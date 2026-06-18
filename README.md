@@ -14,7 +14,7 @@ A multilingual, cross-platform skill that customizes the Antigravity CLI statusl
 
 | English (us) | Traditional Chinese (zh-tw) | Japanese (jp) |
 | :---: | :---: | :---: |
-| ![English](docs/images/antigravity-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/antigravity-cli-statusline-windows-zhtw.png) | ![Japanese](docs/images/antigravity-cli-statusline-windows-jp.png) |
+| ![English](docs/images/agy-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-windows-zhtw.png) | ![Japanese](docs/images/agy-cli-statusline-windows-jp.png) |
 
 ### macOS
 
