@@ -23,6 +23,7 @@ jobs:
           cp -r skills dist/antigravity-cli-statusline/
           cp -r scripts dist/antigravity-cli-statusline/
           cp -r references dist/antigravity-cli-statusline/
+          cp -r docs dist/antigravity-cli-statusline/
 
       - name: Create Archive
         run: |
