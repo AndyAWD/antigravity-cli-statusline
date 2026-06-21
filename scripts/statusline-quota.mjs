@@ -77,17 +77,61 @@ function normalizeModelName(name) {
 // ==========================================
 // System Information Retrieval
 // ==========================================
-function getGitBranch(lang) {
+function getGitBranch(lang, projectPath) {
   try {
-    const opts = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true };
+    const opts = {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+      cwd: projectPath || process.cwd(),
+      timeout: 1000
+    };
     let branch = '';
     try {
-      branch = execSync('git rev-parse --abbrev-ref HEAD', opts).trim();
+      try {
+        branch = execSync('git branch --show-current', opts).trim();
+      } catch (e) {}
+      if (!branch) {
+        branch = execSync('git rev-parse --abbrev-ref HEAD', opts).trim();
+      }
     } catch (err) {
       if (process.platform === 'win32') {
-        const gitPath = 'C:\\Program Files\\Git\\cmd\\git.exe';
-        if (existsSync(gitPath)) {
-          branch = execSync(`"${gitPath}" rev-parse --abbrev-ref HEAD`, opts).trim();
+        const paths = [
+          'C:\\Program Files\\Git\\cmd\\git.exe',
+          'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+          'C:\\Program Files\\Git\\bin\\git.exe'
+        ];
+        for (const gitPath of paths) {
+          if (existsSync(gitPath)) {
+            try {
+              try {
+                branch = execSync(`"${gitPath}" branch --show-current`, opts).trim();
+              } catch (e) {}
+              if (!branch) {
+                branch = execSync(`"${gitPath}" rev-parse --abbrev-ref HEAD`, opts).trim();
+              }
+              if (branch) break;
+            } catch (e) {}
+          }
+        }
+      } else {
+        const paths = [
+          '/usr/local/bin/git',
+          '/opt/homebrew/bin/git',
+          '/usr/bin/git'
+        ];
+        for (const gitPath of paths) {
+          if (existsSync(gitPath)) {
+            try {
+              try {
+                branch = execSync(`"${gitPath}" branch --show-current`, opts).trim();
+              } catch (e) {}
+              if (!branch) {
+                branch = execSync(`"${gitPath}" rev-parse --abbrev-ref HEAD`, opts).trim();
+              }
+              if (branch) break;
+            } catch (e) {}
+          }
         }
       }
     }
@@ -97,17 +141,46 @@ function getGitBranch(lang) {
   }
 }
 
-function getGitDirty() {
+function getGitDirty(projectPath) {
   try {
-    const opts = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true };
+    const opts = {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+      cwd: projectPath || process.cwd(),
+      timeout: 1000
+    };
     let out = '';
     try {
       out = execSync('git status --porcelain', opts);
     } catch (err) {
       if (process.platform === 'win32') {
-        const gitPath = 'C:\\Program Files\\Git\\cmd\\git.exe';
-        if (existsSync(gitPath)) {
-          out = execSync(`"${gitPath}" status --porcelain`, opts);
+        const paths = [
+          'C:\\Program Files\\Git\\cmd\\git.exe',
+          'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+          'C:\\Program Files\\Git\\bin\\git.exe'
+        ];
+        for (const gitPath of paths) {
+          if (existsSync(gitPath)) {
+            try {
+              out = execSync(`"${gitPath}" status --porcelain`, opts);
+              break;
+            } catch (e) {}
+          }
+        }
+      } else {
+        const paths = [
+          '/usr/local/bin/git',
+          '/opt/homebrew/bin/git',
+          '/usr/bin/git'
+        ];
+        for (const gitPath of paths) {
+          if (existsSync(gitPath)) {
+            try {
+              out = execSync(`"${gitPath}" status --porcelain`, opts);
+              break;
+            } catch (e) {}
+          }
         }
       }
     }
@@ -120,13 +193,13 @@ function getGitDirty() {
 function getCliMemoryMB() {
   try {
     if (process.platform === 'win32') {
-      const output = execSync(`powershell -NoProfile -Command "(Get-Process -Name 'agy' -ErrorAction SilentlyContinue | Measure-Object -Property WorkingSet -Sum).Sum"`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+      const output = execSync(`powershell -NoProfile -Command "(Get-Process -Name 'agy' -ErrorAction SilentlyContinue | Measure-Object -Property WorkingSet -Sum).Sum"`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout: 1000 });
       const totalBytes = parseInt(output.trim(), 10);
       if (!isNaN(totalBytes)) {
         return Math.round(totalBytes / 1024 / 1024);
       }
     } else {
-      const output = execSync(`ps -o rss= -p ${process.ppid}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+      const output = execSync(`ps -o rss= -p ${process.ppid}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout: 1000 });
       const memKb = parseInt(output.trim(), 10);
       if (!isNaN(memKb)) return Math.round(memKb / 1024);
     }
@@ -302,9 +375,15 @@ function extractMetrics(meta, lang, fallbackModel, cache, cachedAccount, quotaIn
   // System & Environment
   const rssMem = getCliMemoryMB();
   const memUsage = `${rssMem}MB`;
-  const gitBranch = getGitBranch(lang);
-  const projectName = basename(process.cwd());
-  const projectFullPath = process.cwd();
+  const projectPath = (typeof meta?.project?.path === 'string' && meta.project.path) ? meta.project.path : process.cwd();
+  const projectName = basename(projectPath);
+  const projectFullPath = projectPath;
+  let gitBranch;
+  if (typeof meta?.vcs?.branch === 'string' && meta.vcs.branch) {
+    gitBranch = meta.vcs.branch;
+  } else {
+    gitBranch = getGitBranch(lang, projectPath);
+  }
 
   // Account
   const planTier = (cache && cache.planTier) ? cache.planTier : (meta?.account?.plan_tier || cachedAccount.planTier || unknownStr);
@@ -331,7 +410,7 @@ function extractMetrics(meta, lang, fallbackModel, cache, cachedAccount, quotaIn
   if (typeof meta?.vcs?.dirty === 'boolean') {
     vcsDirtyFlag = meta.vcs.dirty;
   } else {
-    vcsDirtyFlag = getGitDirty();
+    vcsDirtyFlag = getGitDirty(projectPath);
   }
   const vcsDirtyGlyph = vcsDirtyFlag ? '✗' : '✓';
   const vcsDirtyLabel = vcsDirtyFlag
@@ -352,7 +431,7 @@ function extractMetrics(meta, lang, fallbackModel, cache, cachedAccount, quotaIn
 
   // CLI
   const cliVersion = meta?.version ? `v${meta.version}` : unknownStr;
-  const rawConvId = meta?.conversation_id || '';
+  const rawConvId = typeof meta?.conversation_id === 'string' ? meta.conversation_id : '';
   const conversationIdShort = rawConvId ? rawConvId.replace(/-/g, '').slice(0, 8) : unknownStr;
 
   return {
@@ -511,7 +590,10 @@ async function main() {
     
     const lang = settings?.ui?.language || 'zh-tw';
     const footerItems = settings.ui.footer.items;
-    const conversationId = meta?.conversation_id || 'default';
+    let conversationId = 'default';
+    if (typeof meta?.conversation_id === 'string' && meta.conversation_id) {
+      conversationId = meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '');
+    }
     
     // 讀取快取並觸發更新
     const cachePath = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
