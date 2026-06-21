@@ -25,6 +25,6 @@
 
 ---
 
-## 核心安全鐵則（保留於 skills/antigravity-cli-statusline.md 主檔，本檔僅作對照索引）
+## 核心安全鐵則（保留於 skills/antigravity-cli-statusline/SKILL.md 主檔，本檔僅作對照索引）
 
-關於陷阱 #8 的「禁止憑空生成 Hook 腳本」鐵則由於屬於每次部署都必須遵守的核心安全規則，已**完整保留於 skills/antigravity-cli-statusline.md 主檔**步驟 7 區塊。本檔僅作對照索引，主檔規則才是 source of truth。
+關於陷阱 #8 的「禁止憑空生成 Hook 腳本」鐵則由於屬於每次部署都必須遵守的核心安全規則，已**完整保留於 skills/antigravity-cli-statusline/SKILL.md 主檔**步驟 7 區塊。本檔僅作對照索引，主檔規則才是 source of truth。
