@@ -21,8 +21,6 @@ jobs:
           cp plugin.json dist/antigravity-cli-statusline/
           cp README.md README.zh-TW.md LICENSE dist/antigravity-cli-statusline/
           cp -r skills dist/antigravity-cli-statusline/
-          cp -r scripts dist/antigravity-cli-statusline/
-          cp -r references dist/antigravity-cli-statusline/
           cp -r docs dist/antigravity-cli-statusline/
 
       - name: Create Archive

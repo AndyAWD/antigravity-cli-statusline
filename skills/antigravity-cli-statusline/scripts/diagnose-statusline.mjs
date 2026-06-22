@@ -141,7 +141,7 @@ function diagnose(layers) {
 
   if (cli && 'statusLine' in cli && (cli.statusLine?.command === '' || cli.statusLine?.command === undefined)) {
     findings.push(alert('CLI 專屬層的 statusLine.command 為空或缺失 → agy CLI 不會呼叫 hook → 狀態列空白'));
-    findings.push('   → 高度符合 references/pitfalls.md 陷阱 #2 / #9 的徵兆（可能是 /model 指令覆寫所致）');
+    findings.push('   → 高度符合 skills/antigravity-cli-statusline/references/pitfalls.md 陷阱 #2 / #9 的徵兆（可能是 /model 指令覆寫所致）');
     findings.push('   → 建議：重新執行本技能以同步覆寫三層 statusLine');
   } else if (!effectiveCmd) {
     findings.push(alert('三層合併後 statusLine.command 仍為空 → CLI 不會呼叫 hook'));
