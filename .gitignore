@@ -3,3 +3,8 @@
 .claude/
 .idea/
 dist/
+
+# AI 代理的暫存與狀態檔案 (Antigravity Teamwork 等)
+.agents/*
+!.agents/AGENTS.md
+!.agents/skills/
