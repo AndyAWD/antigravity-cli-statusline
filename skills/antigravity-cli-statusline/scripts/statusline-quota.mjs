@@ -1,4 +1,4 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { spawn, execSync } from 'child_process';
 import { join, basename } from 'path';
 import os from 'os';
@@ -72,6 +72,17 @@ function formatTokens(num) {
 
 function normalizeModelName(name) {
   return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function safeGetCount(val) {
+  if (val === undefined || val === null) return 0;
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (Array.isArray(val)) return val.length;
+  if (typeof val === 'string') {
+    const parsed = parseInt(val, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
 }
 
 // ==========================================
@@ -356,6 +367,33 @@ function manageAccountMetaCache(meta) {
   return cachedAccount;
 }
 
+function getMetricValue(meta, keys, countersCachePath, fallbackFn) {
+  if (meta) {
+    for (const key of keys) {
+      if (meta[key] !== undefined && meta[key] !== null) {
+        return safeGetCount(meta[key]);
+      }
+    }
+  }
+
+  let cacheCounters = null;
+  if (countersCachePath && existsSync(countersCachePath)) {
+    try {
+      cacheCounters = JSON.parse(readFileSync(countersCachePath, 'utf8'));
+    } catch (e) {}
+  }
+
+  if (cacheCounters) {
+    for (const key of keys) {
+      if (cacheCounters[key] !== undefined && cacheCounters[key] !== null) {
+        return safeGetCount(cacheCounters[key]);
+      }
+    }
+  }
+
+  return fallbackFn();
+}
+
 function extractMetrics(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo) {
   const unknownStr = lang === 'zh-tw' ? '未知' : (lang === 'jp' ? '不明' : 'Unknown');
   const noneStr = lang === 'zh-tw' ? '無' : (lang === 'jp' ? 'なし' : 'N/A');
@@ -393,10 +431,138 @@ function extractMetrics(meta, lang, fallbackModel, cache, cachedAccount, quotaIn
   // Agent State
   const agentState = meta?.agent_state || 'idle';
   const toolConfirmPending = !!meta?.tool_confirmation_pending;
-  const pendingInputCount = Number(meta?.pending_input_count) || 0;
-  const backgroundTasksCount = Array.isArray(meta?.background_tasks) ? meta.background_tasks.length : 0;
-  const subagentsCount = Array.isArray(meta?.subagents) ? meta.subagents.length : 0;
-  const artifactsCount = Array.isArray(meta?.artifacts) ? meta.artifacts.length : 0;
+
+  // Filter out inactive subagents before counting
+  if (Array.isArray(meta?.subagents)) {
+    meta.subagents = meta.subagents.filter(s => {
+      if (typeof s === 'object' && s.status) {
+        return s.status !== 'completed' && s.status !== 'stopped' && s.status !== 'error';
+      }
+      return true; // Keep if format is unknown
+    });
+  }
+
+  const countersCachePath = join(os.homedir(), '.gemini', 'tmp', 'statusline_counters.json');
+
+  // 1. pending-input
+  const pendingInputCount = getMetricValue(
+    meta,
+    ['pending_input_count', 'pending_input', 'pending_inputs'],
+    countersCachePath,
+    () => {
+      const pendingInputFilePath = join(os.homedir(), '.gemini', 'tmp', 'pending_input_count');
+      if (existsSync(pendingInputFilePath)) {
+        try {
+          const fileContent = readFileSync(pendingInputFilePath, 'utf8').trim();
+          const parsed = Number(fileContent);
+          return isNaN(parsed) ? 0 : parsed;
+        } catch (e) {
+          return 0;
+        }
+      } else if (process.env.PENDING_INPUT_COUNT !== undefined) {
+        const parsed = Number(process.env.PENDING_INPUT_COUNT);
+        return isNaN(parsed) ? 0 : parsed;
+      } else {
+        return 0;
+      }
+    }
+  );
+
+  // 2. background-tasks
+  const backgroundTasksCount = getMetricValue(
+    meta,
+    ['background_tasks', 'background_tasks_count', 'background_jobs'],
+    countersCachePath,
+    () => {
+      const bgTasksDir = join(os.homedir(), '.gemini', 'tmp', 'background-processes');
+      if (existsSync(bgTasksDir)) {
+        try {
+          const files = readdirSync(bgTasksDir);
+          let count = 0;
+          for (const file of files) {
+            if (file.startsWith('.')) continue;
+            try {
+              const stat = statSync(join(bgTasksDir, file));
+              if (stat.isFile()) {
+                count++;
+              }
+            } catch (e) {}
+          }
+          return count;
+        } catch (e) {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    }
+  );
+
+  // 3. subagents
+  const subagentsCount = getMetricValue(
+    meta,
+    ['subagents', 'subagents_count', 'active_subagents'],
+    countersCachePath,
+    () => {
+      const agentsDir = join(projectPath, '.agents');
+      if (existsSync(agentsDir)) {
+        try {
+          const dirs = readdirSync(agentsDir);
+          let count = 0;
+          const now = Date.now();
+          for (const d of dirs) {
+            if (d.startsWith('.')) continue;
+            const dPath = join(agentsDir, d);
+            try {
+              const statD = statSync(dPath);
+              if (statD.isDirectory()) {
+                const progressPath = join(dPath, 'progress.md');
+                if (existsSync(progressPath)) {
+                  const statP = statSync(progressPath);
+                  if (now - statP.mtimeMs <= 300000) {
+                    count++;
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+          return count;
+        } catch (e) {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    }
+  );
+
+  // 4. artifacts
+  const artifactsCount = getMetricValue(
+    meta,
+    ['artifacts', 'artifacts_count', 'artifact_count'],
+    countersCachePath,
+    () => {
+      const rawConvId = (typeof meta?.conversation_id === 'string' && meta.conversation_id)
+        ? meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '')
+        : '';
+      if (rawConvId) {
+        const brainDir = join(os.homedir(), '.gemini', 'antigravity-cli', 'brain', rawConvId);
+        if (existsSync(brainDir)) {
+          try {
+            const files = readdirSync(brainDir);
+            const metadataFiles = files.filter(f => f.endsWith('.metadata.json'));
+            return metadataFiles.length;
+          } catch (e) {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    }
+  );
 
   let agentProfileName = lang === 'zh-tw' ? '預設' : (lang === 'jp' ? 'デフォルト' : 'Default');
   if (typeof meta?.agent === 'string') agentProfileName = meta.agent;
