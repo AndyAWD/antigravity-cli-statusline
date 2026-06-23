@@ -255,13 +255,13 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 ### 步驟 6：自動部署 Hook 腳本
 
 > [!CAUTION]
-> **絕對禁令（最關鍵的安全規則）**：AI 代理**絕對禁止**自行發明、撰寫、或修改 `statusline-quota.mjs` 與 `fetch-local-quota.mjs` 的底層程式碼來部署！部署時，**必須 100% 準確地讀取本外掛 `scripts/` 資料夾（相對於本外掛根目錄為 `scripts/`）中的對應腳本檔案，原封不動地寫入**到使用者的 `hooks` 目錄中。若要更新狀態列邏輯，必須先更新對應的 `scripts/*.mjs` 內容再進行部署，**嚴禁憑空發明或竄改邏輯**！違反此規則將導致狀態列功能殘缺、指標抓取失敗、甚至 CLI 崩潰。
+> **絕對禁令（最關鍵的安全規則）**：AI 代理**絕對禁止**自行發明、撰寫、或修改 `statusline-quota.mjs` 與 `fetch-local-quota.mjs` 的底層程式碼來部署！部署時，**必須 100% 準確地讀取本外掛 `skills/antigravity-cli-statusline/scripts/` 資料夾（相對於本外掛根目錄為 `skills/antigravity-cli-statusline/scripts/`）中的對應腳本檔案，原封不動地寫入**到使用者的 `hooks` 目錄中。若要更新狀態列邏輯，必須先更新對應的 `skills/antigravity-cli-statusline/scripts/*.mjs` 內容再進行部署，**嚴禁憑空發明或竄改邏輯**！違反此規則將導致狀態列功能殘缺、指標抓取失敗、甚至 CLI 崩潰。
 
 **讀取來源（Workspace-First 路由）**：
-1. **優先**讀取當前工作區（Workspace）根目錄下的 `scripts/<filename>`
-2. 若不存在或在其他工作區，**退回**從本外掛安裝目錄下的 `scripts/<filename>` 讀取。AI 代理應動態推導真實絕對路徑，例如：
-   - macOS / Linux：`~/.gemini/antigravity-cli/plugins/antigravity-cli-statusline/scripts/<filename>`
-   - Windows：`%USERPROFILE%\.gemini\antigravity-cli\plugins\antigravity-cli-statusline\scripts\<filename>`
+1. **優先**讀取當前工作區（Workspace）根目錄下的 `skills/antigravity-cli-statusline/scripts/<filename>`
+2. 若不存在或在其他工作區，**退回**從本外掛安裝目錄下的 `skills/antigravity-cli-statusline/scripts/<filename>` 讀取。AI 代理應動態推導真實絕對路徑，例如：
+   - macOS / Linux：`~/.gemini/config/plugins/antigravity-cli-statusline/skills/antigravity-cli-statusline/scripts/<filename>`
+   - Windows：`%USERPROFILE%\.gemini\config\plugins\antigravity-cli-statusline\skills\antigravity-cli-statusline\scripts\<filename>`
 
 **部署目標**：
 - `~/.gemini/antigravity-cli/hooks/statusline-quota.mjs`
@@ -269,7 +269,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 **寫入規範**：必須使用 `fs.writeFileSync(targetPath, content, { encoding: 'utf8' })`，防止 Windows 預設 UTF-16 編碼導致 CLI 崩潰。
 
-**【僅 Windows】編譯靜默 sh.exe**：CLI 底層強制依賴 `sh -c` 執行指令，Windows 缺 `sh.exe`，必須利用內建 `csc.exe` 編譯一個無窗體（`/target:winexe`）的 `sh.exe` 橋接器，徹底消除黑框閃爍。完整步驟（從 `scripts/sh_hidden.cs` 編譯）詳見 [references/windows.md §6](references/windows.md)。
+**【僅 Windows】編譯靜默 sh.exe**：CLI 底層強制依賴 `sh -c` 執行指令，Windows 缺 `sh.exe`，必須利用內建 `csc.exe` 編譯一個無窗體（`/target:winexe`）的 `sh.exe` 橋接器，徹底消除黑框閃爍。完整步驟（從 `skills/antigravity-cli-statusline/scripts/sh_hidden.cs` 編譯）詳見 [references/windows.md §6](references/windows.md)。
 
 ### 步驟 7：回報與重新載入提示
 
@@ -277,7 +277,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 **舊版腳本檢查**：使用 Node 的 `fs.existsSync`，或跨平台終端機指令（macOS/Linux：`test -f`、Windows PowerShell：`Test-Path`）檢查 `~/.gemini/hooks/statusline-quota.mjs` 與 `~/.gemini/hooks/fetch-local-quota.mjs`。**只有當偵測到任一舊版腳本存在時**，才在回覆最後溫馨提醒：「若不再使用舊版的 Gemini CLI，可安全地手動刪除上述兩個舊版腳本檔，以節省空間並避免混淆。」若檔案皆不存在則完全略過此提醒，避免造成使用者困惑。
 
-**故障診斷指引（依語系翻譯）**：在最終回覆末尾加入一句提示：「若日後狀態列突然完全消失（特別是在 agy CLI 內使用 `/statusline`、`/model` 等指令切換之後），請前往本外掛目錄執行 `node scripts/diagnose-statusline.mjs`，並把完整輸出貼給 AI 代理。該腳本為唯讀診斷工具，會檢查三層 `settings.json`、`trusted_hooks.json`、Hook 檔案存在性、以及最關鍵的 CLI 專屬層 `statusLine.command` 是否被清空（參見 [references/pitfalls.md](references/pitfalls.md) 陷阱 #9）。」
+**故障診斷指引（依語系翻譯）**：在最終回覆末尾加入一句提示：「若日後狀態列突然完全消失（特別是在 agy CLI 內使用 `/statusline`、`/model` 等指令切換之後），請前往本外掛目錄執行 `node skills/antigravity-cli-statusline/scripts/diagnose-statusline.mjs`，並把完整輸出貼給 AI 代理。該腳本為唯讀診斷工具，會檢查三層 `settings.json`、`trusted_hooks.json`、Hook 檔案存在性、以及最關鍵的 CLI 專屬層 `statusLine.command` 是否被清空（參見 [references/pitfalls.md](references/pitfalls.md) 陷阱 #9）。」
 
 ---
 
@@ -287,4 +287,4 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 1. **必須同步寫入三層設定檔**（特別是 CLI 專屬的 `~/.gemini/antigravity-cli/settings.json`，是最致命的盲點）
 2. **Windows 寫設定檔絕對禁止帶 BOM**，寫入後必須驗證前 3 個位元組
-3. **絕對禁止憑空生成 Hook 腳本**，必須從本外掛的 `scripts/` 讀取原文部署
+3. **絕對禁止憑空生成 Hook 腳本**，必須從本外掛的 `skills/antigravity-cli-statusline/scripts/` 讀取原文部署

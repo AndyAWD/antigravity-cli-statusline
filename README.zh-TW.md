@@ -1,6 +1,6 @@
 # Antigravity CLI 狀態列設定技能
 
-[![版本](https://img.shields.io/badge/版本-1.4.0-blue.svg)](skills/antigravity-cli-statusline.md)
+[![版本](https://img.shields.io/badge/版本-1.4.1-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -14,7 +14,7 @@
 
 | 繁體中文 (zh-tw) | English (us) | 日本語 (jp) |
 | :---: | :---: | :---: |
-| ![繁體中文](docs/images/antigravity-cli-statusline-windows-zhtw.png) | ![English](docs/images/antigravity-cli-statusline-windows-us.png) | ![日本語](docs/images/antigravity-cli-statusline-windows-jp.png) |
+| ![繁體中文](docs/images/agy-cli-statusline-windows-zhtw.png) | ![English](docs/images/agy-cli-statusline-windows-us.png) | ![日本語](docs/images/agy-cli-statusline-windows-jp.png) |
 
 ### macOS
 

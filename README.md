@@ -1,6 +1,6 @@
 # Antigravity CLI Statusline Skill
 
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](skills/antigravity-cli-statusline.md)
+[![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -14,7 +14,7 @@ A multilingual, cross-platform skill that customizes the Antigravity CLI statusl
 
 | English (us) | Traditional Chinese (zh-tw) | Japanese (jp) |
 | :---: | :---: | :---: |
-| ![English](docs/images/antigravity-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/antigravity-cli-statusline-windows-zhtw.png) | ![Japanese](docs/images/antigravity-cli-statusline-windows-jp.png) |
+| ![English](docs/images/agy-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-windows-zhtw.png) | ![Japanese](docs/images/agy-cli-statusline-windows-jp.png) |
 
 ### macOS
 
