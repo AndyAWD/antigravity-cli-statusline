@@ -291,34 +291,40 @@
     .reveal pre code::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
     .reveal pre code::-webkit-scrollbar-track { background: #2d2d2d; }
 
+    /* 超長提示詞頁用：把 pre code 高度限縮，依賴內部捲動，標題與底部 callout 仍要看得到。
+       用法：在 markdown slide 開頭加 `<!-- .slide: class="scroll-prompt" -->` */
+    .reveal section.scroll-prompt pre code {
+      max-height: 38vh !important;
+    }
+
     /* 長提示詞/多 JSON 塊頁面用：縮小程式碼框字級避免溢出。
        用法：在 markdown slide 開頭加 `<!-- .slide: class="compact-code" -->` */
     .reveal section.compact-code h2 {
-      font-size: 1.6em;
-      margin-bottom: 0.3em;
+      font-size: 1.7em;
+      margin-bottom: 0.35em;
     }
     .reveal section.compact-code p {
-      font-size: 0.85em;
-      margin: 0.3em 0;
+      font-size: 0.95em;
+      margin: 0.4em 0;
     }
     .reveal section.compact-code pre {
-      font-size: 0.41em;
-      margin: 0.25em 0;
+      font-size: 0.6em;
+      margin: 0.4em 0;
     }
     .reveal section.compact-code pre code {
-      line-height: 1.25 !important;
+      line-height: 1.35 !important;
       max-height: none !important;
-      padding: 0.45em 0.7em !important;
+      padding: 0.55em 0.8em !important;
     }
     .reveal section.compact-code ul,
     .reveal section.compact-code ol {
-      font-size: 0.8em;
-      margin: 0.3em 0;
+      font-size: 0.9em;
+      margin: 0.35em 0;
     }
     .reveal section.compact-code blockquote {
-      font-size: 0.75em;
-      padding: 0.45em 0.75em;
-      margin: 0.35em 0;
+      font-size: 0.85em;
+      padding: 0.5em 0.85em;
+      margin: 0.4em 0;
     }
 
     /* ============================================================

@@ -148,25 +148,6 @@ v24.14.0
 
 ---
 
-## 動工前 30 秒
-
-**1. 用檔案總管／Finder 建立資料夾**
-
-- macOS / Linux：`~/.gemini/antigravity-cli/hooks/`
-- Windows：`%USERPROFILE%\.gemini\antigravity-cli\hooks\`
-
-> 待會 AI 寫好的腳本就存進這個資料夾。
-
-**2. 驗證 Node.js 已安裝**
-
-```bash
-node -v   # 應該看到 v18 以上
-```
-
-> ⚠️ 接下來腳本要靠 `agy` 行程在跑才能抓到 PID／Token，**請在另一個視窗保持 `agy` 開著**。
-
----
-
 ## 你會碰到的 3 個檔案 + 1 個指令
 
 | 角色 | 路徑 | 用途 |
@@ -180,59 +161,45 @@ node -v   # 應該看到 v18 以上
 
 ---
 
-<!-- .slide: class="compact-code" -->
+<!-- .slide: class="scroll-prompt" -->
 
-## Step 1／3：請 AI 寫「抓額度」腳本
+## Step 1／3：請 agy 寫「抓額度」腳本
 
-**任何 LLM 皆可：Gemini（免費 <https://aistudio.google.com>）／ ChatGPT ／ Claude**
-
-複製以下提示詞貼給 AI：
+直接在 Agy CLI 的對話框輸入下面這段，它會把檔案寫到指定路徑，不必複製貼上到別處。
 
 ```text
-請幫我寫一個 Node.js 腳本，作為 Antigravity CLI (agy) 的終端機狀態列 (statusline) 腳本。
-我希望狀態列上只要顯示一個資訊：
-- API 可用額度（百分比）
+請在 ~/.gemini/antigravity-cli/hooks/ 建立 my-status.mjs
+（Windows：%USERPROFILE%\.gemini\antigravity-cli\hooks\my-status.mjs，若資料夾不存在請一併建立）
 
-請依照以下 Antigravity CLI 的底層架構，實作資料抓取邏輯：
-1. 找出 agy 的 PID 與 CSRF Token：
-   - Mac／Linux 用 `ps auxww`，找出包含 agy 的行程
-   - Windows 用 PowerShell `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*agy*" }`
-     （絕對不要用 `wmic`，Win10 21H1 起已棄用，新系統可能沒裝會直接報錯）
-   - 從 CommandLine 解析出 --csrf_token=<token> 或 --csrf_token <token>
-2. 找出監聽的 Port：
-   - Mac／Linux 用 `lsof -nP -a -p <PID> -iTCP -sTCP:LISTEN`
-   - Windows 用 `netstat -ano` 篩出 LISTENING 且 PID 相符的本地 Port
-3. 發送本地 HTTPS 請求：
-   - POST 至 https://127.0.0.1:<port>/exa.language_server_pb.LanguageServerService/GetUserStatus
-   - Header：X-Codeium-Csrf-Token: <token>、Connect-Protocol-Version: 1
-   - 忽略憑證錯誤（rejectUnauthorized: false）
-   - Payload：{ "metadata": { "ideName": "antigravity" } }
-4. 解析回傳 JSON 並印出：
-   - 額度在 userStatus.cascadeModelConfigData.clientModelConfigs 陣列中
-   - 找出帶有 quotaInfo 的物件，remainingFraction * 100 = 剩餘百分比
-   - 用 console.log 印出「API: 剩餘 80%」字串
+寫一支 Antigravity CLI (agy) 的 statusline 腳本，顯示「API 可用額度（百分比）」：
 
-跨平台必守規則（Windows / macOS / Linux 都要過）：
+1. 找 agy 的 PID 與 CSRF Token
+   - Mac/Linux：ps auxww；Windows：PowerShell Get-CimInstance Win32_Process（別用 wmic）
+   - 從 CommandLine 解析 --csrf_token=<token>
+2. 找監聽的 Port
+   - Mac/Linux：lsof -nP -a -p <PID> -iTCP -sTCP:LISTEN
+   - Windows：netstat -ano 篩 LISTENING + PID
+3. POST https://127.0.0.1:<port>/exa.language_server_pb.LanguageServerService/GetUserStatus
+   - Header：X-Codeium-Csrf-Token、Connect-Protocol-Version: 1，rejectUnauthorized: false
+   - Payload：{"metadata":{"ideName":"antigravity"}}
+4. 解析 userStatus.cascadeModelConfigData.clientModelConfigs 陣列
+   找帶 quotaInfo 的物件，remainingFraction * 100，console.log「API: 剩餘 80%」
+
+跨平台必守規則：
 - 用 process.platform === 'win32' 判斷平台，分別呼叫對應指令
-- 所有 child_process 子行程（spawn / exec / execFile）必須加 { windowsHide: true }，
-  否則背景 hook 在 Windows 每次執行都會閃一個黑色 CMD 視窗
-- 呼叫 PowerShell 用 spawn('powershell.exe', ['-NoProfile', '-Command', script], { windowsHide: true })，
-  -NoProfile 避免被使用者個人設定干擾
-- 讀子行程 stdout 要明確 { encoding: 'utf8' }，Windows 預設 cp950/cp1252 會吃掉中文與特殊字元
-- HTTPS 請求 timeout 設 2000ms；任何步驟失敗都 console.log 印出「API: --」不要拋例外
-- 只用 Node.js 內建模組（https、child_process、os、path），不要 npm install 任何套件
-- 檔案請存成 UTF-8 無 BOM；統一用 .mjs 並使用 import 語法
-- 路徑都用 Node path.join(os.homedir(), '.gemini', ...) 動態組，
+- 所有 child_process（spawn / exec / execFile）必須加 { windowsHide: true }，
+  否則 Windows 每次執行都會閃一個黑色 CMD 視窗
+- PowerShell 用 spawn('powershell.exe', ['-NoProfile', '-Command', script], { windowsHide: true })
+- 子行程 stdout 明確 { encoding: 'utf8' }，避免 Windows cp950/cp1252 吃掉中文
+- HTTPS timeout 設 2000ms；任何步驟失敗都 console.log 印「API: --」不要拋例外
+- 只用 Node 內建模組（https / child_process / os / path），不要 npm install
+- 檔案請存 UTF-8 無 BOM；用 .mjs + import 語法
+- 路徑用 path.join(os.homedir(), '.gemini', ...) 動態組，
   不要寫死 ~ 或 $HOME 或 %USERPROFILE%（背景 hook 不經 shell，這些變數不會展開）
 ```
 
-**收到 AI 寫好的腳本後，存到：**
-
-- macOS / Linux：`~/.gemini/antigravity-cli/hooks/my-status.mjs`
-- Windows：`%USERPROFILE%\.gemini\antigravity-cli\hooks\my-status.mjs`
-
-> 💡 **進下一頁前，先在終端機獨立跑一次驗證**：
-> `node ~/.gemini/antigravity-cli/hooks/my-status.mjs`，看到「API: 剩餘 X%」才繼續。
+> ✅ agy 寫完後，在另一個終端機跑：`node ~/.gemini/antigravity-cli/hooks/my-status.mjs`
+> 看到「API: 剩餘 X%」就過關。
 
 ---
 
