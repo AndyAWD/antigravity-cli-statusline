@@ -203,11 +203,66 @@ v24.14.0
 
 ---
 
+## 設定檔在哪？告訴 CLI 執行腳本
+
+- 注意事項
+   1. `command` **必須用絕對路徑**，不能用 `~` / `$HOME` / `%USERPROFILE%`（Hook 在背景跑不經 shell，環境變數不會展開）
+   2. Windows 用戶請用 **VS Code** 或記事本（另存新檔→編碼選「UTF-8」不勾 BOM）編輯，**不要用 PowerShell 的 `Out-File` / `Set-Content` / `>` 重導向**，預設會寫成 UTF-16 LE 或加上 BOM，CLI 解析會出現 `invalid character 'ï'`
+- 手動增加 
+  1. 打開 `~/.gemini/antigravity-cli/settings.json`
+  2. 在最外層 `{}` 內加上 statusLine 的資訊 
+     - macOS
+        ```json
+        {
+          "statusLine": {
+            "enabled": true,
+            "type": "command",
+            "command": "node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
+          }
+        }
+        ```
+     - Windows
+        ```json
+        {
+          "statusLine": {
+            "enabled": true,
+            "type": "command",
+            "command": "node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
+          }
+        }
+        ```
+
+---
+
+## 註冊安全白名單
+
+CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/trusted_hooks.json`
+
+ - macOS
+    ```json
+   {
+    "*": [
+      "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
+    ]
+   }
+    ```
+ - Windows
+     ```json
+     {
+      "*": [
+        "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
+      ]
+     }
+     ```
+
+
+---
+
 <!-- .slide: class="scroll-prompt" -->
 
 ## 設定 CLI ＋ 註冊白名單（同樣交給 agy）
 
-接著貼下面這段，agy 會把 `settings.json` 與 `trusted_hooks.json` 同步寫好。
+理論講完了——實際操作就把下面這段貼給 agy，它會把 `settings.json` 與 `trusted_hooks.json` 同步寫好。
 
 ```text
 請更新（或建立）兩個設定檔，讓 Antigravity CLI 認得並信任剛剛的 my-status.mjs：
