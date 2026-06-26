@@ -317,22 +317,47 @@
       border-collapse: separate;
       border-spacing: 0;
       border: 1px solid var(--gdg-line);
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.08);
       background: #fff;
+      margin: 0.5em auto;
     }
     .reveal th {
-      background: var(--gdg-blue-p);
+      background: linear-gradient(135deg, var(--gdg-blue-p), #e8f1ff);
       color: var(--gdg-blue);
       font-weight: 700;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
+      text-transform: none;
+      padding: 0.7em 1.1em;
+      border-bottom: 2px solid var(--gdg-blue);
     }
-    .reveal td, .reveal th {
-      padding: 0.55em 0.9em;
+    .reveal td {
+      padding: 0.6em 1.1em;
       border-bottom: 1px solid var(--gdg-line);
+      vertical-align: middle;
     }
+    .reveal tbody tr:nth-child(even) td { background: #fafbfd; }
+    .reveal tbody tr:hover td { background: var(--gdg-yellow-p); transition: background 0.15s; }
     .reveal tr:last-child td { border-bottom: none; }
+    /* 第一欄（通常是指令/key）右側分隔線、加粗 */
+    .reveal td:first-child,
+    .reveal th:first-child {
+      border-right: 1px solid var(--gdg-line);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    /* 表格內 inline code 改成終端機風（黑底螢光黃）以強調指令感 */
+    .reveal td code,
+    .reveal th code {
+      background: var(--gdg-ink);
+      color: var(--gdg-yellow-ht);
+      border: none;
+      padding: 0.15em 0.5em;
+      border-radius: 5px;
+      font-family: 'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
+      font-size: 0.95em;
+    }
 
     /* ============================================================
        Links

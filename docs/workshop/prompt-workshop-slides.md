@@ -117,7 +117,19 @@ node -v
 
 ## Antigravity CLI 基本指令
 
-（待填）
+| 編號 | 指令                   | 用途           |
+|----|----------------------|--------------|
+| 1  | `/grill-me`          | 互動式訪談模式      |
+| 2  | `/fast` ` /planning` | 快速 / 思考模式切換  |
+| 3  | `/teamwork-preview`  | 子代理團隊模式      |
+| 4  | `/artifact`          | 查看計畫文件       |
+| 5  | `/resume`            | 載入之前的對話      |
+| 6  | `/statusline`        | 客製底部狀態列開關    |
+| 7  | `/clear`             | 清除目前對話串      |
+| 8  | `/btw`               | 長對話中插入對話     |
+| 9  | `/antigravity-guide` | Agy CLI 內部知識 |
+| 10 | `/model`             | 切換使用模型       |
+| 11 | `/usage`             | 使用模型額度       |
 
 ---
 
