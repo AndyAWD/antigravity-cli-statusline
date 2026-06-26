@@ -148,23 +148,14 @@ v24.14.0
 
 ---
 
-## 動工前 30 秒：建立目錄 + 開著 agy
+## 動工前 30 秒
 
-**1. 建立 Hook 目錄與快取目錄**
+**1. 用檔案總管／Finder 建立資料夾**
 
-**macOS / Linux**
+- macOS / Linux：`~/.gemini/antigravity-cli/hooks/`
+- Windows：`%USERPROFILE%\.gemini\antigravity-cli\hooks\`
 
-```bash
-mkdir -p ~/.gemini/antigravity-cli/hooks
-mkdir -p ~/.gemini/tmp
-```
-
-**Windows PowerShell**
-
-```powershell
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\antigravity-cli\hooks"
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\tmp"
-```
+> 待會 AI 寫好的腳本就存進這個資料夾。
 
 **2. 驗證 Node.js 已安裝**
 
