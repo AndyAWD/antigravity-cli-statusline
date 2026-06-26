@@ -60,11 +60,13 @@ CSS 變數命名（沿用此命名，下次別重新發明）：
 - bullet：圓點 4 色輪替（500 主色 + Pastel 光暈）
 - `**標籤**：...` bullet 自動把 `<strong>` 套 Pastel chip（4 色輪替）
 - 程式碼框：**Black 02 純黑底 + 白字**，**沒有** macOS 終端機 chrome（traffic light）
-  - 字級 `0.78em`（之前曾經是 `0.62em` 太小，這次調大）
+  - 字級 `1em`（與內文同大；Andy 要求簡報內文字大小一致）
   - 保留 Monokai 語法上色
-- inline code：Pastel Blue 底 + Blue 500 字
-- blockquote：Pastel Yellow 底 + Yellow 600 左框
-- 表格：白底、Pastel Blue header
+- inline code：Pastel Blue 底 + Blue 500 字，字級 `1em`
+- blockquote：Pastel Yellow 底 + Yellow 600 左框，字級 `1em`
+- 表格：白底、Pastel Blue header，字級 `1em`
+
+**字級一致性原則**：內容頁所有「正文等級」元素（內文、code block、inline code、blockquote、table）一律 `1em`，**不要**用 `0.8x` 之類的相對縮小。標題（H1–H4）才可以放大。
 
 ### 章節頁（class: `chapter-page`）
 
@@ -100,6 +102,8 @@ CSS 變數命名（沿用此命名，下次別重新發明）：
 1. **不要**把 macOS 終端機 chrome（traffic light）套在每個 `<pre>` 程式碼框上 —
    會把字級壓到 0.62em 並讓程式碼看起來既窄又小。
    終端機 chrome **只能**用在 `.chapter-page` 整張 section 的外觀上。
+   另：內容頁所有正文等級元素（code block / inline code / blockquote / table）一律 `1em`，
+   不要再回頭設 `0.78em` / `0.9em` / `0.82em` 之類的縮小值 — Andy 明確要求一致字級。
 2. **不要**在封面用 `display: flex` + `background: radial-gradient` + `border-radius` —
    會產生「比畫布窄的偏移卡片框」。封面只用 `text-align: center + padding`。
 3. **不要**修改 `prompt-workshop-slides.md` — 那是 Andy 的稿。任何視覺調整都在 `index.html` 完成。

@@ -35,43 +35,50 @@
 
 ## 今日議程
 
-1. **環境準備** 安裝 Antigravity CLI
+1. **環境準備** 安裝 Antigravity CLI 和 Node.JS
 2. **終端機移動路徑** Windows 和 macOS 資料夾移動位置
 3. **基本指令** 瞭解 Antigravity CLI 的內建指令操作
 4. **深入實作** 做出自己的底部狀態列 Status Line
 
 ---
 
-## 環境準備：把 `agy` 裝到你的機器上
+環境準備：安裝 `agy` 和 `nodejs` 裝到你的機器上
+
+---
+
+## 如何安裝 Antigravity CLI 
 
 **官方下載頁**：<https://antigravity.google/download#antigravity-cli>
 
-- 裝完跑 `agy --version` 確認版本
-- 首次啟動會引導你用 Google 帳號認證（Authentication）
-
-**macOS**
+**macOS / Linux**
 
 ```bash
-# Andy 待填：請於工作坊前貼上 macOS 安裝指令
+curl -fsSL https://antigravity.google/cli/install.sh | bash
 ```
-
-**Windows**
+**Windows PowerShell**
 
 ```powershell
-# Andy 待填：請於工作坊前貼上 Windows 安裝指令
+irm https://antigravity.google/cli/install.ps1 | iex
+```
+**Windows CMD**
+
+```cmd
+curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd
 ```
 
-**Linux**
+---
 
-```bash
-# Andy 待填：請於工作坊前貼上 Linux 安裝指令
-```
+## 如何安裝 Node.js（底部狀態列會用到）
+
+1. 前往網址：`https://nodejs.org/zh-tw/download`
+2. Windows 用戶：直接點擊下載 `.msi`，並執行安裝程序即可。
+3. macOS 用戶：直接點擊下載 `.pkg`，並執行安裝程序即可。
 
 **裝完驗證**
 
 ```bash
-agy --version    # CLI 版本
-node -v          # Node.js 必裝（狀態列 Hook 依賴）
+agy --version 
+node -v 
 ```
 
 ---

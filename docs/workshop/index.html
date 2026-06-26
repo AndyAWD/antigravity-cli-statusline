@@ -250,7 +250,7 @@
       color: var(--gdg-blue);
       padding: 0.12em 0.45em;
       border-radius: 5px;
-      font-size: 0.92em;
+      font-size: 1em;
       font-weight: 500;
       font-family: 'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
     }
@@ -266,12 +266,13 @@
       border: none;
       background: var(--gdg-ink);
       overflow: hidden;
+      font-size: 0.8em;
     }
     .reveal pre code {
       background: var(--gdg-ink) !important;
       color: var(--gdg-offwhite);
       padding: 0.9em 1.1em !important;
-      font-size: 0.78em !important;
+      font-size: 1em !important;
       line-height: 1.6;
       max-height: 52vh;
       overflow: auto;
@@ -297,7 +298,7 @@
       box-shadow: 0 2px 8px rgba(249,171,0,0.12);
       font-style: normal;
       color: var(--gdg-ink);
-      font-size: 0.9em;
+      font-size: 1em;
       line-height: 1.65;
       border-radius: 0 10px 10px 0;
       margin: 0.7em 0;
@@ -308,7 +309,7 @@
        Tables
        ============================================================ */
     .reveal table {
-      font-size: 0.82em;
+      font-size: 1em;
       border-collapse: separate;
       border-spacing: 0;
       border: 1px solid var(--gdg-line);
@@ -598,9 +599,17 @@
       color: var(--gdg-offwhite);
       border-radius: 14px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.18);
-      padding: 4em 2.4em 2em !important;
+      padding: calc(4em + 56px) 2.4em 4em !important;
       font-family: 'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
-      position: relative;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      align-items: stretch !important;
+      box-sizing: border-box !important;
+      top: 90 !important;
+      bottom: 100 !important;
+      left: 0 !important;
+      right: 0 !important;
     }
 
     /* 終端機上方 chrome（traffic light + title bar） */
@@ -608,16 +617,16 @@
       content: 'andy@gdg — workshop — zsh';
       position: absolute;
       top: 0; left: 0; right: 0;
-      height: 36px;
+      height: 56px;
       background:
-        radial-gradient(circle 7px at 18px 18px, #ff5f57 99%, transparent),
-        radial-gradient(circle 7px at 42px 18px, #febc2e 99%, transparent),
-        radial-gradient(circle 7px at 66px 18px, #28c840 99%, transparent),
+        radial-gradient(circle 9px at 24px 28px, #ff5f57 99%, transparent),
+        radial-gradient(circle 9px at 54px 28px, #febc2e 99%, transparent),
+        radial-gradient(circle 9px at 84px 28px, #28c840 99%, transparent),
         linear-gradient(180deg, #3a3a3a, #2d2d2d);
-      color: #aaa;
-      font-size: 12px;
+      color: #bbb;
+      font-size: 16px;
       text-align: center;
-      line-height: 36px;
+      line-height: 56px;
       border-radius: 14px 14px 0 0;
       letter-spacing: 0.05em;
       font-family: 'Inter', sans-serif;
@@ -802,7 +811,7 @@
        Andy 之後會給範圍，目前留空。
        ============================================================ */
     const CHAPTER_PAGE_INDEXES = [
-      // 例：1, 7, 27
+      3, // 環境準備（章節頁）
     ];
 
     function applyChapterPages() {
