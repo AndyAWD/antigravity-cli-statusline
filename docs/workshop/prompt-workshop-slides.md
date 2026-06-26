@@ -201,6 +201,456 @@ v24.14.0
 
 ---
 
+## 補充：GetUserStatus 拿到了什麼？
+
+在剛剛的提示詞第 182 行，我們讓腳本打了一個本地端 API 請求（`POST GetUserStatus`）。
+這其實是向 Agy 的語言伺服器（Language Server）索取當前狀態。
+
+**發送的請求內容（Payload）：**
+```json
+{
+  "metadata": {
+    "ideName": "antigravity"
+  }
+}
+```
+
+**取得的回傳資料格式（完整的 Response JSON 範例）：**
+```json
+{
+  "userStatus": {
+    "name": "戴維廷",
+    "email": "developer@example.com",
+    "planStatus": {
+      "planInfo": {
+        "teamsTier": "TEAMS_TIER_PRO",
+        "planName": "Pro",
+        "hasAutocompleteFastMode": true,
+        "allowStickyPremiumModels": true,
+        "allowPremiumCommandModels": true,
+        "hasTabToJump": true,
+        "maxNumPremiumChatMessages": "-1",
+        "maxNumChatInputTokens": "16384",
+        "maxCustomChatInstructionCharacters": "600",
+        "maxNumPinnedContextItems": "-1",
+        "maxLocalIndexSize": "-1",
+        "monthlyPromptCredits": 50000,
+        "monthlyFlowCredits": 150000,
+        "monthlyFlexCreditPurchaseAmount": 25000,
+        "canBuyMoreCredits": true,
+        "cascadeWebSearchEnabled": true,
+        "canCustomizeAppIcon": true,
+        "cascadeCanAutoRunCommands": true,
+        "canGenerateCommitMessages": true,
+        "knowledgeBaseEnabled": true,
+        "defaultTeamConfig": {
+          "allowMcpServers": true,
+          "allowAutoRunCommands": true,
+          "allowBrowserExperimentalFeatures": true
+        },
+        "canAllowCascadeInBackground": true,
+        "browserEnabled": true
+      },
+      "availablePromptCredits": 500,
+      "availableFlowCredits": 100
+    },
+    "cascadeModelConfigData": {
+      "clientModelConfigs": [
+        {
+          "label": "Claude Opus 4.6 (Thinking)",
+          "modelOrAlias": {
+            "model": "MODEL_PLACEHOLDER_M26"
+          },
+          "supportsImages": true,
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:53:31Z"
+          },
+          "supportedMimeTypes": {
+            "image/heic": true,
+            "image/heif": true,
+            "image/jpeg": true,
+            "image/png": true,
+            "image/webp": true,
+            "video/jpeg2000": true,
+            "video/videoframe/jpeg2000": true
+          }
+        },
+        {
+          "label": "GPT-OSS 120B (Medium)",
+          "modelOrAlias": {
+            "model": "MODEL_OPENAI_GPT_OSS_120B_MEDIUM"
+          },
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:53:31Z"
+          }
+        },
+        {
+          "label": "Gemini 3.5 Flash (Medium)",
+          "modelOrAlias": {
+            "model": "MODEL_PLACEHOLDER_M20"
+          },
+          "supportsImages": true,
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:23:24Z"
+          },
+          "tagTitle": "Fast",
+          "tagDescription": "Limited time",
+          "supportedMimeTypes": {
+            "application/json": true,
+            "application/pdf": true,
+            "application/rtf": true,
+            "application/x-ipynb+json": true,
+            "application/x-javascript": true,
+            "application/x-python-code": true,
+            "application/x-typescript": true,
+            "audio/webm;codecs=opus": true,
+            "image/heic": true,
+            "image/heif": true,
+            "image/jpeg": true,
+            "image/png": true,
+            "image/webp": true,
+            "text/css": true,
+            "text/csv": true,
+            "text/html": true,
+            "text/javascript": true,
+            "text/markdown": true,
+            "text/plain": true,
+            "text/rtf": true,
+            "text/x-python": true,
+            "text/x-python-script": true,
+            "text/x-typescript": true,
+            "text/xml": true,
+            "video/audio/s16le": true,
+            "video/audio/wav": true,
+            "video/jpeg2000": true,
+            "video/mp4": true,
+            "video/text/timestamp": true,
+            "video/videoframe/jpeg2000": true,
+            "video/webm": true
+          }
+        },
+        {
+          "label": "Gemini 3.5 Flash (High)",
+          "modelOrAlias": {
+            "model": "MODEL_PLACEHOLDER_M132"
+          },
+          "supportsImages": true,
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:23:24Z"
+          },
+          "tagTitle": "Fast",
+          "tagDescription": "Limited time",
+          "supportedMimeTypes": {
+            "application/json": true,
+            "application/pdf": true,
+            "application/rtf": true,
+            "application/x-ipynb+json": true,
+            "application/x-javascript": true,
+            "application/x-python-code": true,
+            "application/x-typescript": true,
+            "audio/webm;codecs=opus": true,
+            "image/heic": true,
+            "image/heif": true,
+            "image/jpeg": true,
+            "image/png": true,
+            "image/webp": true,
+            "text/css": true,
+            "text/csv": true,
+            "text/html": true,
+            "text/javascript": true,
+            "text/markdown": true,
+            "text/plain": true,
+            "text/rtf": true,
+            "text/x-python": true,
+            "text/x-python-script": true,
+            "text/x-typescript": true,
+            "text/xml": true,
+            "video/audio/s16le": true,
+            "video/audio/wav": true,
+            "video/jpeg2000": true,
+            "video/mp4": true,
+            "video/text/timestamp": true,
+            "video/videoframe/jpeg2000": true,
+            "video/webm": true
+          }
+        },
+        {
+          "label": "Gemini 3.5 Flash (Low)",
+          "modelOrAlias": {
+            "model": "MODEL_PLACEHOLDER_M187"
+          },
+          "supportsImages": true,
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:23:24Z"
+          },
+          "tagTitle": "Fast",
+          "tagDescription": "Limited time",
+          "supportedMimeTypes": {
+            "application/json": true,
+            "application/pdf": true,
+            "application/rtf": true,
+            "application/x-ipynb+json": true,
+            "application/x-javascript": true,
+            "application/x-python-code": true,
+            "application/x-typescript": true,
+            "audio/webm;codecs=opus": true,
+            "image/heic": true,
+            "image/heif": true,
+            "image/jpeg": true,
+            "image/png": true,
+            "image/webp": true,
+            "text/css": true,
+            "text/csv": true,
+            "text/html": true,
+            "text/javascript": true,
+            "text/markdown": true,
+            "text/plain": true,
+            "text/rtf": true,
+            "text/x-python": true,
+            "text/x-python-script": true,
+            "text/x-typescript": true,
+            "text/xml": true,
+            "video/audio/s16le": true,
+            "video/audio/wav": true,
+            "video/jpeg2000": true,
+            "video/mp4": true,
+            "video/text/timestamp": true,
+            "video/videoframe/jpeg2000": true,
+            "video/webm": true
+          }
+        },
+        {
+          "label": "Gemini 3.1 Pro (Low)",
+          "modelOrAlias": {
+            "model": "MODEL_PLACEHOLDER_M36"
+          },
+          "supportsImages": true,
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:23:24Z"
+          },
+          "supportedMimeTypes": {
+            "application/json": true,
+            "application/pdf": true,
+            "application/rtf": true,
+            "application/x-ipynb+json": true,
+            "application/x-javascript": true,
+            "application/x-python-code": true,
+            "application/x-typescript": true,
+            "audio/webm;codecs=opus": true,
+            "image/heic": true,
+            "image/heif": true,
+            "image/jpeg": true,
+            "image/png": true,
+            "image/webp": true,
+            "text/css": true,
+            "text/csv": true,
+            "text/html": true,
+            "text/javascript": true,
+            "text/markdown": true,
+            "text/plain": true,
+            "text/rtf": true,
+            "text/x-python": true,
+            "text/x-python-script": true,
+            "text/x-typescript": true,
+            "text/xml": true,
+            "video/audio/s16le": true,
+            "video/audio/wav": true,
+            "video/jpeg2000": true,
+            "video/mp4": true,
+            "video/text/timestamp": true,
+            "video/videoframe/jpeg2000": true,
+            "video/webm": true
+          }
+        },
+        {
+          "label": "Gemini 3.1 Pro (High)",
+          "modelOrAlias": {
+            "model": "MODEL_PLACEHOLDER_M16"
+          },
+          "supportsImages": true,
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:23:24Z"
+          },
+          "supportedMimeTypes": {
+            "application/json": true,
+            "application/pdf": true,
+            "application/rtf": true,
+            "application/x-ipynb+json": true,
+            "application/x-javascript": true,
+            "application/x-python-code": true,
+            "application/x-typescript": true,
+            "audio/webm;codecs=opus": true,
+            "image/heic": true,
+            "image/heif": true,
+            "image/jpeg": true,
+            "image/png": true,
+            "image/webp": true,
+            "text/css": true,
+            "text/csv": true,
+            "text/html": true,
+            "text/javascript": true,
+            "text/markdown": true,
+            "text/plain": true,
+            "text/rtf": true,
+            "text/x-python": true,
+            "text/x-python-script": true,
+            "text/x-typescript": true,
+            "text/xml": true,
+            "video/audio/s16le": true,
+            "video/audio/wav": true,
+            "video/jpeg2000": true,
+            "video/mp4": true,
+            "video/text/timestamp": true,
+            "video/videoframe/jpeg2000": true,
+            "video/webm": true
+          }
+        },
+        {
+          "label": "Claude Sonnet 4.6 (Thinking)",
+          "modelOrAlias": {
+            "model": "MODEL_PLACEHOLDER_M35"
+          },
+          "supportsImages": true,
+          "isRecommended": true,
+          "allowedTiers": [
+            "TEAMS_TIER_PRO",
+            "TEAMS_TIER_TEAMS",
+            "TEAMS_TIER_ENTERPRISE_SELF_HOSTED",
+            "TEAMS_TIER_ENTERPRISE_SAAS",
+            "TEAMS_TIER_HYBRID",
+            "TEAMS_TIER_PRO_ULTIMATE"
+          ],
+          "quotaInfo": {
+            "remainingFraction": 1,
+            "resetTime": "2026-06-03T19:53:31Z"
+          },
+          "supportedMimeTypes": {
+            "image/heic": true,
+            "image/heif": true,
+            "image/jpeg": true,
+            "image/png": true,
+            "image/webp": true,
+            "video/jpeg2000": true,
+            "video/videoframe/jpeg2000": true
+          }
+        }
+      ],
+      "clientModelSorts": [
+        {
+          "name": "Recommended",
+          "groups": [
+            {
+              "modelLabels": [
+                "Gemini 3.5 Flash (Medium)",
+                "Gemini 3.5 Flash (High)",
+                "Gemini 3.5 Flash (Low)",
+                "Gemini 3.1 Pro (Low)",
+                "Gemini 3.1 Pro (High)",
+                "Claude Sonnet 4.6 (Thinking)",
+                "Claude Opus 4.6 (Thinking)",
+                "GPT-OSS 120B (Medium)"
+              ]
+            }
+          ]
+        }
+      ],
+      "defaultOverrideModelConfig": {
+        "modelOrAlias": {
+          "model": "MODEL_PLACEHOLDER_M20"
+        }
+      }
+    },
+    "acceptedLatestTermsOfService": true,
+    "userTier": {
+      "id": "g1-pro-tier",
+      "name": "Google AI Pro",
+      "description": "Google AI Pro",
+      "upgradeSubscriptionUri": "https://antigravity.google/g1-upgrade",
+      "upgradeSubscriptionText": "You can upgrade to a Google AI Ultra plan to receive the highest rate limits.",
+      "availableCredits": [
+        {
+          "creditType": "GOOGLE_ONE_AI",
+          "creditAmount": "1000",
+          "minimumCreditAmountForUsage": "50"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
 ## 設定檔在哪？告訴 CLI 執行腳本
 
 - 注意事項
