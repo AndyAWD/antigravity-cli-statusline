@@ -386,8 +386,10 @@
     /* ============================================================
        Slide number badge & progress bar
        ============================================================ */
-    .reveal .slide-number {
+    .reveal .slide-number,
+    .reveal .slide-number:hover {
       background: linear-gradient(135deg, var(--gdg-blue-ht), var(--gdg-blue));
+      background-image: linear-gradient(135deg, var(--gdg-blue-ht), var(--gdg-blue));
       color: #fff;
       font-size: 13px;
       padding: 4px 12px;
@@ -399,6 +401,11 @@
       top: 16px;
       bottom: auto;
       left: auto;
+    }
+    .reveal .slide-number a,
+    .reveal .slide-number a:hover {
+      background-image: none;
+      color: #fff;
     }
     .reveal .progress {
       height: 4px;
@@ -842,6 +849,7 @@
     const CHAPTER_PAGE_INDEXES = [
       3, // 環境準備（章節頁）
       6, // 終端機移動路徑（章節頁）
+      9, // 深入實作（章節頁）
     ];
 
     function applyChapterPages() {
