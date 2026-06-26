@@ -1,16 +1,34 @@
-# 使用 Antigravity CLI 打造自己的 Status Line
+# GDG 2026 / 06 月特別場 — Google IO「使用 Antigravity 系列」
 
-### GDG 2026 / 06 月特別場 — Google IO「使用 Antigravity 系列」
-
-戴維廷（Andy）
+## 使用 Antigravity CLI 打造自己的 Status Line
 
 ---
 
-## 講者：戴維廷（Andy）
+## 講者介紹
 
-- GDG Kaohsiung 組織者
-- Android 工程師
-- 目前還是個人類
+<div style="display:flex; align-items:center; justify-content:center; gap:3.5rem; margin-top:1.2rem;">
+  <div style="flex:0 0 352px; width:352px; height:352px; box-sizing:border-box;
+              padding:6px; border-radius:50%;
+              background: conic-gradient(from 135deg, #4285f4, #ea4335, #f9ab00, #34a853, #4285f4);
+              box-shadow: 0 18px 40px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.10);">
+    <div style="width:100%; height:100%; border-radius:50%; overflow:hidden;
+                border:5px solid #f0f0f0; box-sizing:border-box; background:#fff;">
+      <img src="DevFest2024.jpg" alt="戴維廷（Andy）"
+           style="display:block; width:100%; height:100%; object-fit:cover;
+                  border:none !important; border-radius:0 !important;
+                  box-shadow:none !important; max-height:none !important;
+                  max-width:none !important; background:transparent !important;">
+    </div>
+  </div>
+  <div style="font-size:1.15em;">
+    <ul>
+      <li>戴維廷 / Andy</li>
+      <li>GDG Kaohsiung 組織者</li>
+      <li>Android 工程師</li>
+      <li>目前還是個人類</li>
+    </ul>
+  </div>
+</div>
 
 ---
 
