@@ -15,6 +15,7 @@
                 border:5px solid #f0f0f0; box-sizing:border-box; background:#fff;">
       <img src="DevFest2024.jpg" alt="戴維廷（Andy）"
            style="display:block; width:100%; height:100%; object-fit:cover;
+                  transform:scale(1.02) translateY(-6%); transform-origin:center top;
                   border:none !important; border-radius:0 !important;
                   box-shadow:none !important; max-height:none !important;
                   max-width:none !important; background:transparent !important;">
