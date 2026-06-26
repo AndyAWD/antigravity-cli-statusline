@@ -104,6 +104,7 @@ CSS 變數命名（沿用此命名，下次別重新發明）：
    會產生「比畫布窄的偏移卡片框」。封面只用 `text-align: center + padding`。
 3. **不要**修改 `prompt-workshop-slides.md` — 那是 Andy 的稿。任何視覺調整都在 `index.html` 完成。
 4. **Yellow** 用 `#f9ab00`（Yellow 600），**不是** 舊版的 `#FBBC04`。
+5. **`.reveal .slides section` 必須 `box-sizing: border-box`** — reveal.js 預設給 section `width: 1280px` + `content-box` + `left: 0`，padding 會整包往右溢出 slides 容器，封面 `text-align: center` 會跟著被推右約 70px（內容頁因左對齊不易察覺，但 section 邊界也是歪的）。
 
 ---
 
