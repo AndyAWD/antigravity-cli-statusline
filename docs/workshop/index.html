@@ -1,0 +1,729 @@
+<!doctype html>
+<!--
+  使用方式：
+  1. 推薦：在專案根目錄執行 `python3 -m http.server 8000`，
+     然後瀏覽器開 http://localhost:8000/docs/workshop/
+  2. 雙擊本檔（file://）開啟在某些瀏覽器（Chrome 等）會被 CORS 擋下載入外部 .md，
+     若必須離線雙擊播放請改用 Firefox，或先跑上面的本機 HTTP server。
+  3. 部署到 GitHub Pages（Settings → Pages → Branch: main / Folder: /docs）後，
+     可直接訪問 https://andyawd.github.io/antigravity-cli-statusline/workshop/
+-->
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>使用 Antigravity CLI 打造自己的 Status Line — GDG Workshop</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+
+  <style>
+    /* ============================================================
+       GDG 官方三階色票（Blue / Red / Yellow / Green × 500/Halftone/Pastel）
+       + 灰階（OFF White、Black 02）
+       ============================================================ */
+    :root {
+      /* 500 主色 */
+      --gdg-blue:        #4285f4;
+      --gdg-red:         #ea4335;
+      --gdg-yellow:      #f9ab00;
+      --gdg-green:       #34a853;
+      /* Halftone（中亮度） */
+      --gdg-blue-ht:     #57caff;
+      --gdg-red-ht:      #ff7daf;
+      --gdg-yellow-ht:   #ffd427;
+      --gdg-green-ht:    #5cdb6d;
+      /* Pastel（淡彩） */
+      --gdg-blue-p:      #c3ecf6;
+      --gdg-red-p:       #f8d8d8;
+      --gdg-yellow-p:   #ffe7a5;
+      --gdg-green-p:     #ccf6c5;
+      /* 灰階 */
+      --gdg-offwhite:    #f0f0f0;
+      --gdg-ink:         #1e1e1e;
+      --gdg-soft:        #5f6368;
+      --gdg-line:        #e0e0e0;
+    }
+
+    /* ============================================================
+       全頁底色：OFF White
+       ============================================================ */
+    html, body {
+      background: var(--gdg-offwhite);
+    }
+
+    /* ============================================================
+       Base typography
+       ============================================================ */
+    .reveal {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, "PingFang TC",
+                   "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 22px;
+      color: var(--gdg-ink);
+      font-weight: 400;
+    }
+
+    .reveal .slides section {
+      text-align: left;
+      overflow-y: auto;
+      max-height: 100%;
+      padding: 1.2em 1.6em !important;
+    }
+
+    /* ============================================================
+       Headings
+       ============================================================ */
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+      text-transform: none;
+      letter-spacing: -0.01em;
+      font-weight: 800;
+      line-height: 1.25;
+      color: var(--gdg-ink);
+    }
+    .reveal h1 { font-size: 2.4em; letter-spacing: -0.02em; }
+    .reveal h2 {
+      font-size: 1.55em;
+      margin: 0 0 0.55em;
+      padding-bottom: 0.35em;
+      position: relative;
+      display: inline-block;
+    }
+    /* Halftone 四色漸層底線 */
+    .reveal h2::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(90deg,
+        var(--gdg-blue-ht)   0   25%,
+        var(--gdg-red-ht)    25% 50%,
+        var(--gdg-yellow-ht) 50% 75%,
+        var(--gdg-green-ht)  75% 100%);
+    }
+    .reveal h3 { font-size: 1.15em; color: var(--gdg-blue); margin-top: 0.8em; }
+    .reveal h4 { font-size: 1.0em; color: var(--gdg-soft); }
+
+    /* 標題內的 inline code：與標題協調，不要藍底膠囊 */
+    .reveal h1 code, .reveal h2 code, .reveal h3 code, .reveal h4 code {
+      background: transparent !important;
+      color: inherit !important;
+      padding: 0 !important;
+      border-radius: 0 !important;
+      font-size: 0.92em !important;
+      font-weight: 700;
+      border-bottom: 2px dotted var(--gdg-blue-ht);
+    }
+
+    /* ============================================================
+       Strong / paragraph
+       ============================================================ */
+    .reveal strong {
+      color: var(--gdg-blue);
+      font-weight: 700;
+    }
+    .reveal p {
+      line-height: 1.6;
+      margin: 0.5em 0;
+    }
+
+    /* ============================================================
+       Unordered list with 4-color rotating bullets
+       ============================================================ */
+    .reveal ul {
+      list-style: none;
+      padding-left: 0.2em;
+    }
+    .reveal ul > li {
+      position: relative;
+      padding-left: 1.4em;
+      margin: 0.45em 0;
+      line-height: 1.55;
+    }
+    .reveal ul > li::before {
+      content: '';
+      position: absolute;
+      left: 0.1em;
+      top: 0.65em;
+      width: 0.5em;
+      height: 0.5em;
+      border-radius: 50%;
+      background: var(--gdg-blue);
+      box-shadow: 0 0 0 3px var(--gdg-blue-p);
+    }
+    .reveal ul > li:nth-child(4n+2)::before {
+      background: var(--gdg-red);
+      box-shadow: 0 0 0 3px var(--gdg-red-p);
+    }
+    .reveal ul > li:nth-child(4n+3)::before {
+      background: var(--gdg-yellow);
+      box-shadow: 0 0 0 3px var(--gdg-yellow-p);
+    }
+    .reveal ul > li:nth-child(4n+4)::before {
+      background: var(--gdg-green);
+      box-shadow: 0 0 0 3px var(--gdg-green-p);
+    }
+
+    /* Nested ul：較小、空心 marker */
+    .reveal ul ul {
+      padding-left: 1.2em;
+    }
+    .reveal ul ul > li::before {
+      background: transparent !important;
+      border: 2px solid var(--gdg-soft);
+      width: 0.4em;
+      height: 0.4em;
+      box-shadow: none !important;
+      top: 0.7em;
+    }
+
+    /* ============================================================
+       「**標籤**：...」段落自動 chip 化（依 4 色輪替）
+       ============================================================ */
+    .reveal li:has(> strong:first-child) > strong:first-child {
+      display: inline-block;
+      background: var(--gdg-blue-p);
+      color: var(--gdg-blue);
+      padding: 0.12em 0.7em;
+      border-radius: 999px;
+      font-size: 0.88em;
+      font-weight: 700;
+      margin-right: 0.5em;
+    }
+    .reveal ul > li:nth-child(4n+2):has(> strong:first-child) > strong:first-child {
+      background: var(--gdg-red-p); color: var(--gdg-red);
+    }
+    .reveal ul > li:nth-child(4n+3):has(> strong:first-child) > strong:first-child {
+      background: var(--gdg-yellow-p); color: #b06b00;
+    }
+    .reveal ul > li:nth-child(4n+4):has(> strong:first-child) > strong:first-child {
+      background: var(--gdg-green-p); color: var(--gdg-green);
+    }
+
+    /* ============================================================
+       Ordered list with circle badges
+       ============================================================ */
+    .reveal ol {
+      list-style: none;
+      padding-left: 0;
+      counter-reset: gdg-ol;
+    }
+    .reveal ol > li {
+      counter-increment: gdg-ol;
+      position: relative;
+      padding-left: 2.2em;
+      margin: 0.6em 0;
+      line-height: 1.55;
+      min-height: 1.6em;
+    }
+    .reveal ol > li::before {
+      content: counter(gdg-ol);
+      position: absolute;
+      left: 0;
+      top: 0.05em;
+      width: 1.5em;
+      height: 1.5em;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gdg-blue-ht), var(--gdg-blue));
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.72em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(66,133,244,0.35);
+    }
+
+    /* ============================================================
+       Inline code（Pastel Blue 底 + Blue 500 字）
+       ============================================================ */
+    .reveal code {
+      background: var(--gdg-blue-p);
+      color: var(--gdg-blue);
+      padding: 0.12em 0.45em;
+      border-radius: 5px;
+      font-size: 0.92em;
+      font-weight: 500;
+      font-family: 'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
+    }
+
+    /* ============================================================
+       Code block：純 Black 02 底 + 白字（無終端機 chrome）
+       ============================================================ */
+    .reveal pre {
+      width: 100%;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08);
+      border-radius: 10px;
+      margin: 1em 0;
+      border: none;
+      background: var(--gdg-ink);
+      overflow: hidden;
+    }
+    .reveal pre code {
+      background: var(--gdg-ink) !important;
+      color: var(--gdg-offwhite);
+      padding: 0.9em 1.1em !important;
+      font-size: 0.78em !important;
+      line-height: 1.6;
+      max-height: 52vh;
+      overflow: auto;
+      display: block;
+      font-family: 'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
+      tab-size: 2;
+      box-shadow: none;
+    }
+
+    /* Code 滾動條 */
+    .reveal pre code::-webkit-scrollbar { height: 8px; width: 8px; }
+    .reveal pre code::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+    .reveal pre code::-webkit-scrollbar-track { background: #2d2d2d; }
+
+    /* ============================================================
+       Blockquote callout（Pastel Yellow 底 + Yellow 600 左框）
+       ============================================================ */
+    .reveal blockquote {
+      background: var(--gdg-yellow-p);
+      border-left: 5px solid var(--gdg-yellow);
+      padding: 0.85em 1.1em;
+      width: 100%;
+      box-shadow: 0 2px 8px rgba(249,171,0,0.12);
+      font-style: normal;
+      color: var(--gdg-ink);
+      font-size: 0.9em;
+      line-height: 1.65;
+      border-radius: 0 10px 10px 0;
+      margin: 0.7em 0;
+    }
+    .reveal blockquote p { margin: 0.3em 0; }
+
+    /* ============================================================
+       Tables
+       ============================================================ */
+    .reveal table {
+      font-size: 0.82em;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--gdg-line);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      background: #fff;
+    }
+    .reveal th {
+      background: var(--gdg-blue-p);
+      color: var(--gdg-blue);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .reveal td, .reveal th {
+      padding: 0.55em 0.9em;
+      border-bottom: 1px solid var(--gdg-line);
+    }
+    .reveal tr:last-child td { border-bottom: none; }
+
+    /* ============================================================
+       Links
+       ============================================================ */
+    .reveal a {
+      color: var(--gdg-blue);
+      text-decoration: none;
+      background-image: linear-gradient(transparent 80%, var(--gdg-blue-p) 80%);
+      transition: background-image 0.2s;
+    }
+    .reveal a:hover {
+      background-image: linear-gradient(transparent 80%, var(--gdg-blue-ht) 80%);
+    }
+
+    /* ============================================================
+       Images
+       ============================================================ */
+    .reveal img {
+      max-height: 55vh;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      border: 1px solid var(--gdg-line);
+      background: #fff;
+    }
+
+    /* ============================================================
+       Slide number badge & progress bar
+       ============================================================ */
+    .reveal .slide-number {
+      background: linear-gradient(135deg, var(--gdg-blue-ht), var(--gdg-blue));
+      color: #fff;
+      font-size: 13px;
+      padding: 4px 12px;
+      border-radius: 14px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      box-shadow: 0 2px 8px rgba(66,133,244,0.4);
+      right: 16px;
+      bottom: 16px;
+    }
+    .reveal .progress {
+      height: 4px;
+      color: var(--gdg-blue);
+    }
+    .reveal .progress span {
+      background: linear-gradient(90deg,
+        var(--gdg-blue-ht), var(--gdg-red-ht),
+        var(--gdg-yellow-ht), var(--gdg-green-ht));
+    }
+
+    /* ============================================================
+       Brand strip (left bottom)
+       ============================================================ */
+    .brand-strip {
+      position: fixed;
+      left: 16px;
+      bottom: 14px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--gdg-soft);
+      z-index: 30;
+      pointer-events: none;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+    }
+    .brand-strip .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin: 0 4px;
+      vertical-align: middle;
+    }
+    .brand-strip .b { background: var(--gdg-blue); }
+    .brand-strip .r { background: var(--gdg-red); }
+    .brand-strip .y { background: var(--gdg-yellow); }
+    .brand-strip .g { background: var(--gdg-green); }
+
+    /* ============================================================
+       封面（第一張）— 沿用第一輪簡化置中
+       ============================================================ */
+    .reveal .slides > section:first-of-type {
+      text-align: center !important;
+      padding: 2em 3em !important;
+    }
+    .reveal .slides > section:first-of-type > * {
+      text-align: center !important;
+    }
+    .reveal .slides > section:first-of-type h1 {
+      font-size: 2.6em;
+      font-weight: 900;
+      color: var(--gdg-ink);
+      line-height: 1.25;
+      margin: 0 auto 0.6em;
+      display: inline-block;
+      position: relative;
+      padding-bottom: 0.4em;
+    }
+    .reveal .slides > section:first-of-type h1::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      width: 280px;
+      height: 7px;
+      border-radius: 4px;
+      background: linear-gradient(90deg,
+        var(--gdg-blue)   0   25%,
+        var(--gdg-red)    25% 50%,
+        var(--gdg-yellow) 50% 75%,
+        var(--gdg-green)  75% 100%);
+    }
+    .reveal .slides > section:first-of-type h3 {
+      color: var(--gdg-soft);
+      font-size: 1.05em;
+      font-weight: 500;
+      margin: 1.5em auto 2.2em;
+      letter-spacing: 0.02em;
+    }
+    .reveal .slides > section:first-of-type h3::after { display: none; }
+    .reveal .slides > section:first-of-type p {
+      font-size: 1.4em;
+      font-weight: 800;
+      color: var(--gdg-blue);
+      margin: 1.2em auto 0;
+    }
+    .reveal .slides > section:first-of-type ul,
+    .reveal .slides > section:first-of-type ol { display: none; }
+
+    /* ============================================================
+       Thank You（最後一張）
+       ============================================================ */
+    .reveal .slides > section:last-of-type {
+      text-align: center;
+    }
+    .reveal .slides > section:last-of-type h2 {
+      font-size: 4em;
+      letter-spacing: -0.03em;
+      font-weight: 900;
+      background: linear-gradient(90deg,
+        var(--gdg-blue), var(--gdg-red), var(--gdg-yellow), var(--gdg-green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      padding-bottom: 0;
+      margin-bottom: 0.5em;
+      display: inline-block;
+    }
+    .reveal .slides > section:last-of-type h2::after { display: none; }
+    .reveal .slides > section:last-of-type ul {
+      max-width: 700px;
+      margin: 1.5em auto;
+      text-align: left;
+    }
+    .reveal .slides > section:last-of-type p {
+      font-size: 1.2em;
+      color: var(--gdg-blue);
+      font-weight: 700;
+      margin-top: 1em;
+    }
+
+    /* ============================================================
+       第一個元素去頂部 margin（避免空白）
+       ============================================================ */
+    .reveal .slides section > *:first-child {
+      margin-top: 0;
+    }
+
+    /* ============================================================
+       章節頁版型（class: chapter-page）
+       整張 section = macOS 終端機視窗外觀
+       ============================================================ */
+    .reveal section.chapter-page {
+      background: var(--gdg-ink);
+      color: var(--gdg-offwhite);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.18);
+      padding: 4em 2.4em 2em !important;
+      font-family: 'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
+      position: relative;
+    }
+
+    /* 終端機上方 chrome（traffic light + title bar） */
+    .reveal section.chapter-page::before {
+      content: 'andy@gdg — workshop — zsh';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 36px;
+      background:
+        radial-gradient(circle 7px at 18px 18px, #ff5f57 99%, transparent),
+        radial-gradient(circle 7px at 42px 18px, #febc2e 99%, transparent),
+        radial-gradient(circle 7px at 66px 18px, #28c840 99%, transparent),
+        linear-gradient(180deg, #3a3a3a, #2d2d2d);
+      color: #aaa;
+      font-size: 12px;
+      text-align: center;
+      line-height: 36px;
+      border-radius: 14px 14px 0 0;
+      letter-spacing: 0.05em;
+      font-family: 'Inter', sans-serif;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    /* 章節頁 H2 加大、改 Halftone 綠（仿 terminal 提示色） */
+    .reveal section.chapter-page h2 {
+      color: var(--gdg-green-ht);
+      font-size: 2.4em;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.6em;
+      padding-bottom: 0;
+      display: block;
+    }
+    .reveal section.chapter-page h2::before {
+      content: '# ';
+      color: var(--gdg-yellow-ht);
+      opacity: 0.9;
+    }
+    .reveal section.chapter-page h2::after { display: none; }
+
+    /* 章節頁 H3 子標題（藍色提示） */
+    .reveal section.chapter-page h3 {
+      color: var(--gdg-blue-ht);
+      font-size: 1.4em;
+      font-weight: 600;
+      margin-top: 1em;
+    }
+    .reveal section.chapter-page h3::before {
+      content: '## ';
+      color: var(--gdg-yellow-ht);
+      opacity: 0.8;
+    }
+
+    /* 章節頁 段落字級加大、白字 */
+    .reveal section.chapter-page p {
+      color: var(--gdg-offwhite);
+      font-size: 1.25em;
+      line-height: 1.65;
+    }
+    .reveal section.chapter-page strong {
+      color: var(--gdg-yellow-ht);
+    }
+
+    /* 章節頁 bullet：用 $ 提示符取代圓點，字體加大 */
+    .reveal section.chapter-page ul {
+      padding-left: 0;
+    }
+    .reveal section.chapter-page ul > li {
+      padding-left: 1.6em;
+      margin: 0.55em 0;
+      font-size: 1.2em;
+      line-height: 1.6;
+      color: var(--gdg-offwhite);
+    }
+    .reveal section.chapter-page ul > li::before,
+    .reveal section.chapter-page ul > li:nth-child(4n+2)::before,
+    .reveal section.chapter-page ul > li:nth-child(4n+3)::before,
+    .reveal section.chapter-page ul > li:nth-child(4n+4)::before {
+      content: '$';
+      background: transparent !important;
+      box-shadow: none !important;
+      color: var(--gdg-green-ht);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      width: auto;
+      height: auto;
+      border-radius: 0;
+      left: 0;
+      top: 0.05em;
+      font-size: 1em;
+      border: none !important;
+    }
+
+    /* 章節頁 巢狀 ul 維持 $ 樣式但縮小 */
+    .reveal section.chapter-page ul ul > li {
+      font-size: 1em;
+    }
+    .reveal section.chapter-page ul ul > li::before {
+      content: '›';
+      color: var(--gdg-blue-ht);
+      border: none !important;
+    }
+
+    /* 章節頁 ol：簡單數字提示 */
+    .reveal section.chapter-page ol > li {
+      font-size: 1.2em;
+      color: var(--gdg-offwhite);
+    }
+    .reveal section.chapter-page ol > li::before {
+      background: transparent;
+      color: var(--gdg-yellow-ht);
+      box-shadow: none;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* 章節頁 inline code：暗底反白 */
+    .reveal section.chapter-page code {
+      background: rgba(255,255,255,0.08);
+      color: var(--gdg-yellow-ht);
+      border-bottom: none;
+    }
+    .reveal section.chapter-page h2 code,
+    .reveal section.chapter-page h3 code {
+      background: transparent !important;
+      color: inherit !important;
+      border-bottom: 2px dotted var(--gdg-green-ht);
+    }
+
+    /* 章節頁 blockquote */
+    .reveal section.chapter-page blockquote {
+      background: rgba(255,212,39,0.08);
+      border-left-color: var(--gdg-yellow-ht);
+      color: var(--gdg-offwhite);
+      box-shadow: none;
+    }
+
+    /* 章節頁 連結 */
+    .reveal section.chapter-page a {
+      color: var(--gdg-blue-ht);
+      background-image: none;
+      border-bottom: 1px dashed var(--gdg-blue-ht);
+    }
+
+    /* 章節頁 table（少用，但保底） */
+    .reveal section.chapter-page table {
+      background: rgba(255,255,255,0.05);
+      border-color: #444;
+    }
+    .reveal section.chapter-page th {
+      background: rgba(87,202,255,0.18);
+      color: var(--gdg-blue-ht);
+    }
+    .reveal section.chapter-page td,
+    .reveal section.chapter-page th {
+      border-color: #444;
+      color: var(--gdg-offwhite);
+    }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+      <section
+        data-markdown="prompt-workshop-slides.md"
+        data-separator="^\r?\n---\r?\n$"
+        data-charset="utf-8">
+      </section>
+    </div>
+  </div>
+
+  <div class="brand-strip">
+    <span class="dot b"></span><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    &nbsp;GDG · Antigravity CLI Statusline Workshop · Andy
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/markdown/markdown.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      width: 1280,
+      height: 800,
+      margin: 0.06,
+      transition: 'slide',
+      transitionSpeed: 'default',
+      backgroundTransition: 'fade',
+      pdfSeparateFragments: false,
+      plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+    });
+
+    /* ============================================================
+       章節頁套用 hook
+       使用方式：把要當章節頁的投影片「0-based index」放入陣列即可。
+       例：第 1 張（封面）= 0，第 2 張 = 1，依此類推。
+       封面（0）與 Thank You（最後一張）有自己的特殊樣式，不要放進來。
+       Andy 之後會給範圍，目前留空。
+       ============================================================ */
+    const CHAPTER_PAGE_INDEXES = [
+      // 例：1, 7, 27
+    ];
+
+    function applyChapterPages() {
+      document
+        .querySelectorAll('.reveal .slides > section')
+        .forEach((section, i) => {
+          if (CHAPTER_PAGE_INDEXES.includes(i)) {
+            section.classList.add('chapter-page');
+          } else {
+            section.classList.remove('chapter-page');
+          }
+        });
+    }
+    Reveal.on('ready', applyChapterPages);
+    Reveal.on('slidechanged', applyChapterPages);
+  </script>
+</body>
+</html>
