@@ -198,8 +198,6 @@ v24.14.0
   不要寫死 ~ 或 $HOME 或 %USERPROFILE%（背景 hook 不經 shell，這些變數不會展開）
 ```
 
-> ✅ agy 寫完後，在另一個終端機跑：`node ~/.gemini/antigravity-cli/hooks/my-status.mjs`
-> 看到「API: 剩餘 X%」就過關。
 
 ---
 
@@ -218,6 +216,11 @@ v24.14.0
             "enabled": true,
             "type": "command",
             "command": "node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
+          },
+          "ui": {
+            "footer": {
+              "items": ["model-name", "quota", "context-used"]
+            }
           }
         }
         ```
@@ -228,20 +231,29 @@ v24.14.0
             "enabled": true,
             "type": "command",
             "command": "node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
+          },
+          "ui": {
+            "footer": {
+              "items": ["model-name", "quota", "context-used"]
+            }
           }
         }
         ```
+     - **注意**：必須同步寫入全域（Global）、CLI 專屬（CLI-specific）與專案（Project）三層設定檔，確保狀態列配置在所有執行層級與工作區路徑下都能被正確載入和繼承。
 
 ---
 
 ## 註冊安全白名單
 
-CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/trusted_hooks.json`
+CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/trusted_hooks.json`。為了安全考量與路徑匹配的完整性，不應只註冊 `"*"` 全域萬用字元（wildcard），還必須對當前工作區路徑（Workspaces）、家目錄路徑等進行多路徑註冊與環境變數註冊。
 
  - macOS
     ```json
    {
     "*": [
+      "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
+    ],
+    "/Users/你的帳號/Project/your-project": [
       "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
     ]
    }
@@ -250,6 +262,9 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
      ```json
      {
       "*": [
+        "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
+      ],
+      "C:\\Users\\你的帳號\\Project\\your-project": [
         "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
       ]
      }
@@ -265,24 +280,29 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
 理論講完了——實際操作就把下面這段貼給 agy，它會把 `settings.json` 與 `trusted_hooks.json` 同步寫好。
 
 ```text
-請更新（或建立）兩個設定檔，讓 Antigravity CLI 認得並信任剛剛的 my-status.mjs：
+請更新（或建立）設定檔，讓 Antigravity CLI 認得並信任剛剛的 my-status.mjs：
 
 【1】~/.gemini/antigravity-cli/settings.json
 （Windows：%USERPROFILE%\.gemini\antigravity-cli\settings.json）
 
-在根節點合併以下欄位（保留其他既有欄位，勿覆蓋整個檔案）：
+在根節點合併以下欄位（保留其他既有欄位，勿覆蓋整個檔案），並請注意：必須同步寫入全域（Global）、CLI 專屬（CLI-specific）與專案（Project）三層設定檔，確保狀態列配置在所有執行層級下都能被正確套用與繼承。
 {
   "statusLine": {
     "enabled": true,
     "type": "command",
     "command": "node <絕對路徑>/.gemini/antigravity-cli/hooks/my-status.mjs"
+  },
+  "ui": {
+    "footer": {
+      "items": ["model-name", "quota", "context-used"]
+    }
   }
 }
 
 【2】~/.gemini/trusted_hooks.json
 （Windows：%USERPROFILE%\.gemini\trusted_hooks.json）
 
-在根節點 "*" 陣列 append 下面字串（保留陣列既有項目）：
+不應只在全域 "*" 陣列註冊，還必須對當前工作區路徑（Workspaces）、家目錄路徑等進行多路徑註冊。請在 "*" 陣列以及對應工作區路徑的陣列中，append 下面字串（保留陣列既有項目）：
 "statusLine:node <絕對路徑>/.gemini/antigravity-cli/hooks/my-status.mjs"
 
 規則：
@@ -365,7 +385,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 3. **Windows 路徑寫法** → 反斜線**必須雙倍** `C:\\Users\\xxx\\.gemini\\...`，或改用正斜線 `C:/Users/xxx/.gemini/...`；單一反斜線會被 JSON 當跳脫字元吃掉
 4. **Windows 出現 `invalid character 'ï' looking for beginning of value`** → JSON 檔頭被偷塞 BOM。用 VS Code 開啟，右下角點「UTF-8 with BOM」改成「UTF-8」重新存檔
 
-**Windows 黑色 CMD 視窗一直閃** → AI 寫的腳本忘了在 `spawn` 加 `windowsHide: true`，回 Step 1 把那條規則補強再請 AI 重寫。
+**Windows 黑色 CMD 視窗一直閃** → 注意！只在 `spawn` 加 `windowsHide: true` 無法完全解決因 Windows 系統中缺失 `sh` 執行檔而導致的黑視窗閃爍問題。在 Windows 環境下，必須編譯並設定 `sh.exe` 橋接器（bridge）來接管腳本執行，才能徹底消除視窗閃爍。
 
 ---
 
@@ -393,7 +413,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 
 4. 讀 ~/.gemini/antigravity-cli/hooks/my-status.mjs
    - 所有 child_process（spawn / exec / execFile）是否都有 { windowsHide: true }？
-   - 沒有的話幫我補上，避免 Windows 黑色 CMD 視窗一直閃
+   - 說明只加 windowsHide: true 無法解決 sh 缺失導致的黑視窗閃爍，必須確認是否已編譯與設定 sh.exe 橋接器以接管執行，若無則予以說明。
 
 5. 確認 agy 行程還在跑（沒關就抓不到 PID）：
    - Mac/Linux：ps auxww | grep agy
