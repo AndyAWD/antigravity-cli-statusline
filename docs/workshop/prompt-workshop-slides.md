@@ -369,31 +369,80 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 
 ---
 
-## 進階：想要 24 個指標？
+<!-- .slide: class="scroll-prompt" -->
 
-**本工作坊開源專案**
+## 不想自己排查？把這段丟給 agy
 
-- GitHub：<https://github.com/AndyAWD/antigravity-cli-statusline>
-- 24 個指標 / 3 語系 / 跨平台 / 動態折行 / 真彩色配色
+```text
+我的狀態列現在沒有正常顯示，請幫我排查並修好。請依序：
 
-**一鍵安裝設定精靈**
+1. 讀 ~/.gemini/trusted_hooks.json
+   （Windows：%USERPROFILE%\.gemini\trusted_hooks.json）
+   - 確認 "*" 陣列裡有 "statusLine:node <絕對路徑>/my-status.mjs"
+   - 前綴 statusLine: 是否漏掉？
+   - 路徑是否與 settings.json 的 command 逐字相符？
 
-```bash
-agy plugin install antigravity-cli-statusline
-agy
-# 進入 Agy CLI 後輸入：
-/antigravity-cli-statusline
+2. 讀 ~/.gemini/antigravity-cli/settings.json
+   （Windows：%USERPROFILE%\.gemini\antigravity-cli\settings.json）
+   - statusLine.command 是否為絕對路徑（不含 ~ / $HOME / %USERPROFILE%）？
+   - Windows 反斜線是否寫成雙倍（C:\\Users\\...）？
+
+3. 用二進位方式讀兩個 JSON 檔的前 3 個位元組
+   - 若出現 EF BB BF 表示被加了 UTF-8 BOM，請重新存成無 BOM 版本
+   - 若是 FF FE 或 FE FF 表示被存成 UTF-16，請改回 UTF-8 無 BOM
+
+4. 讀 ~/.gemini/antigravity-cli/hooks/my-status.mjs
+   - 所有 child_process（spawn / exec / execFile）是否都有 { windowsHide: true }？
+   - 沒有的話幫我補上，避免 Windows 黑色 CMD 視窗一直閃
+
+5. 確認 agy 行程還在跑（沒關就抓不到 PID）：
+   - Mac/Linux：ps auxww | grep agy
+   - Windows：Get-Process | Where-Object { $_.ProcessName -like "*agy*" }
+
+6. 查看最近的 hook 錯誤紀錄
+   - cat ~/.gemini/hook_error.log（Windows：%USERPROFILE%\.gemini\hook_error.log）
+   - 把最後 30 行貼給我，並指出可能的原因
+
+修好後請告訴我改了哪些檔案、改了什麼。
 ```
 
-精靈會帶你勾選想要的指標、選擇語系、自動寫好三層設定檔。
+> Agy CLI 會自動讀檔、診斷、必要時直接幫你改回正確版本。
 
 ---
 
-## Thank You
+## 進階：想要 24 個指標？
 
-**感謝**
+<div style="margin-top:0.8em; padding:1.6em 1.8em; background:#fff;
+            border-radius:16px; box-shadow:0 14px 40px rgba(0,0,0,0.12);
+            border:1px solid #e8eaed; display:flex; gap:2em; align-items:center;">
+  <div style="flex:0 0 260px; text-align:center;">
+    <img src="qr-github-repo.png" alt="GitHub 倉庫 QR Code"
+         style="width:260px; height:260px; display:block; margin:0;
+                border:none; box-shadow:none; background:transparent;">
+    <div style="font-size:0.65em; color:#5f6368; margin-top:0.5em;
+                letter-spacing:0.08em;">SCAN ME</div>
+  </div>
+  <div style="flex:1; min-width:0;">
+    <div style="font-family:'Menlo','Consolas',monospace; font-size:0.85em;
+                color:#1a73e8; font-weight:700; margin-bottom:0.15em;">
+      antigravity-cli-statusline
+    </div>
+    <div style="color:#5f6368; font-size:0.78em; margin-bottom:1.1em;">
+      24 個指標 · 3 語系 · 跨平台 · 真彩色 · 動態折行
+    </div>
+    <div style="background:#1e1e1e; border-radius:10px;
+                padding:0.85em 1.1em; font-family:'Menlo','Consolas',monospace;
+                font-size:0.72em; line-height:1.9;">
+      <div><span style="color:#888;">$ </span><span style="color:#57caff;">agy plugin install </span><span style="color:#fff;">antigravity-cli-statusline</span></div>
+      <div><span style="color:#888;">$ </span><span style="color:#fff;">agy</span></div>
+      <div><span style="color:#5cdb6d;">&gt; </span><span style="color:#ffd427;">/antigravity-cli-statusline</span></div>
+    </div>
+    <div style="font-size:0.7em; color:#5f6368; margin-top:0.7em;">
+      精靈會帶你勾選指標 · 選擇語系 · 自動寫好三層設定檔
+    </div>
+  </div>
+</div>
 
-- GDG Kaohsiung 與 Google Developer 社群提供舞台
-- 每一位願意把終端機底部留給狀態列的你
+---
 
-**期待下一次 GDG 活動再見**
+## Thank You ＆ Q＆A
