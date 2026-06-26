@@ -35,31 +35,10 @@
 
 ## 今日議程
 
-1. **環境準備**：安裝 Antigravity CLI
-2. **終端機移動路徑**：Windows 和 macOS 資料夾移動位置
-3. **基本指令**：瞭解 Antigravity CLI 的內建指令操作
-4. **深入實作**：做出自己的底部狀態列 Status Line
-
----
-
-## 先搞懂主角：Antigravity 跟它的終端機版本
-
-- **Antigravity**：Google 出的 AI 開發平台（AI Development Platform）
-  - 講白話就是「會幫你寫 code、會幫你跑任務的 AI 代理（Agent）」
-- **Antigravity CLI（`agy`）**：它的「終端機版本」
-  - 官方定位：**給那種一整天都泡在終端機裡的人**
-  - 不用跳出視窗、不用切來切去，就在你的黑底白字裡跟 AI 對話
-- **Antigravity IDE**：有圖形介面的版本，跟 CLI 共用同一組帳號
-
-Note:
-官方主打的五個亮點（懶人版翻譯）：
-- Work in Natural Language：用講的就好
-- Snappy Experience：跑起來很輕
-- Subagents：可以同時派好幾個分身（`/agents` 看進度、`Ctrl+K` 一鍵批准）
-- Highly configurable：什麼都能調（`/config`、`/keybindings`）
-- Slash Commands：斜線一打全有了（Plugins、MCP、Skills、Hooks）
-
-今天我們玩哪一塊？就是「Highly configurable」裡面的——**底部狀態列**。CLI 最下面那一行，預設只有寥寥幾個字，但其實是一塊任你揮灑的小儀表板，可以塞模型名稱、剩餘額度、Git 分支、記憶體用量……愛塞什麼塞什麼。
+1. **環境準備** 安裝 Antigravity CLI
+2. **終端機移動路徑** Windows 和 macOS 資料夾移動位置
+3. **基本指令** 瞭解 Antigravity CLI 的內建指令操作
+4. **深入實作** 做出自己的底部狀態列 Status Line
 
 ---
 

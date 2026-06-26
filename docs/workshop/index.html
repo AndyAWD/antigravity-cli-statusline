@@ -499,6 +499,97 @@
     }
 
     /* ============================================================
+       今日議程（第 3 張）— 4 色縱向 stepper
+       ol 預設只有藍色徽章；此頁改為時間軸式卡片，
+       依步驟順序由上到下、用 4 色輪替（藍 → 紅 → 黃 → 綠）。
+       ============================================================ */
+    .reveal .slides > section:nth-of-type(3) > ol {
+      position: relative;
+      list-style: none;
+      counter-reset: gdg-ol;
+      padding: 0 0 0 0.4em;
+      margin: 1.2em 0 0;
+    }
+    /* 左側貫穿時間軸（4 色等分） */
+    .reveal .slides > section:nth-of-type(3) > ol::before {
+      content: '';
+      position: absolute;
+      left: 1.55em;
+      top: 1.4em;
+      bottom: 1.4em;
+      width: 3px;
+      border-radius: 2px;
+      background: linear-gradient(to bottom,
+        var(--gdg-blue)   0%   25%,
+        var(--gdg-red)    25%  50%,
+        var(--gdg-yellow) 50%  75%,
+        var(--gdg-green)  75% 100%);
+      opacity: 0.35;
+      z-index: 0;
+    }
+    .reveal .slides > section:nth-of-type(3) > ol > li {
+      counter-increment: gdg-ol;
+      position: relative;
+      padding: 0.95em 1.3em 0.95em 4.5em;
+      margin: 0.7em 0;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+      font-size: 1.08em;
+      line-height: 1.55;
+      min-height: auto;
+    }
+    /* 數字徽章：圓角方形（與卡片視覺一致） */
+    .reveal .slides > section:nth-of-type(3) > ol > li::before {
+      content: counter(gdg-ol);
+      position: absolute;
+      left: 0.55em;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2.1em;
+      height: 2.1em;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95em;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
+      color: #fff;
+      background: linear-gradient(135deg, var(--gdg-blue-ht), var(--gdg-blue));
+      border: 3px solid var(--gdg-offwhite);
+      box-shadow: 0 3px 10px rgba(66,133,244,0.4);
+      z-index: 1;
+    }
+    /* 第 2 / 3 / 4 項：紅 / 黃 / 綠輪替（徽章 + 陰影色） */
+    .reveal .slides > section:nth-of-type(3) > ol > li:nth-child(2)::before {
+      background: linear-gradient(135deg, var(--gdg-red-ht), var(--gdg-red));
+      box-shadow: 0 3px 10px rgba(234,67,53,0.4);
+    }
+    .reveal .slides > section:nth-of-type(3) > ol > li:nth-child(3)::before {
+      background: linear-gradient(135deg, var(--gdg-yellow-ht), var(--gdg-yellow));
+      box-shadow: 0 3px 10px rgba(249,171,0,0.4);
+    }
+    .reveal .slides > section:nth-of-type(3) > ol > li:nth-child(4)::before {
+      background: linear-gradient(135deg, var(--gdg-green-ht), var(--gdg-green));
+      box-shadow: 0 3px 10px rgba(52,168,83,0.4);
+    }
+    /* 步驟標籤（**xxx**）覆寫通用 chip：4 色輪替 */
+    .reveal .slides > section:nth-of-type(3) > ol > li > strong:first-child {
+      background: var(--gdg-blue-p);
+      color: var(--gdg-blue);
+    }
+    .reveal .slides > section:nth-of-type(3) > ol > li:nth-child(2) > strong:first-child {
+      background: var(--gdg-red-p); color: var(--gdg-red);
+    }
+    .reveal .slides > section:nth-of-type(3) > ol > li:nth-child(3) > strong:first-child {
+      background: var(--gdg-yellow-p); color: #b06b00;
+    }
+    .reveal .slides > section:nth-of-type(3) > ol > li:nth-child(4) > strong:first-child {
+      background: var(--gdg-green-p); color: var(--gdg-green);
+    }
+
+    /* ============================================================
        章節頁版型（class: chapter-page）
        整張 section = macOS 終端機視窗外觀
        ============================================================ */
