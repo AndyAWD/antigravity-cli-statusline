@@ -203,68 +203,42 @@ v24.14.0
 
 ---
 
-<!-- .slide: class="compact-code" -->
+<!-- .slide: class="scroll-prompt" -->
 
-## 設定檔在哪？告訴 CLI 執行腳本
+## 設定 CLI ＋ 註冊白名單（同樣交給 agy）
 
-**打開（或建立）** `~/.gemini/antigravity-cli/settings.json`
-（Windows：`%USERPROFILE%\.gemini\antigravity-cli\settings.json`）
+接著貼下面這段，agy 會把 `settings.json` 與 `trusted_hooks.json` 同步寫好。
 
-**在最外層 `{}` 內加：**
+```text
+請更新（或建立）兩個設定檔，讓 Antigravity CLI 認得並信任剛剛的 my-status.mjs：
 
-```json
+【1】~/.gemini/antigravity-cli/settings.json
+（Windows：%USERPROFILE%\.gemini\antigravity-cli\settings.json）
+
+在根節點合併以下欄位（保留其他既有欄位，勿覆蓋整個檔案）：
 {
   "statusLine": {
     "enabled": true,
     "type": "command",
-    "command": "node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
+    "command": "node <絕對路徑>/.gemini/antigravity-cli/hooks/my-status.mjs"
   }
 }
+
+【2】~/.gemini/trusted_hooks.json
+（Windows：%USERPROFILE%\.gemini\trusted_hooks.json）
+
+在根節點 "*" 陣列 append 下面字串（保留陣列既有項目）：
+"statusLine:node <絕對路徑>/.gemini/antigravity-cli/hooks/my-status.mjs"
+
+規則：
+- <絕對路徑> 動態用 os.homedir() 解析（macOS：/Users/xxx；Windows：C:\Users\xxx）
+  別寫死 ~ / $HOME / %USERPROFILE%——hook 在背景跑不經 shell，這些變數不會展開
+- Windows 反斜線寫雙倍：node C:\\Users\\xxx\\.gemini\\...
+- 兩檔都用 UTF-8 無 BOM 存檔
+- "statusLine:" 前綴與 settings.json 的 command 必須逐字相符，否則 CLI 拒絕執行
 ```
 
-**Windows 範例**（反斜線必須雙倍）：
-
-```json
-{
-  "statusLine": {
-    "enabled": true,
-    "type": "command",
-    "command": "node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
-  }
-}
-```
-
-⚠️ **兩個關鍵警告**
-
-- `command` **必須用絕對路徑**，不能用 `~` / `$HOME` / `%USERPROFILE%`（Hook 在背景跑不經 shell，環境變數不會展開）
-- Windows 用戶請用 **VS Code** 或記事本（另存新檔→編碼選「UTF-8」不勾 BOM）編輯，**不要用 PowerShell 的 `Out-File` / `Set-Content` / `>` 重導向**——預設會寫成 UTF-16 LE 或加上 BOM，CLI 解析會爆 `invalid character 'ï'`
-
----
-
-## 註冊安全白名單
-
-CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/trusted_hooks.json`
-（Windows：`%USERPROFILE%\.gemini\trusted_hooks.json`）
-
-```json
-{
-  "*": [
-    "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
-  ]
-}
-```
-
-**Windows 範例**：
-
-```json
-{
-  "*": [
-    "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
-  ]
-}
-```
-
-⚠️ **前綴 `statusLine:` 不能漏**，後面字串要與 settings.json 的 `command` **逐字相符**，否則 CLI 直接拒絕。
+> ✅ agy 寫完後，下一頁直接在 CLI 輸入 `/statusline` 啟用。
 
 ---
 
@@ -288,12 +262,12 @@ API: 剩餘 80%
 
 ---
 
-## Step 2／3：請 AI 加上「重置倒數」
+## Step 2／3：請 agy 加上「重置倒數」
 
-**接續剛剛的 AI 對話，貼這段：**
+**接續剛剛的 Agy CLI 對話，貼這段，agy 會自己改寫 `my-status.mjs`：**
 
 ```text
-請在剛剛的腳本上，再加上一個資訊：
+請在 ~/.gemini/antigravity-cli/hooks/my-status.mjs 上，再加上一個資訊：
 - 額度重置的倒數時間（距離現在還剩幾小時幾分）
 
 實作要點：
@@ -304,14 +278,16 @@ API: 剩餘 80%
 - 最終輸出：「API: 剩餘 80%  ⏰ 重置: 2h 30m」
 ```
 
-**存檔覆蓋原本的 `my-status.mjs`**，回到 Antigravity CLI 按 Enter，狀態列就會自動更新。
+> ✅ agy 改寫完後，回到下一張投影片再按 Enter，狀態列就會自動更新。
 
 ---
 
-## Step 3／3：請 AI 套用色彩美化
+## Step 3／3：請 agy 套用色彩美化
+
+**繼續在 Agy CLI 對話框貼這段，agy 會直接改寫腳本：**
 
 ```text
-請在剛剛的腳本上加 24-bit ANSI 真彩色：
+請在 ~/.gemini/antigravity-cli/hooks/my-status.mjs 上加 24-bit ANSI 真彩色：
 - 額度 ≥ 75%：藍 #57caff
 - 額度 ≥ 50%：綠 #5cdb6d
 - 額度 ≥ 25%：黃 #ffd427
@@ -323,7 +299,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 所有色彩串末尾記得加 \x1b[0m 重置，避免污染後續輸出。
 ```
 
-**存檔覆蓋**，現在你的狀態列會根據額度動態變色。
+> ✅ agy 改寫完後按 Enter，你的狀態列就會根據額度動態變色。
 
 ---
 
