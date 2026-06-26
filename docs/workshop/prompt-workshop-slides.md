@@ -42,7 +42,7 @@
 
 ---
 
-環境準備：安裝 `agy` 和 `nodejs` 裝到你的機器上
+環境準備：安裝 `Antigravity CLI` 和 `Node.JS`
 
 ---
 
@@ -74,12 +74,18 @@ curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.
 2. Windows 用戶：直接點擊下載 `.msi`，並執行安裝程序即可。
 3. macOS 用戶：直接點擊下載 `.pkg`，並執行安裝程序即可。
 
-**裝完驗證**
+**裝完驗證，有出現版本號**
 
 ```bash
-agy --version 
-node -v 
+andyawd@AndydeMacBook-Pro workshop % agy --version
+1.0.12
+andyawd@AndydeMacBook-Pro workshop % node -v
+v24.14.0
 ```
+
+---
+
+終端機移動路徑：`Windows` 和 `macOS` 資料夾移動位置
 
 ---
 
@@ -130,6 +136,7 @@ node -v
 | 9  | `/antigravity-guide` | Agy CLI 內部知識 |
 | 10 | `/model`             | 切換使用模型       |
 | 11 | `/usage`             | 使用模型額度       |
+| 12 | `/exit (quit)`             | 離開 Agy CLI   |
 
 ---
 
