@@ -10,7 +10,7 @@
 | # | Name | Scope | Dependencies | Status | Conversation ID |
 |---|------|-------|-------------|--------|-----------------|
 | 1 | Milestone 1: Exploration | 診斷盤點 `SKILL.md` 及 `scripts/` 下的動態生成與跨平台寫入 (BOM) 問題 | None | DONE | 6b06ab94-0b69-4f64-a220-240263ce8815 |
-| 2 | Milestone 2: Implementation | 修正所發現之動態生成陷阱 (R1) 與跨平台檔案寫入 bug (R2) | Milestone 1 | IN_PROGRESS (Gen 2) | 1f9e1f85-2db1-4bf3-b702-23986dfac472 |
+| 2 | Milestone 2: Implementation | 修正所發現之動態生成陷阱 (R1) 與跨平台檔案寫入 bug (R2) | Milestone 1 | IN_PROGRESS (Gen 3) | 08c3a0d8-363b-42c3-8816-aff39aac9f67 |
 | 3 | Milestone 3: Verification & Audit | 進行 Reviewer 審查、Challenger 測試與 Forensic Auditor 完整性審計 | Milestone 2 | PLANNED | - |
 
 ## Interface Contracts
