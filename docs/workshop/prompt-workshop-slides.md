@@ -204,7 +204,7 @@ v24.14.0
 
 ## 補充：GetUserStatus 拿到了什麼？
 
-在剛剛的提示詞第 182 行，我們讓腳本打了一個本地端 API 請求（`POST GetUserStatus`）。
+在剛剛提示詞的第三步，我們讓腳本打了一個本地端 API 請求（`POST GetUserStatus`）。
 這其實是向 Agy CLI 的語言伺服器（Language Server）索取當前狀態。
 
 **發送的請求內容（Payload）：**
