@@ -81,7 +81,7 @@ if (isDefaultOrder) {
 
 console.log('Resolved items sequence:', items);
 
-// 3. 部署 Hook 腳本
+// 3. 部署掛鉤（Hook）腳本
 const homeDir = os.homedir();
 const hooksDir = path.join(homeDir, '.gemini', 'antigravity-cli', 'hooks');
 
@@ -108,7 +108,7 @@ function writeContentAndVerifyNoBOM(filePath, content) {
   }
   fs.writeFileSync(filePath, content, { encoding: 'utf8' });
   
-  // 驗證並就地剝除 BOM
+  // 驗證並就地剝除位元組順序記號（BOM）
   let buffer = fs.readFileSync(filePath);
   if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
     console.log(`[BOM Detected] Found BOM in ${filePath}, stripping...`);
@@ -121,7 +121,7 @@ writeContentAndVerifyNoBOM(path.join(hooksDir, 'statusline-quota.mjs'), statusli
 writeContentAndVerifyNoBOM(path.join(hooksDir, 'fetch-local-quota.mjs'), fetchLocalQuotaContent);
 console.log('Hook scripts deployed successfully.');
 
-// 4. 三層 settings.json 寫入與防禦 BOM 鐵則
+// 4. 三層 settings.json 寫入與防禦位元組順序記號（BOM）鐵則
 const statuslineQuotaMjsPath = path.join(hooksDir, 'statusline-quota.mjs');
 
 function readJsonWithBOMDefense(filePath) {
@@ -168,7 +168,7 @@ const cliSettingsPath = path.join(homeDir, '.gemini', 'antigravity-cli', 'settin
 updateSettings(globalSettingsPath);
 updateSettings(cliSettingsPath);
 
-// 寫入專案層 settings.json (如果符合條件)
+// 寫入專案層 settings.json （如果符合條件）
 if (workspacePath) {
   const projectGeminiDir = path.join(workspacePath, '.gemini');
   const projectSettingsPath = path.join(projectGeminiDir, 'settings.json');
@@ -177,7 +177,7 @@ if (workspacePath) {
   }
 }
 
-// 5. trusted_hooks.json 寫入與防禦 BOM
+// 5. trusted_hooks.json 寫入與防禦位元組順序記號（BOM）
 const trustedHooksPath = path.join(homeDir, '.gemini', 'trusted_hooks.json');
 console.log(`Updating trusted hooks: ${trustedHooksPath}`);
 const trustedHooks = readJsonWithBOMDefense(trustedHooksPath);

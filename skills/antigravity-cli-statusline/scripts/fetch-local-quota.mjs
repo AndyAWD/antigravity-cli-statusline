@@ -1,5 +1,5 @@
 import { spawnSync, execSync } from 'child_process';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import https from 'https';
 import os from 'os';
@@ -230,12 +230,21 @@ async function fetchLiveQuotaCache() {
   return null;
 }
 
+function writeFileSyncAndVerifyNoBOM(filePath, content) {
+  writeFileSync(filePath, content, { encoding: 'utf8' });
+  let buffer = readFileSync(filePath);
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    buffer = buffer.slice(3);
+    writeFileSync(filePath, buffer);
+  }
+}
+
 async function main() {
   try {
     const cache = await fetchLiveQuotaCache();
     if (cache) {
       mkdirSync(dirname(CACHE_FILE), { recursive: true });
-      writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), { encoding: 'utf8' });
+      writeFileSyncAndVerifyNoBOM(CACHE_FILE, JSON.stringify(cache, null, 2));
     }
   } catch (e) {}
 }

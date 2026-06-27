@@ -1,16 +1,16 @@
 ---
 name: antigravity-cli-statusline
-description: 本技能用於設定 Antigravity CLI（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / English us / 日本語 jp），並自動部署跨平台 Node.js Hook 腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、CLI 專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用 CLI 狀態列、調整 CLI 頁尾顯示項目、顯示 API 額度 / Token 用量 / Context 消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / AI 模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話 / 輸入佇列 / 背景任務 / 子代理數 / 工件（artifacts）/ 沙盒模式 / CLI 版本 / 對話 ID / 使用中代理（agent profile）/ RAM 記憶體用量 / 訂閱方案等指標於 CLI 底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並於 Windows 上自動處理 sh.exe 缺失、UTF-8 BOM 污染、wmic 棄用等系統陷阱。
+description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 工件（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並於 Windows 上自動處理 sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
 ---
 
 # Antigravity 狀態列設定技能
 
-本技能提供 Antigravity CLI 狀態列（Statusline / Footer）的客製化、語系設定與跨平台 Hook 部署能力。
+本技能提供 Antigravity 命令列介面（CLI）狀態列（Statusline / Footer）的客製化、語系設定與跨平台掛鉤（Hook）部署能力。
 
 ## ⚠️ References 載入規範（必讀）
 
 本技能的細節分散於下列三份 references/：
-- [`references/windows.md`](references/windows.md) — Windows 特定規範（BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯等）
+- [`references/windows.md`](references/windows.md) — Windows 特定規範（位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.exe` 編譯等）
 - [`references/config-files.md`](references/config-files.md) — 三層設定檔結構、`statusLine` 物件、`trusted_hooks.json` 信任機制
 - [`references/pitfalls.md`](references/pitfalls.md) — 常見陷阱對照表
 
@@ -25,12 +25,12 @@ description: 本技能用於設定 Antigravity CLI（agy）的狀態列（Status
 
 | 層級 | 路徑語法 | 優先級 |
 |---|---|---|
-| **CLI 專屬（最高）** | `~/.gemini/antigravity-cli/settings.json` | 🔥 高於全域 |
+| **命令列介面（CLI）專屬（最高）** | `~/.gemini/antigravity-cli/settings.json` | 🔥 高於全域 |
 | 全域 | `~/.gemini/settings.json` | 中 |
 | 專案（條件性）| `<workspace>/.gemini/settings.json` | 若存在則覆寫 |
 
 > [!CAUTION]
-> CLI 專屬設定檔由 agy CLI 自身維護，優先級**高於**全域設定檔。若忽略此檔案，全域設定將被無聲覆蓋！這是本技能中**最致命且最隱蔽的 Bug**。完整路徑解析規則、JSON 結構、跨電腦移植雙保險設計詳見 [references/config-files.md](references/config-files.md)。
+> 命令列介面（CLI）專屬設定檔由 agy 命令列介面（CLI）自身維護，優先級**高於**全域設定檔。若忽略此檔案，全域設定將被無聲覆蓋！這是本技能中**最致命且最隱蔽的 Bug**。完整路徑解析規則、JSON 結構、跨電腦移植雙保險設計詳見 [references/config-files.md](references/config-files.md)。
 
 自訂語系偏好記錄於 `ui.language` 屬性中；指標順序記錄於 `ui.footer.items` 陣列中。
 
@@ -49,14 +49,14 @@ description: 本技能用於設定 Antigravity CLI（agy）的狀態列（Status
    - `49~25%`：黃色 `#ffd427`（`\x1b[38;2;255;212;39m`）
    - `24~0%`：紅色 `#ff7daf`（`\x1b[38;2;255;125;175m`）
 
-Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide: true` 規範詳見 [references/windows.md](references/windows.md)。
+Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide: true` 規範詳見 [references/windows.md](references/windows.md)。
 
 ---
 
 ## 🌐 語言鎖定規則（Locale Locking — 全域強制）
 
 > [!CAUTION]
-> **使用者在步驟 1 一旦選定語系（`zh-tw` / `us` / `jp`），AI 代理在本次執行的剩餘所有對話輸出，都必須使用該語言。**
+> **使用者在步驟 1 一旦選定語系（`zh-tw` / `us` / `jp`），人工智慧（AI）代理在本次執行的剩餘所有對話輸出，都必須使用該語言。**
 
 **為什麼必須鎖定**：使用者選擇英文（us）或日文（jp）的前提是「他可能不懂中文」，反之亦然。若中間穿插任何非所選語系的訊息，會破壞使用者體驗、甚至讓使用者讀不懂關鍵警告而誤判決策。**這也是為什麼語系選擇必須是第一步**——所有後續訊息（包括 Node.js 預檢的缺失警告）才能用使用者看得懂的語言呈現。
 
@@ -64,7 +64,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 - 步驟 2 Node.js 缺失時的 `ask_question` 警告對話
 - 步驟 3 / 4 的 `ask_question` 問卷（`question` 文字、`options` 字串、`toolSummary`、`toolAction`）
 - 步驟 5 / 6 進行中的 any 進度說明、確認語句、警告訊息
-- 步驟 5（BOM 污染修復）與步驟 6（Windows 缺 `sh.exe`）的偵測與修復提示
+- 步驟 5（位元組順序記號（BOM）污染修復）與步驟 6（Windows 缺 `sh.exe`）的偵測與修復提示
 - 步驟 7 的最終回報訊息與舊版腳本溫馨提醒
 - 任何例外、錯誤、降級、再次詢問使用者意見時的訊息
 
@@ -82,7 +82,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 **為何最先**：後續所有訊息（含 Node.js 缺失警告、設定檔讀寫進度、錯誤提示、最終回報）皆須用使用者選定的語言呈現，因此語系必須在 any 其他對話之前確定。
 
-呼叫 `ask_question`（Antigravity CLI 原生支援以 `/statusline` 切換啟用或關閉狀態列，因此無需提供冗長的還原選單）：
+呼叫 `ask_question`（Antigravity 命令列介面（CLI）原生支援以 `/statusline` 切換啟用或關閉狀態列，因此無需提供冗長的還原選單）：
 
 ```json
 {
@@ -117,7 +117,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 - ❌ **若 Node.js 未安裝**（指令回傳 `command not found` 或非零退出碼）：
   1. **向使用者發出明確警告（以所選語系撰寫）**，說明缺少 Node.js 將導致：
      - CLI 底部狀態列**完全空白**，不會顯示 any 指標
-     - `agy` CLI 會反覆記錄 `statusline: command failed: exit status 127 (stderr: sh: node: command not found)`，連續失敗 30 次後自動停用 statusline
+     - `agy` 命令列介面（CLI）會反覆記錄 `statusline: command failed: exit status 127 (stderr: sh: node: command not found)`，連續失敗 30 次後自動停用 statusline
   2. **呼叫 `ask_question` 詢問使用者是否繼續**（問卷 `question`、`options`、`toolSummary`、`toolAction` 全部以所選語系撰寫，以下範例為 `zh-tw` 版本）：
 
 ```json
@@ -138,15 +138,15 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 ```
 
   3. **若使用者選擇「中斷」**：以所選語系輸出安裝指引後結束本技能流程，不進行 any 設定檔寫入。
-  4. **若使用者選擇「繼續」**：繼續執行後續步驟。設定檔會正確寫入，待使用者安裝 Node.js 並重新啟動 `agy` CLI 後狀態列即會自動生效。
+  4. **若使用者選擇「繼續」**：繼續執行後續步驟。設定檔會正確寫入，待使用者安裝 Node.js 並重新啟動 `agy` 命令列介面（CLI）後狀態列即會自動生效。
 
 **【動態解析三層設定檔】**：在 Node.js 預檢通過（或使用者選擇繼續）後，動態展開 `$HOME` / `USERPROFILE`，讀取三層 `settings.json`。檢查目前 `ui.footer.items` 啟用了哪些項目、`ui.language` 設定，以及各設定檔中是否存在空的或殘缺的 `statusLine` 物件（如 `{ "type": "", "command": "", "enabled": true }`）。
 
-**【Windows 平台額外步驟：BOM 預檢】**：讀取每份 `settings.json` 與 `trusted_hooks.json` 時，必須檢查檔案前 3 個位元組是否為 `EF BB BF`（UTF-8 BOM）。若是，記錄該檔案路徑為「需於步驟 5 自動修復」的目標。詳見 [references/windows.md §1](references/windows.md) 與 §3。
+**【Windows 平台額外步驟：位元組順序記號（BOM）預檢】**：讀取每份 `settings.json` 與 `trusted_hooks.json` 時，必須檢查檔案前 3 個位元組是否為 `EF BB BF`（UTF-8 位元組順序記號（BOM））。若是，記錄該檔案路徑為「需於步驟 5 自動修復」的目標。詳見 [references/windows.md §1](references/windows.md) 與 §3。
 
 ### 步驟 3：第二階段問卷（讀取 questions.json 與勾選指標）
 
-1. **讀取靜態問卷**：AI 代理必須優先讀取本外掛目錄底下的 `skills/antigravity-cli-statusline/questions.json` 檔案。
+1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/antigravity-cli-statusline/questions.json` 檔案。
 2. **根據步驟 1 的語言代碼（`zh-tw` / `us` / `jp`）**，從 `questions.json` 中讀取對應的問卷資訊，呼叫 `ask_question`。例如，若步驟 1 選擇 `zh-tw`：
    ```json
    {
@@ -192,7 +192,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 1. 取得使用者工作區（workspace）的絕對路徑（`workspace`）。
 2. 呼叫 `run_command` 執行本外掛目錄下的 `configure-statusline.mjs` 腳本，傳入相關參數。腳本會全自動處理：
    - 排序輸入解析。
-   - 同步寫入三層 `settings.json`（已執行防禦性 BOM 剝除與寫入後無 BOM 驗證）。
+   - 同步寫入三層 `settings.json`（已執行防禦性 位元組順序記號（BOM）剝除與寫入後無 位元組順序記號（BOM）驗證）。
    - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 萬用字元（Wildcard）鍵，並在 Windows 上註冊各種反斜線/環境變數變體）。
    - 將 Hook 腳本安全拷貝部署至 `~/.gemini/antigravity-cli/hooks/` 目錄中，寫入時強制 `{ encoding: 'utf8' }`。
    - 若為 Windows 平台且 CLI 目錄缺少 `sh.exe`，自動編譯靜默無窗體橋接器。
@@ -213,9 +213,9 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 ### 步驟 7：回報與重新載入提示
 
-1. **根據所選語系撰寫最終回覆**：告知使用者設定已自動在 CLI 底部即時熱更新 (Hot Reload) 生效，無需重新啟動。
+1. **根據所選語系撰寫最終回覆**：告知使用者設定已自動在 命令列介面（CLI）底部即時熱更新 (Hot Reload) 生效，無需重新啟動。
 2. **舊版腳本檢查**：讀取或檢查 `~/.gemini/hooks/statusline-quota.mjs` 與 `~/.gemini/hooks/fetch-local-quota.mjs` 是否存在。若存在，則以所選語系提醒使用者可以安全地手動刪除它們。
-3. **故障診斷指引**：在回覆末尾以所選語系加入提示：「若日後狀態列突然消失，請前往本外掛目錄執行 `node skills/antigravity-cli-statusline/scripts/diagnose-statusline.mjs`，並把完整輸出貼給 AI 代理進行診斷。」
+3. **故障診斷指引**：在回覆末尾以所選語系加入提示：「若日後狀態列突然消失，請前往本外掛目錄執行 `node skills/antigravity-cli-statusline/scripts/diagnose-statusline.mjs`，並把完整輸出貼給 人工智慧（AI）代理進行診斷。」
 
 ---
 
@@ -223,6 +223,6 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 完整對照表（8 條陷阱與修正做法）詳見 [references/pitfalls.md](references/pitfalls.md)。最關鍵的三條速記：
 
-1. **必須同步寫入三層設定檔**（特別是 CLI 專屬的 `~/.gemini/antigravity-cli/settings.json`，是最致命的盲點）
-2. **Windows 寫設定檔絕對禁止帶 BOM**，寫入後必須驗證前 3 個位元組
-3. **絕對禁止憑空生成 Hook 腳本**，必須從本外掛的 `skills/antigravity-cli-statusline/scripts/` 讀取原文部署
+1. **必須同步寫入三層設定檔**（特別是 命令列介面（CLI）專屬的 `~/.gemini/antigravity-cli/settings.json`，是最致命的盲點）
+2. **Windows 寫設定檔絕對禁止帶 位元組順序記號（BOM）**，寫入後必須驗證前 3 個位元組
+3. **絕對禁止憑空生成 掛鉤（Hook） 腳本**，必須從本外掛的 `skills/antigravity-cli-statusline/scripts/` 讀取原文部署
