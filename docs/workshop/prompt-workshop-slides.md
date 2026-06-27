@@ -904,7 +904,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
     <div style="background:#1e1e1e; border-radius:10px;
                 padding:0.85em 1.1em; font-family:'Menlo','Consolas',monospace;
                 font-size:0.72em; line-height:1.9;">
-      <div><span style="color:#888;">$ </span><span style="color:#57caff;">agy plugin install </span><span style="color:#fff;">antigravity-cli-statusline</span></div>
+      <div><span style="color:#888;">$ </span><span style="color:#57caff;">agy plugin install </span><span style="color:#fff;">https://github.com/andyawd/antigravity-cli-statusline</span></div>
       <div><span style="color:#888;">$ </span><span style="color:#fff;">agy</span></div>
       <div><span style="color:#5cdb6d;">&gt; </span><span style="color:#ffd427;">/antigravity-cli-statusline</span></div>
     </div>
