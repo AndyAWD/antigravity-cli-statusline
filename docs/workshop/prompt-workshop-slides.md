@@ -27,6 +27,7 @@
       <li>GDG Kaohsiung 組織者</li>
       <li>Android 工程師</li>
       <li>目前還是個人類</li>
+      <li><a href="https://www.facebook.com/groups/GDGKaohsiung" target="_blank" rel="noopener">https://www.facebook.com/groups/GDGKaohsiung</a></li>
     </ul>
   </div>
 </div>
@@ -36,7 +37,7 @@
 ## 今日議程
 
 1. **環境準備** 安裝 Antigravity CLI 和 Node.JS
-2. **終端機移動路徑** Windows 和 macOS 資料夾移動位置
+2. **移動路徑** Windows 和 macOS 資料夾移動位置
 3. **基本指令** 瞭解 Antigravity CLI 的內建指令操作
 4. **深入實作** 做出自己的底部狀態列 Status Line
 
@@ -163,7 +164,7 @@ v24.14.0
 
 <!-- .slide: class="scroll-prompt" -->
 
-## Step 1／3：請 agy 寫「抓額度」腳本
+## Step 1／3：請 Agy CLI 寫「抓額度」腳本
 
 直接在 Agy CLI 的對話框輸入下面這段，它會把檔案寫到指定路徑，不必複製貼上到別處。
 
@@ -204,7 +205,7 @@ v24.14.0
 ## 補充：GetUserStatus 拿到了什麼？
 
 在剛剛的提示詞第 182 行，我們讓腳本打了一個本地端 API 請求（`POST GetUserStatus`）。
-這其實是向 Agy 的語言伺服器（Language Server）索取當前狀態。
+這其實是向 Agy CLI 的語言伺服器（Language Server）索取當前狀態。
 
 **發送的請求內容（Payload）：**
 ```json
@@ -725,9 +726,9 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
 
 <!-- .slide: class="scroll-prompt" -->
 
-## 設定 CLI ＋ 註冊白名單（同樣交給 agy）
+## 設定 CLI ＋ 註冊白名單（同樣交給 Agy CLI）
 
-理論講完了——實際操作就把下面這段貼給 agy，它會把 `settings.json` 與 `trusted_hooks.json` 同步寫好。
+理論講完了——實際操作就把下面這段貼給 Agy CLI，它會把 `settings.json` 與 `trusted_hooks.json` 同步寫好。
 
 ```text
 請更新（或建立）設定檔，讓 Antigravity CLI 認得並信任剛剛的 my-status.mjs：
@@ -763,7 +764,7 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
 - "statusLine:" 前綴與 settings.json 的 command 必須逐字相符，否則 CLI 拒絕執行
 ```
 
-> ✅ agy 寫完後，下一頁直接在 CLI 輸入 `/statusline` 啟用。
+> ✅ Agy CLI 寫完後，下一頁直接在 CLI 輸入 `/statusline` 啟用。
 
 ---
 
@@ -787,9 +788,9 @@ API: 剩餘 80%
 
 ---
 
-## Step 2／3：請 agy 加上「重置倒數」
+## Step 2／3：請 Agy CLI 加上「重置倒數」
 
-**接續剛剛的 Agy CLI 對話，貼這段，agy 會自己改寫 `my-status.mjs`：**
+**接續剛剛的 Agy CLI 對話，貼這段，他會自己改寫 `my-status.mjs`：**
 
 ```text
 請在 ~/.gemini/antigravity-cli/hooks/my-status.mjs 上，再加上一個資訊：
@@ -803,13 +804,13 @@ API: 剩餘 80%
 - 最終輸出：「API: 剩餘 80%  ⏰ 重置: 2h 30m」
 ```
 
-> ✅ agy 改寫完後，回到下一張投影片再按 Enter，狀態列就會自動更新。
+> ✅ Agy CLI 改寫完後，回到下一張投影片再按 Enter，狀態列就會自動更新。
 
 ---
 
-## Step 3／3：請 agy 套用色彩美化
+## Step 3／3：請 Agy CLI 套用色彩美化
 
-**繼續在 Agy CLI 對話框貼這段，agy 會直接改寫腳本：**
+**繼續在 Agy CLI 對話框貼這段，他會直接改寫腳本：**
 
 ```text
 請在 ~/.gemini/antigravity-cli/hooks/my-status.mjs 上加 24-bit ANSI 真彩色：
@@ -824,7 +825,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 所有色彩串末尾記得加 \x1b[0m 重置，避免污染後續輸出。
 ```
 
-> ✅ agy 改寫完後按 Enter，你的狀態列就會根據額度動態變色。
+> ✅ Agy CLI 改寫完後按 Enter，你的狀態列就會根據額度動態變色。
 
 ---
 
@@ -841,7 +842,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 
 <!-- .slide: class="scroll-prompt" -->
 
-## 不想自己排查？把這段丟給 agy
+## 不想自己排查？把這段丟給 Agy CLI
 
 ```text
 我的狀態列現在沒有正常顯示，請幫我排查並修好。請依序：
@@ -880,7 +881,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 
 ---
 
-## 進階：想要 24 個指標？
+## 我把全部的功能都放在這裡了，想要的話就去拿吧
 
 <div style="margin-top:0.8em; padding:1.6em 1.8em; background:#fff;
             border-radius:16px; box-shadow:0 14px 40px rgba(0,0,0,0.12);
