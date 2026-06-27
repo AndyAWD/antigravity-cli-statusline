@@ -66,7 +66,7 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 - **目前訂閱方案等級（`plan-tier`）**
 
 **互動狀態**
-- **等你回應的工具確認對話框（`tool-confirmation`）**
+- **等你回應的工具確認對話方塊（Dialog Box）（`tool-confirmation`）**
 - **佇列中待處理的使用者輸入數（`pending-input`）**
 - **進行中的背景任務數（`background-tasks`）**
 - **活躍子代理數（`subagents`）**

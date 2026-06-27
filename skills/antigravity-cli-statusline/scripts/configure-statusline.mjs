@@ -39,14 +39,14 @@ console.log(`- Workspace: ${workspacePath}`);
 // 2. 排序解析規則
 let selectedList = [];
 try {
-  selectedList = JSON.parse(selectedStr);
+  selectedList = JSON.parse(selectedStr.replace(/^\uFEFF/, ''));
 } catch (e) {
   console.error('Failed to parse --selected JSON string:', e);
 }
 
 // 提取英文識別碼
 const selectedIds = selectedList.map(item => {
-  const match = item.match(/\(([^)]+)\)$/);
+  const match = item.match(/[\(（]([^）\)]+)[\)）]$/);
   return match ? match[1] : item;
 });
 
@@ -101,8 +101,24 @@ if (!fs.existsSync(statuslineQuotaSrcPath) || !fs.existsSync(fetchLocalQuotaSrcP
 const statuslineQuotaContent = fs.readFileSync(statuslineQuotaSrcPath, 'utf8');
 const fetchLocalQuotaContent = fs.readFileSync(fetchLocalQuotaSrcPath, 'utf8');
 
-fs.writeFileSync(path.join(hooksDir, 'statusline-quota.mjs'), statuslineQuotaContent, { encoding: 'utf8' });
-fs.writeFileSync(path.join(hooksDir, 'fetch-local-quota.mjs'), fetchLocalQuotaContent, { encoding: 'utf8' });
+function writeContentAndVerifyNoBOM(filePath, content) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(filePath, content, { encoding: 'utf8' });
+  
+  // 驗證並就地剝除 BOM
+  let buffer = fs.readFileSync(filePath);
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    console.log(`[BOM Detected] Found BOM in ${filePath}, stripping...`);
+    buffer = buffer.slice(3);
+    fs.writeFileSync(filePath, buffer);
+  }
+}
+
+writeContentAndVerifyNoBOM(path.join(hooksDir, 'statusline-quota.mjs'), statuslineQuotaContent);
+writeContentAndVerifyNoBOM(path.join(hooksDir, 'fetch-local-quota.mjs'), fetchLocalQuotaContent);
 console.log('Hook scripts deployed successfully.');
 
 // 4. 三層 settings.json 寫入與防禦 BOM 鐵則
@@ -123,23 +139,7 @@ function readJsonWithBOMDefense(filePath) {
 }
 
 function writeJsonAndVerifyNoBOM(filePath, data) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  const jsonStr = JSON.stringify(data, null, 2);
-  
-  // 寫檔，預設不帶 BOM
-  fs.writeFileSync(filePath, jsonStr, { encoding: 'utf8' });
-  
-  // 驗證並就地剝除 BOM
-  let buffer = fs.readFileSync(filePath);
-  while (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
-    console.log(`[BOM Detected] Found BOM in ${filePath}, stripping...`);
-    buffer = buffer.slice(3);
-    fs.writeFileSync(filePath, buffer);
-    buffer = fs.readFileSync(filePath);
-  }
+  writeContentAndVerifyNoBOM(filePath, JSON.stringify(data, null, 2));
 }
 
 function updateSettings(settingsPath) {
@@ -264,6 +264,16 @@ if (process.platform === 'win32') {
         }
       } else {
         console.warn('sh_hidden.cs source file not found. sh.exe compilation skipped.');
+      }
+
+      if (!fs.existsSync(destShPath)) {
+        if (lang === 'zh-tw') {
+          console.warn('警告：sh.exe 編譯失敗，請檢查權限是否足夠，或嘗試以系統管理員權限重新設定。');
+        } else if (lang === 'jp') {
+          console.warn('警告：sh.exe のコンパイルに失敗しました。アクセス権限が十分であるか確認するか、管理者権限で再設定を試みてください。');
+        } else {
+          console.warn('Warning: Compilation of sh.exe failed. Please check if you have sufficient privileges, or try configuring again with administrator privileges.');
+        }
       }
     } else {
       console.log('sh.exe already exists, skipping compilation.');

@@ -109,7 +109,7 @@ function inspectTrustedHooks(path, expectedHomeAbs, expectedWorkspaceAbs) {
   };
   checkKey(expectedWorkspaceAbs, '當前工作區');
   checkKey(expectedHomeAbs, '家目錄');
-  checkKey('*', '通配符 "*"');
+  checkKey('*', '萬用字元（Wildcard） "*"');
 }
 
 function inspectHookFiles(hooksDir) {

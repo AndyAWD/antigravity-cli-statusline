@@ -124,7 +124,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 {
   "questions": [
     {
-      "question": "⚠️ 偵測到系統未安裝 Node.js。\n\n狀態列 Hook 需要 Node.js 才能運作，缺少 Node.js 將導致 CLI 底部狀態列完全空白且自動停用。\n\n建議先安裝 Node.js（例如：brew install node），再重新執行本技能。\n\n是否仍要繼續設定？（設定檔會正確寫入，但狀態列在安裝 Node.js 前不會顯示）",
+      "question": "⚠️ 偵測到系統未安裝 Node.js。\n\n狀態列掛鉤（Hook）需要 Node.js 才能運作，缺少 Node.js 將導致命令列介面（CLI）底部狀態列完全空白且自動停用。\n\n建議先安裝 Node.js（例如：brew install node），再重新執行本技能。\n\n是否仍要繼續設定？（設定檔會正確寫入，但狀態列在安裝 Node.js 前不會顯示）",
       "options": [
         "(Recommended) 中斷，我先去安裝 Node.js",
         "繼續設定（安裝 Node.js 後狀態列會自動生效）"
@@ -167,13 +167,13 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 ### 步驟 4：第三階段問卷（手動排序與最終篩選）
 
-1. 將**步驟 3 中使用者勾選的指標**按順序整理出來，標上數字編號（如 `1. 目前使用的 AI 模型名稱 (model-name)`），每項以 `\n` 分隔。
+1. 將**步驟 3 中使用者勾選的指標**按順序整理出來，標上數字編號（如 `1. 目前使用的人工智慧（AI）模型名稱（model-name）`），每項以 `\n` 分隔。
 2. 呼叫 `ask_question` 引導使用者進行排序：
    ```json
    {
      "questions": [
        {
-         "question": "請設定狀態列顯示順序。\n\n目前已選取：\n1. 目前使用的 AI 模型名稱 (model-name)\n2. 帳號真實 API 可用額度 (quota)\n3. 目前對話已消耗的 Context 比例 (context-used)\n\n請在下方輸入框「Write-in...」中輸入以逗號分隔的數字序號或英文識別碼（如：2, 1, context-used）。可以使用 `n` 來強制換行。未填寫的指標將不予顯示。",
+         "question": "請設定狀態列顯示順序。\n\n目前已選取：\n1. 目前使用的人工智慧（AI）模型名稱（model-name）\n2. 帳號真實應用程式介面（API）可用額度（quota）\n3. 目前對話已消耗的上下文（Context）比例（context-used）\n\n請在下方輸入框「Write-in...」中輸入以逗號分隔的數字序號或英文識別碼（如：2, 1, context-used）。可以使用 `n` 來強制換行。未填寫的指標將不予顯示。",
          "options": [
            "(Recommended) 略過，使用原勾選順序啟用全部指標",
            "手動排序（請在下方「Write-in...」欄位中填寫）"
@@ -193,7 +193,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 2. 呼叫 `run_command` 執行本外掛目錄下的 `configure-statusline.mjs` 腳本，傳入相關參數。腳本會全自動處理：
    - 排序輸入解析。
    - 同步寫入三層 `settings.json`（已執行防禦性 BOM 剝除與寫入後無 BOM 驗證）。
-   - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 通配符鍵，並在 Windows 上註冊各種反斜線/環境變數變體）。
+   - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 萬用字元（Wildcard）鍵，並在 Windows 上註冊各種反斜線/環境變數變體）。
    - 將 Hook 腳本安全拷貝部署至 `~/.gemini/antigravity-cli/hooks/` 目錄中，寫入時強制 `{ encoding: 'utf8' }`。
    - 若為 Windows 平台且 CLI 目錄缺少 `sh.exe`，自動編譯靜默無窗體橋接器。
 
@@ -201,7 +201,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
    ```bash
    node skills/antigravity-cli-statusline/scripts/configure-statusline.mjs --lang "<步驟1選定的語言>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/略過輸入>" --workspace "<當前工作區絕對路徑>"
    ```
-   *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["目前使用的 AI 模型名稱 (model-name)","帳號真實 API 可用額度 (quota)"]'`。請注意外層與內層引號的正確跳脫。*
+   *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["目前使用的人工智慧（AI）模型名稱（model-name）","帳號真實應用程式介面（API）可用額度（quota）"]'`。請注意外層與內層引號的正確跳脫。*
 
 ### 步驟 6：自動驗證
 

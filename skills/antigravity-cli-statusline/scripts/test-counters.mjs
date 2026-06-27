@@ -160,10 +160,10 @@ async function main() {
     } else {
       console.log(`狀態列輸出: ${res0.stdout.trim()}`);
       
-      const regexPending = new RegExp("輸入佇列.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "11" + escapeRegex(RESET));
-      const regexBg = new RegExp("背景任務.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "12" + escapeRegex(RESET));
-      const regexSub = new RegExp("子代理.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "13" + escapeRegex(RESET));
-      const regexArt = new RegExp("累計產出.*?" + escapeRegex(BOLD) + "14" + escapeRegex(RESET));
+      const regexPending = new RegExp("佇列中待處理的使用者輸入數.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "11" + escapeRegex(RESET));
+      const regexBg = new RegExp("進行中的背景任務數.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "12" + escapeRegex(RESET));
+      const regexSub = new RegExp("活躍子代理數.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "13" + escapeRegex(RESET));
+      const regexArt = new RegExp("本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數.*?" + escapeRegex(BOLD) + "14" + escapeRegex(RESET));
 
       const p1 = regexPending.test(res0.stdout);
       const p2 = regexBg.test(res0.stdout);
@@ -174,10 +174,10 @@ async function main() {
         console.log("✅ 測試 0 通過！Meta 優先級與防禦性擷取完全正確。");
       } else {
         console.error("❌ 測試 0 失敗！Meta 優先或屬性相容無效。");
-        console.error(`- 輸入佇列 (11, 紅色): ${p1 ? 'OK' : 'FAIL'}`);
-        console.error(`- 背景任務 (12, 紅色): ${p2 ? 'OK' : 'FAIL'}`);
-        console.error(`- 子代理 (13, 紅色): ${p3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 累計產出 (14, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
+        console.error(`- 佇列中待處理的使用者輸入數 (11, 紅色): ${p1 ? 'OK' : 'FAIL'}`);
+        console.error(`- 進行中的背景任務數 (12, 紅色): ${p2 ? 'OK' : 'FAIL'}`);
+        console.error(`- 活躍子代理數 (13, 紅色): ${p3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數 (14, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
@@ -212,10 +212,10 @@ async function main() {
       console.log(`狀態列輸出: ${res1.stdout.trim()}`);
       
       // 驗證 2 (GREEN), 3 (YELLOW), 4 (YELLOW), 5 (BOLD)
-      const regexPending = new RegExp("輸入佇列.*?" + escapeRegex(GREEN) + escapeRegex(BOLD) + "2" + escapeRegex(RESET));
-      const regexBg = new RegExp("背景任務.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "3" + escapeRegex(RESET));
-      const regexSub = new RegExp("子代理.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "4" + escapeRegex(RESET));
-      const regexArt = new RegExp("累計產出.*?" + escapeRegex(BOLD) + "5" + escapeRegex(RESET));
+      const regexPending = new RegExp("佇列中待處理的使用者輸入數.*?" + escapeRegex(GREEN) + escapeRegex(BOLD) + "2" + escapeRegex(RESET));
+      const regexBg = new RegExp("進行中的背景任務數.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "3" + escapeRegex(RESET));
+      const regexSub = new RegExp("活躍子代理數.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "4" + escapeRegex(RESET));
+      const regexArt = new RegExp("本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數.*?" + escapeRegex(BOLD) + "5" + escapeRegex(RESET));
 
       const p1 = regexPending.test(res1.stdout);
       const p2 = regexBg.test(res1.stdout);
@@ -226,10 +226,10 @@ async function main() {
         console.log("✅ 測試 1 通過！快取數據及配色完全正確。");
       } else {
         console.error("❌ 測試 1 失敗！輸出未匹配預期配色或數值。");
-        console.error(`- 輸入佇列 (2, 綠色): ${p1 ? 'OK' : 'FAIL'}`);
-        console.error(`- 背景任務 (3, 黃色): ${p2 ? 'OK' : 'FAIL'}`);
-        console.error(`- 子代理 (4, 黃色): ${p3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 累計產出 (5, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
+        console.error(`- 佇列中待處理的使用者輸入數 (2, 綠色): ${p1 ? 'OK' : 'FAIL'}`);
+        console.error(`- 進行中的背景任務數 (3, 黃色): ${p2 ? 'OK' : 'FAIL'}`);
+        console.error(`- 活躍子代理數 (4, 黃色): ${p3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數 (5, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
@@ -330,10 +330,10 @@ async function main() {
       console.log(`狀態列輸出: ${res2.stdout.trim()}`);
       
       // 驗證 8 (RED), 6 (RED), expectedSubagents (subagentsColor), 7 (BOLD)
-      const regexPending = new RegExp("輸入佇列.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "8" + escapeRegex(RESET));
-      const regexBg = new RegExp("背景任務.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "6" + escapeRegex(RESET));
-      const regexSub = new RegExp("子代理.*?" + escapeRegex(subagentsColor) + escapeRegex(BOLD) + expectedSubagents + escapeRegex(RESET));
-      const regexArt = new RegExp("累計產出.*?" + escapeRegex(BOLD) + "7" + escapeRegex(RESET));
+      const regexPending = new RegExp("佇列中待處理的使用者輸入數.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "8" + escapeRegex(RESET));
+      const regexBg = new RegExp("進行中的背景任務數.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "6" + escapeRegex(RESET));
+      const regexSub = new RegExp("活躍子代理數.*?" + escapeRegex(subagentsColor) + escapeRegex(BOLD) + expectedSubagents + escapeRegex(RESET));
+      const regexArt = new RegExp("本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數.*?" + escapeRegex(BOLD) + "7" + escapeRegex(RESET));
 
       const p1 = regexPending.test(res2.stdout);
       const p2 = regexBg.test(res2.stdout);
@@ -344,10 +344,10 @@ async function main() {
         console.log("✅ 測試 2 通過！退讓數據及配色完全正確。");
       } else {
         console.error("❌ 測試 2 失敗！輸出未匹配預期配色或數值。");
-        console.error(`- 輸入佇列 (8, 紅色): ${p1 ? 'OK' : 'FAIL'}`);
-        console.error(`- 背景任務 (6, 紅色): ${p2 ? 'OK' : 'FAIL'}`);
-        console.error(`- 子代理 (${expectedSubagents}, 配色): ${p3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 累計產出 (7, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
+        console.error(`- 佇列中待處理的使用者輸入數 (8, 紅色): ${p1 ? 'OK' : 'FAIL'}`);
+        console.error(`- 進行中的背景任務數 (6, 紅色): ${p2 ? 'OK' : 'FAIL'}`);
+        console.error(`- 活躍子代理數 (${expectedSubagents}, 配色): ${p3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數 (7, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
@@ -387,10 +387,10 @@ async function main() {
       console.log(`狀態列輸出: ${res3.stdout.trim()}`);
 
       // 驗證輸出是否為著色的 0 (0 值對應配色為 BLUE)
-      const regexPending3 = new RegExp("輸入佇列.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
-      const regexBg3 = new RegExp("背景任務.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
-      const regexSub3 = new RegExp("子代理.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
-      const regexArt3 = new RegExp("累計產出.*?" + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
+      const regexPending3 = new RegExp("佇列中待處理的使用者輸入數.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
+      const regexBg3 = new RegExp("進行中的背景任務數.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
+      const regexSub3 = new RegExp("活躍子代理數.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
+      const regexArt3 = new RegExp("本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數.*?" + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
 
       const p1_3 = regexPending3.test(res3.stdout);
       const p2_3 = regexBg3.test(res3.stdout);
@@ -401,10 +401,10 @@ async function main() {
         console.log("✅ 測試 3 通過！0 值成功優先於非零快取，未發生錯誤退讓。");
       } else {
         console.error("❌ 測試 3 失敗！0 值退讓至快取或檔案系統。");
-        console.error(`- 輸入佇列 (0, 藍色): ${p1_3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 背景任務 (0, 藍色): ${p2_3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 子代理 (0, 藍色): ${p3_3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 累計產出 (0, BOLD): ${p4_3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 佇列中待處理的使用者輸入數 (0, 藍色): ${p1_3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 進行中的背景任務數 (0, 藍色): ${p2_3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 活躍子代理數 (0, 藍色): ${p3_3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數 (0, BOLD): ${p4_3 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
@@ -449,7 +449,7 @@ async function main() {
       console.log(`狀態列輸出: ${res4.stdout.trim()}`);
 
       // 驗證輸出是否為子代理 4 (4 值對應配色為 YELLOW)
-      const regexSub4 = new RegExp("子代理.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "4" + escapeRegex(RESET));
+      const regexSub4 = new RegExp("活躍子代理數.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "4" + escapeRegex(RESET));
 
       const p3_4 = regexSub4.test(res4.stdout);
 
@@ -457,7 +457,7 @@ async function main() {
         console.log("✅ 測試 4 通過！子代理狀態物件成功過濾，僅保留活躍項目。");
       } else {
         console.error("❌ 測試 4 失敗！子代理狀態物件過濾無效或計數錯誤。");
-        console.error(`- 子代理 (4, 黃色): ${p3_4 ? 'OK' : 'FAIL'}`);
+        console.error(`- 活躍子代理數 (4, 黃色): ${p3_4 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
