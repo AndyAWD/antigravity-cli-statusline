@@ -204,7 +204,7 @@ v24.14.0
 
 ## 補充：GetUserStatus 拿到了什麼？
 
-在剛剛的提示詞第 182 行，我們讓腳本打了一個本地端 API 請求（`POST GetUserStatus`）。
+在剛剛提示詞的第三步，我們讓腳本打了一個本地端 API 請求（`POST GetUserStatus`）。
 這其實是向 Agy CLI 的語言伺服器（Language Server）索取當前狀態。
 
 **發送的請求內容（Payload）：**
@@ -904,7 +904,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
     <div style="background:#1e1e1e; border-radius:10px;
                 padding:0.85em 1.1em; font-family:'Menlo','Consolas',monospace;
                 font-size:0.72em; line-height:1.9;">
-      <div><span style="color:#888;">$ </span><span style="color:#57caff;">agy plugin install </span><span style="color:#fff;">antigravity-cli-statusline</span></div>
+      <div><span style="color:#888;">$ </span><span style="color:#57caff;">agy plugin install </span><span style="color:#fff;">https://github.com/andyawd/antigravity-cli-statusline</span></div>
       <div><span style="color:#888;">$ </span><span style="color:#fff;">agy</span></div>
       <div><span style="color:#5cdb6d;">&gt; </span><span style="color:#ffd427;">/antigravity-cli-statusline</span></div>
     </div>
