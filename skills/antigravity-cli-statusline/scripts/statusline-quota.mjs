@@ -123,8 +123,10 @@ async function getGitBranch(lang, projectPath) {
         const paths = [
           'C:\\Program Files\\Git\\cmd\\git.exe',
           'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-          'C:\\Program Files\\Git\\bin\\git.exe'
-        ];
+          'C:\\Program Files\\Git\\bin\\git.exe',
+          '%USERPROFILE%\\AppData\\Local\\Programs\\Git\\cmd\\git.exe',
+          '%USERPROFILE%\\scoop\\apps\\git\\current\\cmd\\git.exe'
+        ].map(p => p.replace(/%USERPROFILE%/g, process.env.USERPROFILE || os.homedir()));
         for (const gitPath of paths) {
           try {
             await fs.access(gitPath);
@@ -174,8 +176,10 @@ async function getGitDirty(projectPath) {
         const paths = [
           'C:\\Program Files\\Git\\cmd\\git.exe',
           'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-          'C:\\Program Files\\Git\\bin\\git.exe'
-        ];
+          'C:\\Program Files\\Git\\bin\\git.exe',
+          '%USERPROFILE%\\AppData\\Local\\Programs\\Git\\cmd\\git.exe',
+          '%USERPROFILE%\\scoop\\apps\\git\\current\\cmd\\git.exe'
+        ].map(p => p.replace(/%USERPROFILE%/g, process.env.USERPROFILE || os.homedir()));
         for (const gitPath of paths) {
           try {
             await fs.access(gitPath);
@@ -207,6 +211,14 @@ async function getGitDirty(projectPath) {
 async function getCliMemoryMB() {
   try {
     if (process.platform === 'win32') {
+      try {
+        const cmd = `powershell.exe -NoProfile -Command "(Get-CimInstance Win32_Process -Filter 'ProcessId = ${process.ppid}').WorkingSetSize"`;
+        const output = await runCmdAsync(cmd);
+        const memBytes = parseInt(output.trim(), 10);
+        if (!isNaN(memBytes) && memBytes > 0) {
+          return Math.round(memBytes / 1024 / 1024);
+        }
+      } catch (err) {}
       return Math.round(process.memoryUsage().rss / 1024 / 1024);
     } else {
       const output = await runCmdAsync(`ps -o rss= -p ${process.ppid}`);
@@ -240,11 +252,11 @@ async function getSettingsAsync() {
   let settings = {};
   try {
     const globalContent = await fs.readFile(globalPath, 'utf8');
-    settings = JSON.parse(globalContent);
+    settings = JSON.parse(globalContent.replace(/^\uFEFF/, ''));
   } catch (e) {}
   try {
     const projContent = await fs.readFile(projectPath, 'utf8');
-    const projSettings = JSON.parse(projContent);
+    const projSettings = JSON.parse(projContent.replace(/^\uFEFF/, ''));
     settings = { ...settings, ...projSettings };
     if (projSettings.ui) {
       settings.ui = { ...settings.ui, ...projSettings.ui };
@@ -332,7 +344,7 @@ async function calculateContextUsageAsync(meta, conversationId) {
   if (totalInput === 0 && totalOutput === 0) {
     try {
       const content = await fs.readFile(ctxCachePath, 'utf8');
-      const cachedCtx = JSON.parse(content);
+      const cachedCtx = JSON.parse(content.replace(/^\uFEFF/, ''));
       totalInput = cachedCtx.total_input_tokens || 0;
       totalOutput = cachedCtx.total_output_tokens || 0;
       if (cachedCtx.used_percentage) usedPctNum = cachedCtx.used_percentage;
@@ -363,7 +375,7 @@ async function manageAccountMetaCacheAsync(meta) {
   let cachedAccount = {};
   try {
     const content = await fs.readFile(accountMetaPath, 'utf8');
-    cachedAccount = JSON.parse(content);
+    cachedAccount = JSON.parse(content.replace(/^\uFEFF/, ''));
   } catch (e) {}
   
   if (meta && meta.account && (meta.account.email || meta.account.plan_tier || meta.account.ai_credits)) {
@@ -391,7 +403,7 @@ async function getMetricValueAsync(meta, keys, countersCachePath, fallbackFn) {
   if (countersCachePath) {
     try {
       const content = await fs.readFile(countersCachePath, 'utf8');
-      cacheCounters = JSON.parse(content);
+      cacheCounters = JSON.parse(content.replace(/^\uFEFF/, ''));
     } catch (e) {}
   }
 
@@ -742,7 +754,7 @@ async function main() {
 
   try {
     const stdinStr = await readStdin();
-    try { if (stdinStr.trim()) meta = JSON.parse(stdinStr); } catch (e) {}
+    try { if (stdinStr.trim()) meta = JSON.parse(stdinStr.replace(/^\uFEFF/, '')); } catch (e) {}
 
     const settings = await getSettingsAsync();
     const termWidth = Math.max(40, (meta?.terminal_width || process.stdout.columns || 80) - 15);
@@ -772,7 +784,7 @@ async function main() {
     let cache = null;
     try {
       const cacheContent = await fs.readFile(cachePath, 'utf8');
-      cache = JSON.parse(cacheContent);
+      cache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
     } catch (e) {}
     await triggerQuotaUpdateIfNeededAsync(cache);
 

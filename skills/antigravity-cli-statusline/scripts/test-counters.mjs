@@ -42,7 +42,8 @@ function runStatusline(stdinData) {
   return new Promise((resolve) => {
     const child = spawn('node', ['skills/antigravity-cli-statusline/scripts/statusline-quota.mjs'], {
       env: { ...process.env, DISABLE_QUOTA_HOOK: undefined },
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true
     });
 
     let stdout = '';
