@@ -152,8 +152,9 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 - `us`：英文說明 + 英文識別碼
 - `jp`：日文說明 + 英文識別碼
 
-由於 CLI 狀態列支援「多行智慧折行」且容納指標無上限，**嚴禁將指標拆分為多個問題發送**，必須合併至單一多選問題：
+由於 CLI 狀態列支援「多行智慧折行」且容納指標無上限，**嚴禁將指標拆分為多個問題發送**，必須合併至單一多選問題。為防止 AI 翻譯時漏項，請**嚴格完整複製**以下對應語系的 24 個選項，不可自行刪減：
 
+**【zh-tw 繁體中文選項】**
 ```json
 {
   "questions": [
@@ -190,6 +191,86 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
   ],
   "toolSummary": "指標選擇",
   "toolAction": "詢問狀態列指標"
+}
+```
+
+**【us English 選項】**
+```json
+{
+  "questions": [
+    {
+      "question": "Select statusline metrics to display (sorting will be done in the next step)",
+      "options": [
+        "Current AI model name (model-name)",
+        "Active agent profile (agent-profile)",
+        "Agent state (idle / thinking / working / tool_use / initializing) (agent-state)",
+        "Sandbox status (off / on (net) / on (no-net)) (sandbox-status)",
+        "Context used percentage (context-used)",
+        "Exact token count for current session (token-count)",
+        "Total artifacts generated in this session (artifacts)",
+        "Account email (account-email)",
+        "Current subscription plan tier (plan-tier)",
+        "Real API quota remaining (quota)",
+        "API quota reset countdown (quota-reset-countdown)",
+        "AI credits (ai-credits)",
+        "Pending tool confirmation dialog (tool-confirmation)",
+        "Pending user inputs in queue (pending-input)",
+        "Running background tasks (background-tasks)",
+        "Active subagents (subagents)",
+        "Current workspace short path (project-path)",
+        "Current workspace full path (project-full-path)",
+        "VCS type (git / jj / fig) (vcs-type)",
+        "Current Git branch (git-branch)",
+        "Workspace dirty status (dirty / clean) (vcs-dirty)",
+        "RAM usage of CLI process (memory-usage)",
+        "Antigravity CLI version (cli-version)",
+        "Current conversation ID (first 8 chars) (conversation-id)"
+      ],
+      "is_multi_select": true
+    }
+  ],
+  "toolSummary": "Select Metrics",
+  "toolAction": "Ask for statusline metrics"
+}
+```
+
+**【jp 日本語選項】**
+```json
+{
+  "questions": [
+    {
+      "question": "表示するステータスラインの指標を選択してください（並べ替えは次のステップで行います）",
+      "options": [
+        "現在のAIモデル名 (model-name)",
+        "使用中のエージェント (agent-profile)",
+        "エージェント状態（idle / thinking / working / tool_use / initializing）(agent-state)",
+        "サンドボックス状態（off / on (net) / on (no-net)）(sandbox-status)",
+        "消費されたコンテキストの割合 (context-used)",
+        "現在のセッションの正確なトークン数 (token-count)",
+        "今回のセッションで生成されたアーティファクト数 (artifacts)",
+        "アカウントのメールアドレス (account-email)",
+        "現在のサブスクリプションプラン (plan-tier)",
+        "実際のAPI利用可能枠 (quota)",
+        "APIリセット時間のカウントダウン (quota-reset-countdown)",
+        "AIクレジット (ai-credits)",
+        "返答待ちのツール確認ダイアログ (tool-confirmation)",
+        "キュー内の待機中ユーザー入力数 (pending-input)",
+        "実行中のバックグラウンドタスク数 (background-tasks)",
+        "アクティブなサブエージェント数 (subagents)",
+        "現在のワークスペースの短いパス (project-path)",
+        "現在のワークスペースの完全なパス (project-full-path)",
+        "バージョン管理タイプ（git / jj / fig）(vcs-type)",
+        "現在のGitブランチ (git-branch)",
+        "ワークスペースの未コミット変更（dirty / clean）(vcs-dirty)",
+        "CLIプロセスのRAM使用量 (memory-usage)",
+        "Antigravity CLIバージョン (cli-version)",
+        "現在の会話ID（先頭8文字）(conversation-id)"
+      ],
+      "is_multi_select": true
+    }
+  ],
+  "toolSummary": "指標の選択",
+  "toolAction": "ステータスラインの指標を尋ねる"
 }
 ```
 
