@@ -244,7 +244,7 @@ Windows 平台的 BOM 鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide
 
 寫入內容：`ui.language` + 解析後的 `ui.footer.items` + 完整的 `statusLine` 物件（含 `enabled`、`type`、`command`）。
 
-- macOS / Linux 與 Windows 的 `statusLine` JSON 範本、`command` 動態絕對路徑替換規則、`trusted_hooks.json` 信任機制細節（含當前工作區、家目錄、`"*"` 通配符三個鍵）→ 詳見 [references/config-files.md](references/config-files.md)
+- macOS / Linux 與 Windows 的 `statusLine` JSON 範本、`command` 動態絕對路徑替換規則、`trusted_hooks.json` 信任機制細節（含當前工作區、家目錄、`"*"` 萬用字元（Wildcard）三個鍵）→ 詳見 [references/config-files.md](references/config-files.md)
 - **Windows 平台的 UTF-8 BOM 編碼鐵則（絕對禁止帶 BOM 寫檔的工具清單與保證不帶 BOM 的替代方案）** → 詳見 [references/windows.md](references/windows.md) §1
 
 > [!CAUTION]

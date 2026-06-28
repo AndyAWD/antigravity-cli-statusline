@@ -72,8 +72,8 @@ curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.
 ## 如何安裝 Node.js（底部狀態列會用到）
 
 1. 前往網址：`https://nodejs.org/zh-tw/download`
-2. Windows 用戶：直接點擊下載 `.msi`，並執行安裝程序即可。
-3. macOS 用戶：直接點擊下載 `.pkg`，並執行安裝程序即可。
+2. Windows 使用者（User）：直接點擊下載 `.msi`，並執行安裝程序即可。
+3. macOS 使用者（User）：直接點擊下載 `.pkg`，並執行安裝程序即可。
 
 **裝完驗證，有出現版本號**
 
@@ -109,12 +109,12 @@ v24.14.0
 
 ## 簡單易懂的終端機移動路徑（Windows / macOS）
 
-- **Windows 用戶**
+- **Windows 使用者（User）**
     1. 用檔案總管開啟你的專案資料夾
     2. 點擊上方的路徑列，刪除原本的路徑
     3. 輸入 `cmd`，按下 Enter
     4. 命令提示字元就會自動開啟在這個路徑！
-- **macOS 用戶**
+- **macOS 使用者（User）**
     1. 開啟終端機
     2. 輸入 `cd `（cd 後面要空一格）
     3. 打開 Finder，把專案資料夾拖曳到終端機視窗
@@ -656,7 +656,7 @@ v24.14.0
 
 - 注意事項
    1. `command` **必須用絕對路徑**，不能用 `~` / `$HOME` / `%USERPROFILE%`（Hook 在背景跑不經 shell，環境變數不會展開）
-   2. Windows 用戶請用 **VS Code** 或記事本（另存新檔→編碼選「UTF-8」不勾 BOM）編輯，**不要用 PowerShell 的 `Out-File` / `Set-Content` / `>` 重導向**，預設會寫成 UTF-16 LE 或加上 BOM，CLI 解析會出現 `invalid character 'ï'`
+   2. Windows 使用者（User）請用 **VS Code** 或記事本（另存新檔→編碼選「UTF-8」不勾 BOM）編輯，**不要用 PowerShell 的 `Out-File` / `Set-Content` / `>` 重導向**，預設會寫成 UTF-16 LE 或加上 BOM，CLI 解析會出現 `invalid character 'ï'`
 - 手動增加 
   1. 打開 `~/.gemini/antigravity-cli/settings.json`
   2. 在最外層 `{}` 內加上 statusLine 的資訊 
