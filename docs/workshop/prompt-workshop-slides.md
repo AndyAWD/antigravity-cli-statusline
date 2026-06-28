@@ -166,7 +166,7 @@ v24.14.0
 
 ## Step 1／3：請 Agy CLI 寫「抓額度」腳本
 
-直接在 Agy CLI 的對話框輸入下面這段，它會把檔案寫到指定路徑，不必複製貼上到別處。
+直接在 Agy CLI 的對話方塊（Dialog Box）輸入下面這段，它會把檔案寫到指定路徑，不必複製貼上到別處。
 
 ```text
 請在 ~/.gemini/antigravity-cli/hooks/ 建立 my-status.mjs
@@ -810,7 +810,7 @@ API: 剩餘 80%
 
 ## Step 3／3：請 Agy CLI 套用色彩美化
 
-**繼續在 Agy CLI 對話框貼這段，他會直接改寫腳本：**
+**繼續在 Agy CLI 對話方塊（Dialog Box）貼這段，他會直接改寫腳本：**
 
 ```text
 請在 ~/.gemini/antigravity-cli/hooks/my-status.mjs 上加 24-bit ANSI 真彩色：

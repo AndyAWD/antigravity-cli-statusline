@@ -123,8 +123,10 @@ async function getGitBranch(lang, projectPath) {
         const paths = [
           'C:\\Program Files\\Git\\cmd\\git.exe',
           'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-          'C:\\Program Files\\Git\\bin\\git.exe'
-        ];
+          'C:\\Program Files\\Git\\bin\\git.exe',
+          '%USERPROFILE%\\AppData\\Local\\Programs\\Git\\cmd\\git.exe',
+          '%USERPROFILE%\\scoop\\apps\\git\\current\\cmd\\git.exe'
+        ].map(p => p.replace(/%USERPROFILE%/g, process.env.USERPROFILE || os.homedir()));
         for (const gitPath of paths) {
           try {
             await fs.access(gitPath);
@@ -174,8 +176,10 @@ async function getGitDirty(projectPath) {
         const paths = [
           'C:\\Program Files\\Git\\cmd\\git.exe',
           'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-          'C:\\Program Files\\Git\\bin\\git.exe'
-        ];
+          'C:\\Program Files\\Git\\bin\\git.exe',
+          '%USERPROFILE%\\AppData\\Local\\Programs\\Git\\cmd\\git.exe',
+          '%USERPROFILE%\\scoop\\apps\\git\\current\\cmd\\git.exe'
+        ].map(p => p.replace(/%USERPROFILE%/g, process.env.USERPROFILE || os.homedir()));
         for (const gitPath of paths) {
           try {
             await fs.access(gitPath);
@@ -207,6 +211,14 @@ async function getGitDirty(projectPath) {
 async function getCliMemoryMB() {
   try {
     if (process.platform === 'win32') {
+      try {
+        const cmd = `powershell.exe -NoProfile -Command "(Get-CimInstance Win32_Process -Filter 'ProcessId = ${process.ppid}').WorkingSetSize"`;
+        const output = await runCmdAsync(cmd);
+        const memBytes = parseInt(output.trim(), 10);
+        if (!isNaN(memBytes) && memBytes > 0) {
+          return Math.round(memBytes / 1024 / 1024);
+        }
+      } catch (err) {}
       return Math.round(process.memoryUsage().rss / 1024 / 1024);
     } else {
       const output = await runCmdAsync(`ps -o rss= -p ${process.ppid}`);
@@ -240,11 +252,11 @@ async function getSettingsAsync() {
   let settings = {};
   try {
     const globalContent = await fs.readFile(globalPath, 'utf8');
-    settings = JSON.parse(globalContent);
+    settings = JSON.parse(globalContent.replace(/^\uFEFF/, ''));
   } catch (e) {}
   try {
     const projContent = await fs.readFile(projectPath, 'utf8');
-    const projSettings = JSON.parse(projContent);
+    const projSettings = JSON.parse(projContent.replace(/^\uFEFF/, ''));
     settings = { ...settings, ...projSettings };
     if (projSettings.ui) {
       settings.ui = { ...settings.ui, ...projSettings.ui };
@@ -320,6 +332,15 @@ function resolveModelQuota(fallbackModel, cache) {
   return modelQuota || { remaining_percentage: 100, refreshes_in: '' };
 }
 
+async function writeFileAndVerifyNoBOM(filePath, content) {
+  await fs.writeFile(filePath, content, { encoding: 'utf8' });
+  let buffer = await fs.readFile(filePath);
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    buffer = buffer.slice(3);
+    await fs.writeFile(filePath, buffer);
+  }
+}
+
 async function calculateContextUsageAsync(meta, conversationId) {
   const contextWindow = meta.context_window || {};
   const ctxCachePath = join(os.homedir(), '.gemini', 'tmp', `ctx_${conversationId}.json`);
@@ -332,7 +353,7 @@ async function calculateContextUsageAsync(meta, conversationId) {
   if (totalInput === 0 && totalOutput === 0) {
     try {
       const content = await fs.readFile(ctxCachePath, 'utf8');
-      const cachedCtx = JSON.parse(content);
+      const cachedCtx = JSON.parse(content.replace(/^\uFEFF/, ''));
       totalInput = cachedCtx.total_input_tokens || 0;
       totalOutput = cachedCtx.total_output_tokens || 0;
       if (cachedCtx.used_percentage) usedPctNum = cachedCtx.used_percentage;
@@ -341,12 +362,12 @@ async function calculateContextUsageAsync(meta, conversationId) {
   } else {
     try {
       await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-      await fs.writeFile(ctxCachePath, JSON.stringify({
+      await writeFileAndVerifyNoBOM(ctxCachePath, JSON.stringify({
         total_input_tokens: totalInput,
         total_output_tokens: totalOutput,
         used_percentage: usedPctNum,
         context_window_size: contextSize
-      }), { encoding: 'utf8' });
+      }));
     } catch (e) {}
   }
   
@@ -363,16 +384,15 @@ async function manageAccountMetaCacheAsync(meta) {
   let cachedAccount = {};
   try {
     const content = await fs.readFile(accountMetaPath, 'utf8');
-    cachedAccount = JSON.parse(content);
+    cachedAccount = JSON.parse(content.replace(/^\uFEFF/, ''));
   } catch (e) {}
   
-  if (meta && meta.account && (meta.account.email || meta.account.plan_tier || meta.account.ai_credits)) {
+  if (meta && meta.account && (meta.account.email || meta.account.plan_tier)) {
     if (meta.account.email) cachedAccount.email = meta.account.email;
     if (meta.account.plan_tier) cachedAccount.planTier = meta.account.plan_tier;
-    if (meta.account.ai_credits) cachedAccount.aiCredits = meta.account.ai_credits;
     try {
       await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-      await fs.writeFile(accountMetaPath, JSON.stringify(cachedAccount), { encoding: 'utf8' });
+      await writeFileAndVerifyNoBOM(accountMetaPath, JSON.stringify(cachedAccount));
     } catch (e) {}
   }
   return cachedAccount;
@@ -391,7 +411,7 @@ async function getMetricValueAsync(meta, keys, countersCachePath, fallbackFn) {
   if (countersCachePath) {
     try {
       const content = await fs.readFile(countersCachePath, 'utf8');
-      cacheCounters = JSON.parse(content);
+      cacheCounters = JSON.parse(content.replace(/^\uFEFF/, ''));
     } catch (e) {}
   }
 
@@ -429,7 +449,6 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   // Account
   const planTier = (cache && cache.planTier) ? cache.planTier : (meta?.account?.plan_tier || cachedAccount.planTier || unknownStr);
   const accountEmail = (cache && cache.email) ? cache.email : (meta?.account?.email || cachedAccount.email || unknownStr);
-  const aiCredits = (cache && cache.aiCredits) ? cache.aiCredits : (meta?.account?.ai_credits || cachedAccount.aiCredits || noneStr);
 
   // Agent State
   const agentState = meta?.agent_state || 'idle';
@@ -608,7 +627,7 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
 
   return {
     fallbackModel, quotaColor, quotaVal, contextColor, usedPct, memUsage, tokenCount,
-    countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail, aiCredits,
+    countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail,
     agentState, toolConfirmPending, pendingInputCount, backgroundTasksCount, subagentsCount,
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
     sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName
@@ -618,29 +637,28 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
 function buildI18nDict(lang, m) {
   const dicts = {
     'zh-tw': {
-      'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
-      'quota': `${WHITE}API 可用額度:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
-      'context-used': `${WHITE}Context:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
-      'memory-usage': `${WHITE}記憶體:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
-      'token-count': `${WHITE}Token:${RESET} ${m.tokenCount}`,
-      'quota-reset-countdown': `${WHITE}API 重置倒數:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
-      'git-branch': `${WHITE}Git 分支: ${BOLD}${m.gitBranch}${RESET}`,
-      'project-path': `${WHITE}專案: ${BOLD}${m.projectName}${RESET}`,
-      'project-full-path': `${WHITE}專案路徑: ${BOLD}${m.projectFullPath}${RESET}`,
-      'plan-tier': `${WHITE}帳號等級: ${BOLD}${m.planTier}${RESET}`,
-      'account-email': `${WHITE}帳號: ${BOLD}${m.accountEmail}${RESET}`,
-      'ai-credits': `${WHITE}AI 點數:${RESET} ${BLUE}${BOLD}${m.aiCredits}${RESET}`,
-      'agent-state': `${WHITE}代理狀態:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
-      'tool-confirmation': `${WHITE}等你同意:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? '在等你' : '都好了'}${RESET}`,
-      'pending-input': `${WHITE}輸入佇列:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
-      'background-tasks': `${WHITE}背景任務:${RESET} ${getColorByCount(m.backgroundTasksCount)}${BOLD}${m.backgroundTasksCount}${RESET}`,
-      'subagents': `${WHITE}子代理:${RESET} ${getColorByCount(m.subagentsCount)}${BOLD}${m.subagentsCount}${RESET}`,
-      'artifacts': `${WHITE}累計產出: ${BOLD}${m.artifactsCount}${RESET}`,
-      'vcs-dirty': `${WHITE}工作區:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyGlyph} ${m.vcsDirtyLabel}${RESET}`,
-      'vcs-type': `${WHITE}版控類型: ${BOLD}${m.vcsType}${RESET}`,
-      'sandbox-status': `${WHITE}沙盒:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
-      'conversation-id': `${WHITE}對話 ID: ${BOLD}${m.conversationIdShort}${RESET}`,
+      'model-name': `${WHITE}目前使用的人工智慧（AI）模型名稱:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'quota': `${WHITE}帳號真實應用程式介面（API）可用額度:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
+      'context-used': `${WHITE}目前對話已消耗的上下文（Context）比例:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
+      'memory-usage': `${WHITE}命令列介面（CLI）行程所消耗的隨機存取記憶體（RAM）記憶體量:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
+      'token-count': `${WHITE}目前工作階段（Session）消耗的精確權杖（Token）數量:${RESET} ${m.tokenCount}`,
+      'quota-reset-countdown': `${WHITE}應用程式介面（API）重置時間倒數:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'git-branch': `${WHITE}目前工作區專案的 Git 分支: ${BOLD}${m.gitBranch}${RESET}`,
+      'project-path': `${WHITE}目前工作區專案短路徑: ${BOLD}${m.projectName}${RESET}`,
+      'project-full-path': `${WHITE}目前工作區專案完整路徑: ${BOLD}${m.projectFullPath}${RESET}`,
+      'plan-tier': `${WHITE}目前訂閱方案等級（Plan Tier）: ${BOLD}${m.planTier}${RESET}`,
+      'account-email': `${WHITE}帳號電子郵件（Account Email）: ${BOLD}${m.accountEmail}${RESET}`,
+      'agent-state': `${WHITE}代理當前狀態（Agent State）:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
+      'tool-confirmation': `${WHITE}是否有等你回應的工具確認對話方塊（Dialog Box）:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? '在等你' : '都好了'}${RESET}`,
+      'pending-input': `${WHITE}佇列中待處理的使用者輸入數:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
+      'background-tasks': `${WHITE}進行中的背景任務數:${RESET} ${getColorByCount(m.backgroundTasksCount)}${BOLD}${m.backgroundTasksCount}${RESET}`,
+      'subagents': `${WHITE}活躍子代理數:${RESET} ${getColorByCount(m.subagentsCount)}${BOLD}${m.subagentsCount}${RESET}`,
+      'artifacts': `${WHITE}本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數: ${BOLD}${m.artifactsCount}${RESET}`,
+      'vcs-dirty': `${WHITE}工作區是否有未提交變更（dirty / clean）:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyGlyph} ${m.vcsDirtyLabel}${RESET}`,
+      'vcs-type': `${WHITE}版本控制類型（git / jj / fig）: ${BOLD}${m.vcsType}${RESET}`,
+      'sandbox-status': `${WHITE}沙盒模式狀態（off / on (net) / on (no-net)）:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
+      'cli-version': `${WHITE}Antigravity 命令列介面（CLI）版本號: ${BOLD}${m.cliVersion}${RESET}`,
+      'conversation-id': `${WHITE}目前對話識別碼（ID）（前 8 碼，用於除錯）: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}使用中代理:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`
     },
     'us': {
@@ -655,7 +673,6 @@ function buildI18nDict(lang, m) {
       'project-full-path': `${WHITE}Project Path: ${BOLD}${m.projectFullPath}${RESET}`,
       'plan-tier': `${WHITE}Plan: ${BOLD}${m.planTier}${RESET}`,
       'account-email': `${WHITE}Account: ${BOLD}${m.accountEmail}${RESET}`,
-      'ai-credits': `${WHITE}AI Credits:${RESET} ${BLUE}${BOLD}${m.aiCredits}${RESET}`,
       'agent-state': `${WHITE}Agent:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
       'tool-confirmation': `${WHITE}Awaiting You:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? 'waiting' : 'all clear'}${RESET}`,
       'pending-input': `${WHITE}Queue:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
@@ -681,7 +698,6 @@ function buildI18nDict(lang, m) {
       'project-full-path': `${WHITE}プロジェクトパス: ${BOLD}${m.projectFullPath}${RESET}`,
       'plan-tier': `${WHITE}プラン: ${BOLD}${m.planTier}${RESET}`,
       'account-email': `${WHITE}アカウント: ${BOLD}${m.accountEmail}${RESET}`,
-      'ai-credits': `${WHITE}AI クレジット:${RESET} ${BLUE}${BOLD}${m.aiCredits}${RESET}`,
       'agent-state': `${WHITE}エージェント状態:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
       'tool-confirmation': `${WHITE}ご承認待ち:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? '待機中' : 'すべて完了'}${RESET}`,
       'pending-input': `${WHITE}入力キュー:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
@@ -742,7 +758,7 @@ async function main() {
 
   try {
     const stdinStr = await readStdin();
-    try { if (stdinStr.trim()) meta = JSON.parse(stdinStr); } catch (e) {}
+    try { if (stdinStr.trim()) meta = JSON.parse(stdinStr.replace(/^\uFEFF/, '')); } catch (e) {}
 
     const settings = await getSettingsAsync();
     const termWidth = Math.max(40, (meta?.terminal_width || process.stdout.columns || 80) - 15);
@@ -772,7 +788,7 @@ async function main() {
     let cache = null;
     try {
       const cacheContent = await fs.readFile(cachePath, 'utf8');
-      cache = JSON.parse(cacheContent);
+      cache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
     } catch (e) {}
     await triggerQuotaUpdateIfNeededAsync(cache);
 
