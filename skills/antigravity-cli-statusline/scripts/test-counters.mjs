@@ -197,7 +197,7 @@ async function main() {
       const p4 = regexArt.test(res1.stdout);
 
       if (p1 && p2 && p3 && p4) {
-        console.log("✅ 測試 1 通過！快取數據及配色完全正確。");
+        console.log("✅ 測試 1 通過！快取資料（Data）及配色完全正確。");
       } else {
         console.error("❌ 測試 1 失敗！輸出未匹配預期配色或數值。");
         console.error(`- 待處理輸入 (2, 綠色): ${p1 ? 'OK' : 'FAIL'}`);
@@ -312,7 +312,7 @@ async function main() {
       const p4 = regexArt.test(res2.stdout);
 
       if (p1 && p2 && p3 && p4) {
-        console.log("✅ 測試 2 通過！退讓數據及配色完全正確。");
+        console.log("✅ 測試 2 通過！退讓資料（Data）及配色完全正確。");
       } else {
         console.error("❌ 測試 2 失敗！輸出未匹配預期配色或數值。");
         console.error(`- 待處理輸入 (8, 紅色): ${p1 ? 'OK' : 'FAIL'}`);
