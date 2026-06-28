@@ -1,5 +1,5 @@
 import { spawnSync, execSync } from 'child_process';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import https from 'https';
 import os from 'os';
@@ -161,7 +161,6 @@ async function fetchLiveQuotaCache() {
   const allModels = {};
   let accountEmail = '';
   let planTierName = '';
-  let aiCreditsAmount = '';
   let planStatusData = {};
   
   for (const info of candidates) {
@@ -174,9 +173,6 @@ async function fetchLiveQuotaCache() {
         if (userStatus.email) accountEmail = userStatus.email;
         if (userStatus.userTier) {
           if (userStatus.userTier.name) planTierName = userStatus.userTier.name;
-          if (userStatus.userTier.availableCredits && userStatus.userTier.availableCredits.length > 0) {
-            aiCreditsAmount = userStatus.userTier.availableCredits[0].creditAmount || '';
-          }
         }
         if (userStatus.planStatus) planStatusData = userStatus.planStatus;
         
@@ -223,11 +219,19 @@ async function fetchLiveQuotaCache() {
       updatedAt: Date.now(),
       email: accountEmail,
       planTier: planTierName,
-      aiCredits: aiCreditsAmount,
       planStatus: planStatusData
     };
   }
   return null;
+}
+
+function writeFileSyncAndVerifyNoBOM(filePath, content) {
+  writeFileSync(filePath, content, { encoding: 'utf8' });
+  let buffer = readFileSync(filePath);
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    buffer = buffer.slice(3);
+    writeFileSync(filePath, buffer);
+  }
 }
 
 async function main() {
@@ -235,7 +239,7 @@ async function main() {
     const cache = await fetchLiveQuotaCache();
     if (cache) {
       mkdirSync(dirname(CACHE_FILE), { recursive: true });
-      writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), { encoding: 'utf8' });
+      writeFileSyncAndVerifyNoBOM(CACHE_FILE, JSON.stringify(cache, null, 2));
     }
   } catch (e) {}
 }

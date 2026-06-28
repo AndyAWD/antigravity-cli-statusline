@@ -320,6 +320,15 @@ function resolveModelQuota(fallbackModel, cache) {
   return modelQuota || { remaining_percentage: 100, refreshes_in: '' };
 }
 
+async function writeFileAndVerifyNoBOM(filePath, content) {
+  await fs.writeFile(filePath, content, { encoding: 'utf8' });
+  let buffer = await fs.readFile(filePath);
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    buffer = buffer.slice(3);
+    await fs.writeFile(filePath, buffer);
+  }
+}
+
 async function calculateContextUsageAsync(meta, conversationId) {
   const contextWindow = meta.context_window || {};
   const ctxCachePath = join(os.homedir(), '.gemini', 'tmp', `ctx_${conversationId}.json`);
@@ -341,12 +350,12 @@ async function calculateContextUsageAsync(meta, conversationId) {
   } else {
     try {
       await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-      await fs.writeFile(ctxCachePath, JSON.stringify({
+      await writeFileAndVerifyNoBOM(ctxCachePath, JSON.stringify({
         total_input_tokens: totalInput,
         total_output_tokens: totalOutput,
         used_percentage: usedPctNum,
         context_window_size: contextSize
-      }), { encoding: 'utf8' });
+      }));
     } catch (e) {}
   }
   
