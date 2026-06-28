@@ -690,7 +690,7 @@ v24.14.0
           }
         }
         ```
-     - **注意**：必須同步寫入全域（Global）、CLI 專屬（CLI-specific）與專案（Project）三層設定檔，確保狀態列配置在所有執行層級與工作區路徑下都能被正確載入和繼承。
+     - **注意**：必須同步寫入全域（Global）、CLI 專屬（CLI-specific）與專案（Project）三層設定檔，確保狀態列設定（Configuration）在所有執行層級與工作區路徑下都能被正確載入和繼承。
 
 ---
 
@@ -736,7 +736,7 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
 【1】~/.gemini/antigravity-cli/settings.json
 （Windows：%USERPROFILE%\.gemini\antigravity-cli\settings.json）
 
-在根節點合併以下欄位（保留其他既有欄位，勿覆蓋整個檔案），並請注意：必須同步寫入全域（Global）、CLI 專屬（CLI-specific）與專案（Project）三層設定檔，確保狀態列配置在所有執行層級下都能被正確套用與繼承。
+在根節點合併以下欄位（保留其他既有欄位，勿覆蓋整個檔案），並請注意：必須同步寫入全域（Global）、CLI 專屬（CLI-specific）與專案（Project）三層設定檔，確保狀態列設定（Configuration）在所有執行層級下都能被正確套用與繼承。
 {
   "statusLine": {
     "enabled": true,
