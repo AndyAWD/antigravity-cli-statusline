@@ -161,7 +161,6 @@ async function fetchLiveQuotaCache() {
   const allModels = {};
   let accountEmail = '';
   let planTierName = '';
-  let aiCreditsAmount = '';
   let planStatusData = {};
   
   for (const info of candidates) {
@@ -174,9 +173,6 @@ async function fetchLiveQuotaCache() {
         if (userStatus.email) accountEmail = userStatus.email;
         if (userStatus.userTier) {
           if (userStatus.userTier.name) planTierName = userStatus.userTier.name;
-          if (userStatus.userTier.availableCredits && userStatus.userTier.availableCredits.length > 0) {
-            aiCreditsAmount = userStatus.userTier.availableCredits[0].creditAmount || '';
-          }
         }
         if (userStatus.planStatus) planStatusData = userStatus.planStatus;
         
@@ -223,7 +219,6 @@ async function fetchLiveQuotaCache() {
       updatedAt: Date.now(),
       email: accountEmail,
       planTier: planTierName,
-      aiCredits: aiCreditsAmount,
       planStatus: planStatusData
     };
   }

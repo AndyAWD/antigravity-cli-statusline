@@ -387,10 +387,9 @@ async function manageAccountMetaCacheAsync(meta) {
     cachedAccount = JSON.parse(content.replace(/^\uFEFF/, ''));
   } catch (e) {}
   
-  if (meta && meta.account && (meta.account.email || meta.account.plan_tier || meta.account.ai_credits)) {
+  if (meta && meta.account && (meta.account.email || meta.account.plan_tier)) {
     if (meta.account.email) cachedAccount.email = meta.account.email;
     if (meta.account.plan_tier) cachedAccount.planTier = meta.account.plan_tier;
-    if (meta.account.ai_credits) cachedAccount.aiCredits = meta.account.ai_credits;
     try {
       await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
       await writeFileAndVerifyNoBOM(accountMetaPath, JSON.stringify(cachedAccount));
@@ -450,7 +449,6 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   // Account
   const planTier = (cache && cache.planTier) ? cache.planTier : (meta?.account?.plan_tier || cachedAccount.planTier || unknownStr);
   const accountEmail = (cache && cache.email) ? cache.email : (meta?.account?.email || cachedAccount.email || unknownStr);
-  const aiCredits = (cache && cache.aiCredits) ? cache.aiCredits : (meta?.account?.ai_credits || cachedAccount.aiCredits || noneStr);
 
   // Agent State
   const agentState = meta?.agent_state || 'idle';
@@ -629,7 +627,7 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
 
   return {
     fallbackModel, quotaColor, quotaVal, contextColor, usedPct, memUsage, tokenCount,
-    countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail, aiCredits,
+    countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail,
     agentState, toolConfirmPending, pendingInputCount, backgroundTasksCount, subagentsCount,
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
     sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName
@@ -650,7 +648,6 @@ function buildI18nDict(lang, m) {
       'project-full-path': `${WHITE}目前工作區專案完整路徑: ${BOLD}${m.projectFullPath}${RESET}`,
       'plan-tier': `${WHITE}目前訂閱方案等級（Plan Tier）: ${BOLD}${m.planTier}${RESET}`,
       'account-email': `${WHITE}帳號電子郵件（Account Email）: ${BOLD}${m.accountEmail}${RESET}`,
-      'ai-credits': `${WHITE}人工智慧（AI）額度點數（AI Credits）:${RESET} ${BLUE}${BOLD}${m.aiCredits}${RESET}`,
       'agent-state': `${WHITE}代理當前狀態（Agent State）:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
       'tool-confirmation': `${WHITE}是否有等你回應的工具確認對話方塊（Dialog Box）:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? '在等你' : '都好了'}${RESET}`,
       'pending-input': `${WHITE}佇列中待處理的使用者輸入數:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
@@ -676,7 +673,6 @@ function buildI18nDict(lang, m) {
       'project-full-path': `${WHITE}Project Path: ${BOLD}${m.projectFullPath}${RESET}`,
       'plan-tier': `${WHITE}Plan: ${BOLD}${m.planTier}${RESET}`,
       'account-email': `${WHITE}Account: ${BOLD}${m.accountEmail}${RESET}`,
-      'ai-credits': `${WHITE}AI Credits:${RESET} ${BLUE}${BOLD}${m.aiCredits}${RESET}`,
       'agent-state': `${WHITE}Agent:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
       'tool-confirmation': `${WHITE}Awaiting You:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? 'waiting' : 'all clear'}${RESET}`,
       'pending-input': `${WHITE}Queue:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
@@ -702,7 +698,6 @@ function buildI18nDict(lang, m) {
       'project-full-path': `${WHITE}プロジェクトパス: ${BOLD}${m.projectFullPath}${RESET}`,
       'plan-tier': `${WHITE}プラン: ${BOLD}${m.planTier}${RESET}`,
       'account-email': `${WHITE}アカウント: ${BOLD}${m.accountEmail}${RESET}`,
-      'ai-credits': `${WHITE}AI クレジット:${RESET} ${BLUE}${BOLD}${m.aiCredits}${RESET}`,
       'agent-state': `${WHITE}エージェント状態:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
       'tool-confirmation': `${WHITE}ご承認待ち:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? '待機中' : 'すべて完了'}${RESET}`,
       'pending-input': `${WHITE}入力キュー:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,

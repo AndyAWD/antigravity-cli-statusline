@@ -55,7 +55,6 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 - **目前使用的 AI 模型名稱（`model-name`）**：即時顯示對話正在使用的模型
 - **使用中代理（`agent-profile`）**：目前載入的 Agent Profile 名稱
 - **代理當前狀態（`agent-state`）**：`idle / thinking / working / tool_use / initializing`
-- **AI 額度點數（`ai-credits`）**：帳號剩餘的 AI Credits
 
 **額度與 Token**
 - **帳號真實 API 可用額度（`quota`）**：百分比，搭配四階配色
