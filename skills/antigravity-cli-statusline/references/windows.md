@@ -18,7 +18,7 @@
 - [4. 行程查詢：Get-CimInstance 取代 wmic](#4-行程查詢get-ciminstance-取代-wmic)
 - [5. settings.json 中 Windows 路徑跳脫範本](#5-settingsjson-中-windows-路徑跳脫範本)
 - [6. sh.exe 缺失修復：編譯靜默無窗體橋接器](#6-shexe-缺失修復編譯靜默無窗體橋接器)
-- [7. 子程序執行：強制 windowsHide: true](#7-子程序執行強制-windowshide-true)
+- [7. 子行程（Child Process）執行：強制 windowsHide: true](#7-子行程child-process執行強制-windowshide-true)
 
 ---
 
@@ -178,7 +178,7 @@ agy CLI 的 `statusline_runner.go` 底層強制依賴 `sh -c` 執行指令。Win
 
 ---
 
-## 7. 子程序執行：強制 windowsHide: true
+## 7. 子行程（Child Process）執行：強制 windowsHide: true
 
 在 Node.js 中使用 `child_process.spawn` 或 `child_process.execSync` 呼叫外部指令（如 `git`、`Get-CimInstance`）時，作業系統預設會瞬間彈出並關閉黑色終端機視窗。在高頻率背景輪詢場景下會造成毀滅性的視覺干擾（持續閃爍）。
 
