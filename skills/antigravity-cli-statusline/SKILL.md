@@ -146,15 +146,17 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 ### 步驟 3：第二階段問卷（讀取 questions.json 與勾選指標）
 
-1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/antigravity-cli-statusline/questions.json` 檔案。
-2. **根據步驟 1 的語言代碼（`zh-tw` / `us` / `jp`）**，從 `questions.json` 中讀取對應的問卷資訊，呼叫 `ask_question`。例如，若步驟 1 選擇 `zh-tw`：
+1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/antigravity-cli-statusline/resources/questions.json` 檔案。
+2. **根據步驟 1 的語言代碼（`zh-tw` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的問卷資訊，呼叫 `ask_question`。
+
+請動態將選定語系的 `options` 內容填入（問卷問題及摘要也請使用對應語系）：
    ```json
    {
      "questions": [
        {
-         "question": "選擇要顯示的狀態列指標（下一步將進行排序）",
+         "question": "<請填入對應語系的提問，例如: 選擇要顯示的狀態列指標（下一步將進行排序）>",
          "options": [
-            // 直接填入 questions.json 中 zh-tw.options 的內容
+            // 從 resources/questions.json 讀取對應語系（如 zh-tw, us 或 jp）的 options 陣列並在此展開
          ],
          "is_multi_select": true
        }
