@@ -1,18 +1,30 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { writeFileSync, mkdirSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
 import assert from 'assert';
+import { fileURLToPath } from 'url';
+
+const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
 
 const BLUE_BOLD = "\x1b[38;2;87;202;255m\x1b[1m";
 const GREEN_BOLD = "\x1b[38;2;92;219;109m\x1b[1m";
 const WHITE = "\x1b[38;2;255;255;255m";
 const RESET = "\x1b[0m";
 
-function runStatusline(stdinData) {
+/**
+ * Spawns the statusline script with redirected HOME and project directory.
+ * @param {object} stdinData - Meta payload piped to stdin
+ * @param {string} homeDir - Isolated temporary directory path
+ * @returns {Promise<{code: number, stdout: string, stderr: string}>}
+ */
+function runStatusline(stdinData, homeDir) {
   return new Promise((resolve) => {
-    const child = spawn('node', ['skills/antigravity-cli-statusline/scripts/statusline-quota.mjs'], {
-      env: { ...process.env, DISABLE_QUOTA_HOOK: undefined },
+    const env = { ...process.env, HOME: homeDir, USERPROFILE: homeDir };
+    delete env.DISABLE_QUOTA_HOOK;            // explicit unset — Finding #1
+    const child = spawn('node', [SCRIPT_PATH], {
+      env,
+      cwd: homeDir,                            // project settings resolve under temp home — Finding #2
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true
     });
@@ -32,31 +44,22 @@ function runStatusline(stdinData) {
   });
 }
 
+/**
+ * Creates a hermetic sandbox home directory containing mock cache and settings.
+ * @param {object} cache - Mock quota cache content
+ * @param {object} settings - Mock settings content
+ * @returns {string} Path to the created temp home directory
+ */
+function makeTempHome(cache, settings) {
+  const home = mkdtempSync(join(os.tmpdir(), 'statusline-weekly-'));
+  mkdirSync(join(home, '.gemini', 'tmp'), { recursive: true });
+  writeFileSync(join(home, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify(cache), 'utf8');
+  writeFileSync(join(home, '.gemini', 'settings.json'), JSON.stringify(settings), 'utf8');
+  return home;
+}
+
 async function main() {
   console.log("=== Running statusline-quota.test.mjs (R1-R4) ===");
-
-  const homedir = os.homedir();
-  const geminiTmpDir = join(homedir, '.gemini', 'tmp');
-  if (!existsSync(geminiTmpDir)) {
-    mkdirSync(geminiTmpDir, { recursive: true });
-  }
-
-  // Backup existing settings and cache
-  const cachePath = join(geminiTmpDir, 'real_quota_cache.json');
-  let originalCache = null;
-  if (existsSync(cachePath)) {
-    originalCache = readFileSync(cachePath, 'utf8');
-  }
-
-  const projSettingsDir = join(process.cwd(), '.gemini');
-  if (!existsSync(projSettingsDir)) {
-    mkdirSync(projSettingsDir, { recursive: true });
-  }
-  const projSettingsPath = join(projSettingsDir, 'settings.json');
-  let originalSettings = null;
-  if (existsSync(projSettingsPath)) {
-    originalSettings = readFileSync(projSettingsPath, 'utf8');
-  }
 
   let testsPassed = true;
 
@@ -76,8 +79,6 @@ async function main() {
       },
       updatedAt: Date.now()
     };
-    writeFileSync(cachePath, JSON.stringify(mockCacheR1), { encoding: 'utf8' });
-
     const settingsR1 = {
       ui: {
         language: "us",
@@ -86,22 +87,25 @@ async function main() {
         }
       }
     };
-    writeFileSync(projSettingsPath, JSON.stringify(settingsR1), { encoding: 'utf8' });
-
     const metaR1 = {
       model: { display_name: "Gemini 1.5 Pro" },
       terminal_width: 120
     };
 
-    const resR1 = await runStatusline(metaR1);
-    console.log("R1 Output:", JSON.stringify(resR1.stdout));
-    
-    const expectedR1 = `${WHITE}Weekly API Reset in:${RESET} ${BLUE_BOLD}4d 11h${RESET}`;
-    if (resR1.code === 0 && resR1.stdout.includes(expectedR1)) {
-      console.log("✅ R1 passed!");
-    } else {
-      console.error(`❌ R1 failed! Expected output to contain: ${JSON.stringify(expectedR1)}`);
-      testsPassed = false;
+    const homeR1 = makeTempHome(mockCacheR1, settingsR1);
+    try {
+      const resR1 = await runStatusline(metaR1, homeR1);
+      console.log("R1 Output:", JSON.stringify(resR1.stdout));
+      
+      const expectedR1 = `${WHITE}Weekly API Reset in:${RESET} ${BLUE_BOLD}4d 11h${RESET}`;
+      if (resR1.code === 0 && resR1.stdout.includes(expectedR1)) {
+        console.log("✅ R1 passed!");
+      } else {
+        console.error(`❌ R1 failed! Expected output to contain: ${JSON.stringify(expectedR1)}`);
+        testsPassed = false;
+      }
+    } finally {
+      rmSync(homeR1, { recursive: true, force: true });
     }
 
     // ----------------------------------------------------
@@ -119,8 +123,6 @@ async function main() {
       },
       updatedAt: Date.now()
     };
-    writeFileSync(cachePath, JSON.stringify(mockCacheR2), { encoding: 'utf8' });
-
     const settingsR2 = {
       ui: {
         language: "us",
@@ -129,22 +131,25 @@ async function main() {
         }
       }
     };
-    writeFileSync(projSettingsPath, JSON.stringify(settingsR2), { encoding: 'utf8' });
-
     const metaR2 = {
       model: { display_name: "Gemini 1.5 Pro" },
       terminal_width: 120
     };
 
-    const resR2 = await runStatusline(metaR2);
-    console.log("R2 Output:", JSON.stringify(resR2.stdout));
+    const homeR2 = makeTempHome(mockCacheR2, settingsR2);
+    try {
+      const resR2 = await runStatusline(metaR2, homeR2);
+      console.log("R2 Output:", JSON.stringify(resR2.stdout));
 
-    const expectedR2 = `${WHITE}Weekly API Available:${RESET} ${BLUE_BOLD}90%${RESET}`;
-    if (resR2.code === 0 && resR2.stdout.includes(expectedR2)) {
-      console.log("✅ R2 passed!");
-    } else {
-      console.error(`❌ R2 failed! Expected output to contain: ${JSON.stringify(expectedR2)}`);
-      testsPassed = false;
+      const expectedR2 = `${WHITE}Weekly API Available:${RESET} ${BLUE_BOLD}90%${RESET}`;
+      if (resR2.code === 0 && resR2.stdout.includes(expectedR2)) {
+        console.log("✅ R2 passed!");
+      } else {
+        console.error(`❌ R2 failed! Expected output to contain: ${JSON.stringify(expectedR2)}`);
+        testsPassed = false;
+      }
+    } finally {
+      rmSync(homeR2, { recursive: true, force: true });
     }
 
     // ----------------------------------------------------
@@ -162,8 +167,6 @@ async function main() {
       },
       updatedAt: Date.now()
     };
-    writeFileSync(cachePath, JSON.stringify(mockCacheR3), { encoding: 'utf8' });
-
     const settingsR3 = {
       ui: {
         language: "us",
@@ -172,22 +175,25 @@ async function main() {
         }
       }
     };
-    writeFileSync(projSettingsPath, JSON.stringify(settingsR3), { encoding: 'utf8' });
-
     const metaR3 = {
       model: { display_name: "Claude 3.5 Sonnet" },
       terminal_width: 120
     };
 
-    const resR3 = await runStatusline(metaR3);
-    console.log("R3 Output:", JSON.stringify(resR3.stdout));
+    const homeR3 = makeTempHome(mockCacheR3, settingsR3);
+    try {
+      const resR3 = await runStatusline(metaR3, homeR3);
+      console.log("R3 Output:", JSON.stringify(resR3.stdout));
 
-    const expectedR3 = `${WHITE}Weekly API Available:${RESET} ${GREEN_BOLD}61%${RESET}`;
-    if (resR3.code === 0 && resR3.stdout.includes(expectedR3)) {
-      console.log("✅ R3 passed!");
-    } else {
-      console.error(`❌ R3 failed! Expected output to contain: ${JSON.stringify(expectedR3)}`);
-      testsPassed = false;
+      const expectedR3 = `${WHITE}Weekly API Available:${RESET} ${GREEN_BOLD}61%${RESET}`;
+      if (resR3.code === 0 && resR3.stdout.includes(expectedR3)) {
+        console.log("✅ R3 passed!");
+      } else {
+        console.error(`❌ R3 failed! Expected output to contain: ${JSON.stringify(expectedR3)}`);
+        testsPassed = false;
+      }
+    } finally {
+      rmSync(homeR3, { recursive: true, force: true });
     }
 
     // ----------------------------------------------------
@@ -198,8 +204,6 @@ async function main() {
     const mockCacheR4 = {
       updatedAt: Date.now()
     };
-    writeFileSync(cachePath, JSON.stringify(mockCacheR4), { encoding: 'utf8' });
-
     const settingsR4 = {
       ui: {
         language: "us",
@@ -208,42 +212,30 @@ async function main() {
         }
       }
     };
-    writeFileSync(projSettingsPath, JSON.stringify(settingsR4), { encoding: 'utf8' });
-
     const metaR4 = {
       model: { display_name: "Gemini 1.5 Pro" },
       terminal_width: 120
     };
 
-    const resR4 = await runStatusline(metaR4);
-    console.log("R4 Output:", JSON.stringify(resR4.stdout));
+    const homeR4 = makeTempHome(mockCacheR4, settingsR4);
+    try {
+      const resR4 = await runStatusline(metaR4, homeR4);
+      console.log("R4 Output:", JSON.stringify(resR4.stdout));
 
-    const expectedR4 = `${WHITE}Weekly API Reset in:${RESET} ${BLUE_BOLD}N/A${RESET}`;
-    if (resR4.code === 0 && resR4.stdout.includes(expectedR4)) {
-      console.log("✅ R4 passed!");
-    } else {
-      console.error(`❌ R4 failed! Expected output to contain: ${JSON.stringify(expectedR4)}`);
-      testsPassed = false;
+      const expectedR4 = `${WHITE}Weekly API Reset in:${RESET} ${BLUE_BOLD}N/A${RESET}`;
+      if (resR4.code === 0 && resR4.stdout.includes(expectedR4)) {
+        console.log("✅ R4 passed!");
+      } else {
+        console.error(`❌ R4 failed! Expected output to contain: ${JSON.stringify(expectedR4)}`);
+        testsPassed = false;
+      }
+    } finally {
+      rmSync(homeR4, { recursive: true, force: true });
     }
 
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;
-  } finally {
-    // Restore original files
-    console.log("\n[Cleanup] Restoring original environment...");
-    if (originalCache !== null) {
-      writeFileSync(cachePath, originalCache, { encoding: 'utf8' });
-    } else if (existsSync(cachePath)) {
-      unlinkSync(cachePath);
-    }
-
-    if (originalSettings !== null) {
-      writeFileSync(projSettingsPath, originalSettings, { encoding: 'utf8' });
-    } else if (existsSync(projSettingsPath)) {
-      unlinkSync(projSettingsPath);
-    }
-    console.log("=== Cleanup finished ===");
   }
 
   if (testsPassed) {
