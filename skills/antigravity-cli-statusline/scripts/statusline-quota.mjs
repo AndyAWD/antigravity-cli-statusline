@@ -332,6 +332,42 @@ function resolveModelQuota(fallbackModel, cache) {
   return modelQuota || { remaining_percentage: 100, refreshes_in: '' };
 }
 
+/**
+ * Maps a model display name to its weekly quota pool ('gemini' | '3p') and weekly quota.
+ * @param {string} fallbackModel - the fallback model display name
+ * @param {object} cache - the local quota cache object
+ * @returns {{remaining_percentage:number,reset_time?:string,refreshes_in:string}}
+ */
+function resolveWeeklyQuota(fallbackModel, cache) {
+  const normModel = normalizeModelName(fallbackModel);
+  let pool = '';
+  if (normModel.includes('gemini')) {
+    pool = 'gemini';
+  } else if (normModel.includes('claude') || normModel.includes('gpt')) {
+    pool = '3p';
+  }
+  
+  if (pool && cache && cache.weekly && cache.weekly[pool]) {
+    return cache.weekly[pool];
+  }
+  
+  // A4 Fallback (lowest remaining_percentage among available weekly pools)
+  if (cache && cache.weekly) {
+    const pools = Object.keys(cache.weekly);
+    if (pools.length > 0) {
+      let minPool = pools[0];
+      for (const p of pools) {
+        if (cache.weekly[p].remaining_percentage < cache.weekly[minPool].remaining_percentage) {
+          minPool = p;
+        }
+      }
+      return cache.weekly[minPool];
+    }
+  }
+  
+  return { remaining_percentage: 100, refreshes_in: '' };
+}
+
 async function writeFileAndVerifyNoBOM(filePath, content) {
   await fs.writeFile(filePath, content, { encoding: 'utf8' });
   let buffer = await fs.readFile(filePath);
@@ -426,7 +462,7 @@ async function getMetricValueAsync(meta, keys, countersCachePath, fallbackFn) {
   return await fallbackFn();
 }
 
-async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo) {
+async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo = { remaining_percentage: 100, refreshes_in: '' }) {
   const unknownStr = lang === 'zh-tw' ? '未知' : (lang === 'jp' ? '不明' : 'Unknown');
   const noneStr = lang === 'zh-tw' ? '無' : (lang === 'jp' ? 'なし' : 'N/A');
 
@@ -435,6 +471,12 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   const quotaColor = getColorByPercentage(quotaPct);
   const quotaVal = `${Math.round(quotaPct)}%`;
   const countdownVal = quotaInfo.refreshes_in || noneStr;
+
+  // Weekly Quota
+  const weeklyPct = weeklyInfo.remaining_percentage;
+  const weeklyQuotaColor = getColorByPercentage(weeklyPct);
+  const weeklyQuotaVal = `${Math.round(weeklyPct)}%`;
+  const weeklyCountdownVal = weeklyInfo.refreshes_in || noneStr;
 
   // Context
   const remainCtx = Math.max(0, 100 - contextInfo.usedPctNum);
@@ -630,7 +672,8 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
     countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail,
     agentState, toolConfirmPending, pendingInputCount, backgroundTasksCount, subagentsCount,
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
-    sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName
+    sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName,
+    weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal
   };
 }
 
@@ -643,6 +686,8 @@ function buildI18nDict(lang, m) {
       'memory-usage': `${WHITE}命令列介面（CLI）行程所消耗的隨機存取記憶體（RAM）記憶體量:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}目前工作階段（Session）消耗的精確權杖（Token）數量:${RESET} ${m.tokenCount}`,
       'quota-reset-countdown': `${WHITE}應用程式介面（API）重置時間倒數:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-weekly': `${WHITE}帳號每週應用程式介面（API）可用額度:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}每週應用程式介面（API）重置時間倒數:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
       'git-branch': `${WHITE}目前工作區專案的 Git 分支: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}目前工作區專案短路徑: ${BOLD}${m.projectName}${RESET}`,
       'project-full-path': `${WHITE}目前工作區專案完整路徑: ${BOLD}${m.projectFullPath}${RESET}`,
@@ -668,6 +713,8 @@ function buildI18nDict(lang, m) {
       'memory-usage': `${WHITE}RAM:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}Tokens:${RESET} ${m.tokenCount}`,
       'quota-reset-countdown': `${WHITE}API Reset in:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-weekly': `${WHITE}Weekly API Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}Weekly API Reset in:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
       'git-branch': `${WHITE}Git: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}Project: ${BOLD}${m.projectName}${RESET}`,
       'project-full-path': `${WHITE}Project Path: ${BOLD}${m.projectFullPath}${RESET}`,
@@ -693,6 +740,8 @@ function buildI18nDict(lang, m) {
       'memory-usage': `${WHITE}メモリ:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}トークン数:${RESET} ${m.tokenCount}`,
       'quota-reset-countdown': `${WHITE}API リセットまで:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-weekly': `${WHITE}週間 API 利用可能枠:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}週間 API リセットまで:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
       'git-branch': `${WHITE}Gitブランチ: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}プロジェクト: ${BOLD}${m.projectName}${RESET}`,
       'project-full-path': `${WHITE}プロジェクトパス: ${BOLD}${m.projectFullPath}${RESET}`,
@@ -794,11 +843,12 @@ async function main() {
 
     // 解析核心資料
     const quotaInfo = resolveModelQuota(fallbackModel, cache);
+    const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
     const contextInfo = await calculateContextUsageAsync(meta, conversationId);
     const cachedAccount = await manageAccountMetaCacheAsync(meta);
 
     // 格式化指標並繪製
-    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo);
+    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo);
     const activeDict = buildI18nDict(lang, metrics);
     renderStatusLine(footerItems, activeDict, termWidth);
 

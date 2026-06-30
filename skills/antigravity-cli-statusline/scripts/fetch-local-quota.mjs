@@ -3,6 +3,7 @@ import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import https from 'https';
 import os from 'os';
+import { pathToFileURL } from 'url';
 
 const CACHE_FILE = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
 
@@ -155,10 +156,94 @@ function requestUserStatus(port, csrfToken) {
   });
 }
 
+function requestQuotaSummary(port, csrfToken) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      metadata: { ideName: 'antigravity', extensionName: 'antigravity', locale: 'en' }
+    });
+    
+    const options = {
+      hostname: '127.0.0.1',
+      port: port,
+      path: '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary',
+      method: 'POST',
+      rejectUnauthorized: false,
+      timeout: 2000,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Connect-Protocol-Version': '1',
+        'X-Codeium-Csrf-Token': csrfToken,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch(e) { reject(e); }
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}`));
+        }
+      });
+    });
+    req.on('error', (e) => reject(e));
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.write(postData);
+    req.end();
+  });
+}
+
+export function parseWeeklyBuckets(summaryResponse) {
+  const weekly = {};
+  if (!summaryResponse || !summaryResponse.groups) return weekly;
+  for (const group of summaryResponse.groups) {
+    if (!group.buckets) continue;
+    for (const bucket of group.buckets) {
+      const windowVal = bucket.window || bucket.windowVal || '';
+      if (windowVal !== 'weekly') continue;
+      const bucketId = bucket.bucketId || '';
+      if (!bucketId) continue;
+      const pool = bucketId.replace(/-weekly$/, '');
+      
+      let fraction = 1;
+      const remainingField = bucket.remaining !== undefined ? bucket.remaining : bucket.remainingFraction;
+      if (remainingField !== undefined && remainingField !== null) {
+        fraction = parseFloat(remainingField);
+      } else if (bucket.reset || bucket.resetTime) {
+        fraction = 0;
+      }
+      
+      const remainingNum = fraction > 1 ? fraction : fraction * 100;
+      const remaining = Math.max(0, Math.min(100, remainingNum));
+      
+      const entry = {
+        remaining_percentage: remaining
+      };
+      
+      const resetTime = bucket.reset || bucket.resetTime;
+      if (resetTime) {
+        entry.reset_time = resetTime;
+        entry.refreshes_in = formatResetTime(resetTime);
+      }
+      
+      if (!weekly[pool] || entry.remaining_percentage < weekly[pool].remaining_percentage) {
+        weekly[pool] = entry;
+      }
+    }
+  }
+  return weekly;
+}
+
 async function fetchLiveQuotaCache() {
   const candidates = findServerCandidates();
   // 跨所有候選者合併模型資料，避免只取到部分模型
   const allModels = {};
+  const weekly = {};
   let accountEmail = '';
   let planTierName = '';
   let planStatusData = {};
@@ -208,14 +293,28 @@ async function fetchLiveQuotaCache() {
             allModels[normKey] = entry;
           }
         }
+
+        // Fetch RetrieveUserQuotaSummary
+        try {
+          const summaryResponse = await requestQuotaSummary(port, info.csrf_token);
+          const weeklyBuckets = parseWeeklyBuckets(summaryResponse);
+          for (const pool of Object.keys(weeklyBuckets)) {
+            if (!weekly[pool] || weeklyBuckets[pool].remaining_percentage < weekly[pool].remaining_percentage) {
+              weekly[pool] = weeklyBuckets[pool];
+            }
+          }
+        } catch (weeklyErr) {
+          // weekly failure never breaks the 5h path
+        }
       } catch (e) {
         continue;
       }
     }
   }
-  if (Object.keys(allModels).length > 0) {
+  if (Object.keys(allModels).length > 0 || Object.keys(weekly).length > 0) {
     return { 
       models: allModels, 
+      weekly,
       updatedAt: Date.now(),
       email: accountEmail,
       planTier: planTierName,
@@ -244,4 +343,7 @@ async function main() {
   } catch (e) {}
 }
 
-main();
+// only auto-run when executed directly, not when imported by tests
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
