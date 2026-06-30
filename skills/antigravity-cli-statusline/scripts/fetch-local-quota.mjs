@@ -156,6 +156,12 @@ function requestUserStatus(port, csrfToken) {
   });
 }
 
+/**
+ * Sends a request to retrieve the weekly quota summary from the language server.
+ * @param {number} port - The port number of the active language server.
+ * @param {string} csrfToken - The CSRF token for request authentication.
+ * @returns {Promise<object>} A promise resolving to the parsed response JSON object.
+ */
 function requestQuotaSummary(port, csrfToken) {
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
@@ -198,6 +204,11 @@ function requestQuotaSummary(port, csrfToken) {
   });
 }
 
+/**
+ * Extracts weekly quota buckets from a RetrieveUserQuotaSummary response.
+ * @param {object} summaryResponse - The parsed JSON response object from the language server.
+ * @returns {Object<string, {remaining_percentage: number, reset_time?: string, refreshes_in?: string}>} Map of weekly pool remaining quota, reset time, and formatted refresh countdown.
+ */
 export function parseWeeklyBuckets(summaryResponse) {
   const weekly = {};
   if (!summaryResponse || !summaryResponse.groups) return weekly;
