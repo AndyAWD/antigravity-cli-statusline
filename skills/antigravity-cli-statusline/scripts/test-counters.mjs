@@ -1,7 +1,10 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, rmdirSync, renameSync, utimesSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync, readdirSync, statSync, mkdtempSync, rmSync, utimesSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
 
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
@@ -21,27 +24,19 @@ function escapeRegex(string) {
   return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
-// 輔助函數：遞迴刪除目錄
-function rmDirRecursive(dirPath) {
-  if (existsSync(dirPath)) {
-    const files = readdirSync(dirPath);
-    for (const file of files) {
-      const curPath = join(dirPath, file);
-      if (statSync(curPath).isDirectory()) {
-        rmDirRecursive(curPath);
-      } else {
-        unlinkSync(curPath);
-      }
-    }
-    rmdirSync(dirPath);
-  }
-}
-
-// 輔助函數：執行 statusline-quota.mjs
-function runStatusline(stdinData) {
+/**
+ * Spawns the statusline script with redirected HOME and project directory.
+ * @param {object} stdinData - Meta payload piped to stdin
+ * @param {string} homeDir - Isolated temporary directory path
+ * @returns {Promise<{code: number, stdout: string, stderr: string}>}
+ */
+function runStatusline(stdinData, homeDir) {
   return new Promise((resolve) => {
-    const child = spawn('node', ['skills/antigravity-cli-statusline/scripts/statusline-quota.mjs'], {
-      env: { ...process.env, DISABLE_QUOTA_HOOK: undefined },
+    const env = { ...process.env, HOME: homeDir, USERPROFILE: homeDir };
+    delete env.DISABLE_QUOTA_HOOK;            // explicit unset — Defect A hook flag
+    const child = spawn('node', [SCRIPT_PATH], {
+      env,
+      cwd: homeDir,                            // settings + project log dir resolve under sandbox — Defect B
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true
     });
@@ -64,47 +59,17 @@ function runStatusline(stdinData) {
 async function main() {
   console.log("=== 開始測試狀態列計數器雙軌與防禦性更新機制 ===");
 
-  // 1. 備份原有環境
-  const homedir = os.homedir();
-  const geminiTmpDir = join(homedir, '.gemini', 'tmp');
-  if (!existsSync(geminiTmpDir)) {
-    mkdirSync(geminiTmpDir, { recursive: true });
-  }
+  // 1. 初始化臨時沙箱環境，隔絕真實 HOME 與專案目錄
+  const sandbox = mkdtempSync(join(os.tmpdir(), 'statusline-counters-'));
+  const geminiTmpDir = join(sandbox, '.gemini', 'tmp');
+  mkdirSync(geminiTmpDir, { recursive: true });
 
-  // 備份 statusline_counters.json
   const cachePath = join(geminiTmpDir, 'statusline_counters.json');
-  let originalCache = null;
-  if (existsSync(cachePath)) {
-    originalCache = readFileSync(cachePath, 'utf8');
-  }
-
-  // 備份 pending_input_count
   const pendingInputPath = join(geminiTmpDir, 'pending_input_count');
-  let originalPendingInput = null;
-  if (existsSync(pendingInputPath)) {
-    originalPendingInput = readFileSync(pendingInputPath, 'utf8');
-  }
-
-  // 備份 background-processes 目錄
   const bgTasksDir = join(geminiTmpDir, 'background-processes');
-  const bgTasksBakDir = join(geminiTmpDir, 'background-processes.bak_test');
-  if (existsSync(bgTasksDir)) {
-    if (existsSync(bgTasksBakDir)) {
-      rmDirRecursive(bgTasksBakDir);
-    }
-    renameSync(bgTasksDir, bgTasksBakDir);
-  }
 
-  // 備份專案 .gemini/settings.json
-  const projSettingsDir = join(process.cwd(), '.gemini');
-  if (!existsSync(projSettingsDir)) {
-    mkdirSync(projSettingsDir, { recursive: true });
-  }
+  const projSettingsDir = join(sandbox, '.gemini');
   const projSettingsPath = join(projSettingsDir, 'settings.json');
-  let originalSettings = null;
-  if (existsSync(projSettingsPath)) {
-    originalSettings = readFileSync(projSettingsPath, 'utf8');
-  }
 
   // 建立臨時的 settings.json
   const tempSettings = {
@@ -144,7 +109,7 @@ async function main() {
       conversation_id: "test-meta-priority-id",
       terminal_width: 120,
       project: {
-        path: process.cwd()
+        path: sandbox
       },
       // 使用相容屬性與不同型態 (數字/陣列)
       pending_input: "11", // 字串型態
@@ -153,7 +118,7 @@ async function main() {
       artifacts_count: 14 // 數字型態
     };
 
-    const res0 = await runStatusline(meta0);
+    const res0 = await runStatusline(meta0, sandbox);
     if (res0.code !== 0) {
       console.error(`執行失敗，離開碼: ${res0.code}, stderr: ${res0.stderr}`);
       testsPassed = false;
@@ -199,12 +164,12 @@ async function main() {
       conversation_id: "test-cache-priority-id",
       terminal_width: 120,
       project: {
-        path: process.cwd()
+        path: sandbox
       }
       // 不提供計數器屬性，或提供 0/null
     };
 
-    const res1 = await runStatusline(meta1);
+    const res1 = await runStatusline(meta1, sandbox);
     if (res1.code !== 0) {
       console.error(`執行失敗，離開碼: ${res1.code}, stderr: ${res1.stderr}`);
       testsPassed = false;
@@ -253,7 +218,7 @@ async function main() {
 
     // 2.3 subagents 退讓:
     // 計算原有活躍子代理數
-    const agentsDir = join(process.cwd(), '.agents');
+    const agentsDir = join(sandbox, '.agents');
     let baseCount = 0;
     if (existsSync(agentsDir)) {
       const dirs = readdirSync(agentsDir);
@@ -303,10 +268,7 @@ async function main() {
 
     // 2.4 artifacts 退讓:
     const testConvId = "test_conv_9999";
-    brainDir = join(homedir, '.gemini', 'antigravity-cli', 'brain', testConvId);
-    if (existsSync(brainDir)) {
-      rmDirRecursive(brainDir);
-    }
+    brainDir = join(sandbox, '.gemini', 'antigravity-cli', 'brain', testConvId);
     mkdirSync(brainDir, { recursive: true });
     for (let i = 1; i <= 7; i++) {
       writeFileSync(join(brainDir, `artifact_${i}.metadata.json`), `{}`, { encoding: 'utf8' });
@@ -317,11 +279,11 @@ async function main() {
       conversation_id: testConvId,
       terminal_width: 120,
       project: {
-        path: process.cwd()
+        path: sandbox
       }
     };
 
-    const res2 = await runStatusline(meta2);
+    const res2 = await runStatusline(meta2, sandbox);
 
     if (res2.code !== 0) {
       console.error(`執行失敗，離開碼: ${res2.code}, stderr: ${res2.stderr}`);
@@ -371,7 +333,7 @@ async function main() {
       conversation_id: "test-zero-priority-id",
       terminal_width: 120,
       project: {
-        path: process.cwd()
+        path: sandbox
       },
       pending_input_count: 0,
       background_tasks_count: 0,
@@ -379,7 +341,7 @@ async function main() {
       artifacts_count: 0
     };
 
-    const res3 = await runStatusline(meta3);
+    const res3 = await runStatusline(meta3, sandbox);
     if (res3.code !== 0) {
       console.error(`執行失敗，離開碼: ${res3.code}, stderr: ${res3.stderr}`);
       testsPassed = false;
@@ -428,7 +390,7 @@ async function main() {
       conversation_id: "test-subagent-filtering-id",
       terminal_width: 120,
       project: {
-        path: process.cwd()
+        path: sandbox
       },
       subagents: [
         { id: "sub1", status: "running" },      // 保留
@@ -441,7 +403,7 @@ async function main() {
       ]
     };
 
-    const res4 = await runStatusline(meta4);
+    const res4 = await runStatusline(meta4, sandbox);
     if (res4.code !== 0) {
       console.error(`執行失敗，離開碼: ${res4.code}, stderr: ${res4.stderr}`);
       testsPassed = false;
@@ -467,53 +429,12 @@ async function main() {
     testsPassed = false;
   } finally {
     // ----------------------------------------------------
-    // 4. 環境還原
+    // 4. 環境還原 (直接刪除臨時沙箱)
     // ----------------------------------------------------
     console.log("\n[清理] 開始還原環境...");
-
-    // 清理子代理與 brain 目錄
-    if (subActive1 && existsSync(subActive1)) {
-      try { rmDirRecursive(subActive1); } catch (e) {}
+    if (existsSync(sandbox)) {
+      rmSync(sandbox, { recursive: true, force: true });
     }
-    if (subActive2 && existsSync(subActive2)) {
-      try { rmDirRecursive(subActive2); } catch (e) {}
-    }
-    if (subInactive && existsSync(subInactive)) {
-      try { rmDirRecursive(subInactive); } catch (e) {}
-    }
-    if (brainDir && existsSync(brainDir)) {
-      try { rmDirRecursive(brainDir); } catch (e) {}
-    }
-
-    // 還原 statusline_counters.json
-    if (originalCache !== null) {
-      writeFileSync(cachePath, originalCache, { encoding: 'utf8' });
-    } else if (existsSync(cachePath)) {
-      unlinkSync(cachePath);
-    }
-
-    // 還原 pending_input_count
-    if (originalPendingInput !== null) {
-      writeFileSync(pendingInputPath, originalPendingInput, { encoding: 'utf8' });
-    } else if (existsSync(pendingInputPath)) {
-      unlinkSync(pendingInputPath);
-    }
-
-    // 還原 background-processes
-    if (existsSync(bgTasksDir)) {
-      rmDirRecursive(bgTasksDir);
-    }
-    if (existsSync(bgTasksBakDir)) {
-      renameSync(bgTasksBakDir, bgTasksDir);
-    }
-
-    // 還原專案 settings.json
-    if (originalSettings !== null) {
-      writeFileSync(projSettingsPath, originalSettings, { encoding: 'utf8' });
-    } else if (existsSync(projSettingsPath)) {
-      unlinkSync(projSettingsPath);
-    }
-
     console.log("=== 環境清理完成 ===");
   }
 
