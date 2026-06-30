@@ -336,7 +336,7 @@ function resolveModelQuota(fallbackModel, cache) {
  * Maps a model display name to its weekly quota pool ('gemini' | '3p') and weekly quota.
  * @param {string} fallbackModel - the fallback model display name
  * @param {object} cache - the local quota cache object
- * @returns {{remaining_percentage:number,reset_time?:string,refreshes_in:string}}
+ * @returns {{remaining_percentage:number,reset_time?:string,refreshes_in?:string}}
  */
 function resolveWeeklyQuota(fallbackModel, cache) {
   const normModel = normalizeModelName(fallbackModel);
