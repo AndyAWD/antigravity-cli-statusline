@@ -26,6 +26,9 @@ function testParseWeeklyBucketsUnwrapped() {
   assert.ok(parsed.gemini, "gemini pool should exist");
   assert.strictEqual(parsed.gemini.remaining_percentage, 90.07);
   assert.strictEqual(parsed.gemini.reset_time, '2026-07-05T03:22:46Z');
+  
+  const durationRegex = /^(now|\d+m|\d+h( \d+m)?|\d+d( \d+h)?)$/;
+  assert.ok(durationRegex.test(parsed.gemini.refreshes_in), `gemini refreshes_in format invalid: ${parsed.gemini.refreshes_in}`);
   console.log("✅ Unwrapped format verification passed.");
 }
 
@@ -61,6 +64,10 @@ function testParseWeeklyBucketsWrappedAndCamelCase() {
   assert.strictEqual(parsed.gemini.reset_time, '2026-07-05T03:22:46Z');
   assert.strictEqual(parsed['3p'].remaining_percentage, 100);
   assert.strictEqual(parsed['3p'].reset_time, '2026-07-07T08:18:13Z');
+
+  const durationRegex = /^(now|\d+m|\d+h( \d+m)?|\d+d( \d+h)?)$/;
+  assert.ok(durationRegex.test(parsed.gemini.refreshes_in), `gemini refreshes_in format invalid: ${parsed.gemini.refreshes_in}`);
+  assert.ok(durationRegex.test(parsed['3p'].refreshes_in), `3p refreshes_in format invalid: ${parsed['3p'].refreshes_in}`);
   console.log("✅ Wrapped + CamelCase format verification passed.");
 }
 
