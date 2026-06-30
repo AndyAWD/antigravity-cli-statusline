@@ -1,6 +1,6 @@
 # Antigravity CLI Statusline Skill
 
-[![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -59,6 +59,8 @@ The skill walks you through language selection, indicator picking, and sorting, 
 **Quota & Tokens**
 - **Account API available quota (`quota`)** — percentage, color-coded across four tiers
 - **API reset countdown (`quota-reset-countdown`)** — time remaining until quota refreshes
+- **Weekly API quota remaining (`quota-weekly`)** — weekly remaining percentage, color-coded
+- **Weekly API reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
 - **Context window usage (`context-used`)** — percentage of context consumed
 - **Session token count (`token-count`)** — precise token usage this session
 - **Cumulative AI artifacts (`artifacts`)** — files/outputs produced this session

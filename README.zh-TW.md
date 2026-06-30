@@ -1,6 +1,6 @@
 # Antigravity CLI 狀態列設定技能
 
-[![版本](https://img.shields.io/badge/版本-1.4.1-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
+[![版本](https://img.shields.io/badge/版本-1.5.0-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -59,6 +59,8 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 **額度與 Token**
 - **帳號真實 API 可用額度（`quota`）**：百分比，搭配四階配色
 - **API 重置時間倒數（`quota-reset-countdown`）**：距離下次額度重置剩餘時間
+- **帳號每週 API 可用額度（`quota-weekly`）**：每週剩餘百分比，搭配四階配色
+- **每週 API 重置時間倒數（`quota-weekly-countdown`）**：距離每週額度重置剩餘時間
 - **目前對話已消耗的 Context 比例（`context-used`）**：百分比
 - **目前 Session 消耗的精確 Token 數量（`token-count`）**
 - **本次對話 AI 累計產出的成品 / 檔案數（`artifacts`）**
