@@ -211,8 +211,10 @@ function requestQuotaSummary(port, csrfToken) {
  */
 export function parseWeeklyBuckets(summaryResponse) {
   const weekly = {};
-  if (!summaryResponse || !summaryResponse.groups) return weekly;
-  for (const group of summaryResponse.groups) {
+  if (!summaryResponse) return weekly;
+  const resObj = summaryResponse.response || summaryResponse;
+  if (!resObj.groups) return weekly;
+  for (const group of resObj.groups) {
     if (!group.buckets) continue;
     for (const bucket of group.buckets) {
       const windowVal = bucket.window || bucket.windowVal || '';
@@ -222,10 +224,10 @@ export function parseWeeklyBuckets(summaryResponse) {
       const pool = bucketId.replace(/-weekly$/, '');
       
       let fraction = 1;
-      const remainingField = bucket.remaining !== undefined ? bucket.remaining : bucket.remainingFraction;
+      const remainingField = bucket.remainingFraction !== undefined ? bucket.remainingFraction : bucket.remaining;
       if (remainingField !== undefined && remainingField !== null) {
         fraction = parseFloat(remainingField);
-      } else if (bucket.reset || bucket.resetTime) {
+      } else if (bucket.resetTime || bucket.reset) {
         fraction = 0;
       }
       
@@ -236,7 +238,7 @@ export function parseWeeklyBuckets(summaryResponse) {
         remaining_percentage: remaining
       };
       
-      const resetTime = bucket.reset || bucket.resetTime;
+      const resetTime = bucket.resetTime || bucket.reset;
       if (resetTime) {
         entry.reset_time = resetTime;
         entry.refreshes_in = formatResetTime(resetTime);
