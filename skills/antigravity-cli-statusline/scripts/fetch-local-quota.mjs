@@ -167,7 +167,7 @@ function requestQuotaSummary(port, csrfToken) {
     const postData = JSON.stringify({
       metadata: { ideName: 'antigravity', extensionName: 'antigravity', locale: 'en' }
     });
-    
+
     const options = {
       hostname: '127.0.0.1',
       port: port,
@@ -222,7 +222,7 @@ export function parseWeeklyBuckets(summaryResponse) {
       const bucketId = bucket.bucketId || '';
       if (!bucketId) continue;
       const pool = bucketId.replace(/-weekly$/, '');
-      
+
       let fraction = 1;
       const remainingField = bucket.remainingFraction !== undefined ? bucket.remainingFraction : bucket.remaining;
       if (remainingField !== undefined && remainingField !== null) {
@@ -230,20 +230,20 @@ export function parseWeeklyBuckets(summaryResponse) {
       } else if (bucket.resetTime || bucket.reset) {
         fraction = 0;
       }
-      
+
       const remainingNum = fraction > 1 ? fraction : fraction * 100;
       const remaining = Math.max(0, Math.min(100, remainingNum));
-      
+
       const entry = {
         remaining_percentage: remaining
       };
-      
+
       const resetTime = bucket.resetTime || bucket.reset;
       if (resetTime) {
         entry.reset_time = resetTime;
         entry.refreshes_in = formatResetTime(resetTime);
       }
-      
+
       if (!weekly[pool] || entry.remaining_percentage < weekly[pool].remaining_percentage) {
         weekly[pool] = entry;
       }

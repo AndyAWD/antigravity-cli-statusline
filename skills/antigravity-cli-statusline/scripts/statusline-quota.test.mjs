@@ -96,7 +96,7 @@ async function main() {
     try {
       const resR1 = await runStatusline(metaR1, homeR1);
       console.log("R1 Output:", JSON.stringify(resR1.stdout));
-      
+
       const expectedR1 = `${WHITE}Weekly API Reset in:${RESET} ${BLUE_BOLD}4d 11h${RESET}`;
       if (resR1.code === 0 && resR1.stdout.includes(expectedR1)) {
         console.log("✅ R1 passed!");

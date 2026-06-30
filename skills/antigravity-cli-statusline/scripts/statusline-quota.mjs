@@ -346,11 +346,11 @@ function resolveWeeklyQuota(fallbackModel, cache) {
   } else if (normModel.includes('claude') || normModel.includes('gpt')) {
     pool = '3p';
   }
-  
+
   if (pool && cache && cache.weekly && cache.weekly[pool]) {
     return cache.weekly[pool];
   }
-  
+
   // A4 Fallback (lowest remaining_percentage among available weekly pools)
   if (cache && cache.weekly) {
     const pools = Object.keys(cache.weekly);
@@ -364,7 +364,7 @@ function resolveWeeklyQuota(fallbackModel, cache) {
       return cache.weekly[minPool];
     }
   }
-  
+
   return { remaining_percentage: 100, refreshes_in: '' };
 }
 

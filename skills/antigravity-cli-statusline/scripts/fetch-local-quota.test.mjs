@@ -26,7 +26,7 @@ function testParseWeeklyBucketsUnwrapped() {
   assert.ok(parsed.gemini, "gemini pool should exist");
   assert.strictEqual(parsed.gemini.remaining_percentage, 90.07);
   assert.strictEqual(parsed.gemini.reset_time, '2026-07-05T03:22:46Z');
-  
+
   const durationRegex = /^(now|\d+m|\d+h( \d+m)?|\d+d( \d+h)?)$/;
   assert.ok(durationRegex.test(parsed.gemini.refreshes_in), `gemini refreshes_in format invalid: ${parsed.gemini.refreshes_in}`);
   console.log("✅ Unwrapped format verification passed.");
