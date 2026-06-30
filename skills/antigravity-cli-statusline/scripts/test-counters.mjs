@@ -47,41 +47,27 @@ function runStatusline(stdinData, homeDir) {
     child.stdout.on('data', chunk => stdout += chunk);
     child.stderr.on('data', chunk => stderr += chunk);
 
+    child.on('error', (err) => {
+      resolve({ code: 1, stdout, stderr: `${stderr}spawn error: ${err.message}` });
+    });
+
     child.on('close', (code) => {
       resolve({ code, stdout, stderr });
     });
 
-    child.stdin.write(JSON.stringify(stdinData));
-    child.stdin.end();
+    try {
+      child.stdin.write(JSON.stringify(stdinData));
+      child.stdin.end();
+    } catch (err) {
+      resolve({ code: 1, stdout, stderr: `${stderr}stdin error: ${err.message}` });
+    }
   });
 }
 
 async function main() {
   console.log("=== 開始測試狀態列計數器雙軌與防禦性更新機制 ===");
 
-  // 1. 初始化臨時沙箱環境，隔絕真實 HOME 與專案目錄
-  const sandbox = mkdtempSync(join(os.tmpdir(), 'statusline-counters-'));
-  const geminiTmpDir = join(sandbox, '.gemini', 'tmp');
-  mkdirSync(geminiTmpDir, { recursive: true });
-
-  const cachePath = join(geminiTmpDir, 'statusline_counters.json');
-  const pendingInputPath = join(geminiTmpDir, 'pending_input_count');
-  const bgTasksDir = join(geminiTmpDir, 'background-processes');
-
-  const projSettingsDir = join(sandbox, '.gemini');
-  const projSettingsPath = join(projSettingsDir, 'settings.json');
-
-  // 建立臨時的 settings.json
-  const tempSettings = {
-    ui: {
-      language: "zh-tw",
-      footer: {
-        items: ["pending-input", "background-tasks", "subagents", "artifacts"]
-      }
-    }
-  };
-  writeFileSync(projSettingsPath, JSON.stringify(tempSettings), { encoding: 'utf8' });
-
+  let sandbox = null;
   let subActive1 = null;
   let subActive2 = null;
   let subInactive = null;
@@ -90,6 +76,29 @@ async function main() {
   let testsPassed = true;
 
   try {
+    // 1. 初始化臨時沙箱環境，隔絕真實 HOME 與專案目錄
+    sandbox = mkdtempSync(join(os.tmpdir(), 'statusline-counters-'));
+    const geminiTmpDir = join(sandbox, '.gemini', 'tmp');
+    mkdirSync(geminiTmpDir, { recursive: true });
+
+    const cachePath = join(geminiTmpDir, 'statusline_counters.json');
+    const pendingInputPath = join(geminiTmpDir, 'pending_input_count');
+    const bgTasksDir = join(geminiTmpDir, 'background-processes');
+
+    const projSettingsDir = join(sandbox, '.gemini');
+    const projSettingsPath = join(projSettingsDir, 'settings.json');
+
+    // 建立臨時的 settings.json
+    const tempSettings = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: ["pending-input", "background-tasks", "subagents", "artifacts"]
+        }
+      }
+    };
+    writeFileSync(projSettingsPath, JSON.stringify(tempSettings), { encoding: 'utf8' });
+
     // ----------------------------------------------------
     // 測試 Case 0: Meta 優先軌道 (包含拼寫相容與 safeGetCount)
     // ----------------------------------------------------
@@ -432,7 +441,7 @@ async function main() {
     // 4. 環境還原 (直接刪除臨時沙箱)
     // ----------------------------------------------------
     console.log("\n[清理] 開始還原環境...");
-    if (existsSync(sandbox)) {
+    if (sandbox && existsSync(sandbox)) {
       rmSync(sandbox, { recursive: true, force: true });
     }
     console.log("=== 環境清理完成 ===");
