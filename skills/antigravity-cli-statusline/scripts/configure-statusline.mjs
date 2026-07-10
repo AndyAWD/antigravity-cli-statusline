@@ -8,6 +8,50 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const sourceDir = __dirname;
 
+// --- 偵測、備份並安全刪除舊的全域技能目錄 ---
+const oldGlobalSkillDir = path.join(os.homedir(), '.gemini', 'skills', 'antigravity-cli-statusline');
+const oldGlobalSkillBak = path.join(os.homedir(), '.gemini', 'skills', 'antigravity-cli-statusline.bak');
+
+if (fs.existsSync(oldGlobalSkillDir)) {
+  console.log(`[Clean Up] Detecting old global skill directory: ${oldGlobalSkillDir}`);
+  try {
+    if (fs.existsSync(oldGlobalSkillBak)) {
+      console.log(`[Clean Up] Removing existing backup directory: ${oldGlobalSkillBak}`);
+      fs.rmSync(oldGlobalSkillBak, { recursive: true, force: true });
+    }
+    console.log(`[Clean Up] Backing up to: ${oldGlobalSkillBak}`);
+    try {
+      fs.renameSync(oldGlobalSkillDir, oldGlobalSkillBak);
+    } catch (renameErr) {
+      fs.cpSync(oldGlobalSkillDir, oldGlobalSkillBak, { recursive: true });
+      fs.rmSync(oldGlobalSkillDir, { recursive: true, force: true });
+    }
+    console.log('[Clean Up] Old global skill directory backed up and removed successfully.');
+  } catch (err) {
+    console.error(`[Clean Up] Failed to backup/remove old global skill directory:`, err);
+  }
+}
+
+// --- 偵測並移除冗餘 questions.json ---
+const redundantQuestionsPaths = [
+  path.join(__dirname, 'questions.json'),
+  path.join(__dirname, '..', 'questions.json'),
+  path.join(os.homedir(), '.gemini', 'config', 'plugins', 'antigravity-cli-statusline', 'skills', 'antigravity-cli-statusline', 'questions.json')
+];
+
+for (const qPath of redundantQuestionsPaths) {
+  if (fs.existsSync(qPath)) {
+    console.log(`[Clean Up] Detecting redundant questions.json: ${qPath}`);
+    try {
+      fs.rmSync(qPath, { force: true });
+      console.log(`[Clean Up] Removed redundant questions.json successfully: ${qPath}`);
+    } catch (err) {
+      console.error(`[Clean Up] Failed to remove redundant questions.json at ${qPath}:`, err);
+    }
+  }
+}
+
+
 // 1. 解析命令列參數
 let lang = 'zh-tw';
 let selectedStr = '[]';

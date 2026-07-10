@@ -1,19 +1,25 @@
-# Project: Antigravity CLI Statusline Review & Fixes
+# Project: Antigravity CLI Statusline Conflict Resolution
 
 ## Architecture
-本專案為 `antigravity-cli-statusline` 外掛，提供 Antigravity CLI（agy）狀態列顯示指標。主要邏輯位於 `skills/antigravity-cli-statusline/` 中，包含：
-- `SKILL.md`: 外掛之技能說明與核心指示
-- `scripts/statusline-quota.mjs`, `scripts/fetch-local-quota.mjs`: 動態配額與指標收集腳本
-- `scripts/diagnose-statusline.mjs`, `scripts/test-counters.mjs`: 測試與診斷腳本
+本專案為 `antigravity-cli-statusline` 外掛與技能衝突排查與修復專案。
+主要涉及：
+- 全域技能目錄：`~/.gemini/skills/antigravity-cli-statusline`
+- 外掛安裝目錄：`~/.gemini/config/plugins/antigravity-cli-statusline`
+- 專案根目錄（開發目錄）：`/Users/andyawd/Project/antigravity-cli-statusline`
+- 本機備份目錄：`~/.gemini/skills/antigravity-cli-statusline.bak`
 
 ## Milestones
-| # | Name | Scope | Dependencies | Status | Conversation ID |
-|---|------|-------|-------------|--------|-----------------|
-| 1 | Milestone 1: Exploration | 診斷盤點 `SKILL.md` 及 `scripts/` 下的動態生成與跨平台寫入 (BOM) 問題 | None | DONE | 6b06ab94-0b69-4f64-a220-240263ce8815 |
-| 2 | Milestone 2: Implementation | 修正所發現之動態生成陷阱 (R1) 與跨平台檔案寫入 bug (R2) | Milestone 1 | IN_PROGRESS (Gen 3) | 08c3a0d8-363b-42c3-8816-aff39aac9f67 |
-| 3 | Milestone 3: Verification & Audit | 進行 Reviewer 審查、Challenger 測試與 Forensic Auditor 完整性審計 | Milestone 2 | PLANNED | - |
+| # | Name | Scope | Dependencies | Status |
+|---|------|-------|-------------|--------|
+| 1 | M1: Git 開發分支建立 | 開立並切換至 `feature/fix-plugin-loading-conflict` 分支 | none | DONE |
+| 2 | M2: 目錄檔案差異分析 | 分析全域與安裝外掛目錄下 `SKILL.md` 與 `questions.json` 差異 | M1 | DONE |
+| 3 | M3: 備份與安全刪除 | 自動備份並安全刪除舊全域技能目錄，確保 agy 載入 25 個最新指標的技能 | M2 | PLANNED |
+| 4 | M4: 設定修正防衝突 | 修正專案或外掛設定，避免再次發生雙重路徑載入衝突 | M3 | PLANNED |
+| 5 | M5: 驗證機制 | 驗證 GitHub Release 與 `agy plugin install` 是否自動 checkout 到 `v1.6.0` 標記或 clone 預設分支，確認 `SKILL.md` 為新版 | M4 | PLANNED |
+| 6 | M6: 排查報告撰寫 | 撰寫完整排查報告並遞交給 Parent | M5 | PLANNED |
 
-## Interface Contracts
-- 外掛與 Antigravity CLI 之間透過狀態列設定機制（如三層 `settings.json` 與 `trusted_hooks.json`）進行整合。
-- 指標腳本輸出格式必須符合 CLI 狀態列解析之 JSON 或文字格式。
-- `statusline-quota.mjs` 與 `fetch-local-quota.mjs` 等腳本之跨平台檔案寫入操作需確保不被 BOM 污染。
+## Code Layout
+- `.agents/` — 代理人協調中介資料與報告
+- `skills/antigravity-cli-statusline/` — 外掛最新版技能目錄
+  - `SKILL.md` — 25 項指標技能說明檔
+  - `resources/questions.json` — 25 項指標定義檔
