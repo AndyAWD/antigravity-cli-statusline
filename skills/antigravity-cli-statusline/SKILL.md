@@ -175,7 +175,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    {
      "questions": [
        {
-         "question": "請設定狀態列顯示順序。\n\n目前已選取：\n1. 目前使用的人工智慧（AI）模型名稱（model-name）\n2. 帳號真實應用程式介面（API）可用額度（quota）\n3. 目前對話已消耗的上下文（Context）比例（context-used）\n\n請在下方輸入框「Write-in...」中輸入以逗號分隔的數字序號或英文識別碼（如：2, 1, context-used）。可以使用 `n` 來強制換行。未填寫的指標將不予顯示。",
+         "question": "請設定狀態列顯示順序。\n\n目前已選取：\n1. 目前使用的人工智慧（AI）模型名稱（model-name）\n2. 帳號五小時可用額度百分比（quota）\n3. 目前對話已消耗的脈絡（Context）用量比例（context-used）\n\n請在下方輸入框「Write-in...」中輸入以逗號分隔的數字序號或英文識別碼（如：2, 1, context-used）。可以使用 `n` 來強制換行。未填寫的指標將不予顯示。",
          "options": [
            "(Recommended) 略過，使用原勾選順序啟用全部指標",
            "手動排序（請在下方「Write-in...」欄位中填寫）"
@@ -203,7 +203,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    ```bash
    node skills/antigravity-cli-statusline/scripts/configure-statusline.mjs --lang "<步驟1選定的語言>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/略過輸入>" --workspace "<當前工作區絕對路徑>"
    ```
-   *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["目前使用的人工智慧（AI）模型名稱（model-name）","帳號真實應用程式介面（API）可用額度（quota）"]'`。請注意外層與內層引號的正確跳脫。*
+   *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["目前使用的人工智慧（AI）模型名稱（model-name）","帳號五小時可用額度百分比（quota）"]'`。請注意外層與內層引號的正確跳脫。*
 
 ### 步驟 6：自動驗證
 
