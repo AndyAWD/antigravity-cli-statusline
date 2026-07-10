@@ -93,7 +93,7 @@ async function main() {
       ui: {
         language: "zh-tw",
         footer: {
-          items: ["pending-input", "background-tasks", "subagents", "artifacts"]
+          items: ["pending-input", "background-tasks", "subagents", "artifacts", "mode"]
         }
       }
     };
@@ -429,6 +429,99 @@ async function main() {
       } else {
         console.error("❌ 測試 4 失敗！子代理狀態物件過濾無效或計數錯誤。");
         console.error(`- 子代理 (4, 黃色): ${p3_4 ? 'OK' : 'FAIL'}`);
+        testsPassed = false;
+      }
+    }
+
+    // ----------------------------------------------------
+    // 測試 Case 5: mode 運行模式指標多語言與預設值驗證
+    // ----------------------------------------------------
+    console.log("\n[測試 5] 驗證 mode 運行模式指標多語言與 'default' 預設值邏輯...");
+
+    const testModes = [
+      {
+        lang: 'zh-tw',
+        metaMode: undefined, // 測試 default 預設值
+        expectedLabel: '模式',
+        expectedValue: 'default'
+      },
+      {
+        lang: 'zh-tw',
+        metaMode: 'code-only', // 測試自訂值
+        expectedLabel: '模式',
+        expectedValue: 'code-only'
+      },
+      {
+        lang: 'us',
+        metaMode: undefined, // 測試 default 預設值
+        expectedLabel: 'Mode',
+        expectedValue: 'default'
+      },
+      {
+        lang: 'us',
+        metaMode: 'interactive', // 測試自訂值
+        expectedLabel: 'Mode',
+        expectedValue: 'interactive'
+      },
+      {
+        lang: 'jp',
+        metaMode: undefined, // 測試 default 預設值
+        expectedLabel: 'モード',
+        expectedValue: 'default'
+      },
+      {
+        lang: 'jp',
+        metaMode: 'planning', // 測試自訂值
+        expectedLabel: 'モード',
+        expectedValue: 'planning'
+      }
+    ];
+
+    for (let idx = 0; idx < testModes.length; idx++) {
+      const tc = testModes[idx];
+      console.log(`  - 子測試 5.${idx}: 語系=${tc.lang}, meta.mode=${tc.metaMode}`);
+
+      // 覆寫臨時 settings.json
+      const modeSettings = {
+        ui: {
+          language: tc.lang,
+          footer: {
+            items: ["mode"]
+          }
+        }
+      };
+      writeFileSync(projSettingsPath, JSON.stringify(modeSettings), { encoding: 'utf8' });
+
+      const meta5 = {
+        conversation_id: `test-mode-id-${idx}`,
+        terminal_width: 120,
+        project: {
+          path: sandbox
+        },
+        mode: tc.metaMode
+      };
+
+      const res5 = await runStatusline(meta5, sandbox);
+      if (res5.code !== 0) {
+        console.error(`  ❌ 執行失敗，離開碼: ${res5.code}, stderr: ${res5.stderr}`);
+        testsPassed = false;
+        break;
+      }
+
+      console.log(`  狀態列輸出: ${res5.stdout.trim()}`);
+
+      // 驗證輸出是否包含對應的多語言標籤與值 (預設為 BLUE 著色與 BOLD)
+      const regexMode = new RegExp(
+        escapeRegex(tc.expectedLabel) + ".*?" + 
+        escapeRegex(BLUE) + escapeRegex(BOLD) + 
+        escapeRegex(tc.expectedValue) + escapeRegex(RESET)
+      );
+
+      const match = regexMode.test(res5.stdout);
+      if (match) {
+        console.log(`  ✅ 子測試 5.${idx} 通過！`);
+      } else {
+        console.error(`  ❌ 子測試 5.${idx} 失敗！未能在輸出中比對到 "${tc.expectedLabel}" 或值 "${tc.expectedValue}"`);
         testsPassed = false;
       }
     }

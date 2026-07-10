@@ -26,7 +26,8 @@
       "工作區是否有未提交變更（dirty / clean）（vcs-dirty）",
       "命令列介面（CLI）行程所消耗的隨機存取記憶體（RAM）記憶體量（memory-usage）",
       "Antigravity 命令列介面（CLI）版本號（cli-version）",
-      "目前對話識別碼（ID）（前 8 碼，用於除錯）（conversation-id）"
+      "目前對話識別碼（ID）（前 8 碼，用於除錯）（conversation-id）",
+      "目前運行模式（mode）"
     ]
   },
   "us": {
@@ -56,7 +57,8 @@
       "Workspace dirty status (dirty / clean) (vcs-dirty)",
       "RAM usage of CLI process (memory-usage)",
       "Antigravity CLI version (cli-version)",
-      "Current conversation ID (first 8 chars) (conversation-id)"
+      "Current conversation ID (first 8 chars) (conversation-id)",
+      "Current running mode (mode)"
     ]
   },
   "jp": {
@@ -86,7 +88,8 @@
       "ワークスペースの未コミット変更（dirty / clean）（vcs-dirty）",
       "CLIプロセスのRAM使用量（memory-usage）",
       "Antigravity CLIバージョン（cli-version）",
-      "現在の会話ID（先頭8文字）（conversation-id）"
+      "現在の会話ID（先頭8文字）（conversation-id）",
+      "現在の実行モード（mode）"
     ]
   }
 }
