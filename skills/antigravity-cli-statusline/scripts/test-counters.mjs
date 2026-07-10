@@ -526,6 +526,140 @@ async function main() {
       }
     }
 
+    // ----------------------------------------------------
+    // 測試 Case 6: 對抗性與強健性驗證 (Adversarial & Robustness Tests)
+    // ----------------------------------------------------
+    console.log("\n[測試 6] 開始對抗性與強健性驗證...");
+
+    const stripAnsi = (str) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+
+    const runAdversarialTest = async (name, stdinData, cacheData, settings, verifyFn) => {
+      console.log(`  - 執行對抗測試: ${name}`);
+      const home = mkdtempSync(join(os.tmpdir(), 'statusline-adversarial-'));
+      mkdirSync(join(home, '.gemini', 'tmp'), { recursive: true });
+      if (cacheData !== undefined) {
+        if (typeof cacheData === 'string') {
+          writeFileSync(join(home, '.gemini', 'tmp', 'real_quota_cache.json'), cacheData, 'utf8');
+        } else {
+          writeFileSync(join(home, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify(cacheData), 'utf8');
+        }
+      }
+      writeFileSync(join(home, '.gemini', 'settings.json'), JSON.stringify(settings), 'utf8');
+      try {
+        const res = await runStatusline(stdinData, home);
+        const strippedOut = stripAnsi(res.stdout).trim();
+        console.log(`    [結果] Code: ${res.code}, Stdout: "${strippedOut}"`);
+        const success = verifyFn(res, strippedOut);
+        if (success) {
+          console.log(`    ✅ [${name}] 通過！`);
+          return true;
+        } else {
+          console.error(`    ❌ [${name}] 失敗！Raw Stdout: ${JSON.stringify(res.stdout)}, Stderr: ${JSON.stringify(res.stderr)}`);
+          return false;
+        }
+      } catch (e) {
+        console.error(`    ❌ [${name}] 執行時發生例外:`, e);
+        return false;
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    };
+
+    const advSettings = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: ["mode"]
+        }
+      }
+    };
+
+    const advTests = [
+      {
+        name: "輸入為無效 JSON 字串",
+        stdin: "{invalid-json: [",
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "輸入為 JSON null",
+        stdin: "null",
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "輸入為 JSON 陣列",
+        stdin: "[1, 2, 3]",
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "meta.mode 為陣列型態",
+        stdin: { mode: ["planning", "code-only"] },
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "meta.mode 為物件型態",
+        stdin: { mode: { type: "interactive" } },
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "meta.mode 為數字型態",
+        stdin: { mode: 42 },
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "meta.mode 為空字串",
+        stdin: { mode: "" },
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "meta.mode 為多個空格",
+        stdin: { mode: "   " },
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+      },
+      {
+        name: "快取檔為無效 JSON",
+        stdin: { mode: "planning" },
+        cache: "{ bad json }",
+        verify: (res, out) => res.code === 0 && out.includes("模式: planning")
+      },
+      {
+        name: "快取檔為空物件",
+        stdin: { mode: "planning" },
+        cache: {},
+        verify: (res, out) => res.code === 0 && out.includes("模式: planning")
+      },
+      {
+        name: "快取檔中 models 為字串",
+        stdin: { mode: "planning" },
+        cache: { models: "not-an-object" },
+        verify: (res, out) => res.code === 0 && out.includes("模式: planning")
+      },
+      {
+        name: "快取檔 models 包含 null 值",
+        stdin: { mode: "planning" },
+        cache: { models: { "gemini": null } },
+        verify: (res, out) => res.code === 0
+      },
+      {
+        name: "快取檔 weekly 包含 null 值",
+        stdin: { mode: "planning" },
+        cache: { weekly: { "gemini": null } },
+        verify: (res, out) => res.code === 0
+      }
+    ];
+
+    for (const t of advTests) {
+      const ok = await runAdversarialTest(t.name, t.stdin, t.cache, advSettings, t.verify);
+      if (!ok) testsPassed = false;
+    }
+
   } catch (err) {
     console.error("測試執行時發生錯誤:", err);
     testsPassed = false;
