@@ -8,31 +8,214 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const sourceDir = __dirname;
 
-// --- 偵測、備份並安全刪除舊的全域技能目錄 ---
+// ==========================================
+// 跨平台安全性輔助函式 (Security Helpers)
+// ==========================================
+
+/**
+ * 檢查指定的檔案是否位於 Git 專案工作區中。
+ * 自檔案的父目錄開始逐級向上搜尋祖先目錄，直到根目錄。
+ */
+function isInGitProject(filePath) {
+  try {
+    let currentDir = path.dirname(path.resolve(filePath));
+    const root = path.parse(currentDir).root;
+    
+    while (currentDir && currentDir !== root) {
+      if (fs.existsSync(path.join(currentDir, '.git'))) {
+        return true;
+      }
+      const parent = path.dirname(currentDir);
+      if (parent === currentDir) break;
+      currentDir = parent;
+    }
+    if (root && fs.existsSync(path.join(root, '.git'))) {
+      return true;
+    }
+  } catch (err) {
+    // 忽略錯誤以確保穩定性
+  }
+  return false;
+}
+
+/**
+ * 遞迴檢查目錄或其任何實體子目錄是否為 Git 專案（包含 .git 目錄）。
+ * 遇到符號連結時會跳過以防止遞迴至外部連結。
+ */
+function isOrContainsGitProject(dir) {
+  try {
+    const stats = fs.lstatSync(dir);
+    if (stats.isSymbolicLink()) {
+      return false; // 符號連結本身非 Git 專案，且安全移除時只會 unlink 該連結，不影響內容
+    }
+    if (!stats.isDirectory()) {
+      return false;
+    }
+    // 檢查當前層級是否為 Git 專案
+    if (fs.existsSync(path.join(dir, '.git'))) {
+      return true;
+    }
+    // 遍歷實體子目錄
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      if (isOrContainsGitProject(path.join(dir, file))) {
+        return true;
+      }
+    }
+  } catch (err) {
+    // 忽略讀取錯誤
+  }
+  return false;
+}
+
+/**
+ * 安全地複製檔案或目錄，完全不追隨（Dereference）符號連結。
+ * 對於符號連結，會在目標位置重新建立相同的連結，並處理 Windows 上的權限限制。
+ */
+function safeCopySync(src, dest) {
+  const stats = fs.lstatSync(src);
+
+  if (stats.isSymbolicLink()) {
+    const linkTarget = fs.readlinkSync(src);
+    // 若目標已存在，先將其安全移除
+    try {
+      const destStats = fs.lstatSync(dest);
+      safeRemoveSync(dest);
+    } catch (e) {}
+
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    
+    try {
+      // 在目標位置建立相同的符號連結
+      fs.symlinkSync(linkTarget, dest);
+    } catch (linkErr) {
+      // Windows 上若無權限建立 Symlink，則寫入一個指示性文字檔以避免程序崩潰
+      if (process.platform === 'win32') {
+        console.warn(`[Safe Backup] Windows 權限不足，無法在 ${dest} 建立符號連結。改寫入 .lnk_target 文字檔案。`);
+        fs.writeFileSync(`${dest}.lnk_target`, linkTarget, 'utf8');
+      } else {
+        throw linkErr;
+      }
+    }
+    return;
+  }
+
+  if (stats.isDirectory()) {
+    if (!fs.existsSync(dest)) {
+      fs.mkdirSync(dest, { recursive: true });
+    }
+    const files = fs.readdirSync(src);
+    for (const file of files) {
+      safeCopySync(path.join(src, file), path.join(dest, file));
+    }
+    return;
+  }
+
+  // 實體檔案複製
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+}
+
+/**
+ * 安全地刪除指定路徑。如果是符號連結，僅解除連結（Unlink），絕不跟隨。
+ * 如果是實體目錄，會進行 Git 專案防誤刪檢查，確認安全後再遞迴安全刪除子項。
+ */
+function safeRemoveSync(targetPath) {
+  let stats;
+  try {
+    stats = fs.lstatSync(targetPath);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return; // 路徑不存在
+    }
+    throw err;
+  }
+
+  // 1. 如果是符號連結 (macOS Symlink 或 Windows Junction/Symlink)
+  if (stats.isSymbolicLink()) {
+    console.log(`[Safe Clean] 正在移除符號連結/交接點: ${targetPath}`);
+    try {
+      fs.unlinkSync(targetPath);
+    } catch (unlinkErr) {
+      // Windows 下對於目錄型交接點，有時 unlink 會失敗，改以 rmdirSync 清理連結本身
+      if (process.platform === 'win32') {
+        try {
+          fs.rmdirSync(targetPath);
+          return;
+        } catch (rmdirErr) {}
+      }
+      throw unlinkErr;
+    }
+    return;
+  }
+
+  // 2. 如果是目錄
+  if (stats.isDirectory()) {
+    // 安全防禦：防止刪除本機開發專案（包含 .git）
+    if (isOrContainsGitProject(targetPath)) {
+      throw new Error(`[Security Violation] 刪除操作已被中止。此目錄是或包含 Git 專案: ${targetPath}`);
+    }
+
+    // 遞迴安全刪除所有子項
+    const files = fs.readdirSync(targetPath);
+    for (const file of files) {
+      safeRemoveSync(path.join(targetPath, file));
+    }
+
+    // 刪除實體目錄本身
+    console.log(`[Safe Clean] 正在移除目錄: ${targetPath}`);
+    fs.rmdirSync(targetPath);
+    return;
+  }
+
+  // 3. 如果是普通檔案
+  // 檢查是否處於 Git 專案工作區中
+  if (isInGitProject(targetPath)) {
+    console.warn(`[Safe Clean] 跳過刪除。此檔案是 Git 專案的一部分: ${targetPath}`);
+    return;
+  }
+  console.log(`[Safe Clean] 正在移除檔案: ${targetPath}`);
+  fs.unlinkSync(targetPath);
+}
+
+// ==========================================
+// 重構後的清理與備份執行邏輯
+// ==========================================
+
 const oldGlobalSkillDir = path.join(os.homedir(), '.gemini', 'skills', 'antigravity-cli-statusline');
 const oldGlobalSkillBak = path.join(os.homedir(), '.gemini', 'skills', 'antigravity-cli-statusline.bak');
 
-if (fs.existsSync(oldGlobalSkillDir)) {
-  console.log(`[Clean Up] Detecting old global skill directory: ${oldGlobalSkillDir}`);
+let oldDirExists = false;
+try {
+  fs.lstatSync(oldGlobalSkillDir);
+  oldDirExists = true;
+} catch (e) {}
+
+if (oldDirExists) {
+  console.log(`[Clean Up] 偵測到舊的全域技能目錄: ${oldGlobalSkillDir}`);
   try {
-    if (fs.existsSync(oldGlobalSkillBak)) {
-      console.log(`[Clean Up] Removing existing backup directory: ${oldGlobalSkillBak}`);
-      fs.rmSync(oldGlobalSkillBak, { recursive: true, force: true });
-    }
-    console.log(`[Clean Up] Backing up to: ${oldGlobalSkillBak}`);
+    // 安全移除既有的備份目錄/連結
+    safeRemoveSync(oldGlobalSkillBak);
+    
+    console.log(`[Clean Up] 正在備份至: ${oldGlobalSkillBak}`);
     try {
+      // 優先嘗試不可分割的重新命名（Rename）操作
       fs.renameSync(oldGlobalSkillDir, oldGlobalSkillBak);
     } catch (renameErr) {
-      fs.cpSync(oldGlobalSkillDir, oldGlobalSkillBak, { recursive: true });
-      fs.rmSync(oldGlobalSkillDir, { recursive: true, force: true });
+      // 若跨磁碟分區或其他限制導致 rename 失敗，則執行安全複製與安全刪除
+      safeCopySync(oldGlobalSkillDir, oldGlobalSkillBak);
+      safeRemoveSync(oldGlobalSkillDir);
     }
-    console.log('[Clean Up] Old global skill directory backed up and removed successfully.');
+    console.log('[Clean Up] 舊的全域技能目錄已安全備份並移除。');
   } catch (err) {
-    console.error(`[Clean Up] Failed to backup/remove old global skill directory:`, err);
+    console.error(`[Clean Up] 備份/移除舊的全域技能目錄失敗:`, err);
   }
 }
 
-// --- 偵測並移除冗餘 questions.json ---
+// ==========================================
+// 重構後的冗餘 questions.json 清理邏輯
+// ==========================================
+
 const redundantQuestionsPaths = [
   path.join(__dirname, 'questions.json'),
   path.join(__dirname, '..', 'questions.json'),
@@ -40,13 +223,19 @@ const redundantQuestionsPaths = [
 ];
 
 for (const qPath of redundantQuestionsPaths) {
-  if (fs.existsSync(qPath)) {
-    console.log(`[Clean Up] Detecting redundant questions.json: ${qPath}`);
+  let qExists = false;
+  try {
+    fs.lstatSync(qPath);
+    qExists = true;
+  } catch (e) {}
+
+  if (qExists) {
+    console.log(`[Clean Up] 偵測到 questions.json: ${qPath}`);
     try {
-      fs.rmSync(qPath, { force: true });
-      console.log(`[Clean Up] Removed redundant questions.json successfully: ${qPath}`);
+      // safeRemoveSync 內部會呼叫 isInGitProject 防禦，能安全保護本機專案檔案
+      safeRemoveSync(qPath);
     } catch (err) {
-      console.error(`[Clean Up] Failed to remove redundant questions.json at ${qPath}:`, err);
+      console.error(`[Clean Up] 移除 questions.json 失敗: ${qPath}`, err);
     }
   }
 }
