@@ -42,7 +42,10 @@ function isInGitProject(filePath) {
  * 遞迴檢查目錄或其任何實體子目錄是否為 Git 專案（包含 .git 目錄）。
  * 遇到符號連結時會跳過以防止遞迴至外部連結。
  */
-function isOrContainsGitProject(dir) {
+function isOrContainsGitProject(dir, depth = 0) {
+  if (depth > 30) {
+    throw new RangeError('Directory recursion depth limit exceeded');
+  }
   try {
     const stats = fs.lstatSync(dir);
     if (stats.isSymbolicLink()) {
@@ -58,12 +61,15 @@ function isOrContainsGitProject(dir) {
     // 遍歷實體子目錄
     const files = fs.readdirSync(dir);
     for (const file of files) {
-      if (isOrContainsGitProject(path.join(dir, file))) {
+      if (isOrContainsGitProject(path.join(dir, file), depth + 1)) {
         return true;
       }
     }
   } catch (err) {
-    // 忽略讀取錯誤
+    if (err.code === 'ENOENT') {
+      return false;
+    }
+    throw err;
   }
   return false;
 }
@@ -87,7 +93,16 @@ function safeCopySync(src, dest) {
     
     try {
       // 在目標位置建立相同的符號連結
-      fs.symlinkSync(linkTarget, dest);
+      let isDir = false;
+      try {
+        isDir = fs.statSync(src).isDirectory();
+      } catch (e) {}
+      
+      if (process.platform === 'win32') {
+        fs.symlinkSync(linkTarget, dest, isDir ? 'junction' : 'file');
+      } else {
+        fs.symlinkSync(linkTarget, dest);
+      }
     } catch (linkErr) {
       // Windows 上若無權限建立 Symlink，則寫入一個指示性文字檔以避免程序崩潰
       if (process.platform === 'win32') {
@@ -263,18 +278,18 @@ for (let i = 2; i < process.argv.length; i++) {
   }
 }
 
-console.log('Parsed parameters:');
-console.log(`- Lang: ${lang}`);
-console.log(`- Selected: ${selectedStr}`);
-console.log(`- Order: ${orderStr}`);
-console.log(`- Workspace: ${workspacePath}`);
+console.log('已解析的參數：');
+console.log(`- 語言：${lang}`);
+console.log(`- 已選項目：${selectedStr}`);
+console.log(`- 排序順序：${orderStr}`);
+console.log(`- 工作區：${workspacePath}`);
 
 // 2. 排序解析規則
 let selectedList = [];
 try {
   selectedList = JSON.parse(selectedStr.replace(/^\uFEFF/, ''));
 } catch (e) {
-  console.error('Failed to parse --selected JSON string:', e);
+  console.error('解析 --selected JSON 字串失敗：', e);
 }
 
 // 提取英文識別碼
@@ -312,13 +327,13 @@ if (isDefaultOrder) {
   }
 }
 
-console.log('Resolved items sequence:', items);
+console.log('已解析的指標順序：', items);
 
 // 3. 部署掛鉤（Hook）腳本
 const homeDir = os.homedir();
 const hooksDir = path.join(homeDir, '.gemini', 'antigravity-cli', 'hooks');
 
-console.log(`Deploying hooks to ${hooksDir}...`);
+console.log(`正在部署掛鉤腳本至 ${hooksDir}...`);
 if (!fs.existsSync(hooksDir)) {
   fs.mkdirSync(hooksDir, { recursive: true });
 }
@@ -327,7 +342,7 @@ const statuslineQuotaSrcPath = path.join(sourceDir, 'statusline-quota.mjs');
 const fetchLocalQuotaSrcPath = path.join(sourceDir, 'fetch-local-quota.mjs');
 
 if (!fs.existsSync(statuslineQuotaSrcPath) || !fs.existsSync(fetchLocalQuotaSrcPath)) {
-  console.error('Source hook scripts not found in:', sourceDir);
+  console.error('在以下目錄找不到掛鉤腳本來源：', sourceDir);
   process.exit(1);
 }
 
@@ -344,7 +359,7 @@ function writeContentAndVerifyNoBOM(filePath, content) {
   // 驗證並就地剝除位元組順序記號（BOM）
   let buffer = fs.readFileSync(filePath);
   if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
-    console.log(`[BOM Detected] Found BOM in ${filePath}, stripping...`);
+    console.log(`[偵測到 BOM] 在 ${filePath} 發現 BOM，正在剝除...`);
     buffer = buffer.slice(3);
     fs.writeFileSync(filePath, buffer);
   }
@@ -352,7 +367,7 @@ function writeContentAndVerifyNoBOM(filePath, content) {
 
 writeContentAndVerifyNoBOM(path.join(hooksDir, 'statusline-quota.mjs'), statuslineQuotaContent);
 writeContentAndVerifyNoBOM(path.join(hooksDir, 'fetch-local-quota.mjs'), fetchLocalQuotaContent);
-console.log('Hook scripts deployed successfully.');
+console.log('掛鉤腳本部署成功。');
 
 // 4. 三層 settings.json 寫入與防禦位元組順序記號（BOM）鐵則
 const statuslineQuotaMjsPath = path.join(hooksDir, 'statusline-quota.mjs');
@@ -366,7 +381,7 @@ function readJsonWithBOMDefense(filePath) {
   try {
     return JSON.parse(content);
   } catch (err) {
-    console.error(`Error parsing ${filePath}, returning empty object:`, err);
+    console.error(`解析 ${filePath} 失敗，傳回空物件：`, err);
     return {};
   }
 }
@@ -376,7 +391,7 @@ function writeJsonAndVerifyNoBOM(filePath, data) {
 }
 
 function updateSettings(settingsPath) {
-  console.log(`Updating settings file: ${settingsPath}`);
+  console.log(`正在更新設定檔：${settingsPath}`);
   const settings = readJsonWithBOMDefense(settingsPath);
   
   if (!settings.ui) settings.ui = {};
@@ -412,7 +427,7 @@ if (workspacePath) {
 
 // 5. trusted_hooks.json 寫入與防禦位元組順序記號（BOM）
 const trustedHooksPath = path.join(homeDir, '.gemini', 'trusted_hooks.json');
-console.log(`Updating trusted hooks: ${trustedHooksPath}`);
+console.log(`正在更新信任掛鉤設定：${trustedHooksPath}`);
 const trustedHooks = readJsonWithBOMDefense(trustedHooksPath);
 
 const trustStrings = [];
@@ -456,7 +471,7 @@ for (const key of keysToRegister) {
 }
 
 writeJsonAndVerifyNoBOM(trustedHooksPath, trustedHooks);
-console.log('Trusted hooks updated successfully.');
+console.log('已成功更新信任掛鉤。');
 
 // 6. Windows sh.exe 編譯
 if (process.platform === 'win32') {
@@ -466,13 +481,13 @@ if (process.platform === 'win32') {
     const agyPath = whereOut.split('\r\n')[0].split('\n')[0].trim();
     cliBinDir = path.dirname(agyPath);
   } catch (err) {
-    console.warn('Could not find agy.exe path using where command:', err.message);
+    console.warn('無法使用 where 指令尋找 agy.exe 路徑：', err.message);
   }
 
   if (cliBinDir) {
     const destShPath = path.join(cliBinDir, 'sh.exe');
     if (!fs.existsSync(destShPath)) {
-      console.log(`sh.exe is missing in ${cliBinDir}, attempting to compile...`);
+      console.log(`在 ${cliBinDir} 找不到 sh.exe，嘗試編譯...`);
       const sourceCsPath = path.join(sourceDir, 'sh_hidden.cs');
       if (fs.existsSync(sourceCsPath)) {
         let cscPath = '';
@@ -480,23 +495,23 @@ if (process.platform === 'win32') {
           const cscFindCmd = `powershell.exe -NoProfile -Command "(Get-ChildItem -Path 'C:\\Windows\\Microsoft.NET\\Framework64\\v*\\csc.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName"`;
           cscPath = execSync(cscFindCmd, { windowsHide: true }).toString().trim();
         } catch (err) {
-          console.error('Failed to find csc.exe using PowerShell:', err.message);
+          console.error('使用 PowerShell 尋找 csc.exe 失敗：', err.message);
         }
 
         if (cscPath) {
           try {
-            console.log(`Compiling hidden sh.exe using: ${cscPath}`);
+            console.log(`正在使用 ${cscPath} 編譯隱藏的 sh.exe...`);
             const compileCmd = `"${cscPath}" /target:winexe /out:"${destShPath}" "${sourceCsPath}"`;
             execSync(compileCmd, { windowsHide: true });
-            console.log('sh.exe compiled successfully.');
+            console.log('sh.exe 編譯成功。');
           } catch (err) {
-            console.error('Compilation of sh.exe failed:', err.message);
+            console.error('編譯 sh.exe 失敗：', err.message);
           }
         } else {
-          console.warn('csc.exe was not found. sh.exe compilation skipped.');
+          console.warn('找不到 csc.exe。跳過 sh.exe 編譯。');
         }
       } else {
-        console.warn('sh_hidden.cs source file not found. sh.exe compilation skipped.');
+        console.warn('找不到 sh_hidden.cs 原始碼檔案。跳過 sh.exe 編譯。');
       }
 
       if (!fs.existsSync(destShPath)) {
@@ -509,9 +524,9 @@ if (process.platform === 'win32') {
         }
       }
     } else {
-      console.log('sh.exe already exists, skipping compilation.');
+      console.log('sh.exe 已存在，跳過編譯。');
     }
   }
 }
 
-console.log('Configuration completed successfully!');
+console.log('設定成功完成！');

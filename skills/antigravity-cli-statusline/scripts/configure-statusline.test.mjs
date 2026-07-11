@@ -155,17 +155,34 @@ async function testCase1SymlinkDefense() {
       '重要檔案內容不可被修改或損壞'
     );
 
-    // 驗證備份目錄建立了相同的符號連結
+        // 驗證備份目錄建立了相同的符號連結
     const oldSkillBak = path.join(mockHome, '.gemini', 'skills', 'antigravity-cli-statusline.bak');
-    const bakStats = fs.lstatSync(oldSkillBak);
-    assert.ok(bakStats.isSymbolicLink(), '備份路徑必須是一個符號連結');
+    let bakExists = false;
+    try {
+      fs.lstatSync(oldSkillBak);
+      bakExists = true;
+    } catch (e) {}
 
-    const linkTarget = fs.readlinkSync(oldSkillBak);
-    assert.strictEqual(
-      path.resolve(path.dirname(oldSkillBak), linkTarget),
-      path.resolve(externalDir),
-      '備份的符號連結目標必須指向原始外部實體目錄'
-    );
+    if (bakExists) {
+      const bakStats = fs.lstatSync(oldSkillBak);
+      assert.ok(bakStats.isSymbolicLink(), '備份路徑必須是一個符號連結');
+      const linkTarget = fs.readlinkSync(oldSkillBak);
+      assert.strictEqual(
+        path.resolve(path.dirname(oldSkillBak), linkTarget),
+        path.resolve(externalDir),
+        '備份的符號連結目標必須指向原始外部實體目錄'
+      );
+    } else {
+      // Windows fallback 驗證
+      const fallbackFile = `${oldSkillBak}.lnk_target`;
+      assert.ok(fs.existsSync(fallbackFile), '在 Windows 無權限時，必須寫入 fallback 連結指示檔');
+      const fallbackTarget = fs.readFileSync(fallbackFile, 'utf8');
+      assert.strictEqual(
+        path.resolve(fallbackTarget),
+        path.resolve(externalDir),
+        '指示檔記錄的目標必須指向原始外部實體目錄'
+      );
+    }
 
     console.log('✅ 測試情境 1 通過！');
   } finally {
@@ -310,6 +327,90 @@ async function testCase3QuestionsJsonDefense() {
 }
 
 // ==========================================
+// 測試情境 4：對抗性安全防禦測試
+// ==========================================
+async function testCase4SecuritySwallowDefense() {
+  console.log('\n--- 執行測試情境 4：對抗性安全防禦測試 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case4-'));
+  
+  try {
+    const mockHome = path.join(sandbox, 'mock-home');
+    fs.mkdirSync(mockHome);
+    
+    const runDir = path.join(sandbox, 'run');
+    fs.mkdirSync(runDir, { recursive: true });
+    
+    // 在執行目錄下建立 questions.json 作為實體目錄
+    const qPath = path.join(runDir, 'questions.json');
+    fs.mkdirSync(qPath);
+    
+    // 根據平台建立能觸發非 ENOENT 例外的環境
+    if (process.platform === 'win32') {
+      // Windows 下建立超深目錄觸發 RangeError
+      let current = qPath;
+      for (let i = 0; i < 35; i++) {
+        current = path.join(current, `sub_${i}`);
+        fs.mkdirSync(current);
+      }
+    } else {
+      // Unix 下建立權限不足的目錄觸發 EACCES
+      const noAccessDir = path.join(qPath, 'no-access');
+      fs.mkdirSync(noAccessDir);
+      fs.chmodSync(noAccessDir, 0);
+    }
+    
+    // 複製腳本
+    const targetScript = path.join(runDir, 'configure-statusline.mjs');
+    copyFileSync(configureScriptSrc, targetScript);
+    copyFileSync(statuslineQuotaSrc, path.join(runDir, 'statusline-quota.mjs'));
+    copyFileSync(fetchLocalQuotaSrc, path.join(runDir, 'fetch-local-quota.mjs'));
+    
+    const args = ['--lang', 'zh-tw', '--selected', '[]', '--order', '', '--workspace', sandbox];
+    const env = {
+      HOME: mockHome,
+      USERPROFILE: mockHome
+    };
+    
+    const result = await runScript(targetScript, args, env);
+    console.log('Exit Code:', result.code);
+    console.log('Stdout:', result.stdout);
+    console.log('Stderr:', result.stderr);
+    
+    // 復原 Unix 權限以便清理沙盒
+    if (process.platform !== 'win32') {
+      try {
+        const noAccessDir = path.join(qPath, 'no-access');
+        fs.chmodSync(noAccessDir, 0o755);
+      } catch (e) {}
+    }
+    
+    // 驗證是否拋出非 ENOENT 的異常，並中斷移除
+    const hasErrorLog = result.stdout.includes('移除 questions.json 失敗') || result.stderr.includes('移除 questions.json 失敗');
+    assert.ok(hasErrorLog, '日誌中必須包含 "移除 questions.json 失敗" 的錯誤記錄');
+    
+    if (process.platform === 'win32') {
+      assert.ok(
+        result.stdout.includes('RangeError') || result.stderr.includes('RangeError'),
+        '在 Windows 下必須拋出 RangeError 遞迴深度異常'
+      );
+    } else {
+      assert.ok(
+        result.stdout.includes('EACCES') || result.stderr.includes('EACCES') ||
+        result.stdout.includes('RangeError') || result.stderr.includes('RangeError'),
+        '在 Unix 下必須拋出 EACCES 權限異常或 RangeError 例外'
+      );
+    }
+    
+    // 驗證 questions.json 目錄依然完好，未被刪除
+    assert.ok(fs.existsSync(qPath), '遭受安全異常時，必須停止刪除，questions.json 目錄應依然存在');
+    
+    console.log('✅ 測試情境 4 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -317,6 +418,7 @@ async function runAllTests() {
     await testCase1SymlinkDefense();
     await testCase2GitProjectDefense();
     await testCase3QuestionsJsonDefense();
+    await testCase4SecuritySwallowDefense();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {
