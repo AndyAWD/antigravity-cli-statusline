@@ -55,6 +55,7 @@ The skill walks you through language selection, indicator picking, and sorting, 
 - **Current AI model name (`model-name`)** — the model serving the current conversation
 - **Active agent profile (`agent-profile`)** — the loaded Agent Profile name
 - **Agent state (`agent-state`)** — `idle / thinking / working / tool_use / initializing`
+- **Current CLI run mode (`mode`)** — the active run mode (`default / code-only / plan / interactive / accept-edits`)
 
 **Quota & Tokens**
 - **Account API available quota (`quota`)** — percentage, color-coded across four tiers
