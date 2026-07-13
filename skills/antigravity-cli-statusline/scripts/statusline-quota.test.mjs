@@ -97,7 +97,7 @@ async function main() {
       const resR1 = await runStatusline(metaR1, homeR1);
       console.log("R1 Output:", JSON.stringify(resR1.stdout));
 
-      const expectedR1 = `${WHITE}Weekly API Reset in:${RESET} ${BLUE_BOLD}4d 11h${RESET}`;
+      const expectedR1 = `${WHITE}Weekly Reset:${RESET} ${BLUE_BOLD}4d 11h${RESET}`;
       if (resR1.code === 0 && resR1.stdout.includes(expectedR1)) {
         console.log("✅ R1 passed!");
       } else {
@@ -141,7 +141,7 @@ async function main() {
       const resR2 = await runStatusline(metaR2, homeR2);
       console.log("R2 Output:", JSON.stringify(resR2.stdout));
 
-      const expectedR2 = `${WHITE}Weekly API Available:${RESET} ${BLUE_BOLD}90%${RESET}`;
+      const expectedR2 = `${WHITE}Weekly Available:${RESET} ${BLUE_BOLD}90%${RESET}`;
       if (resR2.code === 0 && resR2.stdout.includes(expectedR2)) {
         console.log("✅ R2 passed!");
       } else {
@@ -185,7 +185,7 @@ async function main() {
       const resR3 = await runStatusline(metaR3, homeR3);
       console.log("R3 Output:", JSON.stringify(resR3.stdout));
 
-      const expectedR3 = `${WHITE}Weekly API Available:${RESET} ${GREEN_BOLD}61%${RESET}`;
+      const expectedR3 = `${WHITE}Weekly Available:${RESET} ${GREEN_BOLD}61%${RESET}`;
       if (resR3.code === 0 && resR3.stdout.includes(expectedR3)) {
         console.log("✅ R3 passed!");
       } else {
@@ -222,7 +222,7 @@ async function main() {
       const resR4 = await runStatusline(metaR4, homeR4);
       console.log("R4 Output:", JSON.stringify(resR4.stdout));
 
-      const expectedR4 = `${WHITE}Weekly API Reset in:${RESET} ${BLUE_BOLD}N/A${RESET}`;
+      const expectedR4 = `${WHITE}Weekly Reset:${RESET} ${BLUE_BOLD}N/A${RESET}`;
       if (resR4.code === 0 && resR4.stdout.includes(expectedR4)) {
         console.log("✅ R4 passed!");
       } else {

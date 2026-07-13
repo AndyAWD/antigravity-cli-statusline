@@ -220,7 +220,7 @@ async function getCliMemoryMB() {
   try {
     if (process.platform === 'win32') {
       try {
-        const cmd = `powershell.exe -NoProfile -Command "(Get-CimInstance Win32_Process -Filter 'ProcessId = ${process.ppid}').WorkingSetSize"`;
+        const cmd = `powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter 'ProcessId = ${process.ppid}' | ForEach-Object { if ($_.Name -like '*agy*') { $_ } else { Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $_.ParentProcessId) } } | ForEach-Object { if ($_.Name -like '*agy*') { $_.WorkingSetSize } }"`;
         const output = await runCmdAsync(cmd);
         const memBytes = parseInt(output.trim(), 10);
         if (!isNaN(memBytes) && memBytes > 0) {
