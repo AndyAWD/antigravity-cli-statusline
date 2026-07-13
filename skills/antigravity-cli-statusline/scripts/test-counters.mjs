@@ -452,6 +452,13 @@ async function main() {
         expectedValue: 'code-only'
       },
       {
+        lang: 'zh-tw',
+        metaMode: 'fallback-mode',
+        metaCycleMode: 'plan', // 測試 cycle_mode 優先於 mode
+        expectedLabel: '模式',
+        expectedValue: 'plan'
+      },
+      {
         lang: 'us',
         metaMode: undefined, // 測試 default 預設值
         expectedLabel: 'Mode',
@@ -462,6 +469,18 @@ async function main() {
         metaMode: 'interactive', // 測試自訂值
         expectedLabel: 'Mode',
         expectedValue: 'interactive'
+      },
+      {
+        lang: 'us',
+        metaCycleMode: 'interactive', // 僅提供 cycle_mode
+        expectedLabel: 'Mode',
+        expectedValue: 'interactive'
+      },
+      {
+        lang: 'us',
+        metaCycleMode: 'accept-edits',
+        expectedLabel: 'Mode',
+        expectedValue: 'accept-edits'
       },
       {
         lang: 'jp',
@@ -479,7 +498,7 @@ async function main() {
 
     for (let idx = 0; idx < testModes.length; idx++) {
       const tc = testModes[idx];
-      console.log(`  - 子測試 5.${idx}: 語系=${tc.lang}, meta.mode=${tc.metaMode}`);
+      console.log(`  - 子測試 5.${idx}: 語系=${tc.lang}, meta.mode=${tc.metaMode}, meta.cycle_mode=${tc.metaCycleMode}`);
 
       // 覆寫臨時 settings.json
       const modeSettings = {
@@ -498,7 +517,8 @@ async function main() {
         project: {
           path: sandbox
         },
-        mode: tc.metaMode
+        mode: tc.metaMode,
+        cycle_mode: tc.metaCycleMode
       };
 
       const res5 = await runStatusline(meta5, sandbox);
@@ -510,10 +530,15 @@ async function main() {
 
       console.log(`  狀態列輸出: ${res5.stdout.trim()}`);
 
-      // 驗證輸出是否包含對應的多語言標籤與值 (預設為 BLUE 著色與 BOLD)
+      // 驗證輸出是否包含對應的多語言標籤與值 (動態色彩配對)
+      let expectedColor = BLUE;
+      const tcVal = (tc.expectedValue || '').toLowerCase();
+      if (tcVal === 'plan') expectedColor = GREEN;
+      else if (tcVal === 'accept-edits') expectedColor = YELLOW;
+
       const regexMode = new RegExp(
         escapeRegex(tc.expectedLabel) + ".*?" + 
-        escapeRegex(BLUE) + escapeRegex(BOLD) + 
+        escapeRegex(expectedColor) + escapeRegex(BOLD) + 
         escapeRegex(tc.expectedValue) + escapeRegex(RESET)
       );
 

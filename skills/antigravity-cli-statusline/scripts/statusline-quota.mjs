@@ -52,6 +52,14 @@ function getSandboxColor(enabled, allowNet) {
   return allowNet ? YELLOW : GREEN;
 }
 
+function getModeColor(mode) {
+  const m = (mode || '').toLowerCase();
+  if (m === 'plan') return GREEN;
+  if (m === 'accept-edits') return YELLOW;
+  if (m === 'default') return BLUE;
+  return BLUE;
+}
+
 function stripAnsi(str) {
   return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
@@ -666,7 +674,9 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   const cliVersion = meta?.version ? `v${meta.version}` : unknownStr;
   const rawConvId = typeof meta?.conversation_id === 'string' ? meta.conversation_id : '';
   const conversationIdShort = rawConvId ? rawConvId.replace(/-/g, '').slice(0, 8) : unknownStr;
-  const mode = (typeof meta?.mode === 'string' && meta.mode.trim()) ? meta.mode.trim() : 'default';
+  const mode = (typeof meta?.cycle_mode === 'string' && meta.cycle_mode.trim())
+    ? meta.cycle_mode.trim()
+    : ((typeof meta?.mode === 'string' && meta.mode.trim()) ? meta.mode.trim() : 'default');
 
   return {
     fallbackModel, quotaColor, quotaVal, contextColor, usedPct, memUsage, tokenCount,
@@ -706,7 +716,7 @@ function buildI18nDict(lang, m) {
       'cli-version': `${WHITE}CLI版本: ${BOLD}${m.cliVersion}${RESET}`,
       'conversation-id': `${WHITE}對話ID: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}代理角色:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
-      'mode': `${WHITE}模式:${RESET} ${BLUE}${BOLD}${m.mode}${RESET}`
+      'mode': `${WHITE}模式:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
     },
     'us': {
       'model-name': `${WHITE}Model:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
@@ -734,7 +744,7 @@ function buildI18nDict(lang, m) {
       'cli-version': `${WHITE}CLI: ${BOLD}${m.cliVersion}${RESET}`,
       'conversation-id': `${WHITE}Conv: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}Profile:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
-      'mode': `${WHITE}Mode:${RESET} ${BLUE}${BOLD}${m.mode}${RESET}`
+      'mode': `${WHITE}Mode:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
     },
     'jp': {
       'model-name': `${WHITE}モデル:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
@@ -762,7 +772,7 @@ function buildI18nDict(lang, m) {
       'cli-version': `${WHITE}CLI版: ${BOLD}${m.cliVersion}${RESET}`,
       'conversation-id': `${WHITE}会話ID: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}プロファイル:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
-      'mode': `${WHITE}モード:${RESET} ${BLUE}${BOLD}${m.mode}${RESET}`
+      'mode': `${WHITE}モード:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
     }
   };
   return dicts[lang] || dicts['zh-tw'];
