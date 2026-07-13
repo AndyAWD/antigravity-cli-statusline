@@ -674,9 +674,13 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   const cliVersion = meta?.version ? `v${meta.version}` : unknownStr;
   const rawConvId = typeof meta?.conversation_id === 'string' ? meta.conversation_id : '';
   const conversationIdShort = rawConvId ? rawConvId.replace(/-/g, '').slice(0, 8) : unknownStr;
-  const mode = (typeof meta?.cycle_mode === 'string' && meta.cycle_mode.trim())
+  let modeVal = (typeof meta?.cycle_mode === 'string' && meta.cycle_mode.trim())
     ? meta.cycle_mode.trim()
     : ((typeof meta?.mode === 'string' && meta.mode.trim()) ? meta.mode.trim() : 'default');
+  if (modeVal.length > 0) {
+    modeVal = modeVal.charAt(0).toUpperCase() + modeVal.slice(1);
+  }
+  const mode = modeVal;
 
   return {
     fallbackModel, quotaColor, quotaVal, contextColor, usedPct, memUsage, tokenCount,

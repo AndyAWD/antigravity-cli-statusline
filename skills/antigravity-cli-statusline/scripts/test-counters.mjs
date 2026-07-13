@@ -443,56 +443,56 @@ async function main() {
         lang: 'zh-tw',
         metaMode: undefined, // 測試 default 預設值
         expectedLabel: '模式',
-        expectedValue: 'default'
+        expectedValue: 'Default'
       },
       {
         lang: 'zh-tw',
         metaMode: 'code-only', // 測試自訂值
         expectedLabel: '模式',
-        expectedValue: 'code-only'
+        expectedValue: 'Code-only'
       },
       {
         lang: 'zh-tw',
         metaMode: 'fallback-mode',
         metaCycleMode: 'plan', // 測試 cycle_mode 優先於 mode
         expectedLabel: '模式',
-        expectedValue: 'plan'
+        expectedValue: 'Plan'
       },
       {
         lang: 'us',
         metaMode: undefined, // 測試 default 預設值
         expectedLabel: 'Mode',
-        expectedValue: 'default'
+        expectedValue: 'Default'
       },
       {
         lang: 'us',
         metaMode: 'interactive', // 測試自訂值
         expectedLabel: 'Mode',
-        expectedValue: 'interactive'
+        expectedValue: 'Interactive'
       },
       {
         lang: 'us',
         metaCycleMode: 'interactive', // 僅提供 cycle_mode
         expectedLabel: 'Mode',
-        expectedValue: 'interactive'
+        expectedValue: 'Interactive'
       },
       {
         lang: 'us',
         metaCycleMode: 'accept-edits',
         expectedLabel: 'Mode',
-        expectedValue: 'accept-edits'
+        expectedValue: 'Accept-edits'
       },
       {
         lang: 'jp',
         metaMode: undefined, // 測試 default 預設值
         expectedLabel: 'モード',
-        expectedValue: 'default'
+        expectedValue: 'Default'
       },
       {
         lang: 'jp',
         metaMode: 'planning', // 測試自訂值
         expectedLabel: 'モード',
-        expectedValue: 'planning'
+        expectedValue: 'Planning'
       }
     ];
 
@@ -604,67 +604,67 @@ async function main() {
         name: "輸入為無效 JSON 字串",
         stdin: "{invalid-json: [",
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "輸入為 JSON null",
         stdin: "null",
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "輸入為 JSON 陣列",
         stdin: "[1, 2, 3]",
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "meta.mode 為陣列型態",
         stdin: { mode: ["planning", "code-only"] },
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "meta.mode 為物件型態",
         stdin: { mode: { type: "interactive" } },
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "meta.mode 為數字型態",
         stdin: { mode: 42 },
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "meta.mode 為空字串",
         stdin: { mode: "" },
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "meta.mode 為多個空格",
         stdin: { mode: "   " },
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: default")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Default")
       },
       {
         name: "快取檔為無效 JSON",
         stdin: { mode: "planning" },
         cache: "{ bad json }",
-        verify: (res, out) => res.code === 0 && out.includes("模式: planning")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Planning")
       },
       {
         name: "快取檔為空物件",
         stdin: { mode: "planning" },
         cache: {},
-        verify: (res, out) => res.code === 0 && out.includes("模式: planning")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Planning")
       },
       {
         name: "快取檔中 models 為字串",
         stdin: { mode: "planning" },
         cache: { models: "not-an-object" },
-        verify: (res, out) => res.code === 0 && out.includes("模式: planning")
+        verify: (res, out) => res.code === 0 && out.includes("模式: Planning")
       },
       {
         name: "快取檔 models 包含 null 值",
