@@ -1,6 +1,4 @@
-# GDG 2026 / 06 月特別場 — Google IO「使用 Antigravity 系列」
-
-## 使用 Antigravity CLI 打造自己的 Status Line
+# 使用 Antigravity CLI 打造自己的 Status Line
 
 ---
 
@@ -131,17 +129,23 @@ v24.14.0
 | 編號 | 指令                   | 用途           |
 |----|----------------------|--------------|
 | 1  | `/grill-me`          | 互動式訪談模式      |
-| 2  | `/fast` ` /planning` | 快速 / 思考模式切換  |
+| 2  | `/plan` (`Shift+Tab`)| 思考模式切換       |
 | 3  | `/teamwork-preview`  | 子代理團隊模式      |
-| 4  | `/artifact`          | 查看計畫文件       |
-| 5  | `/resume`            | 載入之前的對話      |
-| 6  | `/statusline`        | 客製底部狀態列開關    |
-| 7  | `/clear`             | 清除目前對話串      |
-| 8  | `/btw`               | 長對話中插入對話     |
-| 9  | `/antigravity-guide` | Agy CLI 內部知識 |
-| 10 | `/model`             | 切換使用模型       |
-| 11 | `/usage`             | 使用模型額度       |
-| 12 | `/exit (quit)`             | 離開 Agy CLI   |
+| 4  | `/goal`              | 長時間徹底完成任務    |
+| 5  | `/schedule`          | 排程或定時任務      |
+| 6  | `/learn`             | 讓 AI 記住修正行為  |
+| 7  | `/artifact`          | 查看計畫文件       |
+| 8  | `/resume`            | 載入之前的對話      |
+| 9  | `/statusline`        | 客製底部狀態列開關    |
+| 10 | `/clear`             | 清除目前對話串      |
+| 11 | `/btw`               | 長對話中插入對話     |
+| 12 | `/help`              | 顯示所有指令與快捷鍵  |
+| 13 | `/antigravity-guide` | Agy CLI 內部知識 |
+| 14 | `/model`             | 切換使用模型       |
+| 15 | `/usage`             | 使用模型額度       |
+| 16 | `/exit` (`/quit`)    | 離開 Agy CLI   |
+
+💡 支援在同一行串接多個斜線指令，例如 `/plan /grill-me <提示詞>`，會依照輸入順序依序啟用每個指令。
 
 ---
 
