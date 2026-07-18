@@ -179,36 +179,50 @@ v24.14.0
 寫一支 Antigravity CLI (agy) 的 statusline 腳本，顯示「API 可用額度（百分比）」：
 
 1. 找 agy 的 PID 與 CSRF Token
-   - Mac/Linux：ps auxww；Windows：PowerShell Get-CimInstance Win32_Process（別用 wmic）
-   - 從 CommandLine 解析 --csrf_token=<token>
+   - 使用 child_process 模組執行系統指令獲取行程列表。
+   - Mac/Linux 執行：ps auxww
+   - Windows 執行：powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name like '%agy%'\" | Select-Object ProcessId, CommandLine | ConvertTo-Json"
+   - 解析 stdout（若為 JSON 字串）：注意 Get-CimInstance 回傳結果可能是單一 JSON 物件（只有一個行程匹配）或 JSON 陣列（多個行程匹配）。請在代碼中相容此兩種情況，遍歷並尋找 CommandLine 欄位中同時包含 "agy" 與 "--csrf_token=" 的項目，用正則表達式（Regular Expression）解析出其 PID（ProcessId）與 `--csrf_token` 的值。
+   - Mac/Linux 的 stdout 可用正則直接搜尋含有 "agy" 且有 "--csrf_token=" 的行來取得對應的值。
+
 2. 找監聽的 Port
-   - Mac/Linux：lsof -nP -a -p <PID> -iTCP -sTCP:LISTEN
-   - Windows：netstat -ano 篩 LISTENING + PID
+   - 根據取得 the PID，查詢其監聽的 TCP Port。
+   - Mac/Linux 執行：lsof -nP -a -p <PID> -iTCP -sTCP:LISTEN
+     * 解析指引：從輸出中利用 Regex（如 `127\.0\.0\.1:(\d+)` 或 `localhost:(\d+)`）抓取本機監聽的 Port 數字。
+   - Windows 執行：netstat -ano 篩選出 LISTENING 且最後一欄為該 PID 的列
+     * 解析指引：尋找符合格式 `TCP 127.0.0.1:(\d+) ... LISTENING <PID>` 的列，從中以正則表達式解析出本機監聽的 Port 數字。
+
 3. POST https://127.0.0.1:<port>/exa.language_server_pb.LanguageServerService/GetUserStatus
-   - Header：X-Codeium-Csrf-Token、Connect-Protocol-Version: 1，rejectUnauthorized: false
-   - Payload：{"metadata":{"ideName":"antigravity"}}
+   - 使用 Node.js 內建 https 模組發送 POST 請求。
+   - 設定 rejectUnauthorized: false 以忽略自簽憑證錯誤。
+   - 設定 Header：Content-Type: application/json、X-Codeium-Csrf-Token (設定為解析出的 CSRF Token)、Connect-Protocol-Version: 1
+   - Payload 傳入 {"metadata":{"ideName":"antigravity"}}，將其轉為 JSON 字串以 req.write() 寫入並呼叫 req.end() 發送。
+   - HTTPS 連線設定 timeout 為 2000ms。任何超時或連線失敗均捕獲異常，直接輸出 "API: --"，不拋出例外。
+
 4. 解析 userStatus.cascadeModelConfigData.clientModelConfigs 陣列
-   - 每一層存取都要做空值檢查（optional chaining ?.），任何一層是 undefined 就輸出「API: --」
-   - 遍歷整個陣列，找出所有帶 quotaInfo 的物件
-   - 注意：protobuf 會省略值為 0 的欄位！若 quotaInfo 有 resetTime 但沒有
-     remainingFraction，視為 0%
-   - 注意：remainingFraction 可能 > 1（已是百分比），若 ≤ 1 才乘以 100
-   - 取百分比最小的那個（最吃緊的模型額度），用 Math.round() 取整
-   - console.log「API: 剩餘 80%」；整個陣列都找不到 quotaInfo 就印「API: --」
+   - 使用可選鏈（Optional Chaining `?.`）安全讀取 userStatus?.cascadeModelConfigData?.clientModelConfigs。若為空則輸出 "API: --" 並結束。
+   - 從 clientModelConfigs 陣列中篩選出含有 quotaInfo 的物件。
+   - 對於每個含有 quotaInfo 的物件，計算其可用百分比：
+     a. 取得 remainingFraction 欄位。
+     b. 核心邏輯：protobuf 在數值為 0 時會省略欄位。若 quotaInfo 含有 resetTime 但沒有 remainingFraction，請將 remainingFraction 視為 0。
+     c. 核心邏輯：remainingFraction 可能大於 1（代表已是百分比，如 80），若小於或等於 1，才將其乘以 100。
+     d. 使用 Math.round() 將百分比取整。
+   - 找出所有模型中計算出百分比最小的那個（最吃緊的額度）。
+   - console.log 輸出「API: 剩餘 X%」（例如「API: 剩餘 80%」）。若整個陣列都找不到 quotaInfo，則印出「API: --」。
 
 跨平台必守規則：
-- 用 process.platform === 'win32' 判斷平台，分別呼叫對應指令
+- 用 process.platform === 'win32' 判斷平台，分別呼叫對應指令。
 - 所有 child_process（spawn / exec / execFile）必須加 { windowsHide: true }，
-  否則 Windows 每次執行都會閃一個黑色 CMD 視窗
-- PowerShell 用 spawn('powershell.exe', ['-NoProfile', '-Command', script], { windowsHide: true })
-- 子行程 stdout 明確 { encoding: 'utf8' }，避免 Windows cp950/cp1252 吃掉中文
-- HTTPS timeout 設 2000ms；任何步驟失敗都 console.log 印「API: --」不要拋例外
+  否則 Windows 每次執行都會閃一個黑色 CMD 視窗。
+- PowerShell 用 spawn('powershell.exe', ['-NoProfile', '-Command', script], { windowsHide: true })。
+- 子行程 stdout 明確 { encoding: 'utf8' }，避免 Windows cp950/cp1252 吃掉中文。
+- HTTPS timeout 設 2000ms；任何步驟失敗都 console.log 印「API: --」不要拋例外。
 - 寫完後先用 node 直接執行這支腳本，確認輸出正常（需 agy 行程正在跑）；
-  有問題先修好再進下一步
-- 只用 Node 內建模組（https / child_process / os / path），不要 npm install
-- 檔案請存 UTF-8 無 BOM；用 .mjs + import 語法
+  有問題先修好再進下一步。
+- 只用 Node 內建模組（https / child_process / os / path），不要 npm install。
+- 檔案請存 UTF-8 無 BOM；用 .mjs + import 語法。
 - 路徑用 path.join(os.homedir(), '.gemini', ...) 動態組，
-  不要寫死 ~ 或 $HOME 或 %USERPROFILE%（背景 hook 不經 shell，這些變數不會展開）
+  不要寫死 ~ 或 $HOME 或 %USERPROFILE%（背景 hook 不經 shell，這些變數不會展開）。
 ```
 
 
@@ -711,27 +725,27 @@ v24.14.0
 CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/trusted_hooks.json`。為了安全考量與路徑匹配的完整性，不應只註冊 `"*"` 全域萬用字元（wildcard），還必須對當前工作區路徑（Workspaces）、家目錄路徑等進行多路徑註冊與環境變數註冊。
 
  - macOS
-    ```json
+   ```json
    {
-    "*": [
-      "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
-    ],
-    "/Users/你的帳號/Project/your-project": [
-      "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
-    ]
+     "*": [
+       "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
+     ],
+     "/Users/你的帳號/Project/your-project": [
+       "statusLine:node /Users/你的帳號/.gemini/antigravity-cli/hooks/my-status.mjs"
+     ]
    }
-    ```
+   ```
  - Windows
-     ```json
-     {
-      "*": [
-        "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
-      ],
-      "C:\\Users\\你的帳號\\Project\\your-project": [
-        "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
-      ]
-     }
-     ```
+   ```json
+   {
+     "*": [
+       "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
+     ],
+     "C:\\Users\\你的帳號\\Project\\your-project": [
+       "statusLine:node C:\\Users\\你的帳號\\.gemini\\antigravity-cli\\hooks\\my-status.mjs"
+     ]
+   }
+   ```
 
 
 ---
@@ -772,13 +786,15 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
 【2】~/.gemini/trusted_hooks.json
 （Windows：%USERPROFILE%\.gemini\trusted_hooks.json）
 
-不應只在全域 "*" 陣列註冊，還必須對當前工作區路徑（Workspaces）、家目錄路徑等進行多路徑註冊。請在 "*" 陣列以及對應工作區路徑的陣列中，append 下面字串（保留陣列既有項目）：
+不應只在全域 "*" 陣列註冊，還必須對當前工作區路徑（Workspaces）、家目錄路徑等進行多路徑註冊。請同時在 "*" 鍵的陣列、使用者家目錄絕對路徑鍵的陣列、以及當前工作區路徑鍵的陣列中，新增（append）對應的信任字串（保留各陣列既有項目，若鍵不存在請一併建立）：
 "statusLine:node <絕對路徑>/.gemini/antigravity-cli/hooks/my-status.mjs"
 
 規則：
 - <絕對路徑> 動態用 os.homedir() 解析（macOS：/Users/xxx；Windows：C:\Users\xxx）
   別寫死 ~ / $HOME / %USERPROFILE%——hook 在背景跑不經 shell，這些變數不會展開
-- Windows 反斜線寫雙倍：node C:\\Users\\xxx\\.gemini\\...
+- Windows 規則：Windows 下的信任路徑必須同時註冊以下兩個變體（均寫入上述三個鍵 the 陣列中），以確保安全認證完美相容：
+  1. 雙反斜線變體：statusLine:node C:\\Users\\xxx\\.gemini\\antigravity-cli\\hooks\\my-status.mjs
+  2. 正斜線變體：statusLine:node C:/Users/xxx/.gemini/antigravity-cli/hooks/my-status.mjs
 - 兩檔都用 UTF-8 無 BOM 存檔
 - "statusLine:" 前綴與 settings.json 的 command 必須逐字相符，否則 CLI 拒絕執行
 
@@ -821,11 +837,17 @@ API: 剩餘 80%
 - 額度重置的倒數時間（距離現在還剩幾小時幾分）
 
 實作要點：
-- resetTime 欄位在 quotaInfo 物件裡，是 ISO 8601 時間字串
-- 用 new Date(resetTime).getTime() - Date.now() 算毫秒差
-- 換算成「2h 30m」或「45m」格式
-- 已過期顯示「現在」
-- 最終輸出：「API: 剩餘 80%  ⏰ 重置: 2h 30m」
+1. resetTime 欄位在 quotaInfo 物件裡，是 ISO 8601 時間字串。
+2. 計算時間差：用 new Date(resetTime).getTime() - Date.now() 算毫秒差（diffMs）。
+3. 若 diffMs <= 0，顯示「現在」。
+4. 若 diffMs > 0，換算成小時（hours）與分鐘（minutes）：
+   - hours = Math.floor(diffMs / 3600000)
+   - minutes = Math.floor((diffMs % 3600000) / 60000)
+   - 若 hours > 0，格式為「Xh Ym」（例如：2h 30m）
+   - 若 hours === 0，格式為「Ym」（例如：45m）
+5. 最終 console.log 輸出：「API: 剩餘 X%  ⏰ 重置: Y」
+6. 若沒有 resetTime 欄位，則保持原本輸出「API: 剩餘 X%」。
+7. 確保所有改寫有 try-catch 保護，任何失敗均印「API: --」不崩潰。
 ```
 
 > ✅ Agy CLI 改寫完後，回到下一張投影片再按 Enter，狀態列就會自動更新。
@@ -837,16 +859,17 @@ API: 剩餘 80%
 **繼續在 Agy CLI 對話方塊（Dialog Box）貼這段，他會直接改寫腳本：**
 
 ```text
-請在 ~/.gemini/antigravity-cli/hooks/my-status.mjs 上加 24-bit ANSI 真彩色：
-- 額度 ≥ 75%：藍 #57caff
-- 額度 ≥ 50%：綠 #5cdb6d
-- 額度 ≥ 25%：黃 #ffd427
-- 額度 <  25%：紅 #ff7daf
+請在 ~/.gemini/antigravity-cli/hooks/my-status.mjs 上加 24位元（24-bit）ANSI 真彩色（Truecolor）：
+1. 根據算出的剩餘百分比 pct 決定「API: 剩餘 X%」的顏色：
+   - pct >= 75：藍色 #57caff (R:87, G:202, B:255)，即 \x1b[38;2;87;202;255m
+   - pct >= 50 且 < 75：綠色 #5cdb6d (R:92, G:219, B:109)，即 \x1b[38;2;92;219;109m
+   - pct >= 25 且 < 50：黃色 #ffd427 (R:255, G:212, B:39)，即 \x1b[38;2;255;212;39m
+   - pct < 25：紅色 #ff7daf (R:255, G:125, B:175)，即 \x1b[38;2;255;125;175m
 
-ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
-
-⏰ emoji 本身用 BOLD（\x1b[1m），倒數數字（例如「2h 30m」）用白色（\x1b[97m）。
-所有色彩串末尾記得加 \x1b[0m 重置，避免污染後續輸出。
+2. ⏰ 符號本身使用粗體（Bold），即 \x1b[1m⏰\x1b[0m。
+3. 倒數時間標籤（如「重置: 」）使用灰色 \x1b[90m，後續數字與單位（如「2h 30m」或「現在」）使用白色 \x1b[97m。
+4. 請注意：每次使用顏色代碼後，必須在字串結尾或切換顏色處加上 \x1b[0m 重置，避免污染命令列的後續輸出。
+5. 確保任何異常捕獲（catch）時，能安全退回輸出無顏色的「API: --」。
 ```
 
 > ✅ Agy CLI 改寫完後按 Enter，你的狀態列就會根據額度動態變色。
@@ -886,9 +909,9 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
      當前工作目錄下的 .gemini/settings.json，
      三層的 statusLine 設定必須一致（缺哪層就補哪層）
 
-3. 用二進位方式讀兩個 JSON 檔的前 3 個位元組
-   - 若出現 EF BB BF 表示被加了 UTF-8 BOM，請重新存成無 BOM 版本
-   - 若是 FF FE 或 FE FF 表示被存成 UTF-16，請改回 UTF-8 無 BOM
+3. 用二進位（Binary）方式讀取兩個 JSON 檔案的前 3 個位元組（使用 fs.readFileSync 讀取為 Buffer 並檢查其位元組內容）：
+   - 若出現 EF BB BF 表示被加了 UTF-8 BOM，請主動去除前 3 個位元組，重新存成無 BOM 的 UTF-8 版本。
+   - 若出現 FF FE 或 FE FF 表示被存成 UTF-16，請將檔案重新編碼並改回 UTF-8 無 BOM 格式。
 
 4. 讀 ~/.gemini/antigravity-cli/hooks/my-status.mjs
    - 所有 child_process（spawn / exec / execFile）是否都有 { windowsHide: true }？
@@ -904,7 +927,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
    - Mac/Linux：ps auxww | grep agy
    - Windows：Get-Process | Where-Object { $_.ProcessName -like "*agy*" }
 
-7. 查看最近的 hook 錯誤紀錄
+7. 查看最近的掛鉤（Hook）錯誤紀錄
    - cat ~/.gemini/hook_error.log（Windows：%USERPROFILE%\.gemini\hook_error.log）
    - 把最後 30 行貼給我，並指出可能的原因
 
