@@ -224,6 +224,9 @@ if (oldDirExists) {
     console.log('[Clean Up] 舊的全域技能目錄已安全備份並移除。');
   } catch (err) {
     console.error(`[Clean Up] 備份/移除舊的全域技能目錄失敗:`, err);
+    if (err.message && err.message.includes('[Security Violation]')) {
+      process.exit(1);
+    }
   }
 }
 
@@ -251,6 +254,9 @@ for (const qPath of redundantQuestionsPaths) {
       safeRemoveSync(qPath);
     } catch (err) {
       console.error(`[Clean Up] 移除 questions.json 失敗: ${qPath}`, err);
+      if (err.message && err.message.includes('[Security Violation]')) {
+        process.exit(1);
+      }
     }
   }
 }

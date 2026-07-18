@@ -254,23 +254,44 @@ async function readStdin() {
   });
 }
 
-async function getSettingsAsync() {
+async function getSettingsAsync(meta) {
   const globalPath = join(os.homedir(), '.gemini', 'settings.json');
-  const projectPath = join(process.cwd(), '.gemini', 'settings.json');
+  const cliPath = join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
+  const projectDir = (typeof meta?.project?.path === 'string' && meta.project.path)
+    ? meta.project.path
+    : process.cwd();
+  const projectPath = join(projectDir, '.gemini', 'settings.json');
   let settings = {};
+
   try {
     const globalContent = await fs.readFile(globalPath, 'utf8');
     settings = JSON.parse(globalContent.replace(/^\uFEFF/, ''));
   } catch (e) {}
+
+  try {
+    const cliContent = await fs.readFile(cliPath, 'utf8');
+    const cliSettings = JSON.parse(cliContent.replace(/^\uFEFF/, ''));
+    settings = { ...settings, ...cliSettings };
+    if (cliSettings.ui) {
+      settings.ui = { ...settings.ui, ...cliSettings.ui };
+      if (cliSettings.ui.footer) {
+        settings.ui.footer = { ...settings.ui.footer, ...cliSettings.ui.footer };
+      }
+    }
+  } catch (e) {}
+
   try {
     const projContent = await fs.readFile(projectPath, 'utf8');
     const projSettings = JSON.parse(projContent.replace(/^\uFEFF/, ''));
     settings = { ...settings, ...projSettings };
     if (projSettings.ui) {
       settings.ui = { ...settings.ui, ...projSettings.ui };
-      if (projSettings.ui.footer) settings.ui.footer = { ...settings.ui.footer, ...projSettings.ui.footer };
+      if (projSettings.ui.footer) {
+        settings.ui.footer = { ...settings.ui.footer, ...projSettings.ui.footer };
+      }
     }
   } catch (e) {}
+
   return settings;
 }
 
@@ -827,7 +848,7 @@ async function main() {
     const stdinStr = await readStdin();
     try { if (stdinStr.trim()) meta = JSON.parse(stdinStr.replace(/^\uFEFF/, '')); } catch (e) {}
 
-    const settings = await getSettingsAsync();
+    const settings = await getSettingsAsync(meta);
     const termWidth = Math.max(40, (meta?.terminal_width || process.stdout.columns || 80) - 15);
     
     let fallbackModel = 'Gemini 3.5 Flash (High)';
