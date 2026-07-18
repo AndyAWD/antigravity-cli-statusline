@@ -188,7 +188,13 @@ v24.14.0
    - Header：X-Codeium-Csrf-Token、Connect-Protocol-Version: 1，rejectUnauthorized: false
    - Payload：{"metadata":{"ideName":"antigravity"}}
 4. 解析 userStatus.cascadeModelConfigData.clientModelConfigs 陣列
-   找帶 quotaInfo 的物件，remainingFraction * 100，console.log「API: 剩餘 80%」
+   - 每一層存取都要做空值檢查（optional chaining ?.），任何一層是 undefined 就輸出「API: --」
+   - 遍歷整個陣列，找出所有帶 quotaInfo 的物件
+   - 注意：protobuf 會省略值為 0 的欄位！若 quotaInfo 有 resetTime 但沒有
+     remainingFraction，視為 0%
+   - 注意：remainingFraction 可能 > 1（已是百分比），若 ≤ 1 才乘以 100
+   - 取百分比最小的那個（最吃緊的模型額度），用 Math.round() 取整
+   - console.log「API: 剩餘 80%」；整個陣列都找不到 quotaInfo 就印「API: --」
 
 跨平台必守規則：
 - 用 process.platform === 'win32' 判斷平台，分別呼叫對應指令
@@ -197,6 +203,8 @@ v24.14.0
 - PowerShell 用 spawn('powershell.exe', ['-NoProfile', '-Command', script], { windowsHide: true })
 - 子行程 stdout 明確 { encoding: 'utf8' }，避免 Windows cp950/cp1252 吃掉中文
 - HTTPS timeout 設 2000ms；任何步驟失敗都 console.log 印「API: --」不要拋例外
+- 寫完後先用 node 直接執行這支腳本，確認輸出正常（需 agy 行程正在跑）；
+  有問題先修好再進下一步
 - 只用 Node 內建模組（https / child_process / os / path），不要 npm install
 - 檔案請存 UTF-8 無 BOM；用 .mjs + import 語法
 - 路徑用 path.join(os.homedir(), '.gemini', ...) 動態組，
@@ -741,6 +749,13 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
 （Windows：%USERPROFILE%\.gemini\antigravity-cli\settings.json）
 
 在根節點合併以下欄位（保留其他既有欄位，勿覆蓋整個檔案），並請注意：必須同步寫入全域（Global）、CLI 專屬（CLI-specific）與專案（Project）三層設定檔，確保狀態列設定（Configuration）在所有執行層級下都能被正確套用與繼承。
+
+三層設定檔路徑（三個都要寫入相同的 statusLine 設定）：
+- CLI 專屬（最高優先級）：~/.gemini/antigravity-cli/settings.json
+- 全域：~/.gemini/settings.json
+- 專案：當前工作目錄下的 .gemini/settings.json
+（Windows 的 ~ 即 %USERPROFILE%；實際寫入時用 os.homedir() 解析成絕對路徑）
+
 {
   "statusLine": {
     "enabled": true,
@@ -766,6 +781,11 @@ CLI 預設拒絕執行未列管的腳本。**打開（或建立）** `~/.gemini/
 - Windows 反斜線寫雙倍：node C:\\Users\\xxx\\.gemini\\...
 - 兩檔都用 UTF-8 無 BOM 存檔
 - "statusLine:" 前綴與 settings.json 的 command 必須逐字相符，否則 CLI 拒絕執行
+
+完成後請驗證：
+1. 用 node 直接執行 my-status.mjs，確認有正常輸出（如「API: 剩餘 80%」）
+2. 比對 settings.json 的 command 與 trusted_hooks.json 的 statusLine: 後字串完全相同
+3. 都正確後告知使用者：回到 Agy CLI 輸入 /statusline 啟用
 ```
 
 > ✅ Agy CLI 寫完後，下一頁直接在 CLI 輸入 `/statusline` 啟用。
@@ -833,12 +853,13 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 
 ---
 
-## 卡關了？四條跨平台排錯
+## 卡關了？五條跨平台排錯
 
 1. **狀態列沒出現** → 檢查 `trusted_hooks.json` 是否漏 `statusLine:` 前綴；看 `~/.gemini/hook_error.log`（Windows：`%USERPROFILE%\.gemini\hook_error.log`）
 2. **出現 `undefined` 或 `API: --`** → 確認 `settings.json` `command` 是絕對路徑 + 腳本存檔為 UTF-8 無 BOM + 確認 `agy` 行程還在跑（沒關就抓不到 PID）
-3. **Windows 路徑寫法** → 反斜線**必須雙倍** `C:\\Users\\xxx\\.gemini\\...`，或改用正斜線 `C:/Users/xxx/.gemini/...`；單一反斜線會被 JSON 當跳脫字元吃掉
-4. **Windows 出現 `invalid character 'ï' looking for beginning of value`** → JSON 檔頭被偷塞 BOM。用 VS Code 開啟，右下角點「UTF-8 with BOM」改成「UTF-8」重新存檔
+3. **出現 `API: ` 但沒有百分比** → 額度耗盡時 protobuf 會省略 `remainingFraction=0`（只剩 `resetTime`），腳本要把這種情況視為 0%；另外 `remainingFraction` 可能 > 1，只有 ≤ 1 才乘 100
+4. **Windows 路徑寫法** → 反斜線**必須雙倍** `C:\\Users\\xxx\\.gemini\\...`，或改用正斜線 `C:/Users/xxx/.gemini/...`；單一反斜線會被 JSON 當跳脫字元吃掉
+5. **Windows 出現 `invalid character 'ï' looking for beginning of value`** → JSON 檔頭被偷塞 BOM。用 VS Code 開啟，右下角點「UTF-8 with BOM」改成「UTF-8」重新存檔
 
 **Windows 黑色 CMD 視窗一直閃** → 注意！只在 `spawn` 加 `windowsHide: true` 無法完全解決因 Windows 系統中缺失 `sh` 執行檔而導致的黑視窗閃爍問題。在 Windows 環境下，必須編譯並設定 `sh.exe` 橋接器（bridge）來接管腳本執行，才能徹底消除視窗閃爍。
 
@@ -861,6 +882,9 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
    （Windows：%USERPROFILE%\.gemini\antigravity-cli\settings.json）
    - statusLine.command 是否為絕對路徑（不含 ~ / $HOME / %USERPROFILE%）？
    - Windows 反斜線是否寫成雙倍（C:\\Users\\...）？
+   - 同時檢查另外兩層設定檔：~/.gemini/settings.json 與
+     當前工作目錄下的 .gemini/settings.json，
+     三層的 statusLine 設定必須一致（缺哪層就補哪層）
 
 3. 用二進位方式讀兩個 JSON 檔的前 3 個位元組
    - 若出現 EF BB BF 表示被加了 UTF-8 BOM，請重新存成無 BOM 版本
@@ -869,12 +893,18 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
 4. 讀 ~/.gemini/antigravity-cli/hooks/my-status.mjs
    - 所有 child_process（spawn / exec / execFile）是否都有 { windowsHide: true }？
    - 說明只加 windowsHide: true 無法解決 sh 缺失導致的黑視窗閃爍，必須確認是否已編譯與設定 sh.exe 橋接器以接管執行，若無則予以說明。
+   - 檢查額度解析邏輯：quotaInfo 只有 resetTime 沒有 remainingFraction 時
+     是否視為 0%（protobuf 會省略值為 0 的欄位）？
+     remainingFraction > 1 時是否直接當百分比（只有 ≤ 1 才乘 100）？
+     每層巢狀存取是否都有空值檢查？
 
-5. 確認 agy 行程還在跑（沒關就抓不到 PID）：
+5. 直接用 node 執行 my-status.mjs，把完整輸出（含錯誤）貼給我
+
+6. 確認 agy 行程還在跑（沒關就抓不到 PID）：
    - Mac/Linux：ps auxww | grep agy
    - Windows：Get-Process | Where-Object { $_.ProcessName -like "*agy*" }
 
-6. 查看最近的 hook 錯誤紀錄
+7. 查看最近的 hook 錯誤紀錄
    - cat ~/.gemini/hook_error.log（Windows：%USERPROFILE%\.gemini\hook_error.log）
    - 把最後 30 行貼給我，並指出可能的原因
 
