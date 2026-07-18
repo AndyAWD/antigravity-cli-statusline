@@ -940,7 +940,7 @@ ANSI 寫法：\x1b[38;2;R;G;Bm <文字> \x1b[0m
                 font-size:0.72em; line-height:1.9;">
       <div><span style="color:#888;">$ </span><span style="color:#57caff;">agy plugin install </span><span style="color:#fff;">https://github.com/andyawd/antigravity-cli-statusline</span></div>
       <div><span style="color:#888;">$ </span><span style="color:#fff;">agy</span></div>
-      <div><span style="color:#5cdb6d;">&gt; </span><span style="color:#ffd427;">/antigravity-cli-statusline</span></div>
+      <div><span style="color:#5cdb6d;">&gt; </span><span style="color:#ffd427;">/antigravity-cli-statusline:antigravity-cli-statusline</span></div>
     </div>
     <div style="font-size:0.7em; color:#5f6368; margin-top:0.7em;">
       精靈會帶你勾選指標 · 選擇語系 · 自動寫好三層設定檔
