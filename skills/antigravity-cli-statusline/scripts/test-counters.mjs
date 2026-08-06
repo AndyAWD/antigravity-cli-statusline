@@ -586,7 +586,9 @@ async function main() {
         console.error(`    ❌ [${name}] 執行時發生例外:`, e);
         return false;
       } finally {
-        rmSync(home, { recursive: true, force: true });
+        try {
+          rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+        } catch (_) {}
       }
     };
 
