@@ -33,9 +33,13 @@ function findServerCandidates() {
     const candidates = [];
     if (process.platform === 'win32') {
       try {
-        const psCmd = "powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter 'Name like ''%agy%'' or Name like ''%language_server%''' | Select-Object ProcessID, CommandLine | ConvertTo-Json -Compress\"";
+        const psCmd = "powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter 'Name like ''%antigravity%'' or Name like ''%agy%'' or Name like ''%language_server%''' | Select-Object ProcessID, CommandLine | ConvertTo-Json -Compress\"";
         output = execSync(psCmd, { encoding: 'utf8', windowsHide: true }).trim();
         if (output) {
+          const jsonStart = output.search(/\[|\{/);
+          if (jsonStart !== -1) {
+            output = output.slice(jsonStart);
+          }
           let processes = JSON.parse(output);
           if (!Array.isArray(processes)) {
             processes = [processes];
@@ -46,7 +50,7 @@ function findServerCandidates() {
             if (!pid) continue;
             
             const lower = cmdLine.toLowerCase();
-            const isCli = lower.includes('agy') && !lower.includes('statusline-quota');
+            const isCli = (lower.includes('antigravity') || lower.includes('agy')) && !lower.includes('statusline-quota');
             const isLang = lower.includes('language_server');
             if (!isCli && !isLang) continue;
             
@@ -67,7 +71,7 @@ function findServerCandidates() {
         const lines = output.split('\n');
         for (const line of lines) {
           const lower = line.toLowerCase();
-          const isCli = /\bagy(\s|$)/.test(lower);
+          const isCli = (/\bagy(\s|$)/.test(lower) || lower.includes('antigravity-cli')) && !lower.includes('statusline-quota');
           const isLang = lower.includes('language_server');
           if (!isCli && !isLang) continue;
           const parts = line.trim().split(/\s+/);
