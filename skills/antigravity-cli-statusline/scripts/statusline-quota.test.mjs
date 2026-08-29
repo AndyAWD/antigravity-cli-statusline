@@ -9,6 +9,7 @@ const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.
 
 const BLUE_BOLD = "\x1b[38;2;87;202;255m\x1b[1m";
 const GREEN_BOLD = "\x1b[38;2;92;219;109m\x1b[1m";
+const YELLOW = "\x1b[38;2;255;212;39m";
 const WHITE = "\x1b[38;2;255;255;255m";
 const RESET = "\x1b[0m";
 
@@ -105,7 +106,7 @@ async function main() {
         testsPassed = false;
       }
     } finally {
-      rmSync(homeR1, { recursive: true, force: true });
+      try { rmSync(homeR1, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
     // ----------------------------------------------------
@@ -149,7 +150,7 @@ async function main() {
         testsPassed = false;
       }
     } finally {
-      rmSync(homeR2, { recursive: true, force: true });
+      try { rmSync(homeR2, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
     // ----------------------------------------------------
@@ -193,7 +194,7 @@ async function main() {
         testsPassed = false;
       }
     } finally {
-      rmSync(homeR3, { recursive: true, force: true });
+      try { rmSync(homeR3, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
     // ----------------------------------------------------
@@ -230,7 +231,59 @@ async function main() {
         testsPassed = false;
       }
     } finally {
-      rmSync(homeR4, { recursive: true, force: true });
+      try { rmSync(homeR4, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R5: Hourly Available uses shortTerm 5h quota
+    // Justification: Verifies that Hourly Available prefers shortTerm 5h quota (32% / 2h 2m) over weekly bottleneck model quota (4.7% / 1h 20m).
+    // ----------------------------------------------------
+    console.log("\n[Test R5] Verifying shortTerm 5h quota priority for Hourly Available...");
+    const mockCacheR5 = {
+      models: {
+        gemini36flashhigh: {
+          remaining_percentage: 4.67,
+          reset_time: '2026-08-07T11:12:18Z',
+          refreshes_in: '1h 20m'
+        }
+      },
+      shortTerm: {
+        gemini: {
+          remaining_percentage: 31.8,
+          reset_time: '2026-08-07T11:54:34Z',
+          refreshes_in: '2h 2m'
+        }
+      },
+      updatedAt: Date.now()
+    };
+    const settingsR5 = {
+      ui: {
+        language: "us",
+        footer: {
+          items: ["quota", "quota-reset-countdown"]
+        }
+      }
+    };
+    const metaR5 = {
+      model: { display_name: "Gemini 3.6 Flash (High)" },
+      terminal_width: 120
+    };
+
+    const homeR5 = makeTempHome(mockCacheR5, settingsR5);
+    try {
+      const resR5 = await runStatusline(metaR5, homeR5);
+      console.log("R5 Output:", JSON.stringify(resR5.stdout));
+
+      const expectedR5Quota = `${WHITE}Hourly Available:${RESET} ${YELLOW}\x1b[1m32%${RESET}`;
+      const expectedR5Reset = `${WHITE}Hourly Reset:${RESET} ${BLUE_BOLD}2h 2m${RESET}`;
+      if (resR5.code === 0 && resR5.stdout.includes(expectedR5Quota) && resR5.stdout.includes(expectedR5Reset)) {
+        console.log("✅ R5 passed!");
+      } else {
+        console.error(`❌ R5 failed! Expected output to contain 32% and 2h 2m.`);
+        testsPassed = false;
+      }
+    } finally {
+      try { rmSync(homeR5, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
   } catch (err) {

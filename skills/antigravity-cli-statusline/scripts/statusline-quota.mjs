@@ -320,13 +320,35 @@ async function triggerQuotaUpdateIfNeededAsync(cacheInfo) {
 
 function resolveModelQuota(fallbackModel, cache) {
   const normModel = normalizeModelName(fallbackModel);
+
+  // 1. 優先使用 RetrieveUserQuotaSummary 解析出的短週期 (5h) 配額桶
+  let pool = '';
+  if (normModel.includes('gemini')) {
+    pool = 'gemini';
+  } else if (normModel.includes('claude') || normModel.includes('gpt')) {
+    pool = '3p';
+  }
+
+  if (pool && cache && cache.shortTerm && cache.shortTerm[pool]) {
+    return cache.shortTerm[pool];
+  }
+
+  if (cache && cache.shortTerm) {
+    const pools = Object.keys(cache.shortTerm);
+    if (pools.length > 0) {
+      const matchedPool = pools.find(p => normModel.includes(p) || p.includes(normModel));
+      if (matchedPool) return cache.shortTerm[matchedPool];
+    }
+  }
+
+  // 2. 若無 shortTerm 桶，降級回 GetUserStatus 中的 cache.models
   let modelQuota = null;
   if (cache && cache.models) {
-    // 1. Exact match
+    // 2a. Exact match
     if (cache.models[normModel]) {
       modelQuota = cache.models[normModel];
     } else {
-      // 2. Substring match
+      // 2b. Substring match
       for (const k in cache.models) {
         if (normModel.includes(k) || k.includes(normModel)) {
           modelQuota = cache.models[k];
@@ -334,7 +356,7 @@ function resolveModelQuota(fallbackModel, cache) {
         }
       }
     }
-    // 3. Family match
+    // 2c. Family match
     if (!modelQuota) {
       const families = ['claude', 'gemini', 'gpt'];
       const modelFamily = families.find(f => normModel.includes(f));
@@ -349,7 +371,7 @@ function resolveModelQuota(fallbackModel, cache) {
       }
     }
   }
-  // 4. Global minimum fallback
+  // 2d. Global minimum fallback
   if (!modelQuota && cache && cache.models) {
     const allKeys = Object.keys(cache.models);
     if (allKeys.length > 0) {
