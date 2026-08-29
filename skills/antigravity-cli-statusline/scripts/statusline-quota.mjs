@@ -756,7 +756,7 @@ function buildI18nDict(lang, m) {
       'pending-input': `${WHITE}待處理輸入:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
       'background-tasks': `${WHITE}背景任務:${RESET} ${getColorByCount(m.backgroundTasksCount)}${BOLD}${m.backgroundTasksCount}${RESET}`,
       'subagents': `${WHITE}子代理:${RESET} ${getColorByCount(m.subagentsCount)}${BOLD}${m.subagentsCount}${RESET}`,
-      'artifacts': `${WHITE}工件數: ${BOLD}${m.artifactsCount}${RESET}`,
+      'artifacts': `${WHITE}檔案數量: ${BOLD}${m.artifactsCount}${RESET}`,
       'vcs-dirty': `${WHITE}工作區狀態:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyGlyph} ${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}VCS類型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙盒狀態:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
