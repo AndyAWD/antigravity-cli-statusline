@@ -64,7 +64,7 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 - **每週 API 重置時間倒數（`quota-weekly-countdown`）**：距離每週額度重置剩餘時間
 - **目前對話已消耗的 Context 比例（`context-used`）**：百分比
 - **目前 Session 消耗的精確 Token 數量（`token-count`）**
-- **本次對話 AI 累計產出的成品 / 檔案數（`artifacts`）**
+- **本次對話 AI 累計產出的檔案數量（`artifacts`）**
 - **目前訂閱方案等級（`plan-tier`）**
 
 **互動狀態**

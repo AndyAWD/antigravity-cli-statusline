@@ -8,7 +8,7 @@
       "沙盒模式狀態（off / on (net) / on (no-net)）（sandbox-status）",
       "目前對話已消耗的脈絡（Context）用量比例（context-used）",
       "目前工作階段（Session）消耗的精確權杖（Token）數量（token-count）",
-      "本次對話人工智慧（AI）累計產出的工件（Artifacts）/ 檔案數（artifacts）",
+      "本次對話人工智慧（AI）累計產出的檔案數量（Artifacts）（artifacts）",
       "帳號電子郵件（Account Email）（account-email）",
       "目前訂閱方案等級（Plan Tier）（plan-tier）",
       "帳號五小時可用額度百分比（quota）",

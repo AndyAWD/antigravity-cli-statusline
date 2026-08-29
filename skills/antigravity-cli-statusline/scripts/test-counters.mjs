@@ -137,7 +137,7 @@ async function main() {
       const regexPending = new RegExp("待處理輸入.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "11" + escapeRegex(RESET));
       const regexBg = new RegExp("背景任務.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "12" + escapeRegex(RESET));
       const regexSub = new RegExp("子代理.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "13" + escapeRegex(RESET));
-      const regexArt = new RegExp("工件數.*?" + escapeRegex(BOLD) + "14" + escapeRegex(RESET));
+      const regexArt = new RegExp("檔案數量.*?" + escapeRegex(BOLD) + "14" + escapeRegex(RESET));
 
       const p1 = regexPending.test(res0.stdout);
       const p2 = regexBg.test(res0.stdout);
@@ -151,7 +151,7 @@ async function main() {
         console.error(`- 待處理輸入 (11, 紅色): ${p1 ? 'OK' : 'FAIL'}`);
         console.error(`- 背景任務 (12, 紅色): ${p2 ? 'OK' : 'FAIL'}`);
         console.error(`- 子代理 (13, 紅色): ${p3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 工件數 (14, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
+        console.error(`- 檔案數量 (14, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
@@ -189,7 +189,7 @@ async function main() {
       const regexPending = new RegExp("待處理輸入.*?" + escapeRegex(GREEN) + escapeRegex(BOLD) + "2" + escapeRegex(RESET));
       const regexBg = new RegExp("背景任務.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "3" + escapeRegex(RESET));
       const regexSub = new RegExp("子代理.*?" + escapeRegex(YELLOW) + escapeRegex(BOLD) + "4" + escapeRegex(RESET));
-      const regexArt = new RegExp("工件數.*?" + escapeRegex(BOLD) + "5" + escapeRegex(RESET));
+      const regexArt = new RegExp("檔案數量.*?" + escapeRegex(BOLD) + "5" + escapeRegex(RESET));
 
       const p1 = regexPending.test(res1.stdout);
       const p2 = regexBg.test(res1.stdout);
@@ -203,7 +203,7 @@ async function main() {
         console.error(`- 待處理輸入 (2, 綠色): ${p1 ? 'OK' : 'FAIL'}`);
         console.error(`- 背景任務 (3, 黃色): ${p2 ? 'OK' : 'FAIL'}`);
         console.error(`- 子代理 (4, 黃色): ${p3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 工件數 (5, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
+        console.error(`- 檔案數量 (5, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
@@ -304,7 +304,7 @@ async function main() {
       const regexPending = new RegExp("待處理輸入.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "8" + escapeRegex(RESET));
       const regexBg = new RegExp("背景任務.*?" + escapeRegex(RED) + escapeRegex(BOLD) + "6" + escapeRegex(RESET));
       const regexSub = new RegExp("子代理.*?" + escapeRegex(subagentsColor) + escapeRegex(BOLD) + expectedSubagents + escapeRegex(RESET));
-      const regexArt = new RegExp("工件數.*?" + escapeRegex(BOLD) + "7" + escapeRegex(RESET));
+      const regexArt = new RegExp("檔案數量.*?" + escapeRegex(BOLD) + "7" + escapeRegex(RESET));
 
       const p1 = regexPending.test(res2.stdout);
       const p2 = regexBg.test(res2.stdout);
@@ -318,7 +318,7 @@ async function main() {
         console.error(`- 待處理輸入 (8, 紅色): ${p1 ? 'OK' : 'FAIL'}`);
         console.error(`- 背景任務 (6, 紅色): ${p2 ? 'OK' : 'FAIL'}`);
         console.error(`- 子代理 (${expectedSubagents}, 配色): ${p3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 工件數 (7, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
+        console.error(`- 檔案數量 (7, BOLD): ${p4 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
@@ -361,7 +361,7 @@ async function main() {
       const regexPending3 = new RegExp("待處理輸入.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
       const regexBg3 = new RegExp("背景任務.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
       const regexSub3 = new RegExp("子代理.*?" + escapeRegex(BLUE) + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
-      const regexArt3 = new RegExp("工件數.*?" + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
+      const regexArt3 = new RegExp("檔案數量.*?" + escapeRegex(BOLD) + "0" + escapeRegex(RESET));
 
       const p1_3 = regexPending3.test(res3.stdout);
       const p2_3 = regexBg3.test(res3.stdout);
@@ -375,7 +375,7 @@ async function main() {
         console.error(`- 待處理輸入 (0, 藍色): ${p1_3 ? 'OK' : 'FAIL'}`);
         console.error(`- 背景任務 (0, 藍色): ${p2_3 ? 'OK' : 'FAIL'}`);
         console.error(`- 子代理 (0, 藍色): ${p3_3 ? 'OK' : 'FAIL'}`);
-        console.error(`- 工件數 (0, BOLD): ${p4_3 ? 'OK' : 'FAIL'}`);
+        console.error(`- 檔案數量 (0, BOLD): ${p4_3 ? 'OK' : 'FAIL'}`);
         testsPassed = false;
       }
     }
