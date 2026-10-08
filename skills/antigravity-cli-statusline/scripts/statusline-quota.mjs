@@ -3,7 +3,6 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import path, { join, basename } from 'path';
 import os from 'os';
-import { fileURLToPath } from 'url';
 
 // ==========================================
 // Constants & UI Styling
@@ -385,11 +384,7 @@ export function parseMetaQuota(meta) {
   return { shortTerm, weekly };
 }
 
-async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta) {
-  // 若 Antigravity CLI 已於 meta.quota 注入原生即時配額，無需喚醒背景輪詢
-  if (meta?.quota && typeof meta.quota === 'object' && Object.keys(meta.quota).length > 0) {
-    return;
-  }
+async function triggerQuotaUpdateIfNeededAsync(cacheInfo) {
   let needUpdate = true;
   if (cacheInfo && Date.now() - (cacheInfo.updatedAt || 0) < 30000) needUpdate = false;
 
@@ -1010,7 +1005,7 @@ async function main() {
         await writeFileAndVerifyNoBOM(cachePath, JSON.stringify(cache, null, 2));
       } catch (_) {}
     } else {
-      await triggerQuotaUpdateIfNeededAsync(cache, meta);
+      await triggerQuotaUpdateIfNeededAsync(cache);
     }
 
     // 解析核心資料
@@ -1039,17 +1034,4 @@ async function main() {
   process.exit(0);
 }
 
-function isDirectExecution() {
-  if (!process.argv[1]) return false;
-  try {
-    const scriptPath = process.argv[1];
-    const metaPath = fileURLToPath(import.meta.url);
-    return path.resolve(scriptPath).toLowerCase() === path.resolve(metaPath).toLowerCase();
-  } catch (e) {
-    return false;
-  }
-}
-
-if (isDirectExecution()) {
-  main();
-}
+main();
