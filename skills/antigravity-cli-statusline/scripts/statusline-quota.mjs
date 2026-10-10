@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
-import { join, basename } from 'path';
+import path, { join, basename } from 'path';
 import os from 'os';
 
 // ==========================================
@@ -298,6 +298,92 @@ async function getSettingsAsync(meta) {
 // ==========================================
 // Business Logic Helpers
 // ==========================================
+export function formatResetTime(resetTimeStr) {
+  try {
+    const reset = new Date(resetTimeStr);
+    const diffSeconds = Math.floor((reset.getTime() - Date.now()) / 1000);
+    if (diffSeconds <= 0) return 'now';
+    const minutes = Math.floor((diffSeconds + 59) / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours >= 24) {
+      const days = Math.floor(hours / 24);
+      const remHours = hours % 24;
+      return remHours ? `${days}d ${remHours}h` : `${days}d`;
+    }
+    return mins ? `${hours}h ${mins}m` : `${hours}h`;
+  } catch (e) {
+    return '';
+  }
+}
+
+export function formatSecondsToCountdown(totalSec) {
+  if (totalSec <= 0) return 'now';
+  const minutes = Math.floor((totalSec + 59) / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return remHours ? `${days}d ${remHours}h` : `${days}d`;
+  }
+  return mins ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+export function parseMetaQuota(meta) {
+  if (!meta?.quota || typeof meta.quota !== 'object') return null;
+  const keys = Object.keys(meta.quota);
+  if (keys.length === 0) return null;
+
+  const shortTerm = {};
+  const weekly = {};
+
+  for (const key of keys) {
+    const bucket = meta.quota[key];
+    if (!bucket) continue;
+
+    let fraction = 1;
+    const remainingField = bucket.remaining_fraction !== undefined ? bucket.remaining_fraction : bucket.remainingFraction;
+    if (remainingField !== undefined && remainingField !== null) {
+      fraction = parseFloat(remainingField);
+    } else if (bucket.reset_time || bucket.reset_in_seconds || bucket.resetTime) {
+      fraction = 0;
+    }
+
+    const remainingNum = fraction > 1 ? fraction : fraction * 100;
+    const remaining = Math.max(0, Math.min(100, remainingNum));
+
+    const resetTime = bucket.reset_time || bucket.resetTime;
+    const resetSec = bucket.reset_in_seconds !== undefined ? bucket.reset_in_seconds : bucket.resetInSeconds;
+
+    let refreshesIn = '';
+    if (resetSec !== undefined && resetSec !== null) {
+      refreshesIn = formatSecondsToCountdown(resetSec);
+    } else if (resetTime) {
+      refreshesIn = formatResetTime(resetTime);
+    }
+
+    const entry = {
+      remaining_percentage: remaining
+    };
+    if (resetTime) entry.reset_time = resetTime;
+    if (refreshesIn) entry.refreshes_in = refreshesIn;
+
+    if (key.endsWith('-weekly')) {
+      const pool = key.replace(/-weekly$/, '');
+      weekly[pool] = entry;
+    } else {
+      const pool = key.replace(/-(5h|3h|hourly|shortterm)$/, '');
+      shortTerm[pool] = entry;
+    }
+  }
+
+  if (Object.keys(shortTerm).length === 0 && Object.keys(weekly).length === 0) return null;
+  return { shortTerm, weekly };
+}
+
 async function triggerQuotaUpdateIfNeededAsync(cacheInfo) {
   let needUpdate = true;
   if (cacheInfo && Date.now() - (cacheInfo.updatedAt || 0) < 30000) needUpdate = false;
@@ -318,7 +404,7 @@ async function triggerQuotaUpdateIfNeededAsync(cacheInfo) {
   }
 }
 
-function resolveModelQuota(fallbackModel, cache) {
+export function resolveModelQuota(fallbackModel, cache) {
   const normModel = normalizeModelName(fallbackModel);
 
   // 1. 優先使用 RetrieveUserQuotaSummary 解析出的短週期 (5h) 配額桶
@@ -389,7 +475,7 @@ function resolveModelQuota(fallbackModel, cache) {
  * @param {object} cache - the local quota cache object
  * @returns {{remaining_percentage:number,reset_time?:string,refreshes_in?:string}}
  */
-function resolveWeeklyQuota(fallbackModel, cache) {
+export function resolveWeeklyQuota(fallbackModel, cache) {
   const normModel = normalizeModelName(fallbackModel);
   let pool = '';
   if (normModel.includes('gemini')) {
@@ -474,9 +560,12 @@ async function manageAccountMetaCacheAsync(meta) {
     cachedAccount = JSON.parse(content.replace(/^\uFEFF/, ''));
   } catch (e) {}
   
-  if (meta && meta.account && (meta.account.email || meta.account.plan_tier)) {
-    if (meta.account.email) cachedAccount.email = meta.account.email;
-    if (meta.account.plan_tier) cachedAccount.planTier = meta.account.plan_tier;
+  const email = meta?.email || meta?.account?.email;
+  const planTier = meta?.plan_tier || meta?.account?.plan_tier;
+
+  if (email || planTier) {
+    if (email) cachedAccount.email = email;
+    if (planTier) cachedAccount.planTier = planTier;
     try {
       await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
       await writeFileAndVerifyNoBOM(accountMetaPath, JSON.stringify(cachedAccount));
@@ -540,8 +629,8 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   const projectFullPath = projectPath;
 
   // Account
-  const planTier = (cache && cache.planTier) ? cache.planTier : (meta?.account?.plan_tier || cachedAccount.planTier || unknownStr);
-  const accountEmail = (cache && cache.email) ? cache.email : (meta?.account?.email || cachedAccount.email || unknownStr);
+  const planTier = (cache && cache.planTier) ? cache.planTier : (meta?.plan_tier || meta?.account?.plan_tier || cachedAccount.planTier || unknownStr);
+  const accountEmail = (cache && cache.email) ? cache.email : (meta?.email || meta?.account?.email || cachedAccount.email || unknownStr);
 
   // Agent State
   const agentState = meta?.agent_state || 'idle';
@@ -893,14 +982,31 @@ async function main() {
       conversationId = meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '');
     }
     
-    // 讀取快取並觸發更新
+    // 讀取快取並優先整合 Antigravity CLI 原生 meta.quota
     const cachePath = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
     let cache = null;
     try {
       const cacheContent = await fs.readFile(cachePath, 'utf8');
       cache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
     } catch (e) {}
-    await triggerQuotaUpdateIfNeededAsync(cache);
+
+    const metaQuota = parseMetaQuota(meta);
+    if (metaQuota) {
+      if (!cache) cache = {};
+      cache.shortTerm = { ...(cache.shortTerm || {}), ...metaQuota.shortTerm };
+      cache.weekly = { ...(cache.weekly || {}), ...metaQuota.weekly };
+      const planTier = meta?.plan_tier || meta?.account?.plan_tier;
+      const email = meta?.email || meta?.account?.email;
+      if (planTier) cache.planTier = planTier;
+      if (email) cache.email = email;
+      cache.updatedAt = Date.now();
+      try {
+        await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
+        await writeFileAndVerifyNoBOM(cachePath, JSON.stringify(cache, null, 2));
+      } catch (_) {}
+    } else {
+      await triggerQuotaUpdateIfNeededAsync(cache);
+    }
 
     // 解析核心資料
     const quotaInfo = resolveModelQuota(fallbackModel, cache);

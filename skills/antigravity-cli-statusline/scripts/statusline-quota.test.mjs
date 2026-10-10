@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, rmSync, mkdtempSync } from 'fs';
+import { writeFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
@@ -19,11 +19,11 @@ const RESET = "\x1b[0m";
  * @param {string} homeDir - Isolated temporary directory path
  * @returns {Promise<{code: number, stdout: string, stderr: string}>}
  */
-function runStatusline(stdinData, homeDir) {
+function runStatusline(stdinData, homeDir, scriptPath = SCRIPT_PATH) {
   return new Promise((resolve) => {
     const env = { ...process.env, HOME: homeDir, USERPROFILE: homeDir };
     delete env.DISABLE_QUOTA_HOOK;            // explicit unset — Finding #1
-    const child = spawn('node', [SCRIPT_PATH], {
+    const child = spawn('node', [scriptPath], {
       env,
       cwd: homeDir,                            // project settings resolve under temp home — Finding #2
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -284,6 +284,87 @@ async function main() {
       }
     } finally {
       try { rmSync(homeR5, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R6: Direct meta.quota integration (Native CLI quota, zero disk dependency)
+    // ----------------------------------------------------
+    console.log("\n[Test R6] Verifying native meta.quota rendering and persistence...");
+    const settingsR6 = {
+      ui: {
+        language: "us",
+        footer: {
+          items: ["quota", "quota-reset-countdown", "quota-weekly", "quota-weekly-countdown"]
+        }
+      }
+    };
+    const metaR6 = {
+      model: { display_name: "Gemini 3.8 Flash (High)" },
+      quota: {
+        "gemini-5h": {
+          remaining_fraction: 0.75,
+          reset_in_seconds: 7200
+        },
+        "gemini-weekly": {
+          remaining_fraction: 0.82,
+          reset_in_seconds: 360000
+        }
+      },
+      plan_tier: "Google AI Pro",
+      email: "test@example.com",
+      terminal_width: 160
+    };
+
+    const homeR6 = makeTempHome({}, settingsR6);
+    try {
+      const resR6 = await runStatusline(metaR6, homeR6);
+      console.log("R6 Output:", JSON.stringify(resR6.stdout));
+
+      const expectedR6Hourly = `${WHITE}Hourly Available:${RESET} ${BLUE_BOLD}75%${RESET}`;
+      const expectedR6HourlyReset = `${WHITE}Hourly Reset:${RESET} ${BLUE_BOLD}2h${RESET}`;
+      const expectedR6Weekly = `${WHITE}Weekly Available:${RESET} ${BLUE_BOLD}82%${RESET}`;
+      const expectedR6WeeklyReset = `${WHITE}Weekly Reset:${RESET} ${BLUE_BOLD}4d 4h${RESET}`;
+
+      if (resR6.code === 0 && 
+          resR6.stdout.includes(expectedR6Hourly) && 
+          resR6.stdout.includes(expectedR6HourlyReset) &&
+          resR6.stdout.includes(expectedR6Weekly) &&
+          resR6.stdout.includes(expectedR6WeeklyReset)) {
+        console.log("✅ R6 passed!");
+      } else {
+        console.error(`❌ R6 failed! Output did not contain expected values.`);
+        testsPassed = false;
+      }
+    } finally {
+      try { rmSync(homeR6, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R7: Symbolic link execution regression test
+    // ----------------------------------------------------
+    console.log("\n[Test R7] Verifying execution when invoked via symbolic link...");
+    const homeR7 = makeTempHome({}, settingsR6);
+    const symlinkPath = join(homeR7, 'symlink-statusline.mjs');
+    let symlinkTested = false;
+    try {
+      try {
+        symlinkSync(SCRIPT_PATH, symlinkPath, 'file');
+        symlinkTested = true;
+      } catch (symlinkErr) {
+        console.log(`⚠️ Symlinks not permitted in this environment (${symlinkErr.code || symlinkErr.message}), skipping R7 symlink invocation.`);
+      }
+
+      if (symlinkTested) {
+        const resR7 = await runStatusline(metaR6, homeR7, symlinkPath);
+        if (resR7.code === 0 && resR7.stdout && resR7.stdout.trim().length > 0) {
+          console.log("✅ R7 passed! (Symbolic link executed statusline successfully)");
+        } else {
+          console.error(`❌ R7 failed! Statusline returned 0 bytes or failed when invoked via symbolic link. Code: ${resR7.code}, Output: ${JSON.stringify(resR7.stdout)}`);
+          testsPassed = false;
+        }
+      }
+    } finally {
+      try { rmSync(homeR7, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
   } catch (err) {
