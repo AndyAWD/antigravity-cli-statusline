@@ -1,6 +1,6 @@
 # Antigravity CLI Statusline Skill
 
-[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -42,7 +42,7 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 In the Antigravity CLI prompt, type:
 
 ```text
-/antigravity-cli-statusline
+/antigravity-cli-statusline:agy-cli-statusline
 ```
 
 The skill walks you through language selection, indicator picking, and sorting, then deploys the renderer scripts and writes the three-layer `settings.json`. The statusline updates **live without a CLI restart**.

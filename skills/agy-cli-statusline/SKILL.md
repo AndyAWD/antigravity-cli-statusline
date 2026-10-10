@@ -1,6 +1,6 @@
 ---
-name: antigravity-cli-statusline
-description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並於 Windows 上自動處理 sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
+name: antigravity-cli-statusline:agy-cli-statusline
+description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並於 Windows 上自動處理 sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
 ---
 
 # Antigravity 狀態列設定技能
@@ -146,7 +146,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 ### 步驟 3：第二階段問卷（讀取 questions.json 與勾選指標）
 
-1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/antigravity-cli-statusline/resources/questions.json` 檔案。
+1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/agy-cli-statusline/resources/questions.json` 檔案。
 2. **根據步驟 1 的語言代碼（`zh-tw` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的問卷資訊，呼叫 `ask_question`。
 
 請動態將選定語系的 `options` 內容填入（問卷問題及摘要也請使用對應語系）：
@@ -201,7 +201,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
    **指令範例**：
    ```bash
-   node skills/antigravity-cli-statusline/scripts/configure-statusline.mjs --lang "<步驟1選定的語言>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/略過輸入>" --workspace "<當前工作區絕對路徑>"
+   node skills/agy-cli-statusline/scripts/configure-statusline.mjs --lang "<步驟1選定的語言>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/略過輸入>" --workspace "<當前工作區絕對路徑>"
    ```
    *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["目前使用的人工智慧（AI）模型名稱（model-name）","帳號五小時可用額度百分比（quota）"]'`。請注意外層與內層引號的正確跳脫。*
 
@@ -209,7 +209,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 1. 配置腳本執行完成後，呼叫 `run_command` 執行原有的測試驗證腳本：
    ```bash
-   node skills/antigravity-cli-statusline/scripts/test-counters.mjs
+   node skills/agy-cli-statusline/scripts/test-counters.mjs
    ```
 2. 確認測試無誤通過。若有任何錯誤，依照錯誤訊息進行對應修正。
 
@@ -217,7 +217,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 1. **根據所選語系撰寫最終回覆**：告知使用者設定已自動在 命令列介面（CLI）底部即時熱更新 (Hot Reload) 生效，無需重新啟動。
 2. **舊版腳本檢查**：讀取或檢查 `~/.gemini/hooks/statusline-quota.mjs` 與 `~/.gemini/hooks/fetch-local-quota.mjs` 是否存在。若存在，則以所選語系提醒使用者可以安全地手動刪除它們。
-3. **故障診斷指引**：在回覆末尾以所選語系加入提示：「若日後狀態列突然消失，請前往本外掛目錄執行 `node skills/antigravity-cli-statusline/scripts/diagnose-statusline.mjs`，並把完整輸出貼給 人工智慧（AI）代理進行診斷。」
+3. **故障診斷指引**：在回覆末尾以所選語系加入提示：「若日後狀態列突然消失，請前往本外掛目錄執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs`，並把完整輸出貼給 人工智慧（AI）代理進行診斷。」
 
 ---
 
@@ -227,4 +227,4 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 1. **必須同步寫入三層設定檔**（特別是 命令列介面（CLI）專屬的 `~/.gemini/antigravity-cli/settings.json`，是最致命的盲點）
 2. **Windows 寫設定檔絕對禁止帶 位元組順序記號（BOM）**，寫入後必須驗證前 3 個位元組
-3. **絕對禁止憑空生成 掛鉤（Hook） 腳本**，必須從本外掛的 `skills/antigravity-cli-statusline/scripts/` 讀取原文部署
+3. **絕對禁止憑空生成 掛鉤（Hook） 腳本**，必須從本外掛的 `skills/agy-cli-statusline/scripts/` 讀取原文部署

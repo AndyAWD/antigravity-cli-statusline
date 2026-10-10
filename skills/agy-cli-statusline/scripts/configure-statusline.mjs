@@ -237,7 +237,8 @@ if (oldDirExists) {
 const redundantQuestionsPaths = [
   path.join(__dirname, 'questions.json'),
   path.join(__dirname, '..', 'questions.json'),
-  path.join(os.homedir(), '.gemini', 'config', 'plugins', 'antigravity-cli-statusline', 'skills', 'antigravity-cli-statusline', 'questions.json')
+  path.join(os.homedir(), '.gemini', 'config', 'plugins', 'antigravity-cli-statusline', 'skills', 'antigravity-cli-statusline', 'questions.json'),
+  path.join(os.homedir(), '.gemini', 'config', 'plugins', 'antigravity-cli-statusline', 'skills', 'agy-cli-statusline', 'questions.json')
 ];
 
 for (const qPath of redundantQuestionsPaths) {
