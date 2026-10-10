@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-[繁體中文](README.zh-TW.md) | English
+[繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | English
 
 A multilingual, cross-platform skill that customizes the Antigravity CLI statusline (footer) — pick exactly which indicators to show, in any order you like, with smart line wrapping out of the box.
 
@@ -12,15 +12,15 @@ A multilingual, cross-platform skill that customizes the Antigravity CLI statusl
 
 ### Windows
 
-| English (us) | Traditional Chinese (zh-tw) | Japanese (jp) |
-| :---: | :---: | :---: |
-| ![English](docs/images/agy-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-windows-zhtw.png) | ![Japanese](docs/images/agy-cli-statusline-windows-jp.png) |
+| English (us) | Traditional Chinese (zh-tw) | Simplified Chinese (zh-cn) | Japanese (jp) |
+| :---: | :---: | :---: | :---: |
+| ![English](docs/images/agy-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-windows-zhtw.png) | *(supports zh-cn mode)* | ![Japanese](docs/images/agy-cli-statusline-windows-jp.png) |
 
 ### macOS
 
-| English (us) | Traditional Chinese (zh-tw) | Japanese (jp) |
-| :---: | :---: | :---: |
-| ![English](docs/images/agy-cli-statusline-macos-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-macos-zhtw.png) | ![Japanese](docs/images/agy-cli-statusline-macos-jp.png) |
+| English (us) | Traditional Chinese (zh-tw) | Simplified Chinese (zh-cn) | Japanese (jp) |
+| :---: | :---: | :---: | :---: |
+| ![English](docs/images/agy-cli-statusline-macos-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-macos-zhtw.png) | *(supports zh-cn mode)* | ![Japanese](docs/images/agy-cli-statusline-macos-jp.png) |
 
 ## Installation
 

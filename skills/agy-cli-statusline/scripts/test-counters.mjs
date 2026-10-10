@@ -459,6 +459,25 @@ async function main() {
         expectedValue: 'Plan'
       },
       {
+        lang: 'zh-cn',
+        metaMode: undefined, // 測試 default 預設值
+        expectedLabel: '模式',
+        expectedValue: 'Default'
+      },
+      {
+        lang: 'zh-cn',
+        metaMode: 'code-only', // 測試自訂值
+        expectedLabel: '模式',
+        expectedValue: 'Code-only'
+      },
+      {
+        lang: 'zh-cn',
+        metaMode: 'fallback-mode',
+        metaCycleMode: 'plan', // 測試 cycle_mode 優先於 mode
+        expectedLabel: '模式',
+        expectedValue: 'Plan'
+      },
+      {
         lang: 'us',
         metaMode: undefined, // 測試 default 預設值
         expectedLabel: 'Mode',

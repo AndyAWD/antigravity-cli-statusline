@@ -4,7 +4,7 @@
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-繁體中文 | [English](README.md)
+繁體中文 | [简体中文](README.zh-CN.md) | [English](README.md)
 
 一個多語系、跨平台的技能，用來客製化 Antigravity CLI 狀態列（Footer）——精準勾選想顯示的指標、自由排序，並內建智慧型換行。
 
@@ -12,15 +12,15 @@
 
 ### Windows
 
-| 繁體中文 (zh-tw) | English (us) | 日本語 (jp) |
-| :---: | :---: | :---: |
-| ![繁體中文](docs/images/agy-cli-statusline-windows-zhtw.png) | ![English](docs/images/agy-cli-statusline-windows-us.png) | ![日本語](docs/images/agy-cli-statusline-windows-jp.png) |
+| 繁體中文 (zh-tw) | 簡體中文 (zh-cn) | English (us) | 日本語 (jp) |
+| :---: | :---: | :---: | :---: |
+| ![繁體中文](docs/images/agy-cli-statusline-windows-zhtw.png) | *(支援 zh-cn 模式)* | ![English](docs/images/agy-cli-statusline-windows-us.png) | ![日本語](docs/images/agy-cli-statusline-windows-jp.png) |
 
 ### macOS
 
-| 繁體中文 (zh-tw) | English (us) | 日本語 (jp) |
-| :---: | :---: | :---: |
-| ![繁體中文](docs/images/agy-cli-statusline-macos-zhtw.png) | ![English](docs/images/agy-cli-statusline-macos-us.png) | ![日本語](docs/images/agy-cli-statusline-macos-jp.png) |
+| 繁體中文 (zh-tw) | 簡體中文 (zh-cn) | English (us) | 日本語 (jp) |
+| :---: | :---: | :---: | :---: |
+| ![繁體中文](docs/images/agy-cli-statusline-macos-zhtw.png) | *(支援 zh-cn 模式)* | ![English](docs/images/agy-cli-statusline-macos-us.png) | ![日本語](docs/images/agy-cli-statusline-macos-jp.png) |
 
 ## 安裝
 
