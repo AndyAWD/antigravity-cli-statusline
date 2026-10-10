@@ -1,6 +1,6 @@
 # Antigravity CLI 狀態列設定技能
 
-[![版本](https://img.shields.io/badge/版本-1.7.0-blue.svg)](skills/antigravity-cli-statusline/SKILL.md)
+[![版本](https://img.shields.io/badge/版本-1.7.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -42,7 +42,7 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 在 Antigravity CLI 提示字元輸入：
 
 ```text
-/antigravity-cli-statusline
+/antigravity-cli-statusline:agy-cli-statusline
 ```
 
 技能會引導你選擇語系、勾選指標、排序，並把渲染腳本部署到位、寫入三層 `settings.json`。狀態列**熱更新立即生效**，無需重啟 CLI。
