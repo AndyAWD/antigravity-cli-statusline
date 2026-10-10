@@ -92,13 +92,27 @@ The skill walks you through language selection, indicator picking, and sorting, 
 In the skill's third stage (Step 4), enter a comma-separated list of numbers in the Write-in box to set the order:
 
 ```text
-2,5,1
+1,5,6,10,11,n,2,14,7,15,16,17,n,n,8,9,18,19,n,22,21,12,13,n,n,26,25,3,4,23,20,24
 ```
 
 - Numbers refer to the position in your Step 3 selection (1-based)
 - Identifiers like `quota` or `model-name` also work and can be mixed in, but numbers are the most direct
+- Insert `n` to force a line break (consecutive `n,n` creates a blank line separator)
 - **Indicators you don't list are dropped** — the result is your final display set
 - Leave it blank or pick `(Recommended) Skip` to keep the original selection order with all indicators shown
+
+Preview of sorted statusline (5 distinct sections separated with empty lines):
+
+```text
+Model: Gemini 3.8 Flash (High) │ Context Used: 3.4% │ Tokens: 35.7k / 1.0M │ Hourly Available: 98% │ Hourly Reset: 4h 50m
+Profile: Default │ Awaiting You: all clear │ Cumulative Outputs: 0 │ Queue: 0 │ BG: 0 │ Subagents: 2
+
+Account: anandydy529@gmail.com │ Plan: Google AI Pro │ Project: antigravity-cli-statusline
+Project Path: /Users/andyawd/Project/antigravity-cli-statusline
+Status: ✓ clean │ Git: main │ Weekly Available: 78% │ Weekly Reset: 4d 5h
+
+Mode: Accept-edits │ Conv: c5168b1c │ Agent: working │ Sandbox: off │ RAM: 279MB │ VCS: git │ CLI: v1.3.2
+```
 
 ### Line Wrapping
 
