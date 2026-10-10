@@ -411,6 +411,75 @@ async function testCase4SecuritySwallowDefense() {
 }
 
 // ==========================================
+// 測試情境 5：簡體中文 (zh-cn) 配置與大小寫歸一化測試
+// ==========================================
+async function testCase5SimplifiedChineseConfig() {
+  console.log('\n--- 執行測試情境 5：簡體中文 (zh-cn) 配置與大小寫歸一化測試 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case5-'));
+
+  try {
+    const mockHome = path.join(sandbox, 'mock-home');
+    fs.mkdirSync(mockHome);
+
+    const scriptDir = path.join(sandbox, 'run');
+    fs.mkdirSync(scriptDir);
+    const targetScript = path.join(scriptDir, 'configure-statusline.mjs');
+    copyFileSync(configureScriptSrc, targetScript);
+    copyFileSync(statuslineQuotaSrc, path.join(scriptDir, 'statusline-quota.mjs'));
+    copyFileSync(fetchLocalQuotaSrc, path.join(scriptDir, 'fetch-local-quota.mjs'));
+
+    const env = {
+      HOME: mockHome,
+      USERPROFILE: mockHome
+    };
+
+    // 1. 測試標準 zh-cn 參數
+    const selected = '["当前使用的人工智能（AI）模型名称（model-name）","账号五小时可用额度百分比（quota）"]';
+    const args1 = ['--lang', 'zh-cn', '--selected', selected, '--order', '1,2', '--workspace', sandbox];
+    const res1 = await runScript(targetScript, args1, env);
+    assert.strictEqual(res1.code, 0, 'zh-cn 配置腳本執行應該成功返回 0');
+
+    const globalSettingsPath = path.join(mockHome, '.gemini', 'settings.json');
+    const cliSettingsPath = path.join(mockHome, '.gemini', 'antigravity-cli', 'settings.json');
+
+    const globalSettings1 = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+    const cliSettings1 = JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8'));
+
+    assert.strictEqual(globalSettings1.ui.language, 'zh-cn', '全域 settings.ui.language 必須為 zh-cn');
+    assert.strictEqual(cliSettings1.ui.language, 'zh-cn', 'CLI 專屬 settings.ui.language 必須為 zh-cn');
+    assert.deepStrictEqual(globalSettings1.ui.footer.items, ['model-name', 'quota'], 'footer.items 指標識別碼必須正確提取');
+
+    // 2. 測試大小寫相容性：傳入大寫 zh-CN
+    const args2 = ['--lang', 'zh-CN', '--selected', selected, '--order', '1,2', '--workspace', sandbox];
+    const res2 = await runScript(targetScript, args2, env);
+    assert.strictEqual(res2.code, 0, 'zh-CN 配置腳本執行應該成功返回 0');
+
+    const globalSettings2 = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+    assert.strictEqual(globalSettings2.ui.language, 'zh-cn', '大寫 zh-CN 必須自動歸一化為 zh-cn');
+
+    // 3. 測試完整問卷選項標籤：傳入 "简体中文 (zh-cn)"
+    const args3 = ['--lang', '简体中文 (zh-cn)', '--selected', selected, '--order', '1,2', '--workspace', sandbox];
+    const res3 = await runScript(targetScript, args3, env);
+    assert.strictEqual(res3.code, 0, '完整選項文字配置腳本執行應該成功返回 0');
+
+    const globalSettings3 = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+    assert.strictEqual(globalSettings3.ui.language, 'zh-cn', '問卷標籤 "简体中文 (zh-cn)" 必須自動歸一化為小寫代碼 zh-cn');
+
+    // 4. 測試手動排序但未填 Write-in 之防禦退讓（避免清空狀態列）
+    const args4 = ['--lang', 'zh-cn', '--selected', selected, '--order', '手动排序（请在下方“Write-in...”栏位中填写）', '--workspace', sandbox];
+    const res4 = await runScript(targetScript, args4, env);
+    assert.strictEqual(res4.code, 0, '未填 Write-in 配置腳本執行應該成功返回 0');
+
+    const globalSettings4 = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+    assert.deepStrictEqual(globalSettings4.ui.footer.items, ['model-name', 'quota'], '未填 Write-in 時必須防禦性安全退讓保留勾選項，禁止清空');
+
+    console.log('✅ 測試情境 5 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -419,6 +488,7 @@ async function runAllTests() {
     await testCase2GitProjectDefense();
     await testCase3QuestionsJsonDefense();
     await testCase4SecuritySwallowDefense();
+    await testCase5SimplifiedChineseConfig();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {

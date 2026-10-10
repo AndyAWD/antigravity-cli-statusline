@@ -94,6 +94,28 @@ function safeGetCount(val) {
   return 0;
 }
 
+export function normalizeLanguage(lang) {
+  if (!lang || typeof lang !== 'string') return 'zh-tw';
+  let l = lang.toLowerCase().replace(/_/g, '-').trim();
+  const parenMatch = l.match(/[\(（]([a-z0-9\-_]+)[\)）]/);
+  if (parenMatch) {
+    l = parenMatch[1].trim();
+  }
+  if (l === 'zh-cn' || l === 'cn' || l === 'zh-hans' || l === 'zh-sg' || l.startsWith('zh-cn') || l.startsWith('zh-hans') || l.includes('简体') || l.includes('簡體') || l.includes('simplified')) {
+    return 'zh-cn';
+  }
+  if (l === 'zh-tw' || l === 'tw' || l === 'zh-hant' || l === 'zh-hk' || l === 'zh-mo' || l.startsWith('zh-tw') || l.startsWith('zh-hant') || l.includes('繁體') || l.includes('繁体') || l.includes('traditional')) {
+    return 'zh-tw';
+  }
+  if (l === 'jp' || l === 'ja' || l === 'ja-jp' || l.startsWith('ja-') || l.includes('日本') || l.includes('japanese')) {
+    return 'jp';
+  }
+  if (l === 'us' || l === 'en' || l === 'en-us' || l === 'en-gb' || l.startsWith('en-') || l.includes('english') || l.includes('英文')) {
+    return 'us';
+  }
+  return l;
+}
+
 // ==========================================
 // System Information Retrieval
 // ==========================================
@@ -114,6 +136,7 @@ async function runCmdAsync(cmd, options = {}) {
 }
 
 async function getGitBranch(lang, projectPath) {
+  const normLang = normalizeLanguage(lang);
   try {
     const opts = {
       cwd: projectPath || process.cwd()
@@ -163,9 +186,9 @@ async function getGitBranch(lang, projectPath) {
         }
       }
     }
-    return branch || (lang === 'zh-tw' ? '無版本控制' : (lang === 'jp' ? 'バージョン管理なし' : 'No VC'));
+    return branch || (normLang === 'zh-tw' ? '無版本控制' : (normLang === 'zh-cn' ? '无版本控制' : (normLang === 'jp' ? 'バージョン管理なし' : 'No VC')));
   } catch (e) {
-    return lang === 'zh-tw' ? '無版本控制' : (lang === 'jp' ? 'バージョン管理なし' : 'No VC');
+    return normLang === 'zh-tw' ? '無版本控制' : (normLang === 'zh-cn' ? '无版本控制' : (normLang === 'jp' ? 'バージョン管理なし' : 'No VC'));
   }
 }
 
@@ -603,8 +626,9 @@ async function getMetricValueAsync(meta, keys, countersCachePath, fallbackFn) {
 }
 
 async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo = { remaining_percentage: 100, refreshes_in: '' }) {
-  const unknownStr = lang === 'zh-tw' ? '未知' : (lang === 'jp' ? '不明' : 'Unknown');
-  const noneStr = lang === 'zh-tw' ? '無' : (lang === 'jp' ? 'なし' : 'N/A');
+  const normLang = normalizeLanguage(lang);
+  const unknownStr = (normLang === 'zh-tw' || normLang === 'zh-cn') ? '未知' : (normLang === 'jp' ? '不明' : 'Unknown');
+  const noneStr = normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A'));
 
   // Quota
   const quotaPct = quotaInfo.remaining_percentage;
@@ -661,7 +685,7 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
     // 1. Git 分支
     (typeof meta?.vcs?.branch === 'string' && meta.vcs.branch)
       ? Promise.resolve(meta.vcs.branch)
-      : getGitBranch(lang, projectPath),
+      : getGitBranch(normLang, projectPath),
 
     // 2. Git Dirty
     (typeof meta?.vcs?.dirty === 'boolean')
@@ -781,22 +805,22 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   const memUsage = `${rssMem}MB`;
   const vcsDirtyGlyph = vcsDirtyFlag ? '✗' : '✓';
   const vcsDirtyLabel = vcsDirtyFlag
-    ? (lang === 'zh-tw' ? '有變更' : (lang === 'jp' ? '変更あり' : 'dirty'))
-    : (lang === 'zh-tw' ? '乾淨' : (lang === 'jp' ? 'クリーン' : 'clean'));
+    ? (normLang === 'zh-tw' ? '有變更' : (normLang === 'zh-cn' ? '有变更' : (normLang === 'jp' ? '変更あり' : 'dirty')))
+    : (normLang === 'zh-tw' ? '乾淨' : (normLang === 'zh-cn' ? '干净' : (normLang === 'jp' ? 'クリーン' : 'clean')));
   const vcsType = meta?.vcs?.type || 'git';
 
   const sandboxEnabled = !!meta?.sandbox?.enabled;
   const sandboxAllowNet = !!meta?.sandbox?.allow_network;
   let sandboxStatusVal;
   if (!sandboxEnabled) {
-    sandboxStatusVal = lang === 'zh-tw' ? '關閉' : (lang === 'jp' ? 'オフ' : 'off');
+    sandboxStatusVal = normLang === 'zh-tw' ? '關閉' : (normLang === 'zh-cn' ? '关闭' : (normLang === 'jp' ? 'オフ' : 'off'));
   } else if (sandboxAllowNet) {
-    sandboxStatusVal = lang === 'zh-tw' ? '啟用（聯網）' : (lang === 'jp' ? 'オン（ネット）' : 'on (net)');
+    sandboxStatusVal = normLang === 'zh-tw' ? '啟用（聯網）' : (normLang === 'zh-cn' ? '启用（联网）' : (normLang === 'jp' ? 'オン（ネット）' : 'on (net)'));
   } else {
-    sandboxStatusVal = lang === 'zh-tw' ? '啟用（離線）' : (lang === 'jp' ? 'オン（オフライン）' : 'on (no-net)');
+    sandboxStatusVal = normLang === 'zh-tw' ? '啟用（離線）' : (normLang === 'zh-cn' ? '启用（离线）' : (normLang === 'jp' ? 'オン（オフライン）' : 'on (no-net)'));
   }
 
-  let agentProfileName = lang === 'zh-tw' ? '預設' : (lang === 'jp' ? 'デフォルト' : 'Default');
+  let agentProfileName = normLang === 'zh-tw' ? '預設' : (normLang === 'zh-cn' ? '默认' : (normLang === 'jp' ? 'デフォルト' : 'Default'));
   if (typeof meta?.agent === 'string') agentProfileName = meta.agent;
   else if (meta?.agent?.display_name) agentProfileName = meta.agent.display_name;
   else if (meta?.agent?.name) agentProfileName = meta.agent.name;
@@ -851,6 +875,34 @@ function buildI18nDict(lang, m) {
       'sandbox-status': `${WHITE}沙盒狀態:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
       'cli-version': `${WHITE}CLI版本: ${BOLD}${m.cliVersion}${RESET}`,
       'conversation-id': `${WHITE}對話ID: ${BOLD}${m.conversationIdShort}${RESET}`,
+      'agent-profile': `${WHITE}代理角色:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
+      'mode': `${WHITE}模式:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
+    },
+    'zh-cn': {
+      'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'quota': `${WHITE}小时可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
+      'context-used': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
+      'memory-usage': `${WHITE}内存:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
+      'token-count': `${WHITE}令牌数:${RESET} ${m.tokenCount}`,
+      'quota-reset-countdown': `${WHITE}小时倒计时:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-weekly': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}每周倒计时:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'git-branch': `${WHITE}Git: ${BOLD}${m.gitBranch}${RESET}`,
+      'project-path': `${WHITE}项目: ${BOLD}${m.projectName}${RESET}`,
+      'project-full-path': `${WHITE}完整路径: ${BOLD}${m.projectFullPath}${RESET}`,
+      'plan-tier': `${WHITE}订阅计划: ${BOLD}${m.planTier}${RESET}`,
+      'account-email': `${WHITE}账号: ${BOLD}${m.accountEmail}${RESET}`,
+      'agent-state': `${WHITE}代理状态:${RESET} ${getAgentStateColor(m.agentState)}${BOLD}${m.agentState}${RESET}`,
+      'tool-confirmation': `${WHITE}工具待确认:${RESET} ${getToolConfirmColor(m.toolConfirmPending)}${BOLD}${m.toolConfirmPending ? '在等你' : '都好了'}${RESET}`,
+      'pending-input': `${WHITE}待处理输入:${RESET} ${getColorByCount(m.pendingInputCount)}${BOLD}${m.pendingInputCount}${RESET}`,
+      'background-tasks': `${WHITE}后台任务:${RESET} ${getColorByCount(m.backgroundTasksCount)}${BOLD}${m.backgroundTasksCount}${RESET}`,
+      'subagents': `${WHITE}子代理:${RESET} ${getColorByCount(m.subagentsCount)}${BOLD}${m.subagentsCount}${RESET}`,
+      'artifacts': `${WHITE}产出文件数: ${BOLD}${m.artifactsCount}${RESET}`,
+      'vcs-dirty': `${WHITE}工作区状态:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyGlyph} ${m.vcsDirtyLabel}${RESET}`,
+      'vcs-type': `${WHITE}VCS类型: ${BOLD}${m.vcsType}${RESET}`,
+      'sandbox-status': `${WHITE}沙箱状态:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
+      'cli-version': `${WHITE}CLI版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'conversation-id': `${WHITE}对话ID: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}代理角色:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}模式:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
     },
@@ -911,7 +963,8 @@ function buildI18nDict(lang, m) {
       'mode': `${WHITE}モード:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
     }
   };
-  return dicts[lang] || dicts['zh-tw'];
+  const normLang = normalizeLanguage(lang);
+  return dicts[normLang] || dicts['zh-tw'];
 }
 
 function renderStatusLine(footerItems, activeDict, termWidth) {
@@ -975,7 +1028,7 @@ async function main() {
       process.exit(0);
     }
     
-    const lang = settings?.ui?.language || 'zh-tw';
+    const lang = normalizeLanguage(settings?.ui?.language || 'zh-tw');
     const footerItems = settings.ui.footer.items;
     let conversationId = 'default';
     if (typeof meta?.conversation_id === 'string' && meta.conversation_id) {

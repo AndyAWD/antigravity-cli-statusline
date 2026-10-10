@@ -367,6 +367,117 @@ async function main() {
       try { rmSync(homeR7, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
+    // ----------------------------------------------------
+    // Test Case R8: Simplified Chinese (zh-cn) rendering (all 26 indicators)
+    // Justification: Verifies that zh-cn renders correct metric labels, status values, and fallback strings across all 26 indicators.
+    // ----------------------------------------------------
+    console.log("\n[Test R8] Verifying Simplified Chinese (zh-cn) rendering for all 26 indicators...");
+    const mockCacheR8 = {
+      shortTerm: {
+        gemini: {
+          remaining_percentage: 88,
+          refreshes_in: '3h'
+        }
+      },
+      weekly: {
+        gemini: {
+          remaining_percentage: 75,
+          refreshes_in: '5d 2h'
+        }
+      },
+      planTier: 'Google AI Pro',
+      email: 'test@example.com',
+      updatedAt: Date.now()
+    };
+    const all26Items = [
+      "model-name", "quota", "context-used", "memory-usage", "token-count",
+      "quota-reset-countdown", "quota-weekly", "quota-weekly-countdown", "git-branch",
+      "project-path", "project-full-path", "plan-tier", "account-email", "agent-state",
+      "tool-confirmation", "pending-input", "background-tasks", "subagents", "artifacts",
+      "vcs-dirty", "vcs-type", "sandbox-status", "cli-version", "conversation-id",
+      "agent-profile", "mode"
+    ];
+    const settingsR8 = {
+      ui: {
+        language: "zh-cn",
+        footer: {
+          items: all26Items
+        }
+      }
+    };
+    const metaR8 = {
+      model: { display_name: "Gemini 3.5 Flash" },
+      terminal_width: 1000,
+      version: "1.7.0",
+      conversation_id: "test-conv-12345678",
+      vcs: { dirty: false, branch: "main", type: "git" },
+      context_window: { total_input_tokens: 1500, context_window_size: 1000000, used_percentage: 0.15 },
+      agent_state: "idle",
+      mode: "default"
+    };
+
+    const homeR8 = makeTempHome(mockCacheR8, settingsR8);
+    try {
+      const resR8 = await runStatusline(metaR8, homeR8);
+      console.log("R8 Output:", JSON.stringify(resR8.stdout));
+
+      const expectedR8Labels = [
+        "模型:", "小时可用:", "上下文用量:", "内存:", "令牌数:",
+        "小时倒计时:", "每周可用:", "每周倒计时:", "Git:",
+        "项目:", "完整路径:", "订阅计划:", "账号:", "代理状态:",
+        "工具待确认:", "待处理输入:", "后台任务:", "子代理:", "产出文件数:",
+        "工作区状态:", "VCS类型:", "沙箱状态:", "CLI版本:", "对话ID:",
+        "代理角色:", "模式:"
+      ];
+      const missingLabels = expectedR8Labels.filter(item => !resR8.stdout.includes(item));
+      if (resR8.code === 0 && missingLabels.length === 0) {
+        console.log("✅ R8 passed! (All 26 Simplified Chinese zh-cn indicators rendered correctly)");
+      } else {
+        console.error(`❌ R8 failed! Missing labels: ${JSON.stringify(missingLabels)}. Output: ${JSON.stringify(resR8.stdout)}`);
+        testsPassed = false;
+      }
+    } finally {
+      try { rmSync(homeR8, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R9: Case-insensitive & complex language code normalization (zh-CN, cn & 简体中文 (zh-cn))
+    // Justification: Verifies that 'zh-CN', 'cn', and full label '简体中文 (zh-cn)' are properly normalized to 'zh-cn' and render Simplified Chinese instead of falling back to zh-tw.
+    // ----------------------------------------------------
+    console.log("\n[Test R9] Verifying case-insensitive & label language normalization (zh-CN, cn, 简体中文 (zh-cn))...");
+    const langVariants = ["zh-CN", "cn", "简体中文 (zh-cn)"];
+    for (const testLang of langVariants) {
+      const settingsVar = {
+        ui: {
+          language: testLang,
+          footer: {
+            items: ["quota", "context-used", "memory-usage", "vcs-dirty", "sandbox-status", "agent-profile"]
+          }
+        }
+      };
+      const homeVar = makeTempHome(mockCacheR8, settingsVar);
+      try {
+        const resVar = await runStatusline(metaR8, homeVar);
+        console.log(`R9 (${testLang}) Output:`, JSON.stringify(resVar.stdout));
+
+        const hasZhCnQuota = resVar.stdout.includes("小时可用:");
+        const hasZhCnCtx = resVar.stdout.includes("上下文用量:");
+        const hasZhCnMem = resVar.stdout.includes("内存:");
+        const hasZhCnClean = resVar.stdout.includes("干净");
+        const hasZhCnSandbox = resVar.stdout.includes("关闭");
+        const hasZhCnProfile = resVar.stdout.includes("默认");
+
+        if (resVar.code === 0 && hasZhCnQuota && hasZhCnCtx && hasZhCnMem && hasZhCnClean && hasZhCnSandbox && hasZhCnProfile) {
+          console.log(`✅ R9 passed for "${testLang}"! (Properly normalized to Simplified Chinese zh-cn)`);
+        } else {
+          console.error(`❌ R9 failed for "${testLang}"! Did not render Simplified Chinese. Output: ${JSON.stringify(resVar.stdout)}`);
+          testsPassed = false;
+        }
+      } finally {
+        try { rmSync(homeVar, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+      }
+    }
+
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;

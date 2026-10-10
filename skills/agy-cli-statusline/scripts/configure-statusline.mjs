@@ -263,6 +263,28 @@ for (const qPath of redundantQuestionsPaths) {
 }
 
 
+function normalizeLanguage(l) {
+  if (!l || typeof l !== 'string') return 'zh-tw';
+  let norm = l.toLowerCase().replace(/_/g, '-').trim();
+  const parenMatch = norm.match(/[\(（]([a-z0-9\-_]+)[\)）]/);
+  if (parenMatch) {
+    norm = parenMatch[1].trim();
+  }
+  if (norm === 'zh-cn' || norm === 'cn' || norm === 'zh-hans' || norm === 'zh-sg' || norm.startsWith('zh-cn') || norm.startsWith('zh-hans') || norm.includes('简体') || norm.includes('簡體') || norm.includes('simplified')) {
+    return 'zh-cn';
+  }
+  if (norm === 'zh-tw' || norm === 'tw' || norm === 'zh-hant' || norm === 'zh-hk' || norm === 'zh-mo' || norm.startsWith('zh-tw') || norm.startsWith('zh-hant') || norm.includes('繁體') || norm.includes('繁体') || norm.includes('traditional')) {
+    return 'zh-tw';
+  }
+  if (norm === 'jp' || norm === 'ja' || norm === 'ja-jp' || norm.startsWith('ja-') || norm.includes('日本') || norm.includes('japanese')) {
+    return 'jp';
+  }
+  if (norm === 'us' || norm === 'en' || norm === 'en-us' || norm === 'en-gb' || norm.startsWith('en-') || norm.includes('english') || norm.includes('英文')) {
+    return 'us';
+  }
+  return norm;
+}
+
 // 1. 解析命令列參數
 let lang = 'zh-tw';
 let selectedStr = '[]';
@@ -284,6 +306,8 @@ for (let i = 2; i < process.argv.length; i++) {
     i++;
   }
 }
+
+lang = normalizeLanguage(lang);
 
 console.log('已解析的參數：');
 console.log(`- 語言：${lang}`);
@@ -307,7 +331,7 @@ const selectedIds = selectedList.map(item => {
 
 let items = [];
 const seen = new Set();
-const isDefaultOrder = !orderStr || orderStr.trim() === '' || orderStr.includes('(Recommended)');
+const isDefaultOrder = !orderStr || orderStr.trim() === '' || orderStr.includes('(Recommended)') || orderStr.includes('略過') || orderStr.includes('跳过') || orderStr.toLowerCase().includes('skip');
 
 if (isDefaultOrder) {
   items = [...selectedIds];
@@ -331,6 +355,10 @@ if (isDefaultOrder) {
         items.push(matchedId);
       }
     }
+  }
+  // 防禦：若使用者點選「手動排序」但未在 Write-in 填入任何有效指標，避免清空狀態列
+  if (items.length === 0) {
+    items = [...selectedIds];
   }
 }
 
@@ -524,6 +552,8 @@ if (process.platform === 'win32') {
       if (!fs.existsSync(destShPath)) {
         if (lang === 'zh-tw') {
           console.warn('警告：sh.exe 編譯失敗，請檢查權限是否足夠，或嘗試以系統管理員權限重新設定。');
+        } else if (lang === 'zh-cn') {
+          console.warn('警告：sh.exe 编译失败，请检查权限是否足够，或尝试以管理员权限重新设置。');
         } else if (lang === 'jp') {
           console.warn('警告：sh.exe のコンパイルに失敗しました。アクセス権限が十分であるか確認するか、管理者権限で再設定を試みてください。');
         } else {
