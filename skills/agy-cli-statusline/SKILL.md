@@ -1,6 +1,6 @@
 ---
 name: antigravity-cli-statusline:agy-cli-statusline
-description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並於 Windows 上自動處理 sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
+description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並於 Windows 上自動處理 sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
 ---
 
 # Antigravity 狀態列設定技能
@@ -56,7 +56,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 ## 🌐 語言鎖定規則（Locale Locking — 全域強制）
 
 > [!CAUTION]
-> **使用者在步驟 1 一旦選定語系（`zh-tw` / `us` / `jp`），人工智慧（AI）代理在本次執行的剩餘所有對話輸出，都必須使用該語言。**
+> **使用者在步驟 1 一旦選定語系（`zh-tw` / `zh-cn` / `us` / `jp`），人工智慧（AI）代理在本次執行的剩餘所有對話輸出，都必須使用該語言。**
 
 **為什麼必須鎖定**：使用者選擇英文（us）或日文（jp）的前提是「他可能不懂中文」，反之亦然。若中間穿插任何非所選語系的訊息，會破壞使用者體驗、甚至讓使用者讀不懂關鍵警告而誤判決策。**這也是為什麼語系選擇必須是第一步**——所有後續訊息（包括 Node.js 預檢的缺失警告）才能用使用者看得懂的語言呈現。
 
@@ -88,9 +88,10 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 {
   "questions": [
     {
-      "question": "選擇顯示語系 / Select Display Language / 表示言語の選択",
+      "question": "選擇顯示語系 / 选择显示语言 / Select Display Language / 表示言語の選択",
       "options": [
         "繁體中文 (zh-tw)",
+        "简体中文 (zh-cn)",
         "English (us)",
         "日本語 (jp)"
       ],
@@ -102,7 +103,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 }
 ```
 
-選擇完成後，**將所選語言代碼（`zh-tw` / `us` / `jp`）記錄為本次執行的鎖定語系**，並依「🌐 語言鎖定規則」於後續所有步驟使用該語系撰寫對話輸出。
+選擇完成後，**將所選語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）記錄為本次執行的鎖定語系**，並依「🌐 語言鎖定規則」於後續所有步驟使用該語系撰寫對話輸出。
 
 ### 步驟 2：Node.js 預檢 + 三層設定檔讀取
 
@@ -118,8 +119,9 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
   1. **向使用者發出明確警告（以所選語系撰寫）**，說明缺少 Node.js 將導致：
      - CLI 底部狀態列**完全空白**，不會顯示 any 指標
      - `agy` 命令列介面（CLI）會反覆記錄 `statusline: command failed: exit status 127 (stderr: sh: node: command not found)`，連續失敗 30 次後自動停用 statusline
-  2. **呼叫 `ask_question` 詢問使用者是否繼續**（問卷 `question`、`options`、`toolSummary`、`toolAction` 全部以所選語系撰寫，以下範例為 `zh-tw` 版本）：
+  2. **呼叫 `ask_question` 詢問使用者是否繼續**（問卷 `question`、`options`、`toolSummary`、`toolAction` 全部以所選語系撰寫）：
 
+**zh-tw 範例**：
 ```json
 {
   "questions": [
@@ -137,6 +139,24 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 }
 ```
 
+**zh-cn 範例**：
+```json
+{
+  "questions": [
+    {
+      "question": "⚠️ 检测到系统未安装 Node.js。\n\n状态栏挂钩（Hook）需要 Node.js 才能运作，缺少 Node.js 将导致命令行界面（CLI）底部状态栏完全空白且自动停用。\n\n建议先安装 Node.js（例如：brew install node），再重新运行本技能。\n\n是否仍要继续设置？（配置文件会正确写入，但状态栏在安装 Node.js 前不会显示）",
+      "options": [
+        "(Recommended) 中断，我先去安装 Node.js",
+        "继续设置（安装 Node.js 后状态栏会自动生效）"
+      ],
+      "is_multi_select": false
+    }
+  ],
+  "toolSummary": "Node 环境检查",
+  "toolAction": "确认 Node 安装"
+}
+```
+
   3. **若使用者選擇「中斷」**：以所選語系輸出安裝指引後結束本技能流程，不進行 any 設定檔寫入。
   4. **若使用者選擇「繼續」**：繼續執行後續步驟。設定檔會正確寫入，待使用者安裝 Node.js 並重新啟動 `agy` 命令列介面（CLI）後狀態列即會自動生效。
 
@@ -147,7 +167,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 ### 步驟 3：第二階段問卷（讀取 questions.json 與勾選指標）
 
 1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/agy-cli-statusline/resources/questions.json` 檔案。
-2. **根據步驟 1 的語言代碼（`zh-tw` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的問卷資訊，呼叫 `ask_question`。
+2. **根據步驟 1 的語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的問卷資訊，呼叫 `ask_question`。
 
 請動態將選定語系的 `options` 內容填入（問卷問題及摘要也請使用對應語系）：
    ```json
@@ -156,7 +176,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
        {
          "question": "<請填入對應語系的提問，例如: 選擇要顯示的狀態列指標（下一步將進行排序）>",
          "options": [
-            // 從 resources/questions.json 讀取對應語系（如 zh-tw, us 或 jp）的 options 陣列並在此展開
+            // 從 resources/questions.json 讀取對應語系（如 zh-tw, zh-cn, us 或 jp）的 options 陣列並在此展開
          ],
          "is_multi_select": true
        }
@@ -170,7 +190,9 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 ### 步驟 4：第三階段問卷（手動排序與最終篩選）
 
 1. 將**步驟 3 中使用者勾選的指標**按順序整理出來，標上數字編號（如 `1. 目前使用的人工智慧（AI）模型名稱（model-name）`），每項以 `\n` 分隔。
-2. 呼叫 `ask_question` 引導使用者進行排序：
+2. 呼叫 `ask_question` 引導使用者進行排序（問卷以所選語系呈現）：
+
+   **zh-tw 範例**：
    ```json
    {
      "questions": [
@@ -185,6 +207,24 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
      ],
      "toolSummary": "排序設定",
      "toolAction": "詢問顯示順序"
+   }
+   ```
+
+   **zh-cn 範例**：
+   ```json
+   {
+     "questions": [
+       {
+         "question": "请设置状态栏显示顺序。\n\n目前已选取：\n1. 当前使用的人工智能（AI）模型名称（model-name）\n2. 账号五小时可用额度百分比（quota）\n3. 当前对话已消耗的上下文（Context）用量比例（context-used）\n\n请在下方输入框“Write-in...”中输入以逗号分隔的数字序号或英文标识码（如：2, 1, context-used）。可以使用 `n` 来强制换行。未填写的指标将不予显示。",
+         "options": [
+           "(Recommended) 跳过，使用原勾选顺序启用全部指标",
+           "手动排序（请在下方“Write-in...”栏位中填写）"
+         ],
+         "is_multi_select": false
+       }
+     ],
+     "toolSummary": "排序设置",
+     "toolAction": "询问显示顺序"
    }
    ```
 3. 取得使用者的排序輸入（`order`）。
