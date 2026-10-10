@@ -3,7 +3,7 @@
 ## Architecture
 本專案為 `antigravity-cli-statusline` 清理與備份指令腳本之安全性漏洞排查與修護專案。
 主要涉及：
-- 清理腳本：`skills/antigravity-cli-statusline/scripts/configure-statusline.mjs`
+- 清理腳本：`skills/agy-cli-statusline/scripts/configure-statusline.mjs`
 - 舊版全域目錄：`~/.gemini/skills/antigravity-cli-statusline`
 - 舊版備份路徑：`~/.gemini/skills/antigravity-cli-statusline.bak`
 - 冗餘 questions.json 清除路徑：包含本機開發專案及全域配置等路徑。
@@ -20,6 +20,6 @@
 
 ## Code Layout
 - `.agents/` — 代理人協調中介資料與報告
-- `skills/antigravity-cli-statusline/` — 外掛與技能目錄
+- `skills/agy-cli-statusline/` — 外掛與技能目錄
   - `scripts/configure-statusline.mjs` — 配置與部署掛鉤腳本（待修補）
   - `scripts/configure-statusline.test.mjs` — 跨平台安全性自動化測試腳本（待建立）
