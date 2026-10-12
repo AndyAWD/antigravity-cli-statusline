@@ -45,7 +45,10 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 /antigravity-cli-statusline:agy-cli-statusline
 ```
 
-技能会引导您选择语言、勾选指标、排序，并将渲染脚本部署到位、写入三层 `settings.json`。状态栏**热更新立即生效**，无需重启 CLI。
+技能会引导您选择语言、勾选指标、排序，并将渲染脚本部署到位、写入三层 `settings.json` 与 `trusted_hooks.json`。配置脚本会自动处理跨平台 Node.js 执行路径兼容性（macOS / Linux 自动使用 `process.execPath` 绝对路径避免 NVM 环境遗失 PATH 发生 exit status 127；Windows 使用 `node` 裸命令避开路径空格引号剥除与换行转义问题）。
+
+- **初次启用**：若是初次安装或初次启用状态栏，agy CLI 不会在运行期间动态载入新挂钩进程，需重新启动 agy CLI（退出后重新打开）以载入状态栏。
+- **热更新生效**：此前已启用状态栏者，后续调整指标顺序或切换语言时，状态栏**热更新立即生效**，无需重启 CLI。
 
 ## 指标、排序与换行
 
