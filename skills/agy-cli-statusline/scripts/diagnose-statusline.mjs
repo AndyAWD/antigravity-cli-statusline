@@ -102,9 +102,9 @@ function inspectTrustedHooks(path, expectedHomeAbs, expectedWorkspaceAbs) {
     const arr = p.value[k];
     if (!arr) { console.log(`  ${bad(label + ' 鍵缺失')} (${k})`); return; }
     if (!Array.isArray(arr)) { console.log(`  ${alert(label + ' 值非陣列')}`); return; }
-    const hits = arr.filter(s => typeof s === 'string' && s.includes('statusLine:node'));
-    if (hits.length === 0) console.log(`  ${warn(label + ' 鍵存在但無 statusLine:node 條目')} (${k})`);
-    else console.log(`  ${ok(label + `：${hits.length} 條 statusLine:node 信任字串`)} (${k})`);
+    const hits = arr.filter(s => typeof s === 'string' && s.startsWith('statusLine:') && (s.includes('node') || s.includes('statusline-quota.mjs')));
+    if (hits.length === 0) console.log(`  ${warn(label + ' 鍵存在但無 statusLine 條目')} (${k})`);
+    else console.log(`  ${ok(label + `：${hits.length} 條 statusLine 信任字串`)} (${k})`);
     hits.forEach(h => console.log(`     ${dim('•')} ${h}`));
   };
   checkKey(expectedWorkspaceAbs, '當前工作區');
