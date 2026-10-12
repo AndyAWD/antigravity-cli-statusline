@@ -2,7 +2,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -425,6 +425,31 @@ function writeJsonAndVerifyNoBOM(filePath, data) {
   writeContentAndVerifyNoBOM(filePath, JSON.stringify(data, null, 2));
 }
 
+/**
+ * 依平台產生最穩定的 statusLine 指令字串：
+ * - macOS / Linux：使用 Node.js 執行檔的絕對路徑（process.execPath）。
+ *   解決 NVM / Homebrew / fnm / asdf 環境下，non-interactive / non-login 的 sh -c
+ *   因 PATH 未包含 node 而導致 exit status 127 (sh: 1: node: not found) 的問題。
+ *   若路徑包含空白字元，以雙引號包裹。
+ * - Windows：使用裸命令 node 搭配雙引號包裹腳本絕對路徑。
+ *   Windows 系統中，Node.js 安裝程式與版本管理工具（nvm-windows、fnm 等）會將 node.exe 註冊到
+ *   系統/使用者環境變數（Windows 登錄檔 PATH），所有衍生行程（包含 cmd.exe）皆會繼承 PATH。
+ *   使用 node 裸命令能徹底避免 C:\Program Files\nodejs\node.exe 的空白字元引發的
+ *   cmd.exe /c 雙引號剝除陷阱（誤將 C:\Program 當成命令）。
+ *   腳本絕對路徑一律以雙引號包裹，可同時保障使用者路徑含空白（如 C:\Users\John Doe）能被正確解析，
+ *   並防止 Git Bash 等 POSIX sh.exe 誤將路徑反斜線 \ 視為跳脫字元剝除損毀。
+ */
+export function getStatusLineCommand(statuslineScriptPath, platform = process.platform, execPath = process.execPath) {
+  const cleanPath = statuslineScriptPath.replace(/^"(.*)"$/, '$1');
+  if (platform === 'win32') {
+    return `node "${cleanPath}"`;
+  } else {
+    const nodeBin = execPath.includes(' ') ? `"${execPath}"` : execPath;
+    const scriptArg = cleanPath.includes(' ') ? `"${cleanPath}"` : cleanPath;
+    return `${nodeBin} ${scriptArg}`;
+  }
+}
+
 function updateSettings(settingsPath) {
   console.log(`正在更新設定檔：${settingsPath}`);
   const settings = readJsonWithBOMDefense(settingsPath);
@@ -435,10 +460,11 @@ function updateSettings(settingsPath) {
   if (!settings.ui.footer) settings.ui.footer = {};
   settings.ui.footer.items = items;
   
+  const statusLineCmd = getStatusLineCommand(statuslineQuotaMjsPath);
   settings.statusLine = {
     enabled: true,
     type: 'command',
-    command: `node ${statuslineQuotaMjsPath}`
+    command: statusLineCmd
   };
   
   writeJsonAndVerifyNoBOM(settingsPath, settings);
@@ -465,28 +491,63 @@ const trustedHooksPath = path.join(homeDir, '.gemini', 'trusted_hooks.json');
 console.log(`正在更新信任掛鉤設定：${trustedHooksPath}`);
 const trustedHooks = readJsonWithBOMDefense(trustedHooksPath);
 
+const statusLineCommand = getStatusLineCommand(statuslineQuotaMjsPath);
 const trustStrings = [];
+
+// 無論任何平台，最優先加入當前寫入 settings.json 的精確命令字串
+trustStrings.push(`statusLine:${statusLineCommand}`);
+
 if (process.platform === 'win32') {
-  // Windows 平台
-  // 1. 絕對路徑變體（單反斜線）
+  // Windows 平台相容變體
+  // 1. node 裸命令變體（單反斜線，未引號與引號）
   trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath}`);
-  // 2. 絕對路徑變體（雙反斜線）
+  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath}"`);
+  // 2. 雙反斜線變體
   trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}`);
+  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}"`);
   // 3. forward slash 變體
   trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath.replace(/\\/g, '/')}`);
-  // 4. 環境變數 %USERPROFILE% 變體（單反斜線）
+  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath.replace(/\\/g, '/')}"`);
+  // 4. 環境變數 %USERPROFILE% 變體
   trustStrings.push(`statusLine:node %USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs`);
-  // 5. 環境變數 %USERPROFILE% 變體（雙反斜線）
+  trustStrings.push(`statusLine:node "%USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"`);
   trustStrings.push(`statusLine:node %USERPROFILE%\\\\.gemini\\\\antigravity-cli\\\\hooks\\\\statusline-quota.mjs`);
-  // 6. 環境變數 %USERPROFILE% 變體（forward slash）
+  trustStrings.push(`statusLine:node "%USERPROFILE%\\\\.gemini\\\\antigravity-cli\\\\hooks\\\\statusline-quota.mjs"`);
   trustStrings.push(`statusLine:node %USERPROFILE%/.gemini/antigravity-cli/hooks/statusline-quota.mjs`);
+  trustStrings.push(`statusLine:node "%USERPROFILE%/.gemini/antigravity-cli/hooks/statusline-quota.mjs"`);
+  // 5. process.execPath 完整路徑變體（防禦使用者手動覆寫成絕對路徑）
+  trustStrings.push(`statusLine:${process.execPath} ${statuslineQuotaMjsPath}`);
+  trustStrings.push(`statusLine:"${process.execPath}" "${statuslineQuotaMjsPath}"`);
+  trustStrings.push(`statusLine:${process.execPath.replace(/\\/g, '/')} ${statuslineQuotaMjsPath.replace(/\\/g, '/')}`);
+  trustStrings.push(`statusLine:"${process.execPath.replace(/\\/g, '/')}" "${statuslineQuotaMjsPath.replace(/\\/g, '/')}"`);
+  trustStrings.push(`statusLine:${process.execPath.replace(/\\/g, '\\\\')} ${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}`);
+  trustStrings.push(`statusLine:"${process.execPath.replace(/\\/g, '\\\\')}" "${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}"`);
 } else {
-  // macOS / Linux 平台
+  // macOS / Linux 平台相容變體
+  // 1. process.execPath 絕對路徑變體
+  trustStrings.push(`statusLine:${process.execPath} ${statuslineQuotaMjsPath}`);
+  trustStrings.push(`statusLine:"${process.execPath}" "${statuslineQuotaMjsPath}"`);
+  trustStrings.push(`statusLine:${process.execPath} "${statuslineQuotaMjsPath}"`);
+  trustStrings.push(`statusLine:"${process.execPath}" ${statuslineQuotaMjsPath}`);
+  // 2. $HOME 環境變數變體
+  if (statuslineQuotaMjsPath.startsWith(homeDir)) {
+    const homeRelPath = statuslineQuotaMjsPath.slice(homeDir.length);
+    trustStrings.push(`statusLine:${process.execPath} $HOME${homeRelPath}`);
+    trustStrings.push(`statusLine:${process.execPath} "$HOME${homeRelPath}"`);
+    trustStrings.push(`statusLine:"${process.execPath}" $HOME${homeRelPath}`);
+    trustStrings.push(`statusLine:"${process.execPath}" "$HOME${homeRelPath}"`);
+  }
+  // 3. 裸命令 node 歷史相容變體
   trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath}`);
+  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath}"`);
   trustStrings.push(`statusLine:node $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs`);
+  trustStrings.push(`statusLine:node "$HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs"`);
 }
 
 const keysToRegister = [homeDir, '*'];
+if (process.platform === 'win32') {
+  keysToRegister.push(homeDir.replace(/\\/g, '/'));
+}
 if (workspacePath) {
   keysToRegister.push(path.resolve(workspacePath));
   if (process.platform === 'win32') {
@@ -536,8 +597,7 @@ if (process.platform === 'win32') {
         if (cscPath) {
           try {
             console.log(`正在使用 ${cscPath} 編譯隱藏的 sh.exe...`);
-            const compileCmd = `"${cscPath}" /target:winexe /out:"${destShPath}" "${sourceCsPath}"`;
-            execSync(compileCmd, { windowsHide: true });
+            execFileSync(cscPath, ['/target:winexe', `/out:${destShPath}`, sourceCsPath], { windowsHide: true });
             console.log('sh.exe 編譯成功。');
           } catch (err) {
             console.error('編譯 sh.exe 失敗：', err.message);

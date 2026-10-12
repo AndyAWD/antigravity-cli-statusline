@@ -44,17 +44,34 @@ Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更�
 "statusLine": {
   "enabled": true,
   "type": "command",
-  "command": "node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
+  "command": "<真實的 Node.js 執行檔絕對路徑> <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
 }
 ```
 
-> ⚠️ **絕對禁止照抄** `<真實的使用者家目錄絕對路徑>` 此佔位符。AI 代理必須動態解析當前系統環境中真實的絕對路徑（例如 `/Users/andy`）後替換。
+> [!IMPORTANT]
+> **為什麼 macOS / Linux 必須使用 Node.js 絕對路徑**：
+> agy CLI 的狀態列執行器底層透過 `/bin/sh -c "<command>"` 呼叫掛鉤。在 macOS 與 Linux 上，使用者廣泛採用 NVM、fnm、Homebrew 或 asdf 管理 Node.js，這些工具的 `PATH` 通常僅設定在使用者互動式 Shell 設定檔（如 `~/.zshrc` 或 `~/.bashrc`）中。非互動式（Non-interactive）與非登入（Non-login）的 `/bin/sh` 僅包含系統預設的 `/usr/bin:/bin:/usr/sbin:/sbin`，**完全找不到裸命令 `node`**，進而導致 `exit status 127 (sh: 1: node: not found)`，並在累積失敗 30 次後被 CLI 自動停用。
+> 因此配置腳本自動取得當前執行的 `process.execPath`（例如 `/opt/homebrew/bin/node` 或 `/Users/andy/.nvm/versions/node/v20.0.0/bin/node`）寫入設定；若執行路徑或腳本路徑包含空白字元，則自動以雙引號包裹。
+
+> ⚠️ **絕對禁止照抄** `<真實的 Node.js 執行檔絕對路徑>` 與 `<真實的使用者家目錄絕對路徑>` 此類佔位符。AI 代理必須動態解析當前系統環境中真實的絕對路徑後替換。
 
 ---
 
 ## 3. statusLine 物件結構（Windows）
 
-詳見 [windows.md §5](windows.md#5-settingsjson-中-windows-路徑跳脫範本)。Windows 路徑必須使用雙反斜線跳脫，且寫檔時必須遵守 UTF-8 無 BOM 規範。
+詳見 [windows.md §5](windows.md#5-settingsjson-中-windows-路徑跳脫範本)。Windows 上寫入裸命令 `node`（若掛鉤腳本路徑含空白則為腳本路徑加上雙引號）：
+
+```json
+"statusLine": {
+  "enabled": true,
+  "type": "command",
+  "command": "node \"<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
+}
+```
+
+> [!NOTE]
+> Windows 系統中，Node.js 官方安裝程式與版本管理工具（`nvm-windows`、`fnm`、`scoop`）皆會將 `node.exe` 登錄至系統/使用者環境變數（Windows 登錄檔 `PATH`），所有子行程（包含 `cmd.exe`）皆會繼承。
+> 在 Windows 上使用 `node` 裸命令能完全避開 `C:\Program Files\nodejs\node.exe` 空白字元引發的 `cmd.exe /c` 雙引號剝除陷阱，以及 Git Bash `sh.exe` 反斜線 `\n` 換行跳脫問題。
 
 ---
 
@@ -93,35 +110,40 @@ Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更�
 
 ### 信任字串格式
 
-**macOS / Linux**：
+**macOS / Linux**（精確指令 + 絕對路徑變體 + `$HOME` 變體 + 裸命令相容）：
 ```text
+statusLine:<真實的 Node.js 執行檔絕對路徑> <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs
+statusLine:"<真實的 Node.js 執行檔絕對路徑>" "<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
+statusLine:<真實的 Node.js 執行檔絕對路徑> $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs
 statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs
+statusLine:node $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs
 ```
 
-**Windows**（請同時追加 forward slash 與 `%USERPROFILE%` 變體）：
+**Windows**（精確指令 + 雙反斜線 + forward slash + `%USERPROFILE%` + 引號變體）：
 ```text
 statusLine:node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs
+statusLine:node "<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
+statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs
+statusLine:node "<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
+statusLine:node %USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs
+statusLine:node "%USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
 ```
 
-> ⚠️ 必須**同時追加**絕對路徑變體與環境變數變體（`$HOME` 或 `%USERPROFILE%`），以完美通過 CLI 的安全性檢驗。
+> ⚠️ 必須**同時追加**寫入 `settings.json` 的精確指令字串、各類引號變體與環境變數變體（`$HOME` 或 `%USERPROFILE%`），以完美通過 CLI 的安全性檢驗。
 
 ---
 
 ## 6. 跨電腦移植的雙保險設計
 
-### 寫入 `settings.json` 時：用絕對路徑
+### 寫入 `settings.json` 時
 
-AI 代理動態獲取當前使用者的家目錄絕對路徑後，直接將**絕對路徑**寫入 `command` 中（例如 `node /Users/andy/.gemini/...`）。這 100% 確保在本機上執行成功，免去 Shell 展開的依賴。
+- **macOS / Linux**：使用目前環境 Node.js 執行檔絕對路徑（`process.execPath`）搭配腳本絕對路徑，若路徑含空格以引號包裹。免去 non-interactive `sh` 遺失 PATH 的問題（exit status 127）。
+- **Windows**：使用 `node` 裸命令搭配腳本絕對路徑（含空格加引號）。免去 `C:\Program Files\nodejs\node.exe` 空白引號剝除與 Git Bash 換行跳脫問題。
 
-❌ 錯誤：`node $HOME/.gemini/...`（CLI 背景以直接呼叫方式執行 Hook 時無法透過 Shell 展開環境變數，導致 Node.js 因找不到路徑而失敗）
+### 寫入 `trusted_hooks.json` 時：全方位註冊
 
-### 寫入 `trusted_hooks.json` 時：同時追加絕對路徑與環境變數變體
-
-```text
-statusLine:node /Users/andy/.gemini/antigravity-cli/hooks/statusline-quota.mjs
-statusLine:node $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs
-```
+同時寫入精確命令、引號變體、環境變數變體與歷史裸命令變體，確保設定檔無論如何遷移都能保持信任狀態。
 
 ### 跨電腦移植時的自癒機制
 
-由於開源分享或複製設定檔到新電腦時絕對路徑會改變，新電腦的 AI 代理在首次執行本技能時，會全自動動態重新解析新電腦的絕對路徑並覆寫更新設定。因此**直接寫入絕對路徑是最健壯且無副作用的方案**。
+由於開源分享或複製設定檔到新電腦時絕對路徑會改變，新電腦的 AI 代理在首次執行本技能時，會全自動動態重新解析新電腦的絕對路徑並覆寫更新設定。因此**直接由腳本動態解析並寫入適當的跨平台指令是最健壯且無副作用的方案**。
