@@ -45,7 +45,10 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 /antigravity-cli-statusline:agy-cli-statusline
 ```
 
-技能會引導你選擇語系、勾選指標、排序，並把渲染腳本部署到位、寫入三層 `settings.json`。狀態列**熱更新立即生效**，無需重啟 CLI。
+技能會引導你選擇語系、勾選指標、排序，並把渲染腳本部署到位、寫入三層 `settings.json` 與 `trusted_hooks.json`。配置腳本會自動處理跨平台 Node.js 執行路徑相容性（macOS / Linux 自動使用 `process.execPath` 絕對路徑避免 NVM 環境遺失 PATH 發生 exit status 127；Windows 使用 `node` 裸命令避開路徑空白引號剝除與換行跳脫問題）。
+
+- **初次啟用**：若是初次安裝或初次啟用狀態列，agy CLI 不會在執行期間動態載入新掛鉤行程，需重新啟動 agy CLI（退出後重新開啟）以載入狀態列。
+- **熱更新生效**：先前已啟用狀態列者，後續調整指標順序或切換語系時，狀態列**熱更新立即生效**，無需重啟 CLI。
 
 ## 指標、排序與換行
 

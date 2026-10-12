@@ -45,7 +45,10 @@ In the Antigravity CLI prompt, type:
 /antigravity-cli-statusline:agy-cli-statusline
 ```
 
-The skill walks you through language selection, indicator picking, and sorting, then deploys the renderer scripts and writes the three-layer `settings.json`. The statusline updates **live without a CLI restart**.
+The skill walks you through language selection, indicator picking, and sorting, then deploys the renderer scripts and writes the three-layer `settings.json` and `trusted_hooks.json`. The configuration script automatically resolves cross-platform Node.js execution paths (using `process.execPath` absolute path on macOS / Linux to prevent NVM `exit status 127`, and bare `node` on Windows to avoid space quote-stripping and escape pitfalls).
+
+- **First-time Enablement**: If installing or enabling the statusline for the first time, agy CLI does not dynamically register new hook processes at runtime; please restart the agy CLI (exit and re-open) to load the statusline hook.
+- **Hot Reload**: Once previously enabled, subsequent adjustments to indicator ordering or language **hot-reload live without restarting the CLI**.
 
 ## Indicators, Sorting & Line Wrapping
 

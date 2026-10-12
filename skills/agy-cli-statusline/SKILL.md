@@ -1,6 +1,6 @@
 ---
 name: antigravity-cli-statusline:agy-cli-statusline
-description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並於 Windows 上自動處理 sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
+description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並自動處理 Node.js 跨平台執行相容性（macOS/Linux 絕對路徑防 NVM 127、Windows 裸命令防空白與引號剝除）、sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
 ---
 
 # Antigravity 狀態列設定技能
@@ -234,8 +234,9 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 1. 取得使用者工作區（workspace）的絕對路徑（`workspace`）。
 2. 呼叫 `run_command` 執行本外掛目錄下的 `configure-statusline.mjs` 腳本，傳入相關參數。腳本會全自動處理：
    - 排序輸入解析。
+   - 依平台智慧產生 Node.js 執行指令（macOS / Linux 使用絕對路徑以避免 NVM 等非互動式 Shell 遺失 PATH 引發 exit status 127；Windows 使用 `node` 裸命令以避開空白引號剝除與 Git Bash 換行跳脫陷阱，路徑含空白自動加上雙引號）。
    - 同步寫入三層 `settings.json`（已執行防禦性 位元組順序記號（BOM）剝除與寫入後無 位元組順序記號（BOM）驗證）。
-   - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 萬用字元（Wildcard）鍵，並在 Windows 上註冊各種反斜線/環境變數變體）。
+   - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 萬用字元（Wildcard）鍵，精確註冊設定檔命令並全面補齊引號、反斜線、正斜線與環境變數變體）。
    - 將 Hook 腳本安全拷貝部署至 `~/.gemini/antigravity-cli/hooks/` 目錄中，寫入時強制 `{ encoding: 'utf8' }`。
    - 若為 Windows 平台且 CLI 目錄缺少 `sh.exe`，自動編譯靜默無窗體橋接器。
 
@@ -255,7 +256,9 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 ### 步驟 7：回報與重新載入提示
 
-1. **根據所選語系撰寫最終回覆**：告知使用者設定已自動在 命令列介面（CLI）底部即時熱更新 (Hot Reload) 生效，無需重新啟動。
+1. **根據所選語系撰寫最終回覆**：
+   - **初次安裝或初次啟用狀態列**：向使用者說明，由於 agy 命令列介面（CLI）在執行期間不會動態監聽並註冊新增的掛鉤行程，**必須重新啟動 agy 命令列介面（CLI）（退出後重新開啟）** 才能載入掛鉤行程並顯示狀態列。
+   - **已啟用狀態列之調整**：若使用者先前已啟用狀態列，本次僅為調整指標順序或切換語系，設定已自動在命令列介面（CLI）底部**即時熱更新（Hot Reload）生效**，無需重新啟動。
 2. **舊版腳本檢查**：讀取或檢查 `~/.gemini/hooks/statusline-quota.mjs` 與 `~/.gemini/hooks/fetch-local-quota.mjs` 是否存在。若存在，則以所選語系提醒使用者可以安全地手動刪除它們。
 3. **故障診斷指引**：在回覆末尾以所選語系加入提示：「若日後狀態列突然消失，請前往本外掛目錄執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs`，並把完整輸出貼給 人工智慧（AI）代理進行診斷。」
 
@@ -263,7 +266,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 ## ! 常見陷阱速查
 
-完整對照表（8 條陷阱與修正做法）詳見 [references/pitfalls.md](references/pitfalls.md)。最關鍵的三條速記：
+完整對照表（11 條陷阱與修正做法）詳見 [references/pitfalls.md](references/pitfalls.md)。最關鍵的三條速記：
 
 1. **必須同步寫入三層設定檔**（特別是 命令列介面（CLI）專屬的 `~/.gemini/antigravity-cli/settings.json`，是最致命的盲點）
 2. **Windows 寫設定檔絕對禁止帶 位元組順序記號（BOM）**，寫入後必須驗證前 3 個位元組
