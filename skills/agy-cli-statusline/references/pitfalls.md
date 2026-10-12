@@ -22,6 +22,8 @@
 | 7 | Windows 上直接以 `powershell.exe` 替身 `sh.exe` | 每次背景更新閃爍黑色終端機視窗，UX 崩壞 | 利用 `csc.exe` 編譯靜默 `/target:winexe` 橋接器 — 詳見 [windows.md §6](windows.md#6-shexe-缺失修復編譯靜默無窗體橋接器) |
 | 8 | AI 代理憑空生成或竄改 `statusline-quota.mjs` / `fetch-local-quota.mjs` 程式碼 | 狀態列功能殘缺、指標抓取失敗（如抓不到 Token 變成 `--`），甚至導致 CLI 崩潰 | **絕對禁令**：必須 100% 準確讀取本技能 `skills/agy-cli-statusline/scripts/` 目錄下的對應檔案原文部署，禁止自行發明或修改邏輯。要更新狀態列邏輯，必須先更新 `skills/agy-cli-statusline/scripts/*.mjs` 內容再部署 |
 | 9 | agy CLI 內部指令（疑似 `/model` 切換模型時）覆寫 `~/.gemini/antigravity-cli/settings.json` 並把 `statusLine.command` 清空或刪除 | 三層合併後 `command` 為空字串，agy CLI 完全停止呼叫 hook → 狀態列**整條空白消失**（非退讓 UI，是真的不見）；無錯誤訊息、難以察覺 | 短期 workaround：重新執行本技能，會同步覆寫三層 `statusLine`。下次發生時請先**不要重跑技能**，立即執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 抓現場證據（重點看 CLI 專屬層的 `statusLine.command`），確認假設後再決定是否新增 watchdog 機制或向 agy CLI 上游回報 |
+| 10 | macOS / Linux 下 `statusLine.command` 寫死裸命令 `node`，或 Windows 下直接寫入含空格的 Node 絕對路徑 | macOS / Linux 因 non-interactive `sh` 缺乏 NVM PATH 報 `exit status 127 (sh: 1: node: not found)`；Windows 因 `cmd.exe /c` 雙引號剝除導致 `'C:\Program'` 找不到命令或 Git Bash 反斜線 `\n` 換行跳脫失敗 | macOS / Linux 使用 `process.execPath` 絕對路徑；Windows 使用 `node` 裸命令（含空格之腳本路徑加引號），並於 `trusted_hooks.json` 同步登記所有變體 |
+| 11 | 初次安裝或初次啟用狀態列後未重新啟動 agy CLI | agy CLI 在執行期間不會動態掛載新增的 statusLine 掛鉤行程，導致狀態列完全未顯現，誤以為設定失敗 | 向使用者明確說明：初次啟用時必須重新啟動 agy CLI（退出後重新開啟）才能載入掛鉤行程；僅在先前已啟用狀態列時，調整順序或語系才能免重啟熱更新立即生效 |
 
 ---
 

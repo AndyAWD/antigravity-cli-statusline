@@ -115,20 +115,37 @@ Get-CimInstance Win32_Process -Filter "Name like '%agy%'"
 
 ## 5. settings.json 中 Windows 路徑跳脫範本
 
+### 為什麼 Windows 平台使用 `node` 裸命令（架構評估）
+
+在跨平台評估中，若直接將 Node.js 完整路徑（例如 `process.execPath`）寫入 Windows 的 `statusLine.command`，會引發數個極其嚴重的 Windows 系統陷阱：
+1. **路徑空格與 cmd.exe 雙引號剝除陷阱**：Windows 官方預設安裝於 `C:\Program Files\nodejs\node.exe`，內含空白字元。若指令寫為 `"C:\Program Files\nodejs\node.exe" "C:\Users\...\statusline-quota.mjs"`，當 agy CLI 底層透過 `sh -c` 轉發至 `cmd.exe /c` 時，依據 Windows cmd 解析規則，以雙引號開頭且包含多組雙引號的指令會被**自動剝除最外層的第一個與最後一個雙引號**，導致命令變成 `C:\Program Files\nodejs\node.exe" "C:\Users\...`，系統會尋找名為 `C:\Program` 的指令並直接崩潰報錯：`'C:\Program' is not recognized as an internal or external command`。
+2. **Git Bash sh.exe 反斜線跳脫陷阱**：若 Windows 機器裝有 Git for Windows 且 PATH 中包含其 `sh.exe`，POSIX Shell 會將反斜線 `\` 視為跳脫符號，路徑中的 `\n`（例如 `\nodejs` 或 `\new_folder`）會被轉換為換行字元（Newline），導致找不到檔案。
+3. **Windows 登錄檔 PATH 天然繼承**：不同於 macOS/Linux 下 NVM 為僅存在於互動式 Shell 的函式，Windows 下無論是官方 MSI、`nvm-windows`、`fnm` 或 `scoop`，皆會將 `node.exe` 寫入 Windows 系統/使用者環境變數（Windows 登錄檔 `PATH`）。所有父行程衍生的子行程（`cmd.exe`、`agy.exe`）皆會繼承完整 PATH。
+
+因此 Windows 平台上**使用裸命令 `node` 搭配雙引號包裹腳本絕對路徑為最健壯的黃金方案**。腳本絕對路徑一律以雙引號包裹：
+- **路徑空格防護**：使用者家目錄常包含空白（例如 `C:\Users\John Doe`），雙引號可確保路徑參數不被截斷。
+- **Git Bash 反斜線防護**：若 Windows 機器裝有 Git for Windows（PATH 中含 `sh.exe`），雙引號可防止 POSIX Shell 誤將反斜線 `\` 當作跳脫字元剝除損毀。
+- **免於引號剝除**：因為指令開頭為 `node `（第一個字元非雙引號），`cmd.exe /c` 絕對不會觸發最外層雙引號剝除規則，內部雙引號將完整保留傳入 `node`！
+
 `statusLine` 物件的 `command` 欄位在 Windows 平台必須使用雙反斜線跳脫：
 
 ```json
 "statusLine": {
   "enabled": true,
   "type": "command",
-  "command": "node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
+  "command": "node \"<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
 }
 ```
 
-`trusted_hooks.json` 中對應的 Windows 信任字串（同時追加 forward slash 與 `%USERPROFILE%` 變體以確保相容性）：
+`trusted_hooks.json` 中對應的 Windows 信任字串（必須包含精確命令，並同時追加單/雙反斜線、forward slash、引號與 `%USERPROFILE%` 變體以確保相容性）：
 
 ```text
 "statusLine:node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
+"statusLine:node \"<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
+"statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
+"statusLine:node \"<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs\""
+"statusLine:node %USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
+"statusLine:node \"%USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
 ```
 
 > ⚠️ **絕對禁止照抄** `<真實的使用者家目錄絕對路徑>` 此佔位符。AI 代理必須動態解析當前系統環境中的真實絕對路徑（例如 `C:\Users\andy`）替換之。
@@ -141,9 +158,9 @@ Get-CimInstance Win32_Process -Filter "Name like '%agy%'"
 
 agy CLI 的 `statusline_runner.go` 底層強制依賴 `sh -c` 執行指令。Windows 預設沒有 `sh.exe`，若直接複製 `powershell.exe` 當作替身，每次狀態列背景更新時都會閃爍一個黑色終端機視窗。
 
-### 完美越獄方案（無彈窗）
+### 完美越獄方案（無彈窗 + 引號防禦）
 
-利用 Windows 內建的 `.NET Compiler (csc.exe)` 編譯一個無窗體（`/target:winexe`）的 `sh.exe` 橋接器，徹底消除彈窗。
+利用 Windows 內建的 `.NET Compiler (csc.exe)` 編譯一個無窗體（`/target:winexe`）的 `sh.exe` 橋接器，徹底消除彈窗。原始碼中特別增加針對雙引號開頭指令的外層引號防禦包裹，防止 `cmd.exe /c` 誤剝除內部雙引號。
 
 ### 執行步驟
 

@@ -1,0 +1,11 @@
+{
+  "name": "antigravity-cli-statusline",
+  "version": "1.8.0",
+  "description": "Customize the Antigravity CLI statusline (footer) across macOS / Linux / Windows.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test skills/agy-cli-statusline/scripts/configure-statusline.test.mjs skills/agy-cli-statusline/scripts/fetch-local-quota.test.mjs skills/agy-cli-statusline/scripts/statusline-quota.test.mjs && node skills/agy-cli-statusline/scripts/test-counters.mjs"
+  },
+  "author": "andyawd",
+  "license": "MIT"
+}
