@@ -4,6 +4,7 @@ import assert from 'assert';
 import os from 'os';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
+import { getStatusLineCommand } from './configure-statusline.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -448,6 +449,17 @@ async function testCase5SimplifiedChineseConfig() {
     assert.strictEqual(globalSettings1.ui.language, 'zh-cn', '全域 settings.ui.language 必須為 zh-cn');
     assert.strictEqual(cliSettings1.ui.language, 'zh-cn', 'CLI 專屬 settings.ui.language 必須為 zh-cn');
     assert.deepStrictEqual(globalSettings1.ui.footer.items, ['model-name', 'quota'], 'footer.items 指標識別碼必須正確提取');
+    assert.strictEqual(globalSettings1.statusLine.enabled, true, 'statusLine.enabled 必須為 true');
+    assert.strictEqual(globalSettings1.statusLine.type, 'command', 'statusLine.type 必須為 command');
+    if (process.platform === 'win32') {
+      assert.ok(globalSettings1.statusLine.command.startsWith('node '), 'Windows 平台必須使用 node 裸命令');
+      assert.ok(globalSettings1.statusLine.command.startsWith('node "'), 'Windows 平台必須以 node " 開頭以雙引號保護腳本路徑');
+      assert.ok(globalSettings1.statusLine.command.endsWith('.mjs"'), 'Windows 平台腳本路徑必須以雙引號結尾');
+    } else {
+      const expectedBin = process.execPath.includes(' ') ? `"${process.execPath}"` : process.execPath;
+      assert.ok(globalSettings1.statusLine.command.startsWith(expectedBin), 'macOS / Linux 平台必須使用 process.execPath');
+      assert.strictEqual(globalSettings1.statusLine.command.endsWith('.mjs'), true, '必須指向 .mjs 腳本');
+    }
 
     // 2. 測試大小寫相容性：傳入大寫 zh-CN
     const args2 = ['--lang', 'zh-CN', '--selected', selected, '--order', '1,2', '--workspace', sandbox];
@@ -480,6 +492,163 @@ async function testCase5SimplifiedChineseConfig() {
 }
 
 // ==========================================
+// 測試情境 6：跨平台 Node.js 執行路徑與信任白名單相容性驗證
+// ==========================================
+async function testCase6CrossPlatformCommandAndTrustDefense() {
+  console.log('\n--- 執行測試情境 6：跨平台 Node.js 執行路徑與信任白名單相容性驗證 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case6-'));
+
+  try {
+    const mockHome = path.join(sandbox, 'mock-home with space');
+    fs.mkdirSync(mockHome, { recursive: true });
+
+    const scriptDir = path.join(sandbox, 'run');
+    fs.mkdirSync(scriptDir, { recursive: true });
+    const targetScript = path.join(scriptDir, 'configure-statusline.mjs');
+    copyFileSync(configureScriptSrc, targetScript);
+    copyFileSync(statuslineQuotaSrc, path.join(scriptDir, 'statusline-quota.mjs'));
+    copyFileSync(fetchLocalQuotaSrc, path.join(scriptDir, 'fetch-local-quota.mjs'));
+
+    const env = {
+      HOME: mockHome,
+      USERPROFILE: mockHome
+    };
+
+    const selected = '["model-name","quota"]';
+    const args = ['--lang', 'zh-tw', '--selected', selected, '--order', '1,2', '--workspace', sandbox];
+    const res = await runScript(targetScript, args, env);
+    assert.strictEqual(res.code, 0, '配置腳本執行應該成功返回 0');
+
+    const globalSettingsPath = path.join(mockHome, '.gemini', 'settings.json');
+    const cliSettingsPath = path.join(mockHome, '.gemini', 'antigravity-cli', 'settings.json');
+    const trustedHooksPath = path.join(mockHome, '.gemini', 'trusted_hooks.json');
+
+    const globalSettings = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+    const cliSettings = JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8'));
+    const trustedHooks = JSON.parse(fs.readFileSync(trustedHooksPath, 'utf8'));
+
+    // 1. 驗證 statusLine 物件結構
+    assert.strictEqual(globalSettings.statusLine.enabled, true, 'statusLine.enabled 必須為 true');
+    assert.strictEqual(globalSettings.statusLine.type, 'command', 'statusLine.type 必須為 command');
+    assert.strictEqual(cliSettings.statusLine.enabled, true, 'CLI 專屬層 statusLine.enabled 必須為 true');
+    assert.strictEqual(cliSettings.statusLine.command, globalSettings.statusLine.command, '三層 statusLine.command 必須一致');
+
+    const cmd = globalSettings.statusLine.command;
+    if (process.platform === 'win32') {
+      // Windows 必須以 node 裸命令開頭，並為含空格之路徑加上雙引號
+      assert.ok(cmd.startsWith('node '), 'Windows 平台必須使用 node 裸命令以避免 cmd.exe 引號剝除與 bash 換行跳脫陷阱');
+      assert.ok(cmd.includes('"'), '當路徑包含空格時，Windows 參數必須包含雙引號包裹');
+    } else {
+      // macOS / Linux 必須使用 process.execPath 絕對路徑以避免 NVM non-interactive shell 缺少 PATH (exit status 127)
+      assert.ok(cmd.includes(process.execPath) || cmd.startsWith(process.execPath) || cmd.startsWith(`"${process.execPath}"`), 'macOS / Linux 必須使用 process.execPath 絕對路徑');
+      assert.ok(cmd.includes('"'), '當路徑包含空格時，Unix 參數必須包含雙引號包裹');
+    }
+
+    // 2. 驗證 trusted_hooks.json 必須包含寫入 settings.json 的精確 command
+    const exactTrustKey = `statusLine:${cmd}`;
+    const allTrustEntries = [
+      ...(trustedHooks[mockHome] || []),
+      ...(trustedHooks['*'] || [])
+    ];
+    assert.ok(
+      allTrustEntries.includes(exactTrustKey),
+      `trusted_hooks.json 必須包含精確的信任字串: ${exactTrustKey}`
+    );
+
+    // 3. 驗證 trusted_hooks.json 包含歷史相容條目
+    const hasLegacyOrPathEntry = allTrustEntries.some(e => e.includes('statusline-quota.mjs'));
+    assert.ok(hasLegacyOrPathEntry, 'trusted_hooks.json 必須包含 statusline-quota.mjs 相關條目');
+
+    console.log('✅ 測試情境 6 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
+// 測試情境 7：直接驗證 getStatusLineCommand 跨平台矩陣邏輯（Windows/macOS/Linux、空格/無空格/既有引號）
+// ==========================================
+async function testCase7DirectGetStatusLineCommandMatrix() {
+  console.log('\n--- 執行測試情境 7：直接驗證 getStatusLineCommand 跨平台矩陣邏輯 ---');
+
+  // 1. Windows (win32) 平台驗證
+  // 1a. 無空格路徑：必須使用 node 裸命令且以雙引號包裹路徑（防範 Git Bash POSIX sh 反斜線剝除）
+  const winCmd1 = getStatusLineCommand('C:\\Users\\andy\\.gemini\\hooks\\statusline-quota.mjs', 'win32');
+  assert.strictEqual(
+    winCmd1,
+    'node "C:\\Users\\andy\\.gemini\\hooks\\statusline-quota.mjs"',
+    'Windows 無空格路徑必須為 node 裸命令搭配雙引號'
+  );
+
+  // 1b. 含空格路徑：必須使用 node 裸命令且以雙引號包裹路徑（防範路徑空白被截斷）
+  const winCmd2 = getStatusLineCommand('C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs', 'win32');
+  assert.strictEqual(
+    winCmd2,
+    'node "C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs"',
+    'Windows 含空格路徑必須為 node 裸命令搭配雙引號'
+  );
+
+  // 1c. 傳入已含雙引號之路徑：必須自動解除外層雙引號後標準化包裹，不可產生雙重引號 node ""...""
+  const winCmd3 = getStatusLineCommand('"C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs"', 'win32');
+  assert.strictEqual(
+    winCmd3,
+    'node "C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs"',
+    'Windows 既有雙引號路徑必須正確規範化，不可產生雙重引號'
+  );
+
+  // 2. macOS (darwin) 平台驗證
+  // 2a. Node 執行檔無空格、腳本無空格：直接以空格拼接
+  const macCmd1 = getStatusLineCommand('/Users/andy/.gemini/hooks/statusline-quota.mjs', 'darwin', '/usr/local/bin/node');
+  assert.strictEqual(
+    macCmd1,
+    '/usr/local/bin/node /Users/andy/.gemini/hooks/statusline-quota.mjs',
+    'macOS 無空格環境直接以空格拼接'
+  );
+
+  // 2b. Node 執行檔無空格、腳本含空格：腳本加上雙引號
+  const macCmd2 = getStatusLineCommand('/Users/John Doe/.gemini/hooks/statusline-quota.mjs', 'darwin', '/usr/local/bin/node');
+  assert.strictEqual(
+    macCmd2,
+    '/usr/local/bin/node "/Users/John Doe/.gemini/hooks/statusline-quota.mjs"',
+    'macOS 腳本含空格時必須加上雙引號'
+  );
+
+  // 2c. Node 執行檔含空格、腳本無空格：Node 執行檔加上雙引號
+  const macCmd3 = getStatusLineCommand('/Users/andy/.gemini/hooks/statusline-quota.mjs', 'darwin', '/opt/home brew/bin/node');
+  assert.strictEqual(
+    macCmd3,
+    '"/opt/home brew/bin/node" /Users/andy/.gemini/hooks/statusline-quota.mjs',
+    'macOS Node 執行檔含空格時必須加上雙引號'
+  );
+
+  // 2d. Node 執行檔含空格、腳本含空格：兩者皆加上雙引號
+  const macCmd4 = getStatusLineCommand('/Users/John Doe/.gemini/hooks/statusline-quota.mjs', 'darwin', '/opt/home brew/bin/node');
+  assert.strictEqual(
+    macCmd4,
+    '"/opt/home brew/bin/node" "/Users/John Doe/.gemini/hooks/statusline-quota.mjs"',
+    'macOS 兩者皆含空格時皆須加上雙引號'
+  );
+
+  // 2e. 既有雙引號傳入：不可雙重包裹
+  const macCmd5 = getStatusLineCommand('"/Users/John Doe/.gemini/hooks/statusline-quota.mjs"', 'darwin', '/usr/local/bin/node');
+  assert.strictEqual(
+    macCmd5,
+    '/usr/local/bin/node "/Users/John Doe/.gemini/hooks/statusline-quota.mjs"',
+    'macOS 既有雙引號不可雙重包裹'
+  );
+
+  // 3. Linux 平台驗證
+  const linuxCmd = getStatusLineCommand('/home/user with space/.gemini/hooks/statusline-quota.mjs', 'linux', '/usr/bin/node');
+  assert.strictEqual(
+    linuxCmd,
+    '/usr/bin/node "/home/user with space/.gemini/hooks/statusline-quota.mjs"',
+    'Linux 平台行為必須與 Unix 一致'
+  );
+
+  console.log('✅ 測試情境 7 通過！');
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -489,6 +658,8 @@ async function runAllTests() {
     await testCase3QuestionsJsonDefense();
     await testCase4SecuritySwallowDefense();
     await testCase5SimplifiedChineseConfig();
+    await testCase6CrossPlatformCommandAndTrustDefense();
+    await testCase7DirectGetStatusLineCommandMatrix();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {
@@ -498,3 +669,4 @@ async function runAllTests() {
 }
 
 runAllTests();
+
