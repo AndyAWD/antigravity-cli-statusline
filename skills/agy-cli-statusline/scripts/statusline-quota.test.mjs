@@ -4,6 +4,14 @@ import os from 'os';
 import { spawn } from 'child_process';
 import assert from 'assert';
 import { fileURLToPath } from 'url';
+import {
+  formatAbsoluteResetTime,
+  renderBarGraph,
+  buildI18nDict,
+  preprocessAdjacentItems,
+  renderStatusLine,
+  stripAnsi
+} from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
 
@@ -476,6 +484,249 @@ async function main() {
       } finally {
         try { rmSync(homeVar, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
       }
+    }
+
+    // ----------------------------------------------------
+    // Test Case R10: formatAbsoluteResetTime verification
+    // ----------------------------------------------------
+    console.log("\n[Test R10] Verifying formatAbsoluteResetTime (smart, 12h, 24h, custom)...");
+    const refDate = new Date(2026, 9, 13, 10, 0, 0);
+    const sameDayIso = new Date(2026, 9, 13, 15, 30, 0).toISOString();
+    const nextDayIso = new Date(2026, 9, 20, 11, 45, 0).toISOString();
+    const morningIso = new Date(2026, 9, 13, 9, 5, 0).toISOString();
+
+    assert.strictEqual(formatAbsoluteResetTime(sameDayIso, 'smart', refDate), '15:30');
+    assert.strictEqual(formatAbsoluteResetTime(sameDayIso, 'auto', refDate), '15:30');
+    assert.strictEqual(formatAbsoluteResetTime(nextDayIso, 'smart', refDate), '2026/10/20 11:45');
+    assert.strictEqual(formatAbsoluteResetTime(sameDayIso, 'yyyy/MM/dd HH:mm', refDate), '2026/10/13 15:30');
+    assert.strictEqual(formatAbsoluteResetTime(sameDayIso, 'yyyy-MM-dd HH:mm', refDate), '2026/10/13 15:30');
+    assert.strictEqual(formatAbsoluteResetTime(sameDayIso, 'full', refDate), '2026/10/13 15:30');
+    assert.strictEqual(formatAbsoluteResetTime(sameDayIso, '12h', refDate), '03:30 PM');
+    assert.strictEqual(formatAbsoluteResetTime(morningIso, '12h', refDate), '09:05 AM');
+    assert.strictEqual(formatAbsoluteResetTime(nextDayIso, '24h', refDate), '11:45');
+    assert.strictEqual(formatAbsoluteResetTime('', 'smart'), '');
+    assert.strictEqual(formatAbsoluteResetTime(null, 'smart'), '');
+    assert.strictEqual(formatAbsoluteResetTime('invalid-date', 'smart'), '');
+    assert.strictEqual(formatAbsoluteResetTime(sameDayIso, 'smart', null), formatAbsoluteResetTime(sameDayIso, 'smart', new Date()));
+    console.log("✅ R10 passed! (formatAbsoluteResetTime formatted all cases accurately)");
+
+    // ----------------------------------------------------
+    // Test Case R11: renderBarGraph verification
+    // ----------------------------------------------------
+    console.log("\n[Test R11] Verifying renderBarGraph (0%, 50%, 88%, 100%, lengths, colors)...");
+    assert.strictEqual(stripAnsi(renderBarGraph(0, 10)), '[░░░░░░░░░░]');
+    assert.strictEqual(stripAnsi(renderBarGraph(50, 10)), '[█████░░░░░]');
+    assert.strictEqual(stripAnsi(renderBarGraph(88, 10)), '[████████░░]');
+    assert.strictEqual(stripAnsi(renderBarGraph("88%", 10)), '[████████░░]');
+    assert.strictEqual(stripAnsi(renderBarGraph(100, 10)), '[██████████]');
+    assert.strictEqual(stripAnsi(renderBarGraph(-10, 10)), '[░░░░░░░░░░]');
+    assert.strictEqual(stripAnsi(renderBarGraph(150, 10)), '[██████████]');
+    assert.strictEqual(stripAnsi(renderBarGraph(NaN, 10)), '[░░░░░░░░░░]');
+    assert.strictEqual(stripAnsi(renderBarGraph(50, 6)), '[███░░░]');
+    assert.strictEqual(stripAnsi(renderBarGraph(50, 0)), '[█████░░░░░]'); // 0 defaults to 10
+    assert.strictEqual(stripAnsi(renderBarGraph(50, 100)), '[' + '█'.repeat(25) + '░'.repeat(25) + ']'); // capped at 50
+
+    const coloredBar = renderBarGraph(80, 10, '\x1b[38;2;87;202;255m');
+    assert.ok(coloredBar.includes('\x1b[38;2;87;202;255m████████\x1b[0m░░'));
+
+    const invertedLow = renderBarGraph(20, 10, '', true);
+    assert.ok(invertedLow.includes('\x1b[38;2;87;202;255m██\x1b[0m░░░░░░░░'));
+    const invertedHigh = renderBarGraph(90, 10, '', true);
+    assert.ok(invertedHigh.includes('\x1b[38;2;255;125;175m█████████\x1b[0m░'));
+    console.log("✅ R11 passed! (renderBarGraph rendered block graphics and colors accurately)");
+
+    // ----------------------------------------------------
+    // Test Case R12: 4-language i18n dictionary completeness for 6 new metrics
+    // ----------------------------------------------------
+    console.log("\n[Test R12] Verifying buildI18nDict for 6 new metrics and merged items in all 4 languages...");
+    const dummyMetrics = {
+      fallbackModel: 'Gemini 3.5 Flash',
+      quotaColor: '\x1b[38;2;87;202;255m',
+      quotaVal: '88%',
+      contextColor: '\x1b[38;2;92;219;109m',
+      usedPct: '15.2%',
+      memUsage: '50MB',
+      tokenCount: '12.5k / 1.0M',
+      countdownVal: '3h 10m',
+      weeklyQuotaColor: '\x1b[38;2;87;202;255m',
+      weeklyQuotaVal: '90%',
+      weeklyCountdownVal: '4d 11h',
+      mode: 'Default',
+      quotaResetTimeVal: '15:50',
+      weeklyResetTimeVal: '2026/10/20 10:50',
+      quotaBarVal: '[████████░░]',
+      weeklyQuotaBarVal: '[█████████░]',
+      contextBarVal: '[█░░░░░░░░░]',
+      tokenBarVal: '[██░░░░░░░░]',
+      gitBranch: 'main',
+      projectName: 'project',
+      projectFullPath: '/path/project',
+      planTier: 'Pro',
+      accountEmail: 'user@example.com',
+      agentState: 'idle',
+      toolConfirmPending: false,
+      pendingInputCount: 0,
+      backgroundTasksCount: 0,
+      subagentsCount: 0,
+      artifactsCount: 0,
+      vcsDirtyFlag: false,
+      vcsDirtyGlyph: '✓',
+      vcsDirtyLabel: 'clean',
+      vcsType: 'git',
+      sandboxEnabled: false,
+      sandboxAllowNet: false,
+      sandboxStatusVal: 'off',
+      cliVersion: 'v1.7.0',
+      conversationIdShort: '12345678',
+      agentProfileName: 'Default'
+    };
+
+    const newMetricKeys = [
+      'quota-reset-time', 'quota-weekly-reset-time',
+      'quota-bar', 'quota-weekly-bar',
+      'context-used-bar', 'token-count-bar',
+      'quota+bar', 'context-used+bar', 'quota-weekly+bar', 'token-count+bar'
+    ];
+
+    for (const testLang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
+      const dict = buildI18nDict(testLang, dummyMetrics);
+      for (const k of newMetricKeys) {
+        assert.ok(dict[k], `Language ${testLang} must define metric "${k}"`);
+        assert.ok(typeof dict[k] === 'string' && dict[k].length > 0, `Metric "${k}" in ${testLang} must not be empty`);
+      }
+    }
+    console.log("✅ R12 passed! (All 4 languages define all 6 new metrics and 4 merged items)");
+
+    // ----------------------------------------------------
+    // Test Case R13: Adjacent auto-merge preprocessor verification
+    // ----------------------------------------------------
+    console.log("\n[Test R13] Verifying adjacent auto-merge preprocessor...");
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota', 'quota-bar']), ['quota+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota-bar', 'quota']), ['quota+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['context-used', 'context-used-bar']), ['context-used+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['context-used-bar', 'context-used']), ['context-used+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota-weekly', 'quota-weekly-bar']), ['quota-weekly+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota-weekly-bar', 'quota-weekly']), ['quota-weekly+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['token-count', 'token-count-bar']), ['token-count+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['token-count-bar', 'token-count']), ['token-count+bar']);
+
+    // Non-adjacent items remain unmerged
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota', 'model-name', 'quota-bar']), ['quota', 'model-name', 'quota-bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota', 'n', 'quota-bar']), ['quota', 'n', 'quota-bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(null), []);
+
+    // renderStatusLine with merged items
+    const zhTwDict = buildI18nDict('zh-tw', dummyMetrics);
+    const renderedLines = renderStatusLine(['quota', 'quota-bar', 'context-used', 'context-used-bar'], zhTwDict, 200);
+    const plainRendered = stripAnsi(renderedLines[0]);
+    assert.ok(plainRendered.includes('小時可用: 88% [████████░░]'), `Expected merged quota text in: ${plainRendered}`);
+    assert.ok(plainRendered.includes('脈絡用量: 15.2% [█░░░░░░░░░]'), `Expected merged context text in: ${plainRendered}`);
+    console.log("✅ R13 passed! (Adjacent items merged cleanly without directional constraint)");
+
+    // ----------------------------------------------------
+    // Test Case R14: Hermetic E2E execution with new metrics & auto-merge
+    // ----------------------------------------------------
+    console.log("\n[Test R14] Verifying hermetic E2E execution with new metrics & auto-merge...");
+    const mockCacheR14 = {
+      shortTerm: {
+        gemini: {
+          remaining_percentage: 88.0,
+          reset_time: '2026-10-13T07:50:47Z',
+          refreshes_in: '3h 10m'
+        }
+      },
+      weekly: {
+        gemini: {
+          remaining_percentage: 90.0,
+          reset_time: '2026-10-20T07:50:47Z',
+          refreshes_in: '7d'
+        }
+      },
+      updatedAt: Date.now()
+    };
+
+    const settingsR14 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: [
+            "quota", "quota-bar", "quota-reset-time",
+            "quota-weekly", "quota-weekly-bar", "quota-weekly-reset-time",
+            "context-used", "context-used-bar",
+            "token-count", "token-count-bar"
+          ],
+          barLength: 10,
+          timeFormat: "smart"
+        }
+      }
+    };
+
+    const metaR14 = {
+      model: { display_name: "Gemini 3.5 Flash" },
+      terminal_width: 300,
+      context_window: { total_input_tokens: 152000, context_window_size: 1000000, used_percentage: 15.2 }
+    };
+
+    const homeR14 = makeTempHome(mockCacheR14, settingsR14);
+    try {
+      const resR14 = await runStatusline(metaR14, homeR14);
+      console.log("R14 Output:", JSON.stringify(resR14.stdout));
+      const plainOut = stripAnsi(resR14.stdout);
+
+      assert.strictEqual(resR14.code, 0);
+      assert.ok(plainOut.includes('小時可用: 88% [████████░░]'), 'Output must contain merged hourly quota and bar');
+      assert.ok(plainOut.includes('小時重置:'), 'Output must contain hourly reset time label');
+      assert.ok(plainOut.includes('每週可用: 90% [█████████░]'), 'Output must contain merged weekly quota and bar');
+      assert.ok(plainOut.includes('每週重置:'), 'Output must contain weekly reset time label');
+      assert.ok(plainOut.includes('脈絡用量: 15.2% [█░░░░░░░░░]'), 'Output must contain merged context used and bar');
+      assert.ok(plainOut.includes('權杖數:'), 'Output must contain token count');
+      assert.ok(plainOut.includes('[█░░░░░░░░░]'), 'Output must contain token bar graph');
+      console.log("✅ R14 passed! (Hermetic E2E execution rendered merged and new indicators perfectly)");
+    } finally {
+      try { rmSync(homeR14, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R15: meta.quota reset_in_seconds derivation of reset-time
+    // ----------------------------------------------------
+    console.log("\n[Test R15] Verifying meta.quota with reset_in_seconds derives absolute reset time...");
+    const settingsR15 = {
+      ui: {
+        language: "us",
+        footer: {
+          items: ["quota-reset-time", "quota-weekly-reset-time"]
+        }
+      }
+    };
+    const metaR15 = {
+      model: { display_name: "Gemini 3.8 Flash (High)" },
+      quota: {
+        "gemini-5h": {
+          remaining_fraction: 0.8,
+          reset_in_seconds: 3600
+        },
+        "gemini-weekly": {
+          remaining_fraction: 0.9,
+          reset_in_seconds: 86400
+        }
+      },
+      terminal_width: 160
+    };
+
+    const homeR15 = makeTempHome({}, settingsR15);
+    try {
+      const resR15 = await runStatusline(metaR15, homeR15);
+      console.log("R15 Output:", JSON.stringify(resR15.stdout));
+      const plainR15 = stripAnsi(resR15.stdout);
+
+      assert.strictEqual(resR15.code, 0);
+      assert.ok(plainR15.includes('Hourly Reset Time:'), 'Must include Hourly Reset Time label');
+      assert.ok(!plainR15.includes('Hourly Reset Time: N/A'), 'Hourly Reset Time must not be N/A when reset_in_seconds is provided');
+      assert.ok(plainR15.includes('Weekly Reset Time:'), 'Must include Weekly Reset Time label');
+      assert.ok(!plainR15.includes('Weekly Reset Time: N/A'), 'Weekly Reset Time must not be N/A when reset_in_seconds is provided');
+      console.log("✅ R15 passed! (meta.quota reset_in_seconds derived valid absolute reset times)");
+    } finally {
+      try { rmSync(homeR15, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
   } catch (err) {
