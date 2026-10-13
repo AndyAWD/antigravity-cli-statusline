@@ -93,8 +93,11 @@ Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更�
 
 - `ui.language` 可為 `zh-tw` / `zh-cn` / `us` / `jp`
 - `ui.footer.items` 為英文識別碼陣列，順序決定狀態列顯示順序
-- 支援的識別碼：`model-name` / `agent-profile` / `agent-state` / `sandbox-status` / `context-used` / `token-count` / `artifacts` / `account-email` / `plan-tier` / `quota` / `quota-reset-countdown` / `quota-weekly` / `quota-weekly-countdown` / `tool-confirmation` / `pending-input` / `background-tasks` / `subagents` / `project-path` / `project-full-path` / `vcs-type` / `git-branch` / `vcs-dirty` / `memory-usage` / `cli-version` / `conversation-id` / `mode`
+- 支援的識別碼：`model-name` / `agent-profile` / `agent-state` / `sandbox-status` / `context-used` / `context-used-bar` / `token-count` / `token-count-bar` / `artifacts` / `account-email` / `plan-tier` / `quota` / `quota-bar` / `quota-reset-countdown` / `quota-reset-time` / `quota-weekly` / `quota-weekly-bar` / `quota-weekly-countdown` / `quota-weekly-reset-time` / `tool-confirmation` / `pending-input` / `background-tasks` / `subagents` / `project-path` / `project-full-path` / `vcs-type` / `git-branch` / `vcs-dirty` / `memory-usage` / `cli-version` / `conversation-id` / `mode`
 - 特殊識別碼：`n` 或 `newline` 用於強制換行（可重複出現）
+- 自訂設定：
+  - `ui.footer.barLength`：長條圖格數（預設 `10`）
+  - `ui.footer.timeFormat`：重置時間格式，可選 `"smart"` / `"auto"`（預設，同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）、`"yyyy/MM/dd HH:mm"`、`"12h"`、`"24h"`
 
 ---
 

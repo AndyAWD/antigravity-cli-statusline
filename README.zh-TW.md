@@ -62,11 +62,17 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 
 **額度與 Token**
 - **帳號真實 API 可用額度（`quota`）**：百分比，搭配四階配色
+- **五小時可用額度長條圖（`quota-bar`）**：10 格長條圖視覺回饋（`[████████░░]`），與 `quota` 相鄰時自動合併
 - **API 重置時間倒數（`quota-reset-countdown`）**：距離下次額度重置剩餘時間
+- **五小時 API 絕對重置時間（`quota-reset-time`）**：本機時區絕對時間，預設同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`
 - **帳號每週 API 可用額度（`quota-weekly`）**：每週剩餘百分比，搭配四階配色
+- **每週可用額度長條圖（`quota-weekly-bar`）**：每週剩餘長條圖，與 `quota-weekly` 相鄰時自動合併
 - **每週 API 重置時間倒數（`quota-weekly-countdown`）**：距離每週額度重置剩餘時間
+- **每週 API 絕對重置時間（`quota-weekly-reset-time`）**：每週重置絕對時間（如 `2026/10/20 10:50`）
 - **目前對話已消耗的 Context 比例（`context-used`）**：百分比
+- **脈絡用量長條圖（`context-used-bar`）**：脈絡消耗長條圖，與 `context-used` 相鄰時自動合併
 - **目前 Session 消耗的精確 Token 數量（`token-count`）**
+- **權杖數長條圖（`token-count-bar`）**：Token 消耗長條圖，與 `token-count` 相鄰時自動合併
 - **本次對話 AI 累計產出的檔案數量（`artifacts`）**
 - **目前訂閱方案等級（`plan-tier`）**
 
@@ -89,6 +95,17 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 - **目前對話 ID 前 8 碼（`conversation-id`）**：用於除錯
 - **沙盒模式狀態（`sandbox-status`）**：`off / on (net) / on (no-net)`
 - **帳號電子郵件（`account-email`）**
+
+### 長條圖規格與相鄰自動合併
+
+- **長條圖規格**：預設長度為 10 格（`[████████░░]`），可於設定檔 `ui.footer.barLength` 自訂格數。實心方塊 `█` 代表進度，底色淺方塊 `░` 代表剩餘/空白。配額指標依剩餘空間著色，脈絡與權杖指標依緊繃程度著色。
+- **相鄰自動合併（Adjacent Auto-Merge）**：當數值指標與對應長條圖在狀態列相鄰時（無方向性限制），狀態列會自動將其合併為單一標籤與管道隔線：
+  - `quota` + `quota-bar` → `小時可用: 88% [████████░░]`
+  - `quota-weekly` + `quota-weekly-bar` → `每週可用: 90% [█████████░]`
+  - `context-used` + `context-used-bar` → `脈絡用量: 15.2% [█░░░░░░░░░]`
+  - `token-count` + `token-count-bar` → `權杖數: 12.5k / 1.0M [██░░░░░░░░]`
+  - 若彼此未相鄰，則各自維持獨立標籤輸出。
+- **絕對重置時間格式**：可於設定檔 `ui.footer.timeFormat` 自訂為 `"smart"`（預設，同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）、`"yyyy/MM/dd HH:mm"`、`"12h"` 或 `"24h"`。
 
 ### 排序
 

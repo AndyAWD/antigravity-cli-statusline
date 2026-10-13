@@ -290,6 +290,8 @@ let lang = 'zh-tw';
 let selectedStr = '[]';
 let orderStr = '';
 let workspacePath = '';
+let timeFormat = '';
+let barLength = 0;
 
 for (let i = 2; i < process.argv.length; i++) {
   if (process.argv[i] === '--lang' && process.argv[i + 1]) {
@@ -304,6 +306,12 @@ for (let i = 2; i < process.argv.length; i++) {
   } else if (process.argv[i] === '--workspace' && process.argv[i + 1]) {
     workspacePath = process.argv[i + 1];
     i++;
+  } else if (process.argv[i] === '--time-format' && process.argv[i + 1]) {
+    timeFormat = process.argv[i + 1];
+    i++;
+  } else if (process.argv[i] === '--bar-length' && process.argv[i + 1]) {
+    barLength = parseInt(process.argv[i + 1], 10);
+    i++;
   }
 }
 
@@ -314,6 +322,8 @@ console.log(`- 語言：${lang}`);
 console.log(`- 已選項目：${selectedStr}`);
 console.log(`- 排序順序：${orderStr}`);
 console.log(`- 工作區：${workspacePath}`);
+if (timeFormat) console.log(`- 時間格式：${timeFormat}`);
+if (barLength) console.log(`- 長條圖長度：${barLength}`);
 
 // 2. 排序解析規則
 let selectedList = [];
@@ -459,6 +469,8 @@ function updateSettings(settingsPath) {
   
   if (!settings.ui.footer) settings.ui.footer = {};
   settings.ui.footer.items = items;
+  if (timeFormat) settings.ui.footer.timeFormat = timeFormat;
+  if (barLength && !isNaN(barLength) && barLength > 0) settings.ui.footer.barLength = barLength;
   
   const statusLineCmd = getStatusLineCommand(statuslineQuotaMjsPath);
   settings.statusLine = {
