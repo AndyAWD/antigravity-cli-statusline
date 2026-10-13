@@ -62,11 +62,17 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 
 **额度与 Token**
 - **账号真实 API 可用额度（`quota`）**：百分比，搭配四阶配色
+- **五小时可用额度长条图（`quota-bar`）**：10 格长条图视觉反馈（`[████████░░]`），与 `quota` 相邻时自动合并
 - **API 重置时间倒计时（`quota-reset-countdown`）**：距离下次额度重置剩余时间
+- **五小时 API 绝对重置时间（`quota-reset-time`）**：本机时区绝对时间，默认同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`
 - **账号每周 API 可用额度（`quota-weekly`）**：每周剩余百分比，搭配四阶配色
+- **每周可用额度长条图（`quota-weekly-bar`）**：每周剩余长条图，与 `quota-weekly` 相邻时自动合并
 - **每周 API 重置时间倒计时（`quota-weekly-countdown`）**：距离每周额度重置剩余时间
+- **每周 API 绝对重置时间（`quota-weekly-reset-time`）**：每周重置绝对时间（如 `2026/10/20 10:50`）
 - **当前对话已消耗的上下文（Context）比例（`context-used`）**：百分比
+- **上下文用量长条图（`context-used-bar`）**：上下文消耗长条图，与 `context-used` 相邻时自动合并
 - **当前会话消耗的精确 Token 数量（`token-count`）**
+- **令牌数长条图（`token-count-bar`）**：Token 消耗长条图，与 `token-count` 相邻时自动合并
 - **本次对话 AI 累计产出的文件数量（`artifacts`）**
 - **当前订阅计划等级（`plan-tier`）**
 
@@ -89,6 +95,17 @@ agy plugin install https://github.com/andyawd/antigravity-cli-statusline
 - **当前对话 ID 前 8 位（`conversation-id`）**：用于调试
 - **沙箱模式状态（`sandbox-status`）**：`off / on (net) / on (no-net)`
 - **账号电子邮件（`account-email`）**
+
+### 长条图规格与相邻自动合并
+
+- **长条图规格**：默认长度为 10 格（`[████████░░]`），可在配置文件 `ui.footer.barLength` 自定义格数。实心方块 `█` 代表进度，底色浅方块 `░` 代表剩余/空白。配额指标依剩余空间着色，上下文与令牌指标依紧绷程度着色。
+- **相邻自动合并（Adjacent Auto-Merge）**：当数值指标与对应长条图在状态栏相邻时（无方向限制），状态栏会自动将其合并为单一标签与管道分隔线：
+  - `quota` + `quota-bar` → `小时可用: 88% [████████░░]`
+  - `quota-weekly` + `quota-weekly-bar` → `每周可用: 90% [█████████░]`
+  - `context-used` + `context-used-bar` → `上下文用量: 15.2% [█░░░░░░░░░]`
+  - `token-count` + `token-count-bar` → `令牌数: 12.5k / 1.0M [██░░░░░░░░]`
+  - 若彼此未相邻，则各自保持独立标签输出。
+- **绝对重置时间格式**：可在配置文件 `ui.footer.timeFormat` 自定义为 `"smart"`（默认，同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）、`"yyyy/MM/dd HH:mm"`、`"12h"` 或 `"24h"`。
 
 ### 排序
 

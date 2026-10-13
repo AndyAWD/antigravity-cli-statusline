@@ -62,11 +62,17 @@ The skill walks you through language selection, indicator picking, and sorting, 
 
 **Quota & Tokens**
 - **Account API available quota (`quota`)** — percentage, color-coded across four tiers
+- **Hourly available quota bar graph (`quota-bar`)** — 10-block bar visual (`[████████░░]`), auto-merges with `quota` when adjacent
 - **API reset countdown (`quota-reset-countdown`)** — time remaining until quota refreshes
+- **Hourly API absolute reset time (`quota-reset-time`)** — local timezone time, defaults to `HH:mm` for same day, `yyyy/MM/dd HH:mm` across days
 - **Weekly API quota remaining (`quota-weekly`)** — weekly remaining percentage, color-coded
+- **Weekly available quota bar graph (`quota-weekly-bar`)** — weekly quota bar visual, auto-merges with `quota-weekly` when adjacent
 - **Weekly API reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
+- **Weekly API absolute reset time (`quota-weekly-reset-time`)** — weekly absolute reset timestamp (e.g. `2026/10/20 10:50`)
 - **Context window usage (`context-used`)** — percentage of context consumed
+- **Context used bar graph (`context-used-bar`)** — context consumed bar visual, auto-merges with `context-used` when adjacent
 - **Session token count (`token-count`)** — precise token usage this session
+- **Token count bar graph (`token-count-bar`)** — token consumed bar visual, auto-merges with `token-count` when adjacent
 - **Cumulative AI artifacts (`artifacts`)** — files/outputs produced this session
 - **Account plan tier (`plan-tier`)** — current subscription level
 
@@ -89,6 +95,17 @@ The skill walks you through language selection, indicator picking, and sorting, 
 - **Conversation ID (`conversation-id`)** — first 8 chars, for debugging
 - **Sandbox mode (`sandbox-status`)** — `off / on (net) / on (no-net)`
 - **Account email (`account-email`)**
+
+### Bar Graph Specs & Adjacent Auto-Merge
+
+- **Bar Graph Specifications**: Default length is 10 blocks (`[████████░░]`), customizable via `ui.footer.barLength` in settings. Solid block `█` represents capacity/usage, while shaded block `░` represents empty space. Quota bars are colored by remaining capacity, while context and token bars are colored by tightness/usage pressure.
+- **Adjacent Auto-Merge**: When a numeric indicator is placed adjacent to its corresponding bar graph in the statusline items (in either order), they are automatically merged into a single label and separator:
+  - `quota` + `quota-bar` → `Hourly Available: 88% [████████░░]`
+  - `quota-weekly` + `quota-weekly-bar` → `Weekly Available: 90% [█████████░]`
+  - `context-used` + `context-used-bar` → `Context Used: 15.2% [█░░░░░░░░░]`
+  - `token-count` + `token-count-bar` → `Tokens: 12.5k / 1.0M [██░░░░░░░░]`
+  - If not adjacent, each indicator renders individually with its own label.
+- **Reset Time Formats**: Configurable via `ui.footer.timeFormat` in settings with options: `"smart"` (default, `HH:mm` for same day, `yyyy/MM/dd HH:mm` across days), `"yyyy/MM/dd HH:mm"`, `"12h"`, or `"24h"`.
 
 ### Sorting
 
