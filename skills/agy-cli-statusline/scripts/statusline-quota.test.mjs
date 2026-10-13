@@ -729,6 +729,131 @@ async function main() {
       try { rmSync(homeR15, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
+    // ----------------------------------------------------
+    // Test Case R16: Fallback when ui.footer.items is empty array [] (dino bug reproduction)
+    // ----------------------------------------------------
+    console.log("\n[Test R16] Verifying fallback mode when ui.footer.items is empty array [] (dino config)...");
+    const settingsR16 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          theme: "dino",
+          items: []
+        }
+      }
+    };
+    const metaR16 = {
+      model: { display_name: "Gemini 3.8 Flash (High)" },
+      terminal_width: 80
+    };
+    const homeR16 = makeTempHome({}, settingsR16);
+    try {
+      const resR16 = await runStatusline(metaR16, homeR16);
+      console.log("R16 Output:", JSON.stringify(resR16.stdout));
+      const plainR16 = stripAnsi(resR16.stdout).trim();
+
+      assert.strictEqual(resR16.code, 0);
+      assert.ok(plainR16.length > 0, "Output must NOT be empty string");
+      assert.ok(plainR16.startsWith("? for shortcuts"), "Output must start with '? for shortcuts'");
+      assert.ok(plainR16.includes("Gemini 3.8 Flash (High)"), "Output must contain fallback model name");
+      console.log("✅ R16 passed! (Empty items array successfully triggered fallback mode instead of empty output)");
+    } finally {
+      try { rmSync(homeR16, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R17: Fallback when ui.footer.items is null or missing
+    // ----------------------------------------------------
+    console.log("\n[Test R17] Verifying fallback mode when ui.footer.items is null/missing...");
+    const settingsR17 = {
+      ui: {
+        language: "zh-tw",
+        footer: {}
+      }
+    };
+    const metaR17 = {
+      model: { display_name: "Gemini 3.5 Pro" },
+      terminal_width: 80
+    };
+    const homeR17 = makeTempHome({}, settingsR17);
+    try {
+      const resR17 = await runStatusline(metaR17, homeR17);
+      console.log("R17 Output:", JSON.stringify(resR17.stdout));
+      const plainR17 = stripAnsi(resR17.stdout).trim();
+
+      assert.strictEqual(resR17.code, 0);
+      assert.ok(plainR17.length > 0, "Output must NOT be empty string");
+      assert.ok(plainR17.startsWith("? for shortcuts"), "Output must start with '? for shortcuts'");
+      assert.ok(plainR17.includes("Gemini 3.5 Pro"), "Output must contain fallback model name");
+      console.log("✅ R17 passed! (Missing items successfully triggered fallback mode)");
+    } finally {
+      try { rmSync(homeR17, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R18: renderStatusLine defense against empty array / invalid items
+    // ----------------------------------------------------
+    console.log("\n[Test R18] Verifying renderStatusLine never returns empty array or blank line...");
+    const emptyLines1 = renderStatusLine([], {}, 80, 'Test-Model');
+    assert.strictEqual(emptyLines1.length, 1, "renderStatusLine([]) must return 1 fallback line");
+    assert.ok(stripAnsi(emptyLines1[0]).includes('? for shortcuts'), "renderStatusLine([]) must contain '? for shortcuts'");
+    assert.ok(stripAnsi(emptyLines1[0]).includes('Test-Model'), "renderStatusLine([]) must contain fallback model name");
+
+    const emptyLines2 = renderStatusLine(['nonexistent-metric'], {}, 80, 'Fallback-Model-2');
+    assert.strictEqual(emptyLines2.length, 1, "renderStatusLine with unknown items must return 1 fallback line");
+    assert.ok(stripAnsi(emptyLines2[0]).includes('Fallback-Model-2'), "renderStatusLine must contain fallback model name");
+    // ----------------------------------------------------
+    // Test Case R19: renderStatusLine defense against newline-only or null items
+    // ----------------------------------------------------
+    console.log("\n[Test R19] Verifying renderStatusLine defense against newline-only, null, or undefined items...");
+    const emptyLines3 = renderStatusLine(['n', 'newline'], {}, 80, 'Fallback-Model-3');
+    assert.strictEqual(emptyLines3.length, 1, "renderStatusLine with only newlines must return 1 fallback line");
+    assert.ok(stripAnsi(emptyLines3[0]).includes('? for shortcuts'), "renderStatusLine with only newlines must contain '? for shortcuts'");
+    assert.ok(stripAnsi(emptyLines3[0]).includes('Fallback-Model-3'), "renderStatusLine must contain fallback model name");
+
+    const emptyLines4 = renderStatusLine([null, undefined, ''], {}, 80, 'Fallback-Model-4');
+    assert.strictEqual(emptyLines4.length, 1, "renderStatusLine with null/undefined items must return 1 fallback line");
+    assert.ok(stripAnsi(emptyLines4[0]).includes('Fallback-Model-4'), "renderStatusLine must contain fallback model name");
+
+    // Also test rawModel label stripping when fallbackModel is omitted
+    const emptyLines5 = renderStatusLine([], { 'model-name': '\u001b[37m模型:\u001b[0m \u001b[1mGemini 3.5 Pro\u001b[0m' }, 80);
+    assert.strictEqual(emptyLines5.length, 1);
+    assert.ok(stripAnsi(emptyLines5[0]).includes('Gemini 3.5 Pro'), "renderStatusLine must extract raw model name without label");
+    assert.ok(!stripAnsi(emptyLines5[0]).includes('模型:'), "renderStatusLine must NOT include '模型:' label in shortcuts line");
+    console.log("✅ R19 passed! (renderStatusLine safely handles newline-only, null, and extracts raw model cleanly)");
+
+    // ----------------------------------------------------
+    // Test Case R20: E2E fallback when items is a string or non-array (e.g. items: 'dino')
+    // ----------------------------------------------------
+    console.log("\n[Test R20] Verifying E2E fallback mode when items is non-array string/object...");
+    const settingsR20 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          theme: "custom-theme",
+          items: "dino"
+        }
+      }
+    };
+    const metaR20 = {
+      model: { display_name: "Gemini 3.8 Pro" },
+      terminal_width: 80
+    };
+    const homeR20 = makeTempHome({}, settingsR20);
+    try {
+      const resR20 = await runStatusline(metaR20, homeR20);
+      console.log("R20 Output:", JSON.stringify(resR20.stdout));
+      const plainR20 = stripAnsi(resR20.stdout).trim();
+
+      assert.strictEqual(resR20.code, 0);
+      assert.ok(plainR20.length > 0, "Output must NOT be empty string");
+      assert.ok(plainR20.startsWith("? for shortcuts"), "Output must start with '? for shortcuts'");
+      assert.ok(plainR20.includes("Gemini 3.8 Pro"), "Output must contain fallback model name");
+      console.log("✅ R20 passed! (Non-array items string successfully triggered fallback mode)");
+    } finally {
+      try { rmSync(homeR20, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;

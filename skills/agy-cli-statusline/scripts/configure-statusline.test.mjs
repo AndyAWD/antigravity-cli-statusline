@@ -485,6 +485,14 @@ async function testCase5SimplifiedChineseConfig() {
     const globalSettings4 = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
     assert.deepStrictEqual(globalSettings4.ui.footer.items, ['model-name', 'quota'], '未填 Write-in 時必須防禦性安全退讓保留勾選項，禁止清空');
 
+    // 5. 測試 --selected 為空陣列時防禦退讓至核心標準指標（避免寫入空陣列清空狀態列）
+    const args5 = ['--lang', 'zh-cn', '--selected', '[]', '--order', '1,2', '--workspace', sandbox];
+    const res5 = await runScript(targetScript, args5, env);
+    assert.strictEqual(res5.code, 0, '空 --selected 配置腳本執行應該成功返回 0');
+
+    const globalSettings5 = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+    assert.deepStrictEqual(globalSettings5.ui.footer.items, ['model-name', 'quota', 'context-used', 'memory-usage'], '空 selected 必須安全退讓至預設核心指標，禁止寫入空陣列');
+
     console.log('✅ 測試情境 5 通過！');
   } finally {
     rmRfSync(sandbox);

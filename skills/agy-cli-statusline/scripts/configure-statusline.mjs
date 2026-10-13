@@ -194,10 +194,88 @@ function safeRemoveSync(targetPath) {
 }
 
 // ==========================================
-// 重構後的清理與備份執行邏輯
+// 通用輔助函式 (General Helpers)
 // ==========================================
 
-const oldGlobalSkillDir = path.join(os.homedir(), '.gemini', 'skills', 'antigravity-cli-statusline');
+function normalizeLanguage(l) {
+  if (!l || typeof l !== 'string') return 'zh-tw';
+  let norm = l.toLowerCase().replace(/_/g, '-').trim();
+  const parenMatch = norm.match(/[\(（]([a-z0-9\-_]+)[\)）]/);
+  if (parenMatch) {
+    norm = parenMatch[1].trim();
+  }
+  if (norm === 'zh-cn' || norm === 'cn' || norm === 'zh-hans' || norm === 'zh-sg' || norm.startsWith('zh-cn') || norm.startsWith('zh-hans') || norm.includes('简体') || norm.includes('簡體') || norm.includes('simplified')) {
+    return 'zh-cn';
+  }
+  if (norm === 'zh-tw' || norm === 'tw' || norm === 'zh-hant' || norm === 'zh-hk' || norm === 'zh-mo' || norm.startsWith('zh-tw') || norm.startsWith('zh-hant') || norm.includes('繁體') || norm.includes('繁体') || norm.includes('traditional')) {
+    return 'zh-tw';
+  }
+  if (norm === 'jp' || norm === 'ja' || norm === 'ja-jp' || norm.startsWith('ja-') || norm.includes('日本') || norm.includes('japanese')) {
+    return 'jp';
+  }
+  if (norm === 'us' || norm === 'en' || norm === 'en-us' || norm === 'en-gb' || norm.startsWith('en-') || norm.includes('english') || norm.includes('英文')) {
+    return 'us';
+  }
+  return norm;
+}
+
+function writeContentAndVerifyNoBOM(filePath, content) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(filePath, content, { encoding: 'utf8' });
+  
+  // 驗證並就地剝除位元組順序記號（BOM）
+  let buffer = fs.readFileSync(filePath);
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    console.log(`[偵測到 BOM] 在 ${filePath} 發現 BOM，正在剝除...`);
+    buffer = buffer.slice(3);
+    fs.writeFileSync(filePath, buffer);
+  }
+}
+
+function readJsonWithBOMDefense(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+  let content = fs.readFileSync(filePath, 'utf8');
+  content = content.replace(/^\uFEFF/, '');
+  try {
+    return JSON.parse(content);
+  } catch (err) {
+    console.error(`解析 ${filePath} 失敗，傳回空物件：`, err);
+    return {};
+  }
+}
+
+function writeJsonAndVerifyNoBOM(filePath, data) {
+  writeContentAndVerifyNoBOM(filePath, JSON.stringify(data, null, 2));
+}
+
+/**
+ * 依平台產生最穩定的 statusLine 指令字串：
+ * - macOS / Linux：使用 Node.js 執行檔的絕對路徑（process.execPath）。
+ * - Windows：使用裸命令 node 搭配雙引號包裹腳本絕對路徑。
+ */
+export function getStatusLineCommand(statuslineScriptPath, platform = process.platform, execPath = process.execPath) {
+  const cleanPath = statuslineScriptPath.replace(/^"(.*)"$/, '$1');
+  if (platform === 'win32') {
+    return `node "${cleanPath}"`;
+  } else {
+    const nodeBin = execPath.includes(' ') ? `"${execPath}"` : execPath;
+    const scriptArg = cleanPath.includes(' ') ? `"${cleanPath}"` : cleanPath;
+    return `${nodeBin} ${scriptArg}`;
+  }
+}
+
+// ==========================================
+// 主執行流程 (Main Execution)
+// ==========================================
+
+export function main() {
+  const homeDir = os.homedir();
+  const oldGlobalSkillDir = path.join(homeDir, '.gemini', 'skills', 'antigravity-cli-statusline');
 const oldGlobalSkillBak = path.join(os.homedir(), '.gemini', 'skills', 'antigravity-cli-statusline.bak');
 
 let oldDirExists = false;
@@ -262,28 +340,6 @@ for (const qPath of redundantQuestionsPaths) {
   }
 }
 
-
-function normalizeLanguage(l) {
-  if (!l || typeof l !== 'string') return 'zh-tw';
-  let norm = l.toLowerCase().replace(/_/g, '-').trim();
-  const parenMatch = norm.match(/[\(（]([a-z0-9\-_]+)[\)）]/);
-  if (parenMatch) {
-    norm = parenMatch[1].trim();
-  }
-  if (norm === 'zh-cn' || norm === 'cn' || norm === 'zh-hans' || norm === 'zh-sg' || norm.startsWith('zh-cn') || norm.startsWith('zh-hans') || norm.includes('简体') || norm.includes('簡體') || norm.includes('simplified')) {
-    return 'zh-cn';
-  }
-  if (norm === 'zh-tw' || norm === 'tw' || norm === 'zh-hant' || norm === 'zh-hk' || norm === 'zh-mo' || norm.startsWith('zh-tw') || norm.startsWith('zh-hant') || norm.includes('繁體') || norm.includes('繁体') || norm.includes('traditional')) {
-    return 'zh-tw';
-  }
-  if (norm === 'jp' || norm === 'ja' || norm === 'ja-jp' || norm.startsWith('ja-') || norm.includes('日本') || norm.includes('japanese')) {
-    return 'jp';
-  }
-  if (norm === 'us' || norm === 'en' || norm === 'en-us' || norm === 'en-gb' || norm.startsWith('en-') || norm.includes('english') || norm.includes('英文')) {
-    return 'us';
-  }
-  return norm;
-}
 
 // 1. 解析命令列參數
 let lang = 'zh-tw';
@@ -370,12 +426,15 @@ if (isDefaultOrder) {
   if (items.length === 0) {
     items = [...selectedIds];
   }
+  // 防禦：若 --selected 亦為空陣列，回退至核心標準指標，避免寫入空陣列清空狀態列
+  if (items.length === 0) {
+    items = ['model-name', 'quota', 'context-used', 'memory-usage'];
+  }
 }
 
 console.log('已解析的指標順序：', items);
 
 // 3. 部署掛鉤（Hook）腳本
-const homeDir = os.homedir();
 const hooksDir = path.join(homeDir, '.gemini', 'antigravity-cli', 'hooks');
 
 console.log(`正在部署掛鉤腳本至 ${hooksDir}...`);
@@ -394,71 +453,12 @@ if (!fs.existsSync(statuslineQuotaSrcPath) || !fs.existsSync(fetchLocalQuotaSrcP
 const statuslineQuotaContent = fs.readFileSync(statuslineQuotaSrcPath, 'utf8');
 const fetchLocalQuotaContent = fs.readFileSync(fetchLocalQuotaSrcPath, 'utf8');
 
-function writeContentAndVerifyNoBOM(filePath, content) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(filePath, content, { encoding: 'utf8' });
-  
-  // 驗證並就地剝除位元組順序記號（BOM）
-  let buffer = fs.readFileSync(filePath);
-  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
-    console.log(`[偵測到 BOM] 在 ${filePath} 發現 BOM，正在剝除...`);
-    buffer = buffer.slice(3);
-    fs.writeFileSync(filePath, buffer);
-  }
-}
-
 writeContentAndVerifyNoBOM(path.join(hooksDir, 'statusline-quota.mjs'), statuslineQuotaContent);
 writeContentAndVerifyNoBOM(path.join(hooksDir, 'fetch-local-quota.mjs'), fetchLocalQuotaContent);
 console.log('掛鉤腳本部署成功。');
 
 // 4. 三層 settings.json 寫入與防禦位元組順序記號（BOM）鐵則
 const statuslineQuotaMjsPath = path.join(hooksDir, 'statusline-quota.mjs');
-
-function readJsonWithBOMDefense(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return {};
-  }
-  let content = fs.readFileSync(filePath, 'utf8');
-  content = content.replace(/^\uFEFF/, '');
-  try {
-    return JSON.parse(content);
-  } catch (err) {
-    console.error(`解析 ${filePath} 失敗，傳回空物件：`, err);
-    return {};
-  }
-}
-
-function writeJsonAndVerifyNoBOM(filePath, data) {
-  writeContentAndVerifyNoBOM(filePath, JSON.stringify(data, null, 2));
-}
-
-/**
- * 依平台產生最穩定的 statusLine 指令字串：
- * - macOS / Linux：使用 Node.js 執行檔的絕對路徑（process.execPath）。
- *   解決 NVM / Homebrew / fnm / asdf 環境下，non-interactive / non-login 的 sh -c
- *   因 PATH 未包含 node 而導致 exit status 127 (sh: 1: node: not found) 的問題。
- *   若路徑包含空白字元，以雙引號包裹。
- * - Windows：使用裸命令 node 搭配雙引號包裹腳本絕對路徑。
- *   Windows 系統中，Node.js 安裝程式與版本管理工具（nvm-windows、fnm 等）會將 node.exe 註冊到
- *   系統/使用者環境變數（Windows 登錄檔 PATH），所有衍生行程（包含 cmd.exe）皆會繼承 PATH。
- *   使用 node 裸命令能徹底避免 C:\Program Files\nodejs\node.exe 的空白字元引發的
- *   cmd.exe /c 雙引號剝除陷阱（誤將 C:\Program 當成命令）。
- *   腳本絕對路徑一律以雙引號包裹，可同時保障使用者路徑含空白（如 C:\Users\John Doe）能被正確解析，
- *   並防止 Git Bash 等 POSIX sh.exe 誤將路徑反斜線 \ 視為跳脫字元剝除損毀。
- */
-export function getStatusLineCommand(statuslineScriptPath, platform = process.platform, execPath = process.execPath) {
-  const cleanPath = statuslineScriptPath.replace(/^"(.*)"$/, '$1');
-  if (platform === 'win32') {
-    return `node "${cleanPath}"`;
-  } else {
-    const nodeBin = execPath.includes(' ') ? `"${execPath}"` : execPath;
-    const scriptArg = cleanPath.includes(' ') ? `"${cleanPath}"` : cleanPath;
-    return `${nodeBin} ${scriptArg}`;
-  }
-}
 
 function updateSettings(settingsPath) {
   console.log(`正在更新設定檔：${settingsPath}`);
@@ -468,6 +468,9 @@ function updateSettings(settingsPath) {
   settings.ui.language = lang;
   
   if (!settings.ui.footer) settings.ui.footer = {};
+  if (settings.ui.footer.theme) {
+    delete settings.ui.footer.theme;
+  }
   settings.ui.footer.items = items;
   if (timeFormat) settings.ui.footer.timeFormat = timeFormat;
   if (barLength && !isNaN(barLength) && barLength > 0) settings.ui.footer.barLength = barLength;
@@ -638,4 +641,21 @@ if (process.platform === 'win32') {
   }
 }
 
-console.log('設定成功完成！');
+  console.log('設定成功完成！');
+}
+
+export function isDirectExecution() {
+  if (!process.argv[1]) return false;
+  try {
+    const currentFile = fileURLToPath(import.meta.url);
+    const invokedFile = path.resolve(process.argv[1]);
+    if (currentFile === invokedFile) return true;
+    return fs.realpathSync(currentFile) === fs.realpathSync(invokedFile);
+  } catch (e) {
+    return false;
+  }
+}
+
+if (isDirectExecution()) {
+  main();
+}

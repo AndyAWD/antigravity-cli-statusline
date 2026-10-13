@@ -316,6 +316,11 @@ async function getSettingsAsync(meta) {
     }
   } catch (e) {}
 
+  // 防禦：若設定檔中遺留測試主題（如 dino 或非標準屬性），主動清除以避免干擾
+  if (settings?.ui?.footer?.theme) {
+    delete settings.ui.footer.theme;
+  }
+
   return settings;
 }
 
@@ -1115,10 +1120,10 @@ export function preprocessAdjacentItems(items) {
   return result;
 }
 
-export function renderStatusLine(footerItems, activeDict, termWidth) {
+export function renderStatusLine(footerItems, activeDict, termWidth, fallbackModel) {
   const lines = [];
   let currentLine = '';
-  const processedItems = preprocessAdjacentItems(footerItems);
+  const processedItems = preprocessAdjacentItems(footerItems || []);
   
   for (let i = 0; i < processedItems.length; i++) {
     const item = processedItems[i];
@@ -1132,7 +1137,7 @@ export function renderStatusLine(footerItems, activeDict, termWidth) {
       continue;
     }
 
-    const text = activeDict[item];
+    const text = activeDict ? activeDict[item] : '';
     if (!text) continue;
 
     const toAdd = currentLine === '' ? text : ` ${GRAY}│${RESET} ${text}`;
@@ -1147,6 +1152,19 @@ export function renderStatusLine(footerItems, activeDict, termWidth) {
     }
   }
   if (currentLine !== '') lines.push(currentLine);
+
+  // 防禦：若渲染結果為空或全部為空白行（例如 footerItems 為空、僅有換行、或所有指標皆無內容），回退輸出退讓模式，絕不回傳空陣列或空白行
+  if (lines.length === 0 || lines.every(l => stripAnsi(l).trim() === '')) {
+    lines.length = 0;
+    const leftText = '? for shortcuts';
+    const rawModel = activeDict?.['model-name'] ? stripAnsi(activeDict['model-name']).replace(/^[^:]+:\s*/, '') : '';
+    const rightText = fallbackModel || rawModel || 'Gemini 3.5 Flash (High)';
+    const width = termWidth || 80;
+    const spacesCount = Math.max(1, width - getDisplayWidth(leftText) - getDisplayWidth(rightText) - 1);
+    const fallbackLine = `${leftText}${' '.repeat(spacesCount)}${rightText}`;
+    lines.push(fallbackLine);
+  }
+
   console.log(lines.join('\n'));
   return lines;
 }
@@ -1170,7 +1188,7 @@ async function main() {
     else if (meta?.model?.id) fallbackModel = meta.model.id;
     
     // 退讓模式
-    if (!settings?.ui?.footer?.items) {
+    if (!settings?.ui?.footer?.items || !Array.isArray(settings.ui.footer.items) || settings.ui.footer.items.length === 0) {
       const leftText = '? for shortcuts';
       const rightText = fallbackModel;
       const spacesCount = Math.max(1, termWidth - getDisplayWidth(leftText) - getDisplayWidth(rightText) - 1);
@@ -1223,7 +1241,7 @@ async function main() {
     // 格式化指標並繪製
     const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength });
     const activeDict = buildI18nDict(lang, metrics);
-    renderStatusLine(footerItems, activeDict, termWidth);
+    renderStatusLine(footerItems, activeDict, termWidth, fallbackModel);
 
   } catch (err) {
     try {
