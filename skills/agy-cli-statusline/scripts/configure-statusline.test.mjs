@@ -649,6 +649,88 @@ async function testCase7DirectGetStatusLineCommandMatrix() {
 }
 
 // ==========================================
+// 測試情境 8：驗證 questions.json 新增指標識別碼解析與配置整合
+// ==========================================
+async function testCase8QuestionsJsonMetricIds() {
+  console.log('\n--- 執行測試情境 8：驗證 questions.json 新增指標識別碼解析與配置整合 ---');
+  const questionsPath = path.join(originalScriptsDir, '..', 'resources', 'questions.json');
+  assert.ok(fs.existsSync(questionsPath), 'resources/questions.json 必須存在');
+
+  const questionsData = JSON.parse(fs.readFileSync(questionsPath, 'utf8'));
+  const languages = ['zh-tw', 'zh-cn', 'us', 'jp'];
+  const expectedNewIds = [
+    'quota-reset-time',
+    'quota-weekly-reset-time',
+    'quota-bar',
+    'quota-weekly-bar',
+    'context-used-bar',
+    'token-count-bar'
+  ];
+
+  for (const lang of languages) {
+    const langData = questionsData[lang];
+    assert.ok(langData, `${lang} 語系資料必須存在`);
+    assert.ok(Array.isArray(langData.options), `${lang}.options 必須為陣列`);
+    assert.strictEqual(langData.options.length, 32, `${lang}.options 必須包含全部 32 個指標選項`);
+
+    const extractedIds = langData.options.map(item => {
+      const match = item.match(/[\(（]([^）\)]+)[\)）]$/);
+      return match ? match[1] : item;
+    });
+
+    const uniqueIds = new Set(extractedIds);
+    assert.strictEqual(uniqueIds.size, 32, `${lang} 的所有指標識別碼必須不重複`);
+
+    for (const newId of expectedNewIds) {
+      assert.ok(uniqueIds.has(newId), `${lang} 必須包含新指標 ID: "${newId}"`);
+    }
+  }
+
+  // 測試透過 configure-statusline.mjs 配置新指標
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case8-'));
+  try {
+    const selected = JSON.stringify([
+      "五小時重置時間（quota-reset-time）",
+      "五小時可用額度長條圖（quota-bar）",
+      "每週重置時間（quota-weekly-reset-time）",
+      "每週可用額度長條圖（quota-weekly-bar）",
+      "脈絡用量長條圖（context-used-bar）",
+      "權杖數長條圖（token-count-bar）"
+    ]);
+
+    const args = ['--lang', 'zh-tw', '--selected', selected, '--order', '1,2,3,4,5,6', '--workspace', sandbox, '--time-format', 'smart', '--bar-length', '12'];
+    const env = { HOME: sandbox, USERPROFILE: sandbox };
+    const result = await runScript(configureScriptSrc, args, env);
+    assert.strictEqual(result.code, 0, '配置腳本必須成功執行');
+
+    const cliSettingsPath = path.join(sandbox, '.gemini', 'antigravity-cli', 'settings.json');
+    assert.ok(fs.existsSync(cliSettingsPath), 'CLI 專屬設定檔必須產生');
+    const cliSettings = JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8'));
+
+    const expectedOrderedIds = [
+      'quota-reset-time',
+      'quota-bar',
+      'quota-weekly-reset-time',
+      'quota-weekly-bar',
+      'context-used-bar',
+      'token-count-bar'
+    ];
+
+    assert.deepStrictEqual(
+      cliSettings.ui.footer.items,
+      expectedOrderedIds,
+      '設定檔中的 footer.items 必須正確解析為新指標的英文識別碼'
+    );
+    assert.strictEqual(cliSettings.ui.footer.timeFormat, 'smart', '設定檔中的 footer.timeFormat 必須正確寫入');
+    assert.strictEqual(cliSettings.ui.footer.barLength, 12, '設定檔中的 footer.barLength 必須正確寫入');
+  } finally {
+    rmRfSync(sandbox);
+  }
+
+  console.log('✅ 測試情境 8 通過！');
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -660,6 +742,7 @@ async function runAllTests() {
     await testCase5SimplifiedChineseConfig();
     await testCase6CrossPlatformCommandAndTrustDefense();
     await testCase7DirectGetStatusLineCommandMatrix();
+    await testCase8QuestionsJsonMetricIds();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {

@@ -1,6 +1,6 @@
 ---
 name: antigravity-cli-statusline:agy-cli-statusline
-description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度 / 權杖（Token）用量 / 上下文（Context）消耗 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並自動處理 Node.js 跨平台執行相容性（macOS/Linux 絕對路徑防 NVM 127、Windows 裸命令防空白與引號剝除）、sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
+description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度（含長條圖與絕對重置時間） / 權杖（Token）用量與長條圖 / 上下文（Context）消耗與長條圖 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並自動處理 Node.js 跨平台執行相容性（macOS/Linux 絕對路徑防 NVM 127、Windows 裸命令防空白與引號剝除）、sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
 ---
 
 # Antigravity 狀態列設定技能
@@ -48,6 +48,8 @@ description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）
    - `74~50%`：綠色 `#5cdb6d`（`\x1b[38;2;92;219;109m`）
    - `49~25%`：黃色 `#ffd427`（`\x1b[38;2;255;212;39m`）
    - `24~0%`：紅色 `#ff7daf`（`\x1b[38;2;255;125;175m`）
+5. **容量長條圖與相鄰自動合併（Bar Graph & Adjacent Auto-Merge）**：支援五小時可用額度（`quota-bar`）、每週可用額度（`quota-weekly-bar`）、脈絡用量（`context-used-bar`）與權杖數（`token-count-bar`）之長條圖（預設 10 格 `[████████░░]`）。當長條圖與對應數值指標相鄰時，自動合併為單一標籤（如 `小時可用: 88% [████████░░]`）。
+6. **絕對重置時間（Reset Absolute Time）**：支援五小時重置時間（`quota-reset-time`）與每週重置時間（`quota-weekly-reset-time`），原生轉換為本機時區絕對時間，預設同日顯示 `HH:mm`、跨日顯示 `yyyy/MM/dd HH:mm`，亦支援於設定檔以 `ui.footer.timeFormat` 自訂（`smart` / `yyyy/MM/dd HH:mm` / `12h` / `24h`）。
 
 Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide: true` 規範詳見 [references/windows.md](references/windows.md)。
 

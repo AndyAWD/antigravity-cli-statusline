@@ -1,7 +1,8 @@
-import { promises as fs } from 'fs';
+import { promises as fs, realpathSync } from 'fs';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import path, { join, basename } from 'path';
+import { fileURLToPath } from 'url';
 import os from 'os';
 
 // ==========================================
@@ -60,11 +61,11 @@ function getModeColor(mode) {
   return BLUE;
 }
 
-function stripAnsi(str) {
+export function stripAnsi(str) {
   return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
-function getDisplayWidth(str) {
+export function getDisplayWidth(str) {
   let width = 0;
   for (let i = 0; i < str.length; i++) {
     width += str.charCodeAt(i) > 0x7F ? 2 : 1;
@@ -355,6 +356,69 @@ export function formatSecondsToCountdown(totalSec) {
   return mins ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
+export function formatAbsoluteResetTime(resetTimeStr, formatMode = 'smart', now = new Date()) {
+  if (!resetTimeStr) return '';
+  const reset = new Date(resetTimeStr);
+  if (isNaN(reset.getTime())) return '';
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const year = reset.getFullYear();
+  const month = pad(reset.getMonth() + 1);
+  const day = pad(reset.getDate());
+  const hours24 = pad(reset.getHours());
+  const minutes = pad(reset.getMinutes());
+
+  const fullDateTime = `${year}/${month}/${day} ${hours24}:${minutes}`;
+  const time24 = `${hours24}:${minutes}`;
+
+  const rawHours = reset.getHours();
+  const period = rawHours >= 12 ? 'PM' : 'AM';
+  const h12 = rawHours % 12 || 12;
+  const time12 = `${pad(h12)}:${minutes} ${period}`;
+
+  const mode = (formatMode || 'smart').toLowerCase().trim();
+
+  if (mode === 'yyyy/mm/dd hh:mm' || mode === 'yyyy-mm-dd hh:mm' || mode === 'full') {
+    return fullDateTime;
+  }
+  if (mode === '24h') {
+    return time24;
+  }
+  if (mode === '12h') {
+    return time12;
+  }
+
+  // 'smart' or 'auto' or default
+  const nowDate = (now instanceof Date && !isNaN(now.getTime()))
+    ? now
+    : (now ? new Date(now) : new Date());
+  const validNow = isNaN(nowDate.getTime()) ? new Date() : nowDate;
+  const isSameDay = reset.getFullYear() === validNow.getFullYear() &&
+                    reset.getMonth() === validNow.getMonth() &&
+                    reset.getDate() === validNow.getDate();
+  return isSameDay ? time24 : fullDateTime;
+}
+
+export function renderBarGraph(pct, length = 10, color = '', inverted = false) {
+  const len = Math.min(50, Math.max(1, parseInt(length, 10) || 10));
+  const numPct = typeof pct === 'number' ? pct : parseFloat(pct);
+  const clamped = Math.max(0, Math.min(100, typeof numPct === 'number' && !isNaN(numPct) ? numPct : 0));
+  let filled = Math.floor((clamped / 100) * len);
+  if (clamped >= 100) filled = len;
+  if (clamped <= 0) filled = 0;
+  const empty = len - filled;
+  const filledStr = '█'.repeat(filled);
+  const emptyStr = '░'.repeat(empty);
+
+  let appliedColor = color;
+  if (!appliedColor && inverted) {
+    appliedColor = getColorByPercentage(100 - clamped);
+  }
+
+  const filledColored = appliedColor ? `${appliedColor}${filledStr}${RESET}` : filledStr;
+  return `[${filledColored}${emptyStr}]`;
+}
+
 export function parseMetaQuota(meta) {
   if (!meta?.quota || typeof meta.quota !== 'object') return null;
   const keys = Object.keys(meta.quota);
@@ -378,8 +442,11 @@ export function parseMetaQuota(meta) {
     const remainingNum = fraction > 1 ? fraction : fraction * 100;
     const remaining = Math.max(0, Math.min(100, remainingNum));
 
-    const resetTime = bucket.reset_time || bucket.resetTime;
+    const rawResetTime = bucket.reset_time || bucket.resetTime;
     const resetSec = bucket.reset_in_seconds !== undefined ? bucket.reset_in_seconds : bucket.resetInSeconds;
+    const resetTime = rawResetTime || (resetSec !== undefined && resetSec !== null && !isNaN(resetSec)
+      ? new Date(Date.now() + Number(resetSec) * 1000).toISOString()
+      : undefined);
 
     let refreshesIn = '';
     if (resetSec !== undefined && resetSec !== null) {
@@ -625,7 +692,9 @@ async function getMetricValueAsync(meta, keys, countersCachePath, fallbackFn) {
   return await fallbackFn();
 }
 
-async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo = { remaining_percentage: 100, refreshes_in: '' }) {
+export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo = { remaining_percentage: 100, refreshes_in: '' }, options = {}) {
+  const timeFormat = options?.timeFormat || 'smart';
+  const barLength = options?.barLength || 10;
   const normLang = normalizeLanguage(lang);
   const unknownStr = (normLang === 'zh-tw' || normLang === 'zh-cn') ? '未知' : (normLang === 'jp' ? '不明' : 'Unknown');
   const noneStr = normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A'));
@@ -635,18 +704,27 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
   const quotaColor = getColorByPercentage(quotaPct);
   const quotaVal = `${Math.round(quotaPct)}%`;
   const countdownVal = quotaInfo.refreshes_in || noneStr;
+  const formattedReset = quotaInfo.reset_time ? formatAbsoluteResetTime(quotaInfo.reset_time, timeFormat) : '';
+  const quotaResetTimeVal = formattedReset || noneStr;
+  const quotaBarVal = renderBarGraph(quotaPct, barLength, quotaColor);
 
   // Weekly Quota
   const weeklyPct = weeklyInfo.remaining_percentage;
   const weeklyQuotaColor = getColorByPercentage(weeklyPct);
   const weeklyQuotaVal = `${Math.round(weeklyPct)}%`;
   const weeklyCountdownVal = weeklyInfo.refreshes_in || noneStr;
+  const formattedWeeklyReset = weeklyInfo.reset_time ? formatAbsoluteResetTime(weeklyInfo.reset_time, timeFormat) : '';
+  const weeklyResetTimeVal = formattedWeeklyReset || noneStr;
+  const weeklyQuotaBarVal = renderBarGraph(weeklyPct, barLength, weeklyQuotaColor);
 
   // Context
   const remainCtx = Math.max(0, 100 - contextInfo.usedPctNum);
   const contextColor = getColorByPercentage(remainCtx);
   const usedPct = `${contextInfo.usedPctNum.toFixed(1)}%`;
   const tokenCount = `${contextColor}${formatTokens(contextInfo.totalInput)}${RESET} / ${formatTokens(contextInfo.contextSize)}`;
+  const contextBarVal = renderBarGraph(contextInfo.usedPctNum, barLength, contextColor);
+  const tokenPct = contextInfo.contextSize > 0 ? (contextInfo.totalInput / contextInfo.contextSize) * 100 : contextInfo.usedPctNum;
+  const tokenBarVal = renderBarGraph(tokenPct, barLength, contextColor);
 
   const projectPath = (typeof meta?.project?.path === 'string' && meta.project.path) ? meta.project.path : process.cwd();
   const projectName = basename(projectPath);
@@ -844,11 +922,12 @@ async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccou
     agentState, toolConfirmPending, pendingInputCount, backgroundTasksCount, subagentsCount,
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
     sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName,
-    weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode
+    weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode,
+    quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal
   };
 }
 
-function buildI18nDict(lang, m) {
+export function buildI18nDict(lang, m) {
   const dicts = {
     'zh-tw': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
@@ -857,8 +936,18 @@ function buildI18nDict(lang, m) {
       'memory-usage': `${WHITE}記憶體:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}權杖數:${RESET} ${m.tokenCount}`,
       'quota-reset-countdown': `${WHITE}小時倒數:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}小時重置:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}小時可用:${RESET} ${m.quotaBarVal}`,
       'quota-weekly': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
       'quota-weekly-countdown': `${WHITE}每週倒數:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}每週重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'context-used-bar': `${WHITE}脈絡用量:${RESET} ${m.contextBarVal}`,
+      'token-count-bar': `${WHITE}權杖數:${RESET} ${m.tokenBarVal}`,
+      'quota+bar': `${WHITE}小時可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'context-used+bar': `${WHITE}脈絡用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
+      'quota-weekly+bar': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'token-count+bar': `${WHITE}權杖數:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}Git: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}專案: ${BOLD}${m.projectName}${RESET}`,
       'project-full-path': `${WHITE}完整路徑: ${BOLD}${m.projectFullPath}${RESET}`,
@@ -885,8 +974,18 @@ function buildI18nDict(lang, m) {
       'memory-usage': `${WHITE}内存:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}令牌数:${RESET} ${m.tokenCount}`,
       'quota-reset-countdown': `${WHITE}小时倒计时:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}小时重置:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}小时可用:${RESET} ${m.quotaBarVal}`,
       'quota-weekly': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
       'quota-weekly-countdown': `${WHITE}每周倒计时:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}每周重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'context-used-bar': `${WHITE}上下文用量:${RESET} ${m.contextBarVal}`,
+      'token-count-bar': `${WHITE}令牌数:${RESET} ${m.tokenBarVal}`,
+      'quota+bar': `${WHITE}小时可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'context-used+bar': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
+      'quota-weekly+bar': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'token-count+bar': `${WHITE}令牌数:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}Git: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}项目: ${BOLD}${m.projectName}${RESET}`,
       'project-full-path': `${WHITE}完整路径: ${BOLD}${m.projectFullPath}${RESET}`,
@@ -913,8 +1012,18 @@ function buildI18nDict(lang, m) {
       'memory-usage': `${WHITE}RAM:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}Tokens:${RESET} ${m.tokenCount}`,
       'quota-reset-countdown': `${WHITE}Hourly Reset:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}Hourly Reset Time:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}Hourly Available:${RESET} ${m.quotaBarVal}`,
       'quota-weekly': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
       'quota-weekly-countdown': `${WHITE}Weekly Reset:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}Weekly Reset Time:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaBarVal}`,
+      'context-used-bar': `${WHITE}Context Used:${RESET} ${m.contextBarVal}`,
+      'token-count-bar': `${WHITE}Tokens:${RESET} ${m.tokenBarVal}`,
+      'quota+bar': `${WHITE}Hourly Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'context-used+bar': `${WHITE}Context Used:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
+      'quota-weekly+bar': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'token-count+bar': `${WHITE}Tokens:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}Git: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}Project: ${BOLD}${m.projectName}${RESET}`,
       'project-full-path': `${WHITE}Project Path: ${BOLD}${m.projectFullPath}${RESET}`,
@@ -941,8 +1050,18 @@ function buildI18nDict(lang, m) {
       'memory-usage': `${WHITE}メモリ:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}トークン:${RESET} ${m.tokenCount}`,
       'quota-reset-countdown': `${WHITE}時間リセット:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}時間リセット時刻:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}時間残量:${RESET} ${m.quotaBarVal}`,
       'quota-weekly': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
       'quota-weekly-countdown': `${WHITE}週間リセット:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}週間リセット時刻:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaBarVal}`,
+      'context-used-bar': `${WHITE}コンテキスト使用:${RESET} ${m.contextBarVal}`,
+      'token-count-bar': `${WHITE}トークン:${RESET} ${m.tokenBarVal}`,
+      'quota+bar': `${WHITE}時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'context-used+bar': `${WHITE}コンテキスト使用:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
+      'quota-weekly+bar': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'token-count+bar': `${WHITE}トークン:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}Gitブランチ: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}プロジェクト: ${BOLD}${m.projectName}${RESET}`,
       'project-full-path': `${WHITE}パス: ${BOLD}${m.projectFullPath}${RESET}`,
@@ -967,12 +1086,42 @@ function buildI18nDict(lang, m) {
   return dicts[normLang] || dicts['zh-tw'];
 }
 
-function renderStatusLine(footerItems, activeDict, termWidth) {
+export function preprocessAdjacentItems(items) {
+  if (!Array.isArray(items)) return [];
+  const pairs = [
+    { val: 'quota', bar: 'quota-bar', merged: 'quota+bar' },
+    { val: 'context-used', bar: 'context-used-bar', merged: 'context-used+bar' },
+    { val: 'quota-weekly', bar: 'quota-weekly-bar', merged: 'quota-weekly+bar' },
+    { val: 'token-count', bar: 'token-count-bar', merged: 'token-count+bar' }
+  ];
+
+  const result = [];
+  for (let i = 0; i < items.length; i++) {
+    const cur = items[i];
+    const next = items[i + 1];
+
+    if (next) {
+      const match = pairs.find(p =>
+        (cur === p.val && next === p.bar) || (cur === p.bar && next === p.val)
+      );
+      if (match) {
+        result.push(match.merged);
+        i++;
+        continue;
+      }
+    }
+    result.push(cur);
+  }
+  return result;
+}
+
+export function renderStatusLine(footerItems, activeDict, termWidth) {
   const lines = [];
   let currentLine = '';
+  const processedItems = preprocessAdjacentItems(footerItems);
   
-  for (let i = 0; i < footerItems.length; i++) {
-    const item = footerItems[i];
+  for (let i = 0; i < processedItems.length; i++) {
+    const item = processedItems[i];
     if (item === 'n' || item === 'newline') {
       if (currentLine !== '') {
         lines.push(currentLine);
@@ -999,6 +1148,7 @@ function renderStatusLine(footerItems, activeDict, termWidth) {
   }
   if (currentLine !== '') lines.push(currentLine);
   console.log(lines.join('\n'));
+  return lines;
 }
 
 // ==========================================
@@ -1067,8 +1217,11 @@ async function main() {
     const contextInfo = await calculateContextUsageAsync(meta, conversationId);
     const cachedAccount = await manageAccountMetaCacheAsync(meta);
 
+    const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
+    const barLength = settings?.ui?.footer?.barLength || settings?.ui?.barLength || 10;
+
     // 格式化指標並繪製
-    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo);
+    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength });
     const activeDict = buildI18nDict(lang, metrics);
     renderStatusLine(footerItems, activeDict, termWidth);
 
@@ -1087,4 +1240,25 @@ async function main() {
   process.exit(0);
 }
 
-main();
+function isDirectExecution() {
+  if (!process.argv[1]) return false;
+  try {
+    const scriptPath = process.argv[1];
+    const metaPath = fileURLToPath(import.meta.url);
+    if (path.resolve(scriptPath).toLowerCase() === path.resolve(metaPath).toLowerCase()) {
+      return true;
+    }
+    try {
+      if (realpathSync(scriptPath).toLowerCase() === realpathSync(metaPath).toLowerCase()) {
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+if (isDirectExecution()) {
+  main();
+}
