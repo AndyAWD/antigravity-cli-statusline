@@ -1259,9 +1259,9 @@ async function main() {
 }
 
 function isDirectExecution() {
-  if (!process.argv[1]) return false;
+  if (!process.argv[1]) return true;
   try {
-    const scriptPath = process.argv[1];
+    const scriptPath = process.argv[1].replace(/^"(.*)"$/, '$1');
     const metaPath = fileURLToPath(import.meta.url);
     if (path.resolve(scriptPath).toLowerCase() === path.resolve(metaPath).toLowerCase()) {
       return true;
