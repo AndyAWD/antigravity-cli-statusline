@@ -219,6 +219,19 @@ function normalizeLanguage(l) {
   return norm;
 }
 
+export function normalizeLabelStyle(style) {
+  if (!style || typeof style !== 'string') return 'text';
+  let s = style.toLowerCase().trim();
+  const parenMatch = s.match(/[\(（]([a-z0-9\-_]+)[\)）]\s*$/);
+  if (parenMatch) {
+    s = parenMatch[1].trim();
+  }
+  if (s === 'emoji' || s === 'emojis' || s === 'icon' || s === 'icons' || s.includes('emoji') || s.includes('表情') || s.includes('圖示') || s.includes('图标') || s.includes('絵文字')) {
+    return 'emoji';
+  }
+  return 'text';
+}
+
 function writeContentAndVerifyNoBOM(filePath, content) {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -358,6 +371,7 @@ let orderStr = '';
 let workspacePath = '';
 let timeFormat = '';
 let barLength = 0;
+let labelStyle = '';
 
 for (let i = 2; i < process.argv.length; i++) {
   if (process.argv[i] === '--lang' && process.argv[i + 1]) {
@@ -378,13 +392,20 @@ for (let i = 2; i < process.argv.length; i++) {
   } else if (process.argv[i] === '--bar-length' && process.argv[i + 1]) {
     barLength = parseInt(process.argv[i + 1], 10);
     i++;
+  } else if ((process.argv[i] === '--style' || process.argv[i] === '--label-style') && process.argv[i + 1]) {
+    labelStyle = process.argv[i + 1];
+    i++;
   }
 }
 
 lang = normalizeLanguage(lang);
+if (labelStyle) {
+  labelStyle = normalizeLabelStyle(labelStyle);
+}
 
 console.log('已解析的參數：');
 console.log(`- 語言：${lang}`);
+if (labelStyle) console.log(`- 標籤樣式：${labelStyle}`);
 console.log(`- 已選項目：${selectedStr}`);
 console.log(`- 排序順序：${orderStr}`);
 console.log(`- 工作區：${workspacePath}`);
@@ -482,6 +503,11 @@ function updateSettings(settingsPath) {
     delete settings.ui.footer.theme;
   }
   settings.ui.footer.items = items;
+  if (labelStyle) {
+    settings.ui.footer.labelStyle = labelStyle;
+  } else if (!settings.ui.footer.labelStyle) {
+    settings.ui.footer.labelStyle = 'text';
+  }
   if (timeFormat) settings.ui.footer.timeFormat = timeFormat;
   if (barLength && !isNaN(barLength) && barLength > 0) settings.ui.footer.barLength = barLength;
   

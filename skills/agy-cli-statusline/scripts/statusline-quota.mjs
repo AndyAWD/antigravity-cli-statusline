@@ -67,8 +67,10 @@ export function stripAnsi(str) {
 
 export function getDisplayWidth(str) {
   let width = 0;
-  for (let i = 0; i < str.length; i++) {
-    width += str.charCodeAt(i) > 0x7F ? 2 : 1;
+  for (const ch of str) {
+    const cp = ch.codePointAt(0);
+    if (cp === 0xFE0F || cp === 0xFE0E || cp === 0x200D) continue;
+    width += cp > 0x7F ? 2 : 1;
   }
   return width;
 }
@@ -116,6 +118,58 @@ export function normalizeLanguage(lang) {
   }
   return l;
 }
+
+export function normalizeLabelStyle(style) {
+  if (!style || typeof style !== 'string') return 'text';
+  let s = style.toLowerCase().trim();
+  const parenMatch = s.match(/[\(（]([a-z0-9\-_]+)[\)）]\s*$/);
+  if (parenMatch) {
+    s = parenMatch[1].trim();
+  }
+  if (s === 'emoji' || s === 'emojis' || s === 'icon' || s === 'icons' || s.includes('emoji') || s.includes('表情') || s.includes('圖示') || s.includes('图标') || s.includes('絵文字')) {
+    return 'emoji';
+  }
+  return 'text';
+}
+
+export const EMOJI_MAP = {
+  'model-name': '🤖',
+  'quota': '🔋',
+  'quota-bar': '🔋',
+  'quota+bar': '🔋',
+  'quota-reset-countdown': '⏳',
+  'quota-reset-time': '🕒',
+  'quota-weekly': '📅',
+  'quota-weekly-bar': '📅',
+  'quota-weekly+bar': '📅',
+  'quota-weekly-countdown': '📆',
+  'quota-weekly-reset-time': '⏰',
+  'context-used': '🧠',
+  'context-used-bar': '🧠',
+  'context-used+bar': '🧠',
+  'token-count': '🪙',
+  'token-count-bar': '🪙',
+  'token-count+bar': '🪙',
+  'plan-tier': '💎',
+  'account-email': '👤',
+  'agent-state': '⚡',
+  'tool-confirmation': '🔔',
+  'pending-input': '📥',
+  'background-tasks': '🔧',
+  'subagents': '👥',
+  'artifacts': '📄',
+  'git-branch': '🌿',
+  'vcs-dirty': '📝',
+  'vcs-type': '🌱',
+  'project-path': '📁',
+  'project-full-path': '📂',
+  'memory-usage': '💾',
+  'sandbox-status': '🔒',
+  'cli-version': '🚀',
+  'conversation-id': '💬',
+  'agent-profile': '🎭',
+  'mode': '🧭'
+};
 
 // ==========================================
 // System Information Retrieval
@@ -932,7 +986,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   };
 }
 
-export function buildI18nDict(lang, m) {
+export function buildI18nDict(lang, m, labelStyle = 'text') {
   const dicts = {
     'zh-tw': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
@@ -1088,7 +1142,24 @@ export function buildI18nDict(lang, m) {
     }
   };
   const normLang = normalizeLanguage(lang);
-  return dicts[normLang] || dicts['zh-tw'];
+  const baseDict = dicts[normLang] || dicts['zh-tw'];
+  if (normalizeLabelStyle(labelStyle) === 'emoji') {
+    const emojiDict = {};
+    for (const [key, val] of Object.entries(baseDict)) {
+      const emoji = EMOJI_MAP[key];
+      if (emoji && val.startsWith(WHITE)) {
+        const afterWhite = val.slice(WHITE.length);
+        const colonIdx = afterWhite.indexOf(':');
+        if (colonIdx !== -1) {
+          emojiDict[key] = `${WHITE}${emoji}${afterWhite.slice(colonIdx + 1)}`;
+          continue;
+        }
+      }
+      emojiDict[key] = val;
+    }
+    return emojiDict;
+  }
+  return baseDict;
 }
 
 export function preprocessAdjacentItems(items) {
@@ -1157,7 +1228,7 @@ export function renderStatusLine(footerItems, activeDict, termWidth, fallbackMod
   if (lines.length === 0 || lines.every(l => stripAnsi(l).trim() === '')) {
     lines.length = 0;
     const leftText = '? for shortcuts';
-    const rawModel = activeDict?.['model-name'] ? stripAnsi(activeDict['model-name']).replace(/^[^:]+:\s*/, '') : '';
+    const rawModel = activeDict?.['model-name'] ? stripAnsi(activeDict['model-name']).replace(/^(?:🤖\s*|[^:]+:\s*)/, '') : '';
     const rightText = fallbackModel || rawModel || 'Gemini 3.5 Flash (High)';
     const width = termWidth || 80;
     const spacesCount = Math.max(1, width - getDisplayWidth(leftText) - getDisplayWidth(rightText) - 1);
@@ -1237,10 +1308,11 @@ async function main() {
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
     const barLength = settings?.ui?.footer?.barLength || settings?.ui?.barLength || 10;
+    const labelStyle = normalizeLabelStyle(settings?.ui?.footer?.labelStyle || settings?.ui?.footer?.style || settings?.ui?.labelStyle || 'text');
 
     // 格式化指標並繪製
     const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength });
-    const activeDict = buildI18nDict(lang, metrics);
+    const activeDict = buildI18nDict(lang, metrics, labelStyle);
     renderStatusLine(footerItems, activeDict, termWidth, fallbackModel);
 
   } catch (err) {
