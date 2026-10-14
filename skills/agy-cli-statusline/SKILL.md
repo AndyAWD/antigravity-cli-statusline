@@ -236,7 +236,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 1. 取得使用者工作區（workspace）的絕對路徑（`workspace`）。
 2. 呼叫 `run_command` 執行本外掛目錄下的 `configure-statusline.mjs` 腳本，傳入相關參數。腳本會全自動處理：
    - 排序輸入解析。
-   - 依平台智慧產生 Node.js 執行指令（macOS / Linux 使用絕對路徑以避免 NVM 等非互動式 Shell 遺失 PATH 引發 exit status 127；Windows 使用 `node` 裸命令以避開空白引號剝除與 Git Bash 換行跳脫陷阱，路徑含空白自動加上雙引號）。
+   - 依平台智慧產生 Node.js 執行指令（macOS / Linux 使用絕對路徑以避免 NVM 等非互動式 Shell 遺失 `PATH` 引發 exit status 127；Windows 絕對禁止包含雙引號以避開 Go `exec.Command("cmd", "/c", command)` 的 `\"` 字面引號污染陷阱，無空格路徑使用 `node <path>`，含空格路徑自動轉為 `node --import file:///... -e 0`）。
    - 同步寫入三層 `settings.json`（已執行防禦性 位元組順序記號（BOM）剝除與寫入後無 位元組順序記號（BOM）驗證）。
    - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 萬用字元（Wildcard）鍵，精確註冊設定檔命令並全面補齊引號、反斜線、正斜線與環境變數變體）。
    - 將 Hook 腳本安全拷貝部署至 `~/.gemini/antigravity-cli/hooks/` 目錄中，寫入時強制 `{ encoding: 'utf8' }`。
