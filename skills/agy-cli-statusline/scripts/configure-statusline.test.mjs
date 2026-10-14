@@ -753,11 +753,74 @@ async function testCase8QuestionsJsonMetricIds() {
     );
     assert.strictEqual(cliSettings.ui.footer.timeFormat, 'smart', '設定檔中的 footer.timeFormat 必須正確寫入');
     assert.strictEqual(cliSettings.ui.footer.barLength, 12, '設定檔中的 footer.barLength 必須正確寫入');
+    assert.strictEqual(cliSettings.ui.footer.labelStyle, 'text', '未傳入 --style 時預設應寫入 labelStyle: "text"');
   } finally {
     rmRfSync(sandbox);
   }
 
   console.log('✅ 測試情境 8 通過！');
+}
+
+// ==========================================
+// 測試情境 9：驗證標籤顯示樣式（--style text / emoji）與 questions.json style_options
+// ==========================================
+async function testCase9LabelStyleConfig() {
+  console.log('\n--- 執行測試情境 9：驗證標籤顯示樣式（--style text / emoji）與 questions.json style_options ---');
+  const questionsPath = path.join(originalScriptsDir, '..', 'resources', 'questions.json');
+  const questionsData = JSON.parse(fs.readFileSync(questionsPath, 'utf8'));
+
+  for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
+    const langData = questionsData[lang];
+    assert.ok(typeof langData.style_question === 'string' && langData.style_question.length > 0, `${lang}.style_question 必須為非空字串`);
+    assert.ok(Array.isArray(langData.style_options) && langData.style_options.length === 2, `${lang}.style_options 必須包含 2 個選項`);
+  }
+
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case9-'));
+  try {
+    const selected = JSON.stringify([
+      "🤖 目前使用的人工智慧（AI）模型名稱（model-name）",
+      "🔋 帳號五小時可用額度百分比（quota）"
+    ]);
+
+    // 1. 傳入完整問卷選項字串（含 emoji 識別碼）
+    const argsEmoji = [
+      '--lang', 'zh-tw',
+      '--style', 'Emoji 圖示（例如：🤖 Gemini 3.1 Pro）（emoji）',
+      '--selected', selected,
+      '--order', '1,2',
+      '--workspace', sandbox
+    ];
+    const env = { HOME: sandbox, USERPROFILE: sandbox };
+    const resEmoji = await runScript(configureScriptSrc, argsEmoji, env);
+    assert.strictEqual(resEmoji.code, 0, '傳入 --style emoji 選項時配置腳本必須成功執行');
+
+    const cliSettingsPath = path.join(sandbox, '.gemini', 'antigravity-cli', 'settings.json');
+    const globalSettingsPath = path.join(sandbox, '.gemini', 'settings.json');
+    const cliSettings1 = JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8'));
+    const globalSettings1 = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+
+    assert.strictEqual(cliSettings1.ui.footer.labelStyle, 'emoji', 'CLI 設定檔必須寫入 labelStyle: "emoji"');
+    assert.strictEqual(globalSettings1.ui.footer.labelStyle, 'emoji', '全域設定檔必須同步寫入 labelStyle: "emoji"');
+    assert.deepStrictEqual(cliSettings1.ui.footer.items, ['model-name', 'quota']);
+
+    // 2. 傳入文字標籤選項切換回 text
+    const argsText = [
+      '--lang', 'zh-tw',
+      '--style', '文字標籤（例如：模型: Gemini 3.1 Pro）（text）',
+      '--selected', selected,
+      '--order', '1,2',
+      '--workspace', sandbox
+    ];
+    const resText = await runScript(configureScriptSrc, argsText, env);
+    assert.strictEqual(resText.code, 0, '傳入 --style text 選項時配置腳本必須成功執行');
+
+    const cliSettings2 = JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8'));
+    assert.strictEqual(cliSettings2.ui.footer.labelStyle, 'text', 'CLI 設定檔必須更新為 labelStyle: "text"');
+  } finally {
+    rmRfSync(sandbox);
+  }
+
+  console.log('✅ 測試情境 9 通過！');
 }
 
 // ==========================================
@@ -773,6 +836,7 @@ async function runAllTests() {
     await testCase6CrossPlatformCommandAndTrustDefense();
     await testCase7DirectGetStatusLineCommandMatrix();
     await testCase8QuestionsJsonMetricIds();
+    await testCase9LabelStyleConfig();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {

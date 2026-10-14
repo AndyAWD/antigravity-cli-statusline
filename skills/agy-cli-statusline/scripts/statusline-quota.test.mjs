@@ -10,7 +10,10 @@ import {
   buildI18nDict,
   preprocessAdjacentItems,
   renderStatusLine,
-  stripAnsi
+  stripAnsi,
+  getDisplayWidth,
+  normalizeLabelStyle,
+  EMOJI_MAP
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
@@ -852,6 +855,154 @@ async function main() {
       console.log("✅ R20 passed! (Non-array items string successfully triggered fallback mode)");
     } finally {
       try { rmSync(homeR20, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R21: Unit test for Emoji labelStyle, EMOJI_MAP (all 32 + 4 merged keys), and getDisplayWidth
+    // ----------------------------------------------------
+    console.log("\n[Test R21] Verifying normalizeLabelStyle, getDisplayWidth with emojis, and buildI18nDict('emoji')...");
+    assert.strictEqual(normalizeLabelStyle('text'), 'text');
+    assert.strictEqual(normalizeLabelStyle('emoji'), 'emoji');
+    assert.strictEqual(normalizeLabelStyle('Emoji 圖示（例如：🤖 Gemini 3.1 Pro）（emoji）'), 'emoji');
+    assert.strictEqual(normalizeLabelStyle('文字標籤（例如：模型: Gemini 3.1 Pro）（text）'), 'text');
+    assert.strictEqual(normalizeLabelStyle(undefined), 'text');
+
+    // Display width checks for surrogate-pair emojis and variation selectors
+    assert.strictEqual(getDisplayWidth('🤖'), 2, '🤖 should have display width 2');
+    assert.strictEqual(getDisplayWidth('🔋 100%'), 7, '🔋 (2) + space (1) + 100% (4) = 7');
+    assert.strictEqual(getDisplayWidth('⏳ 4h 30m'), 9, '⏳ (2) + space (1) + 4h 30m (6) = 9');
+
+    const mockMetricsR21 = {
+      fallbackModel: 'Gemini 3.1 Pro',
+      quotaColor: BLUE_BOLD,
+      quotaVal: '100%',
+      quotaBarVal: `${BLUE_BOLD}[██████████]${RESET}`,
+      countdownVal: '4h 59m',
+      quotaResetTimeVal: '18:30',
+      weeklyQuotaColor: GREEN_BOLD,
+      weeklyQuotaVal: '72%',
+      weeklyQuotaBarVal: `${GREEN_BOLD}[███████░░░]${RESET}`,
+      weeklyCountdownVal: '5d 12h',
+      weeklyResetTimeVal: '2026/10/20 12:00',
+      contextColor: BLUE_BOLD,
+      usedPct: '15%',
+      contextBarVal: `${BLUE_BOLD}[██░░░░░░░░]${RESET}`,
+      tokenCount: `${BLUE_BOLD}12.5k${RESET}`,
+      tokenBarVal: `${BLUE_BOLD}[█░░░░░░░░░]${RESET}`,
+      planTier: 'Pro',
+      accountEmail: 'dev@example.com',
+      agentState: 'working',
+      toolConfirmPending: true,
+      pendingInputCount: 2,
+      backgroundTasksCount: 1,
+      subagentsCount: 3,
+      artifactsCount: 4,
+      gitBranch: 'main',
+      vcsDirtyFlag: false,
+      vcsDirtyGlyph: '✓',
+      vcsDirtyLabel: '乾淨',
+      vcsType: 'git',
+      projectName: 'my/proj',
+      projectFullPath: '/Users/dev/my/proj',
+      memUsage: '128MB',
+      sandboxEnabled: true,
+      sandboxAllowNet: true,
+      sandboxStatusVal: '啟用（聯網）',
+      cliVersion: 'v1.2.3',
+      conversationIdShort: 'c4a861dd',
+      agentProfileName: '預設',
+      mode: 'Interactive'
+    };
+
+    for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
+      const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
+      const allKeys = Object.keys(EMOJI_MAP);
+      assert.strictEqual(allKeys.length, 36, 'EMOJI_MAP must contain 32 metrics + 4 merged bar keys (36 total)');
+
+      for (const key of allKeys) {
+        const rendered = stripAnsi(emojiDict[key]);
+        const expectedEmoji = EMOJI_MAP[key];
+        assert.ok(
+          rendered.startsWith(`${expectedEmoji} `),
+          `[${lang}] Metric "${key}" in emoji mode must start with "${expectedEmoji} ", got: "${rendered}"`
+        );
+        const afterPrefix = rendered.slice(`${expectedEmoji} `.length);
+        assert.ok(
+          !afterPrefix.startsWith(':'),
+          `[${lang}] Metric "${key}" in emoji mode must NOT have a colon after emoji, got: "${rendered}"`
+        );
+      }
+    }
+
+    // Verify localized status values are preserved in emoji mode
+    const zhTwEmojiDict = buildI18nDict('zh-tw', mockMetricsR21, 'emoji');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['tool-confirmation']), '🔔 在等你');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['vcs-dirty']), '📝 ✓ 乾淨');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['sandbox-status']), '🔒 啟用（聯網）');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['agent-profile']), '🎭 預設');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['quota+bar']), '🔋 100% [██████████]');
+
+    // Verify renderStatusLine fallback rawModel extraction works with emoji dict
+    const fallbackEmojiLines = renderStatusLine([], zhTwEmojiDict, 80);
+    assert.strictEqual(fallbackEmojiLines.length, 1);
+    assert.ok(stripAnsi(fallbackEmojiLines[0]).includes('Gemini 3.1 Pro'));
+    assert.ok(!stripAnsi(fallbackEmojiLines[0]).includes('🤖'), 'Fallback shortcuts line should strip 🤖 prefix from model-name');
+    console.log("✅ R21 passed! (All 36 emoji mappings and localized status values verified)");
+
+    // ----------------------------------------------------
+    // Test Case R22: E2E test with ui.footer.labelStyle = "emoji"
+    // ----------------------------------------------------
+    console.log("\n[Test R22] Verifying E2E execution with ui.footer.labelStyle = 'emoji'...");
+    const settingsR22 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          labelStyle: "emoji",
+          items: [
+            "model-name",
+            "quota",
+            "quota-bar",
+            "git-branch",
+            "vcs-dirty",
+            "tool-confirmation"
+          ]
+        }
+      }
+    };
+    const cacheR22 = {
+      updatedAt: Date.now(),
+      accountEmail: "dev@example.com",
+      planTier: "Pro",
+      models: {
+        "gemini 3.1 pro": {
+          remaining_percentage: 90,
+          reset_time: new Date(Date.now() + 3600 * 1000).toISOString()
+        }
+      }
+    };
+    const metaR22 = {
+      model: { display_name: "Gemini 3.1 Pro" },
+      vcs: { type: "git", branch: "feat/emoji", dirty: false },
+      has_tool_confirmation: false,
+      terminal_width: 120
+    };
+    const homeR22 = makeTempHome(cacheR22, settingsR22);
+    try {
+      const resR22 = await runStatusline(metaR22, homeR22);
+      console.log("R22 Output:", JSON.stringify(resR22.stdout));
+      const plainR22 = stripAnsi(resR22.stdout).trim();
+
+      assert.strictEqual(resR22.code, 0);
+      assert.ok(plainR22.includes("🤖 Gemini 3.1 Pro"), "Must render model with 🤖 and no colon");
+      assert.ok(plainR22.includes("🔋 90% [█████████░]"), "Must render merged quota+bar with 🔋 and no colon");
+      assert.ok(plainR22.includes("🌿 feat/emoji"), "Must render git-branch with 🌿 and no colon");
+      assert.ok(plainR22.includes("📝 ✓ 乾淨"), "Must render vcs-dirty with 📝 and localized value");
+      assert.ok(plainR22.includes("🔔 都好了"), "Must render tool-confirmation with 🔔 and localized value");
+      assert.ok(!plainR22.includes("模型:"), "Must NOT contain text label '模型:'");
+      assert.ok(!plainR22.includes("小時可用:"), "Must NOT contain text label '小時可用:'");
+      console.log("✅ R22 passed! (E2E Emoji statusline rendered cleanly)");
+    } finally {
+      try { rmSync(homeR22, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
   } catch (err) {
