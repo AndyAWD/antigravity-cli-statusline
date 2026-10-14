@@ -256,12 +256,22 @@ function writeJsonAndVerifyNoBOM(filePath, data) {
 /**
  * 依平台產生最穩定的 statusLine 指令字串：
  * - macOS / Linux：使用 Node.js 執行檔的絕對路徑（process.execPath）。
- * - Windows：使用裸命令 node 搭配雙引號包裹腳本絕對路徑。
+ * - Windows：由於 agy.exe (v1.3.5+) 底層透過 Go exec.CommandContext(ctx, "cmd", "/c", command) 呼叫，
+ *   Go 的 syscall.EscapeArg 會將 command 內部的任何雙引號 `"` 轉義為 `\"`，
+ *   而 cmd.exe /c 不會解開 `\"`，導致 node.exe (MSVC CRT) 將 `\"` 當作字面上的雙引號字元，
+ *   進而引發 `Cannot find module 'D:\cwd\"C:\...\statusline-quota.mjs"'`。
+ *   因此 Windows 平台指令「絕對不可包含雙引號 `"`」：
+ *   - 路徑不含空格時：使用 `node <cleanPath>`
+ *   - 路徑含空格時：轉換為無空格、無引號的 `file:///` URL 並透過 `node --import <fileUrl> -e 0` 載入執行
  */
 export function getStatusLineCommand(statuslineScriptPath, platform = process.platform, execPath = process.execPath) {
   const cleanPath = statuslineScriptPath.replace(/^"(.*)"$/, '$1');
   if (platform === 'win32') {
-    return `node "${cleanPath}"`;
+    if (cleanPath.includes(' ')) {
+      const fileUrl = 'file:///' + cleanPath.replace(/\\/g, '/').replace(/^\//, '').replace(/ /g, '%20');
+      return `node --import ${fileUrl} -e 0`;
+    }
+    return `node ${cleanPath}`;
   } else {
     const nodeBin = execPath.includes(' ') ? `"${execPath}"` : execPath;
     const scriptArg = cleanPath.includes(' ') ? `"${cleanPath}"` : cleanPath;
@@ -514,6 +524,8 @@ trustStrings.push(`statusLine:${statusLineCommand}`);
 
 if (process.platform === 'win32') {
   // Windows 平台相容變體
+  const winFileUrl = 'file:///' + statuslineQuotaMjsPath.replace(/^"(.*)"$/, '$1').replace(/\\/g, '/').replace(/^\//, '').replace(/ /g, '%20');
+  trustStrings.push(`statusLine:node --import ${winFileUrl} -e 0`);
   // 1. node 裸命令變體（單反斜線，未引號與引號）
   trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath}`);
   trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath}"`);
