@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
 import os from 'os';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { getStatusLineCommand } from './configure-statusline.mjs';
 
@@ -453,8 +453,14 @@ async function testCase5SimplifiedChineseConfig() {
     assert.strictEqual(globalSettings1.statusLine.type, 'command', 'statusLine.type 必須為 command');
     if (process.platform === 'win32') {
       assert.ok(globalSettings1.statusLine.command.startsWith('node '), 'Windows 平台必須使用 node 裸命令');
-      assert.ok(globalSettings1.statusLine.command.startsWith('node "'), 'Windows 平台必須以 node " 開頭以雙引號保護腳本路徑');
-      assert.ok(globalSettings1.statusLine.command.endsWith('.mjs"'), 'Windows 平台腳本路徑必須以雙引號結尾');
+      assert.ok(!globalSettings1.statusLine.command.includes('"'), 'Windows 平台絕對禁止包含雙引號（防止 Go exec.Command("cmd", "/c", command) 將引號轉義為 \\" 導致模組載入失敗）');
+      const cmdExec1 = spawnSync('cmd', ['/c', globalSettings1.statusLine.command], {
+        input: JSON.stringify({ model: { display_name: 'CmdTestModel' } }),
+        encoding: 'utf8',
+        env: { ...process.env, HOME: mockHome, USERPROFILE: mockHome }
+      });
+      assert.strictEqual(cmdExec1.status, 0, `Windows cmd /c 執行狀態列指令必須成功返回 0 (stderr: ${cmdExec1.stderr})`);
+      assert.ok(cmdExec1.stdout.includes('CmdTestModel'), 'Windows cmd /c 執行狀態列指令必須正常輸出模型名稱');
     } else {
       const expectedBin = process.execPath.includes(' ') ? `"${process.execPath}"` : process.execPath;
       assert.ok(globalSettings1.statusLine.command.startsWith(expectedBin), 'macOS / Linux 平台必須使用 process.execPath');
@@ -543,9 +549,19 @@ async function testCase6CrossPlatformCommandAndTrustDefense() {
 
     const cmd = globalSettings.statusLine.command;
     if (process.platform === 'win32') {
-      // Windows 必須以 node 裸命令開頭，並為含空格之路徑加上雙引號
-      assert.ok(cmd.startsWith('node '), 'Windows 平台必須使用 node 裸命令以避免 cmd.exe 引號剝除與 bash 換行跳脫陷阱');
-      assert.ok(cmd.includes('"'), '當路徑包含空格時，Windows 參數必須包含雙引號包裹');
+      // Windows 在路徑包含空格時必須以 node --import file:///... -e 0 執行，且絕對不包含雙引號
+      assert.ok(cmd.startsWith('node --import file:///'), '當路徑包含空格時，Windows 必須使用 node --import file:///... -e 0');
+      assert.ok(cmd.endsWith('.mjs -e 0'), '當路徑包含空格時，Windows 指令必須以 .mjs -e 0 結尾');
+      assert.ok(cmd.includes('%20'), '當路徑包含空格時，file:/// URL 必須將空格編碼為 %20');
+      assert.ok(!cmd.includes('"'), 'Windows 平台絕對禁止包含雙引號（防止 Go exec.Command("cmd", "/c", command) 將引號轉義為 \\" 導致模組載入失敗）');
+
+      const cmdExec = spawnSync('cmd', ['/c', cmd], {
+        input: JSON.stringify({ model: { display_name: 'SpacePathModel' } }),
+        encoding: 'utf8',
+        env: { ...process.env, HOME: mockHome, USERPROFILE: mockHome }
+      });
+      assert.strictEqual(cmdExec.status, 0, `Windows cmd /c 執行含空格路徑狀態列指令必須成功返回 0 (stderr: ${cmdExec.stderr})`);
+      assert.ok(cmdExec.stdout.includes('SpacePathModel'), 'Windows cmd /c 執行含空格路徑狀態列指令必須正常輸出模型名稱');
     } else {
       // macOS / Linux 必須使用 process.execPath 絕對路徑以避免 NVM non-interactive shell 缺少 PATH (exit status 127)
       assert.ok(cmd.includes(process.execPath) || cmd.startsWith(process.execPath) || cmd.startsWith(`"${process.execPath}"`), 'macOS / Linux 必須使用 process.execPath 絕對路徑');
@@ -580,28 +596,34 @@ async function testCase7DirectGetStatusLineCommandMatrix() {
   console.log('\n--- 執行測試情境 7：直接驗證 getStatusLineCommand 跨平台矩陣邏輯 ---');
 
   // 1. Windows (win32) 平台驗證
-  // 1a. 無空格路徑：必須使用 node 裸命令且以雙引號包裹路徑（防範 Git Bash POSIX sh 反斜線剝除）
+  // 1a. 無空格路徑：必須使用 node 裸命令且「不含雙引號」（防範 Go exec.Command("cmd", "/c", command) 將雙引號轉義為 \" 造成 Node.js 模組載入失敗）
   const winCmd1 = getStatusLineCommand('C:\\Users\\andy\\.gemini\\hooks\\statusline-quota.mjs', 'win32');
   assert.strictEqual(
     winCmd1,
-    'node "C:\\Users\\andy\\.gemini\\hooks\\statusline-quota.mjs"',
-    'Windows 無空格路徑必須為 node 裸命令搭配雙引號'
+    'node C:\\Users\\andy\\.gemini\\hooks\\statusline-quota.mjs',
+    'Windows 無空格路徑必須為無雙引號的 node 裸命令'
   );
 
-  // 1b. 含空格路徑：必須使用 node 裸命令且以雙引號包裹路徑（防範路徑空白被截斷）
+  // 1b. 含空格路徑：必須使用 node --import file:///... -e 0（同時無雙引號且無未編碼空格，完美相容 cmd /c 與 sh.exe -c）
   const winCmd2 = getStatusLineCommand('C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs', 'win32');
   assert.strictEqual(
     winCmd2,
-    'node "C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs"',
-    'Windows 含空格路徑必須為 node 裸命令搭配雙引號'
+    'node --import file:///C:/Users/John%20Doe/.gemini/hooks/statusline-quota.mjs -e 0',
+    'Windows 含空格路徑必須轉換為無雙引號的 node --import file:///... -e 0'
   );
 
-  // 1c. 傳入已含雙引號之路徑：必須自動解除外層雙引號後標準化包裹，不可產生雙重引號 node ""...""
+  // 1c. 傳入已含雙引號之路徑：必須自動剝除外層雙引號後依規則產生無雙引號指令
   const winCmd3 = getStatusLineCommand('"C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs"', 'win32');
   assert.strictEqual(
     winCmd3,
-    'node "C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs"',
-    'Windows 既有雙引號路徑必須正確規範化，不可產生雙重引號'
+    'node --import file:///C:/Users/John%20Doe/.gemini/hooks/statusline-quota.mjs -e 0',
+    'Windows 既有雙引號含空格路徑必須正確剝除引號並轉為 file:/// URL'
+  );
+  const winCmd4 = getStatusLineCommand('"C:\\Users\\andy\\.gemini\\hooks\\statusline-quota.mjs"', 'win32');
+  assert.strictEqual(
+    winCmd4,
+    'node C:\\Users\\andy\\.gemini\\hooks\\statusline-quota.mjs',
+    'Windows 既有雙引號無空格路徑必須正確剝除雙引號'
   );
 
   // 2. macOS (darwin) 平台驗證
