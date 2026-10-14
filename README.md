@@ -6,7 +6,7 @@ English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-An Antigravity plugin that customizes the Antigravity Command-Line Interface (CLI) statusline (footer) — select from 32 real-time indicators, arrange them in any order, display capacity bar graphs in merged or separate modes, and apply automatic or manual line wrapping across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
+An Antigravity plugin that customizes the Antigravity Command-Line Interface (CLI) statusline (footer) — select from 32 real-time indicators, switch between Text (`text`) and Emoji (`emoji`) label styles, arrange them in any order, display capacity bar graphs in merged or separate modes, and apply automatic or manual line wrapping across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
 
 Comprehensive support across the three core platforms of Google Antigravity (AGY): Antigravity Command-Line Interface (CLI) (`agy`), Antigravity Integrated Development Environment (IDE), and Antigravity 2.0 Desktop Application.
 
@@ -40,12 +40,12 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ### Activation Behavior
 
 - **First-time Enablement**: When installing or enabling the statusline for the first time, `agy` CLI does not dynamically register new hook processes at runtime; restart `agy` CLI (exit and reopen) to load the statusline hook.
-- **Hot Reload**: Once enabled, subsequent changes to indicator ordering or display language take effect immediately without restarting the CLI.
+- **Hot Reload**: Once enabled, subsequent changes to indicator ordering, label style (`text` / `emoji`), or display language take effect immediately without restarting the CLI.
 
 ## Key Features
 
 1. **Multi-Platform Compatibility**: Supports Antigravity CLI terminal, Antigravity IDE sidebar chat, and Antigravity 2.0 Desktop Application across Windows, macOS, and Linux.
-2. **32 Real-Time Indicators & 4 Locales**: Provides 32 metrics across model status, API quotas, context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`).
+2. **32 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 32 metrics across model status, API quotas, context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
 3. **Flexible Bar Graphs (Merged or Separate)**: Renders 10-block visual progress bars (`[████████░░]`) for hourly quota, weekly quota, context usage, and session tokens. Automatically merges labels when placed adjacent to numeric counterparts, or displays them with independent labels when separated.
 4. **Custom Sorting & Dual Line-Wrapping**: Supports 1-based index sorting, `n` manual line breaks, `n,n` blank-line section separators, and terminal-width-aware automatic wrapping.
 5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`100–75%` Blue, `74–50%` Green, `49–25%` Yellow, `24–0%` Pink) alongside model-family brand colors.
@@ -118,12 +118,12 @@ Once installed, trigger the configuration workflow using the slash command:
 /antigravity-cli-statusline:agy-cli-statusline
 ```
 
-- **When to Use**: When enabling the statusline for the first time, switching display language (`us` / `zh-tw` / `zh-cn` / `jp`), selecting indicators, or customizing multi-line layout order.
+- **When to Use**: When enabling the statusline for the first time, switching display language (`us` / `zh-tw` / `zh-cn` / `jp`), switching between Text (`text`) and Emoji (`emoji`) label styles, selecting indicators, or customizing multi-line layout order.
 - **How It Works**:
   1. Prompts for display language selection and locks the session output to that locale.
   2. Verifies Node.js environment availability and inspects the three-layer `settings.json` files.
-  3. Presents a 32-item multi-select checklist of statusline indicators.
-  4. Accepts a custom comma-separated sort order (supporting `n` newline tokens) and deploys hook scripts to `~/.gemini/antigravity-cli/hooks/`.
+  3. Prompts for label display style (`text` vs. `emoji`) and presents a 32-item multi-select checklist of statusline indicators.
+  4. Accepts a custom comma-separated sort order (supporting `n` newline tokens), writes `ui.footer.labelStyle` and `ui.footer.items` across all three `settings.json` layers, and deploys hook scripts to `~/.gemini/antigravity-cli/hooks/`.
 
 ---
 
@@ -131,49 +131,56 @@ Once installed, trigger the configuration workflow using the slash command:
 
 ### Available Indicators (1–32)
 
-The numbers below correspond to the 1-based option indices in Step 3 (`resources/questions.json`):
+The numbers below correspond to the 1-based option indices in Step 3 (`resources/questions.json`), along with each indicator's Emoji prefix used in `emoji` mode:
 
 **AI Model & Agent**
-- `1.` **Current AI model name (`model-name`)** — the model serving the current conversation
-- `2.` **Active agent profile (`agent-profile`)** — the loaded Agent Profile name
-- `3.` **Agent state (`agent-state`)** — `idle / thinking / working / tool_use / initializing`
-- `4.` **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
-- `32.` **Current running mode (`mode`)** — `default / code-only / plan / interactive / accept-edits`
+- `1.` 🤖 **Current AI model name (`model-name`)** — the model serving the current conversation
+- `2.` 🎭 **Active agent profile (`agent-profile`)** — the loaded Agent Profile name
+- `3.` ⚡ **Agent state (`agent-state`)** — `idle / thinking / working / tool_use / initializing`
+- `4.` 🔒 **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
+- `32.` 🧭 **Current running mode (`mode`)** — `default / code-only / plan / interactive / accept-edits`
 
 **Quota & Tokens**
-- `5.` **Context used percentage (`context-used`)** — percentage of context window consumed
-- `6.` **Context used bar graph (`context-used-bar`)** — 10-block context consumed bar (`[█░░░░░░░░░]`)
-- `7.` **Exact token count (`token-count`)** — token usage in the current session
-- `8.` **Token count bar graph (`token-count-bar`)** — 10-block token consumed bar (`[█░░░░░░░░░]`)
-- `9.` **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
-- `11.` **Subscription plan tier (`plan-tier`)** — current subscription plan level
-- `12.` **Hourly available quota (`quota`)** — 5-hour API remaining percentage, four-tier color-coded
-- `13.` **Hourly available quota bar graph (`quota-bar`)** — 10-block hourly quota bar (`[████████░░]`)
-- `14.` **Hourly quota reset countdown (`quota-reset-countdown`)** — time remaining until 5-hour quota refresh
-- `15.` **Hourly reset time (`quota-reset-time`)** — local timezone reset timestamp (`HH:mm` same day, `yyyy/MM/dd HH:mm` across days)
-- `16.` **Weekly available quota (`quota-weekly`)** — weekly API remaining percentage, four-tier color-coded
-- `17.` **Weekly available quota bar graph (`quota-weekly-bar`)** — 10-block weekly quota bar (`[███████░░░]`)
-- `18.` **Weekly quota reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
-- `19.` **Weekly reset time (`quota-weekly-reset-time`)** — weekly local reset timestamp (e.g., `2026/10/18 16:00`)
+- `5.` 🧠 **Context used percentage (`context-used`)** — percentage of context window consumed
+- `6.` 🧠 **Context used bar graph (`context-used-bar`)** — 10-block context consumed bar (`[█░░░░░░░░░]`)
+- `7.` 🪙 **Exact token count (`token-count`)** — token usage in the current session
+- `8.` 🪙 **Token count bar graph (`token-count-bar`)** — 10-block token consumed bar (`[█░░░░░░░░░]`)
+- `9.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
+- `11.` 💎 **Subscription plan tier (`plan-tier`)** — current subscription plan level
+- `12.` 🔋 **Hourly available quota (`quota`)** — 5-hour API remaining percentage, four-tier color-coded
+- `13.` 🔋 **Hourly available quota bar graph (`quota-bar`)** — 10-block hourly quota bar (`[████████░░]`)
+- `14.` ⏳ **Hourly quota reset countdown (`quota-reset-countdown`)** — time remaining until 5-hour quota refresh
+- `15.` 🕒 **Hourly reset time (`quota-reset-time`)** — local timezone reset timestamp (`HH:mm` same day, `yyyy/MM/dd HH:mm` across days)
+- `16.` 📅 **Weekly available quota (`quota-weekly`)** — weekly API remaining percentage, four-tier color-coded
+- `17.` 📅 **Weekly available quota bar graph (`quota-weekly-bar`)** — 10-block weekly quota bar (`[███████░░░]`)
+- `18.` 📆 **Weekly quota reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
+- `19.` ⏰ **Weekly reset time (`quota-weekly-reset-time`)** — weekly local reset timestamp (e.g., `2026/10/18 16:00`)
 
 **Interactive State**
-- `20.` **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
-- `21.` **Pending user inputs (`pending-input`)** — queued user inputs waiting to run
-- `22.` **Running background tasks (`background-tasks`)** — active background task count
-- `23.` **Active subagents (`subagents`)** — running subagent count
+- `20.` 🔔 **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
+- `21.` 📥 **Pending user inputs (`pending-input`)** — queued user inputs waiting to run
+- `22.` 🔧 **Running background tasks (`background-tasks`)** — active background task count
+- `23.` 👥 **Active subagents (`subagents`)** — running subagent count
 
 **Project & VCS**
-- `24.` **Workspace short path (`project-path`)** — current workspace directory basename
-- `25.` **Workspace full path (`project-full-path`)** — absolute workspace directory path
-- `26.` **VCS type (`vcs-type`)** — `git / jj / fig`
-- `27.` **Current Git branch (`git-branch`)** — active branch name
-- `28.` **Workspace dirty status (`vcs-dirty`)** — `✗ dirty / ✓ clean`
+- `24.` 📁 **Workspace short path (`project-path`)** — current workspace directory basename
+- `25.` 📂 **Workspace full path (`project-full-path`)** — absolute workspace directory path
+- `26.` 🌱 **VCS type (`vcs-type`)** — `git / jj / fig`
+- `27.` 🌿 **Current Git branch (`git-branch`)** — active branch name
+- `28.` 📝 **Workspace dirty status (`vcs-dirty`)** — `✗ dirty / ✓ clean`
 
 **System & Account**
-- `10.` **Account email (`account-email`)** — logged-in account email address
-- `29.` **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
-- `30.` **Antigravity CLI version (`cli-version`)** — current CLI version string
-- `31.` **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
+- `10.` 👤 **Account email (`account-email`)** — logged-in account email address
+- `29.` 💾 **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
+- `30.` 🚀 **Antigravity CLI version (`cli-version`)** — current CLI version string
+- `31.` 💬 **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
+
+### Label Display Styles: Text (`text`) vs. Emoji (`emoji`)
+
+You can choose between two label display styles in Step 3 of the skill questionnaire (stored in `ui.footer.labelStyle` across `settings.json`):
+
+- **Text labels (`text`, default)**: Displays localized text prefixes with a colon (e.g., `Model: Gemini 3.1 Pro │ Hourly Available: 88% │ Git: main`).
+- **Emoji labels (`emoji`)**: Replaces text label prefixes and colons with the indicator's Emoji followed by a single space (e.g., `🤖 Gemini 3.1 Pro │ 🔋 88% │ 🌿 main`), while keeping status values (`all clear`, `✓ clean`, `off`, `Default`) localized in your chosen language.
 
 ### Percentage Bar Graphs: Merged vs. Separate Display
 
@@ -193,10 +200,15 @@ When a numeric indicator and its corresponding bar graph are placed **adjacent**
   ```text
   5,6,7,8,n,12,13,16,17
   ```
-- **Merged Output Preview**:
+- **Merged Output Preview (Text Mode `text`)**:
   ```text
   Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 185.0k / 1.0M [█░░░░░░░░░]
   Hourly Available: 88% [████████░░] │ Weekly Available: 78% [███████░░░]
+  ```
+- **Merged Output Preview (Emoji Mode `emoji`)**:
+  ```text
+  🧠 18.5% [█░░░░░░░░░] │ 🪙 185.0k / 1.0M [█░░░░░░░░░]
+  🔋 88% [████████░░] │ 📅 78% [███████░░░]
   ```
 
 #### 2. Separate Display Example (Non-Adjacent / Independent Labels)
@@ -229,7 +241,7 @@ In Step 4 of the skill workflow, enter a comma-separated list of numbers in the 
 - **Omitted indicators are excluded** — the sort string defines the exact final display set.
 - Leave blank or choose `(Recommended) Skip` to keep the original selection order with all selected indicators enabled.
 
-Preview of the sorted statusline (3 logical groups across 6 content lines separated by blank lines):
+Preview of the sorted statusline in **Text Mode (`text`)** (3 logical groups across 6 content lines separated by blank lines):
 
 ```text
 Model: Gemini 3.8 Flash (High) │ Account: anandydy529@gmail.com │ Plan: Google AI Pro │ Sandbox: off
@@ -240,6 +252,19 @@ Hourly Available: 88% [████████░░] │ Weekly Available: 78%
 
 Status: ✓ clean │ Git: main │ VCS: git │ Project: antigravity-cli-statusline │ Project Path: /Users/andyawd/Project/antigravity-cli-statusline
 Mode: Accept-edits │ Conv: c5168b1c │ RAM: 279MB │ CLI: v1.3.2
+```
+
+Preview of the same sorted statusline in **Emoji Mode (`emoji`)**:
+
+```text
+🤖 Gemini 3.8 Flash (High) │ 👤 anandydy529@gmail.com │ 💎 Google AI Pro │ 🔒 off
+🎭 Default │ ⚡ working │ 👥 2 │ 📄 0 │ 📥 0 │ 🔧 0 │ 🔔 all clear
+
+🧠 18.5% [█░░░░░░░░░] │ 🪙 185.0k / 1.0M [█░░░░░░░░░] │ ⏳ 4h 50m │ 🕒 15:50
+🔋 88% [████████░░] │ 📅 78% [███████░░░] │ 📆 4d 5h │ ⏰ 2026/10/18 16:00
+
+📝 ✓ clean │ 🌿 main │ 🌱 git │ 📁 antigravity-cli-statusline │ 📂 /Users/andyawd/Project/antigravity-cli-statusline
+🧭 Accept-edits │ 💬 c5168b1c │ 💾 279MB │ 🚀 v1.3.2
 ```
 
 ### Line Wrapping

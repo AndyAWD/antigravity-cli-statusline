@@ -6,7 +6,7 @@
 [![授权条款: MIT](https://img.shields.io/badge/授权条款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-一个专为 Google Antigravity（AGY）设计的插件（Plugin），用于自定义 Antigravity 命令行界面（Command-Line Interface）（`agy`）的状态栏（Statusline / Footer）——支持从 32 项实时指标中自由勾选、自定义排序、切换百分比长条图的合并或分开显示模式，并内置自动与手动换行机制，提供 4 种显示语言（`zh-tw`、`zh-cn`、`us`、`jp`）。
+一个专为 Google Antigravity（AGY）设计的插件（Plugin），用于自定义 Antigravity 命令行界面（Command-Line Interface）（`agy`）的状态栏（Statusline / Footer）——支持从 32 项实时指标中自由勾选、切换文字（`text`）或表情符号（Emoji）（`emoji`）标签显示风格、自定义排序、切换百分比长条图的合并或分开显示模式，并内置自动与手动换行机制，提供 4 种显示语言（`zh-tw`、`zh-cn`、`us`、`jp`）。
 
 全面支持 Google Antigravity 的三大核心平台：Antigravity 命令行界面（`agy`）、Antigravity 集成开发环境（Integrated Development Environment）以及 Antigravity 2.0 桌面应用程序。
 
@@ -40,12 +40,12 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ### 启用与生效机制
 
 - **初次启用**：初次安装或初次启用状态栏时，`agy` 命令行界面不会在运行期间动态载入新增的挂钩（Hook）进程，请重新启动 `agy` 命令行界面（退出后重新打开）以载入状态栏。
-- **热更新（Hot Reload）生效**：此前已启用状态栏者，后续调整指标顺序或切换语言时，状态栏会直接热更新生效，无需重新启动命令行界面。
+- **热更新（Hot Reload）生效**：此前已启用状态栏者，后续调整指标顺序、切换标签显示风格（`text` / `emoji`）或切换语言时，状态栏会直接热更新生效，无需重新启动命令行界面。
 
 ## 特色亮点
 
 1. **跨平台兼容**：支持 Antigravity 命令行界面终端、集成开发环境侧边栏对话框（Dialog Box）以及 Antigravity 2.0 桌面应用程序，覆盖 Windows、macOS 与 Linux 操作系统。
-2. **32 项实时指标与 4 种语言**：涵盖人工智能（Artificial Intelligence）模型状态、应用程序接口（Application Programming Interface）配额、上下文（Context）与令牌（Token）消耗、交互队列、Git 版本控制状态及系统资源，支持简体中文（`zh-cn`）、繁体中文（`zh-tw`）、英文（`us`）与日文（`jp`）。
+2. **32 项实时指标、4 种语言与双标签显示风格**：涵盖人工智能（Artificial Intelligence）模型状态、应用程序接口（Application Programming Interface）配额、上下文（Context）与令牌（Token）消耗、交互队列、Git 版本控制状态及系统资源，支持简体中文（`zh-cn`）、繁体中文（`zh-tw`）、英文（`us`）与日文（`jp`），并可自由切换**文字标签（`text`）**或**表情符号标签（`emoji`，无冒号精简排版）**显示风格（`ui.footer.labelStyle`）。
 3. **灵活百分比长条图（支持合并与分开显示）**：针对五小时额度、每周额度、上下文用量与令牌数提供默认 10 格视觉长条图（`[████████░░]`）；当数值与长条图相邻时自动合并为单一标签，未相邻时则各自以独立标签显示。
 4. **自定义排序与双轨换行机制**：支持以数字序号或英文标识码（Identifier）排序、使用 `n` 强制换行、使用 `n,n` 创建空白分隔行，并依终端宽度自动折行。
 5. **24-bit 四阶动态色彩**：依据配额剩余比例或上下文消耗程度自动切换 4 个色阶（`100~75%` 蓝色、`74~50%` 绿色、`49~25%` 黄色、`24~0%` 粉红色），并为不同人工智能模型家族应用专属品牌识别色。
@@ -118,12 +118,12 @@ antigravity-cli-statusline/
 /antigravity-cli-statusline:agy-cli-statusline
 ```
 
-- **使用场景**：初次启用命令行界面状态栏、切换显示语言（`zh-tw` / `zh-cn` / `us` / `jp`）、增减显示指标，或重新调整多行排版顺序时。
+- **使用场景**：初次启用命令行界面状态栏、切换显示语言（`zh-tw` / `zh-cn` / `us` / `jp`）、切换文字（`text`）或表情符号（`emoji`）标签显示风格、增减显示指标，或重新调整多行排版顺序时。
 - **运作流程**：
   1. 询问显示语言，并将后续所有设置交互锁定为所选语言。
   2. 执行 Node.js 环境预检，并读取命令行界面专属、全局与项目三层 `settings.json` 状态。
-  3. 载入 `questions.json` 提供 32 项状态栏指标的多选列表。
-  4. 接收用户自定义排序字符串（支持数字序号、英文标识码与 `n` 换行符号），将挂钩脚本部署至 `~/.gemini/antigravity-cli/hooks/` 并完成测试验证。
+  3. 载入 `questions.json` 询问标签显示风格（`text` 文字标签或 `emoji` 表情符号标签）并提供 32 项状态栏指标的多选列表。
+  4. 接收用户自定义排序字符串（支持数字序号、英文标识码与 `n` 换行符号），将 `ui.footer.labelStyle` 与 `ui.footer.items` 写入三层 `settings.json`，并将挂钩脚本部署至 `~/.gemini/antigravity-cli/hooks/` 完成测试验证。
 
 ---
 
@@ -131,49 +131,56 @@ antigravity-cli-statusline/
 
 ### 可显示的指标（1–32）
 
-以下编号对应技能步骤 3 问卷（`resources/questions.json`）中的选项序号（从 1 起算）：
+以下编号对应技能步骤 3 问卷（`resources/questions.json`）中的选项序号（从 1 起算），以及各指标在 `emoji` 模式下对应的表情符号：
 
 **人工智能模型与代理**
-- `1.` **当前使用的人工智能模型名称（`model-name`）**：实时显示对话正在使用的模型
-- `2.` **使用中代理（`agent-profile`）**：当前加载的 Agent Profile 名称
-- `3.` **代理当前状态（`agent-state`）**：`idle / thinking / working / tool_use / initializing`
-- `4.` **沙箱模式状态（`sandbox-status`）**：`off / on (net) / on (no-net)`
-- `32.` **当前运行模式（`mode`）**：`default / code-only / plan / interactive / accept-edits`
+- `1.` 🤖 **当前使用的人工智能模型名称（`model-name`）**：实时显示对话正在使用的模型
+- `2.` 🎭 **使用中代理（`agent-profile`）**：当前加载的 Agent Profile 名称
+- `3.` ⚡ **代理当前状态（`agent-state`）**：`idle / thinking / working / tool_use / initializing`
+- `4.` 🔒 **沙箱模式状态（`sandbox-status`）**：`off / on (net) / on (no-net)`
+- `32.` 🧭 **当前运行模式（`mode`）**：`default / code-only / plan / interactive / accept-edits`
 
 **额度与令牌**
-- `5.` **当前对话已消耗的上下文用量比例（`context-used`）**：上下文窗口已消耗百分比
-- `6.` **上下文用量长条图（`context-used-bar`）**：10 格上下文消耗长条图（`[█░░░░░░░░░]`）
-- `7.` **当前会话（Session）消耗的精确令牌数量（`token-count`）**：当前对话累计令牌数
-- `8.` **令牌数长条图（`token-count-bar`）**：10 格令牌消耗长条图（`[█░░░░░░░░░]`）
-- `9.` **本次对话人工智能累计产出的文件数量（`artifacts`）**：本次对话产出的 Artifacts 数量
-- `11.` **当前订阅计划等级（`plan-tier`）**：当前账号的订阅等级
-- `12.` **账号五小时可用额度百分比（`quota`）**：五小时应用程序接口可用额度百分比，搭配四阶配色
-- `13.` **五小时可用额度长条图（`quota-bar`）**：10 格五小时可用额度长条图（`[████████░░]`）
-- `14.` **账号五小时额度重置时间倒计时（`quota-reset-countdown`）**：距离五小时额度重置的剩余时间
-- `15.` **五小时重置时间（`quota-reset-time`）**：本机时区绝对重置时间（默认同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）
-- `16.` **账号每周可用额度百分比（`quota-weekly`）**：每周应用程序接口可用额度百分比，搭配四阶配色
-- `17.` **每周可用额度长条图（`quota-weekly-bar`）**：10 格每周可用额度长条图（`[███████░░░]`）
-- `18.` **账号每周额度重置时间倒计时（`quota-weekly-countdown`）**：距离每周额度重置的剩余时间
-- `19.` **每周重置时间（`quota-weekly-reset-time`）**：每周额度重置的本机绝对时间（如 `2026/10/18 16:00`）
+- `5.` 🧠 **当前对话已消耗的上下文用量比例（`context-used`）**：上下文窗口已消耗百分比
+- `6.` 🧠 **上下文用量长条图（`context-used-bar`）**：10 格上下文消耗长条图（`[█░░░░░░░░░]`）
+- `7.` 🪙 **当前会话（Session）消耗的精确令牌数量（`token-count`）**：当前对话累计令牌数
+- `8.` 🪙 **令牌数长条图（`token-count-bar`）**：10 格令牌消耗长条图（`[█░░░░░░░░░]`）
+- `9.` 📄 **本次对话人工智能累计产出的文件数量（`artifacts`）**：本次对话产出的 Artifacts 数量
+- `11.` 💎 **当前订阅计划等级（`plan-tier`）**：当前账号的订阅等级
+- `12.` 🔋 **账号五小时可用额度百分比（`quota`）**：五小时应用程序接口可用额度百分比，搭配四阶配色
+- `13.` 🔋 **五小时可用额度长条图（`quota-bar`）**：10 格五小时可用额度长条图（`[████████░░]`）
+- `14.` ⏳ **账号五小时额度重置时间倒计时（`quota-reset-countdown`）**：距离五小时额度重置的剩余时间
+- `15.` 🕒 **五小时重置时间（`quota-reset-time`）**：本机时区绝对重置时间（默认同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）
+- `16.` 📅 **账号每周可用额度百分比（`quota-weekly`）**：每周应用程序接口可用额度百分比，搭配四阶配色
+- `17.` 📅 **每周可用额度长条图（`quota-weekly-bar`）**：10 格每周可用额度长条图（`[███████░░░]`）
+- `18.` 📆 **账号每周额度重置时间倒计时（`quota-weekly-countdown`）**：距离每周额度重置的剩余时间
+- `19.` ⏰ **每周重置时间（`quota-weekly-reset-time`）**：每周额度重置的本机绝对时间（如 `2026/10/18 16:00`）
 
 **交互状态**
-- `20.` **是否有等你响应的工具确认对话框（`tool-confirmation`）**：提示是否有工具正在等待用户确认
-- `21.` **队列中待处理的用户输入数（`pending-input`）**：排队等待执行的输入数量
-- `22.` **进行中的后台任务数（`background-tasks`）**：运行中的后台进程数量
-- `23.` **活跃子代理数（`subagents`）**：运行中的子代理数量
+- `20.` 🔔 **是否有等你响应的工具确认对话框（`tool-confirmation`）**：提示是否有工具正在等待用户确认
+- `21.` 📥 **队列中待处理的用户输入数（`pending-input`）**：排队等待执行的输入数量
+- `22.` 🔧 **进行中的后台任务数（`background-tasks`）**：运行中的后台进程数量
+- `23.` 👥 **活跃子代理数（`subagents`）**：运行中的子代理数量
 
 **项目与版本控制**
-- `24.` **当前工作区项目短路径（`project-path`）**：工作区文件夹名称
-- `25.` **当前工作区项目完整路径（`project-full-path`）**：工作区绝对路径
-- `26.` **版本控制类型（`vcs-type`）**：`git / jj / fig`
-- `27.` **当前工作区项目的 Git 分支（`git-branch`）**：当前所在的 Git 分支名称
-- `28.` **工作区是否有未提交变更（`vcs-dirty`）**：`✗ 有变更 / ✓ 干净`
+- `24.` 📁 **当前工作区项目短路径（`project-path`）**：工作区文件夹名称
+- `25.` 📂 **当前工作区项目完整路径（`project-full-path`）**：工作区绝对路径
+- `26.` 🌱 **版本控制类型（`vcs-type`）**：`git / jj / fig`
+- `27.` 🌿 **当前工作区项目的 Git 分支（`git-branch`）**：当前所在的 Git 分支名称
+- `28.` 📝 **工作区是否有未提交变更（`vcs-dirty`）**：`✗ 有变更 / ✓ 干净`
 
 **系统与账号**
-- `10.` **账号电子邮件（`account-email`）**：当前登录的账号邮箱
-- `29.` **命令行界面进程所消耗的随机存取内存（Random Access Memory）量（`memory-usage`）**：`agy` 进程占用的内存大小
-- `30.` **Antigravity 命令行界面版本号（`cli-version`）**：当前运行的命令行界面版本
-- `31.` **当前对话标识码前 8 位（`conversation-id`）**：供调试定位使用
+- `10.` 👤 **账号电子邮件（`account-email`）**：当前登录的账号邮箱
+- `29.` 💾 **命令行界面进程所消耗的随机存取内存（Random Access Memory）量（`memory-usage`）**：`agy` 进程占用的内存大小
+- `30.` 🚀 **Antigravity 命令行界面版本号（`cli-version`）**：当前运行的命令行界面版本
+- `31.` 💬 **当前对话标识码前 8 位（`conversation-id`）**：供调试定位使用
+
+### 标签显示风格：文字（`text`）与表情符号（`emoji`）
+
+可在技能步骤 3 问卷中选择标签显示风格（保存于三层 `settings.json` 的 `ui.footer.labelStyle` 字段）：
+
+- **文字标签模式（`text`，默认）**：以所选语言的文字标签搭配冒号呈现（例如 `模型: Gemini 3.1 Pro │ 小时可用: 88% │ Git: main`）。
+- **表情符号标签模式（`emoji`）**：将各指标前方的文字标签与冒号替换为对应的表情符号加单一空格（例如 `🤖 Gemini 3.1 Pro │ 🔋 88% │ 🌿 main`），并保留状态值（如 `都好了`、`✓ 干净`、`关闭`、`默认`）的多语言显示。
 
 ### 百分比长条图：合并显示与分开显示示例
 
@@ -193,10 +200,15 @@ antigravity-cli-statusline/
   ```text
   5,6,7,8,n,12,13,16,17
   ```
-- **合并显示效果预览**：
+- **合并显示效果预览（文字模式 `text`）**：
   ```text
   上下文用量: 18.5% [█░░░░░░░░░] │ 令牌数: 185.0k / 1.0M [█░░░░░░░░░]
   小时可用: 88% [████████░░] │ 每周可用: 78% [███████░░░]
+  ```
+- **合并显示效果预览（表情符号模式 `emoji`）**：
+  ```text
+  🧠 18.5% [█░░░░░░░░░] │ 🪙 185.0k / 1.0M [█░░░░░░░░░]
+  🔋 88% [████████░░] │ 📅 78% [███████░░░]
   ```
 
 #### 2. 分开显示示例（非相邻／独立标签显示）
@@ -229,7 +241,7 @@ antigravity-cli-statusline/
 - **未列入的指标将不予显示**：排序字符串的结果即为最终显示集合。
 - 若留空或选择 `(Recommended) 跳过`，则沿用原勾选顺序并启用全部已勾选指标。
 
-排序后显示效果预览（三大逻辑分区、共 6 行信息并搭配空行分隔）：
+排序后显示效果预览——**文字模式（`text`）**（三大逻辑分区、共 6 行信息并搭配空行分隔）：
 
 ```text
 模型: Gemini 3.8 Flash (High) │ 账号: anandydy529@gmail.com │ 订阅计划: Google AI Pro │ 沙箱状态: 关闭
@@ -240,6 +252,19 @@ antigravity-cli-statusline/
 
 工作区状态: ✓ 干净 │ Git: main │ VCS类型: git │ 项目: antigravity-cli-statusline │ 完整路径: /Users/andyawd/Project/antigravity-cli-statusline
 模式: Accept-edits │ 对话ID: c5168b1c │ 内存: 279MB │ CLI版本: v1.3.2
+```
+
+相同排序在**表情符号模式（`emoji`）**下的显示效果预览：
+
+```text
+🤖 Gemini 3.8 Flash (High) │ 👤 anandydy529@gmail.com │ 💎 Google AI Pro │ 🔒 关闭
+🎭 默认 │ ⚡ working │ 👥 2 │ 📄 0 │ 📥 0 │ 🔧 0 │ 🔔 都好了
+
+🧠 18.5% [█░░░░░░░░░] │ 🪙 185.0k / 1.0M [█░░░░░░░░░] │ ⏳ 4h 50m │ 🕒 15:50
+🔋 88% [████████░░] │ 📅 78% [███████░░░] │ 📆 4d 5h │ ⏰ 2026/10/18 16:00
+
+📝 ✓ 干净 │ 🌿 main │ 🌱 git │ 📁 antigravity-cli-statusline │ 📂 /Users/andyawd/Project/antigravity-cli-statusline
+🧭 Accept-edits │ 💬 c5168b1c │ 💾 279MB │ 🚀 v1.3.2
 ```
 
 ### 换行

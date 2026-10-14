@@ -1,11 +1,11 @@
 ---
 name: antigravity-cli-statusline:agy-cli-statusline
-description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、顯示應用程式介面（API）額度（含長條圖與絕對重置時間） / 權杖（Token）用量與長條圖 / 上下文（Context）消耗與長條圖 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並自動處理 Node.js 跨平台執行相容性（macOS/Linux 絕對路徑防 NVM 127、Windows 裸命令防空白與引號剝除）、sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
+description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、標籤顯示樣式（文字標籤 text / Emoji 圖示 emoji）、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、切換文字或 Emoji 圖示標籤模式、顯示應用程式介面（API）額度（含長條圖與絕對重置時間） / 權杖（Token）用量與長條圖 / 上下文（Context）消耗與長條圖 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並自動處理 Node.js 跨平台執行相容性（macOS/Linux 絕對路徑防 NVM 127、Windows 裸命令防空白與引號剝除）、sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
 ---
 
 # Antigravity 狀態列設定技能
 
-本技能提供 Antigravity 命令列介面（CLI）狀態列（Statusline / Footer）的客製化、語系設定與跨平台掛鉤（Hook）部署能力。
+本技能提供 Antigravity 命令列介面（CLI）狀態列（Statusline / Footer）的客製化、標籤樣式（文字 / Emoji）、語系設定與跨平台掛鉤（Hook）部署能力。
 
 ## ⚠️ References 載入規範（必讀）
 
@@ -32,7 +32,7 @@ description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）
 > [!CAUTION]
 > 命令列介面（CLI）專屬設定檔由 agy 命令列介面（CLI）自身維護，優先級**高於**全域設定檔。若忽略此檔案，全域設定將被無聲覆蓋！這是本技能中**最致命且最隱蔽的 Bug**。完整路徑解析規則、JSON 結構、跨電腦移植雙保險設計詳見 [references/config-files.md](references/config-files.md)。
 
-自訂語系偏好記錄於 `ui.language` 屬性中；指標順序記錄於 `ui.footer.items` 陣列中。
+自訂語系偏好記錄於 `ui.language` 屬性中；標籤顯示樣式記錄於 `ui.footer.labelStyle`（`"text"` 或 `"emoji"`）中；指標順序記錄於 `ui.footer.items` 陣列中。
 
 ---
 
@@ -42,14 +42,15 @@ description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）
    - macOS / Linux：`ps auxww` + `lsof`
    - Windows：`Get-CimInstance Win32_Process` + `netstat -ano`（不再使用已棄用的 `wmic`）
 2. **所有 `fs.writeFileSync` 強制加 `{ encoding: 'utf8' }`**（防 Windows UTF-16 崩潰）
-3. **智慧型多行換行（Smart Line Wrapping by Feature）**：讀取 `meta.terminal_width` 或 `process.stdout.columns` 得知終端機寬度。組合狀態列字串時，若下一個加入的指標會讓整行長度（不含 ANSI 碼）超過終端機寬度，必須將該指標折疊到新的一行（插入 `\n`）。
+3. **智慧型多行換行（Smart Line Wrapping by Feature）**：讀取 `meta.terminal_width` 或 `process.stdout.columns` 得知終端機寬度。組合狀態列字串時，若下一個加入的指標會讓整行長度（不含 ANSI 碼，並精確計算中日韓全形字元與 Unicode 代理對 Emoji 為 2 格寬度）超過終端機寬度，必須將該指標折疊到新的一行（插入 `\n`）。
 4. **四階段精確色彩辨識（24-bit truecolor 柔和配色）**：
    - `100~75%`：藍色 `#57caff`（`\x1b[38;2;87;202;255m`）
    - `74~50%`：綠色 `#5cdb6d`（`\x1b[38;2;92;219;109m`）
    - `49~25%`：黃色 `#ffd427`（`\x1b[38;2;255;212;39m`）
    - `24~0%`：紅色 `#ff7daf`（`\x1b[38;2;255;125;175m`）
-5. **容量長條圖與相鄰自動合併（Bar Graph & Adjacent Auto-Merge）**：支援五小時可用額度（`quota-bar`）、每週可用額度（`quota-weekly-bar`）、脈絡用量（`context-used-bar`）與權杖數（`token-count-bar`）之長條圖（預設 10 格 `[████████░░]`）。當長條圖與對應數值指標相鄰時，自動合併為單一標籤（如 `小時可用: 88% [████████░░]`）。
+5. **容量長條圖與相鄰自動合併（Bar Graph & Adjacent Auto-Merge）**：支援五小時可用額度（`quota-bar`）、每週可用額度（`quota-weekly-bar`）、脈絡用量（`context-used-bar`）與權杖數（`token-count-bar`）之長條圖（預設 10 格 `[████████░░]`）。當長條圖與對應數值指標相鄰時，自動合併為單一標籤（文字模式如 `小時可用: 88% [████████░░]`，Emoji 模式如 `🔋 88% [████████░░]`）。
 6. **絕對重置時間（Reset Absolute Time）**：支援五小時重置時間（`quota-reset-time`）與每週重置時間（`quota-weekly-reset-time`），原生轉換為本機時區絕對時間，預設同日顯示 `HH:mm`、跨日顯示 `yyyy/MM/dd HH:mm`，亦支援於設定檔以 `ui.footer.timeFormat` 自訂（`smart` / `yyyy/MM/dd HH:mm` / `12h` / `24h`）。
+7. **雙模式標籤顯示樣式（Label Style: `text` vs `emoji`）**：支援於設定檔 `ui.footer.labelStyle` 切換 `"text"`（預設，文字標籤加冒號，如 `模型: Gemini 3.1 Pro`）與 `"emoji"`（以專屬 Emoji 取代文字標籤並省略冒號、僅保留單一空白，如 `🤖 Gemini 3.1 Pro`、`🔋 100%`、`🌿 main`）。在 `"emoji"` 模式下，指標的狀態值（如 `在等你` / `都好了`、`✓ 乾淨` / `✗ 有變更`、`關閉` / `啟用（聯網）`）仍依 `ui.language` 顯示本地化文字。
 
 Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide: true` 規範詳見 [references/windows.md](references/windows.md)。
 
@@ -162,36 +163,43 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
   3. **若使用者選擇「中斷」**：以所選語系輸出安裝指引後結束本技能流程，不進行 any 設定檔寫入。
   4. **若使用者選擇「繼續」**：繼續執行後續步驟。設定檔會正確寫入，待使用者安裝 Node.js 並重新啟動 `agy` 命令列介面（CLI）後狀態列即會自動生效。
 
-**【動態解析三層設定檔】**：在 Node.js 預檢通過（或使用者選擇繼續）後，動態展開 `$HOME` / `USERPROFILE`，讀取三層 `settings.json`。檢查目前 `ui.footer.items` 啟用了哪些項目、`ui.language` 設定，以及各設定檔中是否存在空的或殘缺的 `statusLine` 物件（如 `{ "type": "", "command": "", "enabled": true }`）。
+**【動態解析三層設定檔】**：在 Node.js 預檢通過（或使用者選擇繼續）後，動態展開 `$HOME` / `USERPROFILE`，讀取三層 `settings.json`。檢查目前 `ui.footer.items` 啟用了哪些項目、`ui.footer.labelStyle` 標籤樣式、`ui.language` 設定，以及各設定檔中是否存在空的或殘缺的 `statusLine` 物件（如 `{ "type": "", "command": "", "enabled": true }`）。
 
 **【Windows 平台額外步驟：位元組順序記號（BOM）預檢】**：讀取每份 `settings.json` 與 `trusted_hooks.json` 時，必須檢查檔案前 3 個位元組是否為 `EF BB BF`（UTF-8 位元組順序記號（BOM））。若是，記錄該檔案路徑為「需於步驟 5 自動修復」的目標。詳見 [references/windows.md §1](references/windows.md) 與 §3。
 
-### 步驟 3：第二階段問卷（讀取 questions.json 與勾選指標）
+### 步驟 3：第二階段問卷（讀取 questions.json、選擇標籤樣式與勾選指標）
 
 1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/agy-cli-statusline/resources/questions.json` 檔案。
-2. **根據步驟 1 的語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的問卷資訊，呼叫 `ask_question`。
+2. **根據步驟 1 的語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的 `style_question`、`style_options`、`question` 與 `options` 問卷資訊，呼叫 `ask_question` 同時詢問「標籤顯示樣式（文字標籤 `text` 或 Emoji 圖示 `emoji`）」與「要顯示的狀態列指標」。
 
-請動態將選定語系的 `options` 內容填入（問卷問題及摘要也請使用對應語系）：
+請動態將選定語系的 `style_options` 與 `options` 內容填入（問卷問題及摘要也請使用對應語系）：
    ```json
    {
      "questions": [
        {
-         "question": "<請填入對應語系的提問，例如: 選擇要顯示的狀態列指標（下一步將進行排序）>",
+         "question": "<請填入對應語系的 style_question，例如: 選擇狀態列標籤顯示樣式>",
+         "options": [
+            // 從 resources/questions.json 讀取對應語系的 style_options 陣列並在此展開
+         ],
+         "is_multi_select": false
+       },
+       {
+         "question": "<請填入對應語系的 question，例如: 選擇要顯示的狀態列指標（下一步將進行排序）>",
          "options": [
             // 從 resources/questions.json 讀取對應語系（如 zh-tw, zh-cn, us 或 jp）的 options 陣列並在此展開
          ],
          "is_multi_select": true
        }
      ],
-     "toolSummary": "指標選擇",
-     "toolAction": "詢問狀態列指標"
+     "toolSummary": "樣式與指標選擇",
+     "toolAction": "詢問標籤樣式與狀態列指標"
    }
    ```
-3. 取得使用者所勾選的選項字串陣列（`selected`）。
+3. 取得使用者所選擇的標籤顯示樣式（`style`，解析為 `text` 或 `emoji`）與所勾選的指標選項字串陣列（`selected`）。
 
 ### 步驟 4：第三階段問卷（手動排序與最終篩選）
 
-1. 將**步驟 3 中使用者勾選的指標**按順序整理出來，標上數字編號（如 `1. 目前使用的人工智慧（AI）模型名稱（model-name）`），每項以 `\n` 分隔。
+1. 將**步驟 3 中使用者勾選的指標**按順序整理出來，標上數字編號（如 `1. 🤖 目前使用的人工智慧（AI）模型名稱（model-name）`），每項以 `\n` 分隔。
 2. 呼叫 `ask_question` 引導使用者進行排序（問卷以所選語系呈現）：
 
    **zh-tw 範例**：
@@ -199,7 +207,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    {
      "questions": [
        {
-         "question": "請設定狀態列顯示順序。\n\n目前已選取：\n1. 目前使用的人工智慧（AI）模型名稱（model-name）\n2. 帳號五小時可用額度百分比（quota）\n3. 目前對話已消耗的脈絡（Context）用量比例（context-used）\n\n請在下方輸入框「Write-in...」中輸入以逗號分隔的數字序號或英文識別碼（如：2, 1, context-used）。可以使用 `n` 來強制換行。未填寫的指標將不予顯示。",
+         "question": "請設定狀態列顯示順序。\n\n目前已選取：\n1. 🤖 目前使用的人工智慧（AI）模型名稱（model-name）\n2. 🔋 帳號五小時可用額度百分比（quota）\n3. 🧠 目前對話已消耗的脈絡（Context）用量比例（context-used）\n\n請在下方輸入框「Write-in...」中輸入以逗號分隔的數字序號或英文識別碼（如：2, 1, context-used）。可以使用 `n` 來強制換行。未填寫的指標將不予顯示。",
          "options": [
            "(Recommended) 略過，使用原勾選順序啟用全部指標",
            "手動排序（請在下方「Write-in...」欄位中填寫）"
@@ -217,7 +225,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    {
      "questions": [
        {
-         "question": "请设置状态栏显示顺序。\n\n目前已选取：\n1. 当前使用的人工智能（AI）模型名称（model-name）\n2. 账号五小时可用额度百分比（quota）\n3. 当前对话已消耗的上下文（Context）用量比例（context-used）\n\n请在下方输入框“Write-in...”中输入以逗号分隔的数字序号或英文标识码（如：2, 1, context-used）。可以使用 `n` 来强制换行。未填写的指标将不予显示。",
+         "question": "请设置状态栏显示顺序。\n\n目前已选取：\n1. 🤖 当前使用的人工智能（AI）模型名称（model-name）\n2. 🔋 账号五小时可用额度百分比（quota）\n3. 🧠 当前对话已消耗的上下文（Context）用量比例（context-used）\n\n请在下方输入框“Write-in...”中输入以逗号分隔的数字序号或英文标识码（如：2, 1, context-used）。可以使用 `n` 来强制换行。未填写的指标将不予显示。",
          "options": [
            "(Recommended) 跳过，使用原勾选顺序启用全部指标",
            "手动排序（请在下方“Write-in...”栏位中填写）"
@@ -235,7 +243,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 1. 取得使用者工作區（workspace）的絕對路徑（`workspace`）。
 2. 呼叫 `run_command` 執行本外掛目錄下的 `configure-statusline.mjs` 腳本，傳入相關參數。腳本會全自動處理：
-   - 排序輸入解析。
+   - 排序輸入與標籤顯示樣式（`--style`）解析。
    - 依平台智慧產生 Node.js 執行指令（macOS / Linux 使用絕對路徑以避免 NVM 等非互動式 Shell 遺失 `PATH` 引發 exit status 127；Windows 絕對禁止包含雙引號以避開 Go `exec.Command("cmd", "/c", command)` 的 `\"` 字面引號污染陷阱，無空格路徑使用 `node <path>`，含空格路徑自動轉為 `node --import file:///... -e 0`）。
    - 同步寫入三層 `settings.json`（已執行防禦性 位元組順序記號（BOM）剝除與寫入後無 位元組順序記號（BOM）驗證）。
    - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 萬用字元（Wildcard）鍵，精確註冊設定檔命令並全面補齊引號、反斜線、正斜線與環境變數變體）。
@@ -244,9 +252,9 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
    **指令範例**：
    ```bash
-   node skills/agy-cli-statusline/scripts/configure-statusline.mjs --lang "<步驟1選定的語言>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/略過輸入>" --workspace "<當前工作區絕對路徑>"
+   node skills/agy-cli-statusline/scripts/configure-statusline.mjs --lang "<步驟1選定的語言>" --style "<步驟3選定的標籤樣式(text或emoji)>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/略過輸入>" --workspace "<當前工作區絕對路徑>"
    ```
-   *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["目前使用的人工智慧（AI）模型名稱（model-name）","帳號五小時可用額度百分比（quota）"]'`。請注意外層與內層引號的正確跳脫。*
+   *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["🤖 目前使用的人工智慧（AI）模型名稱（model-name）","🔋 帳號五小時可用額度百分比（quota）"]'`。請注意外層與內層引號的正確跳脫。*
 
 ### 步驟 6：自動驗證
 
