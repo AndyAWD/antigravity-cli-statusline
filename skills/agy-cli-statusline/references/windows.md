@@ -115,32 +115,45 @@ Get-CimInstance Win32_Process -Filter "Name like '%agy%'"
 
 ## 5. settings.json 中 Windows 路徑跳脫範本
 
-### 為什麼 Windows 平台使用 `node` 裸命令（架構評估）
+### 為什麼 Windows 平台使用 `node` 裸命令且「絕對禁止包含雙引號 `"`」（架構評估）
 
-在跨平台評估中，若直接將 Node.js 完整路徑（例如 `process.execPath`）寫入 Windows 的 `statusLine.command`，會引發數個極其嚴重的 Windows 系統陷阱：
-1. **路徑空格與 cmd.exe 雙引號剝除陷阱**：Windows 官方預設安裝於 `C:\Program Files\nodejs\node.exe`，內含空白字元。若指令寫為 `"C:\Program Files\nodejs\node.exe" "C:\Users\...\statusline-quota.mjs"`，當 agy CLI 底層透過 `sh -c` 轉發至 `cmd.exe /c` 時，依據 Windows cmd 解析規則，以雙引號開頭且包含多組雙引號的指令會被**自動剝除最外層的第一個與最後一個雙引號**，導致命令變成 `C:\Program Files\nodejs\node.exe" "C:\Users\...`，系統會尋找名為 `C:\Program` 的指令並直接崩潰報錯：`'C:\Program' is not recognized as an internal or external command`。
-2. **Git Bash sh.exe 反斜線跳脫陷阱**：若 Windows 機器裝有 Git for Windows 且 PATH 中包含其 `sh.exe`，POSIX Shell 會將反斜線 `\` 視為跳脫符號，路徑中的 `\n`（例如 `\nodejs` 或 `\new_folder`）會被轉換為換行字元（Newline），導致找不到檔案。
-3. **Windows 登錄檔 PATH 天然繼承**：不同於 macOS/Linux 下 NVM 為僅存在於互動式 Shell 的函式，Windows 下無論是官方 MSI、`nvm-windows`、`fnm` 或 `scoop`，皆會將 `node.exe` 寫入 Windows 系統/使用者環境變數（Windows 登錄檔 `PATH`）。所有父行程衍生的子行程（`cmd.exe`、`agy.exe`）皆會繼承完整 PATH。
+在跨平台評估與 `agy.exe`（v1.3.5+）反組譯驗證中，Windows 的 `statusLine.command` 存在幾個極其關鍵的系統底層限制：
+1. **Go `exec.CommandContext(ctx, "cmd", "/c", command)` 與 `\"` 字面引號污染陷阱（最致命）**：
+   在 Windows 版 `agy.exe` 的 `statusline_runner.go` 中，底層是透過 Go 標準庫 `exec.CommandContext(ctx, "cmd", "/c", command)` 執行狀態列指令。Go 的 `syscall.EscapeArg` 在組裝 Windows `CreateProcessW` 命令列時，只要參數包含空白或雙引號，就會在外層包裹雙引號 `"..."`，並將**內部所有的雙引號 `"` 強制加上反斜線轉義為 `\"`**（即 `cmd /c "node \"C:\Users\...\statusline-quota.mjs\""`）。
+   然而 `cmd.exe /c` 僅會剝除最外層的雙引號，**不會解開 `\"` 跳脫**，而是原封不動將 `\"C:\Users\...\statusline-quota.mjs\"` 傳給 `node.exe`。接著 `node.exe`（MSVC CRT 命令列解析器）會將 `\"`（奇數個反斜線加雙引號）解析為**字面上的雙引號字元 `"`**（而非字串邊界！），導致 `process.argv[1]` 變成開頭帶有雙引號字元的相對路徑 `"\"C:\\Users\\..."`，進而與當前工作目錄（CWD）拼接並直接崩潰報錯：
+   `Error: Cannot find module 'D:\Project\...\"C:\Users\...\statusline-quota.mjs"'`（累積 30 次後狀態列即被 CLI 自動停用 `enabled: false`）。
+2. **路徑空格與 `cmd.exe` 雙引號剝除陷阱**：Windows 官方預設安裝於 `C:\Program Files\nodejs\node.exe`，內含空白字元，絕對不可寫入 `process.execPath` 絕對路徑。
+3. **Windows 登錄檔 `PATH` 天然繼承**：不同於 macOS / Linux 下 NVM 為僅存在於互動式 Shell 的函式，Windows 下無論是官方 MSI、`nvm-windows`、`fnm` 或 `scoop`，皆會將 `node.exe` 寫入 Windows 系統或使用者環境變數（Windows 登錄檔 `PATH`）。所有父行程衍生的子行程（`cmd.exe`、`agy.exe`）皆會繼承完整 `PATH`。
 
-因此 Windows 平台上**使用裸命令 `node` 搭配雙引號包裹腳本絕對路徑為最健壯的黃金方案**。腳本絕對路徑一律以雙引號包裹：
-- **路徑空格防護**：使用者家目錄常包含空白（例如 `C:\Users\John Doe`），雙引號可確保路徑參數不被截斷。
-- **Git Bash 反斜線防護**：若 Windows 機器裝有 Git for Windows（PATH 中含 `sh.exe`），雙引號可防止 POSIX Shell 誤將反斜線 `\` 當作跳脫字元剝除損毀。
-- **免於引號剝除**：因為指令開頭為 `node `（第一個字元非雙引號），`cmd.exe /c` 絕對不會觸發最外層雙引號剝除規則，內部雙引號將完整保留傳入 `node`！
+因此，Windows 平台上的 `statusLine.command` **絕對禁止包含任何雙引號 `"`**，並依據腳本路徑是否含空格採雙軌無引號策略：
+- **路徑不含空格時（多數情況）**：直接使用無雙引號的裸命令 `node <腳本絕對路徑>`。
+- **路徑包含空格時（例如 `C:\Users\John Doe\...`）**：將腳本絕對路徑轉換為無空格、無引號的 `file:///` URL（空格編碼為 `%20`、反斜線轉為 `/`），並使用 `node --import file:///C:/Users/John%20Doe/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0` 載入執行。此格式完全不含雙引號、不含單引號、亦不含未編碼空白，在 `cmd.exe /c` 與 `sh.exe -c` 下皆可 100% 零錯誤執行。
 
-`statusLine` 物件的 `command` 欄位在 Windows 平台必須使用雙反斜線跳脫：
+`statusLine` 物件的 `command` 欄位在 Windows 平台範本（無空格路徑）：
 
 ```json
 "statusLine": {
   "enabled": true,
   "type": "command",
-  "command": "node \"<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
+  "command": "node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
 }
 ```
 
-`trusted_hooks.json` 中對應的 Windows 信任字串（必須包含精確命令，並同時追加單/雙反斜線、forward slash、引號與 `%USERPROFILE%` 變體以確保相容性）：
+若使用者家目錄包含空格（例如 `C:\Users\John Doe`），則為：
+
+```json
+"statusLine": {
+  "enabled": true,
+  "type": "command",
+  "command": "node --import file:///C:/Users/John%20Doe/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0"
+}
+```
+
+`trusted_hooks.json` 中對應的 Windows 信任字串（必須包含精確命令，並同時追加 `--import file:///`、單/雙反斜線、forward slash、引號與 `%USERPROFILE%` 變體以確保相容性）：
 
 ```text
 "statusLine:node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
+"statusLine:node --import file:///<真實的使用者家目錄正斜線且空格轉%20路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0"
 "statusLine:node \"<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
 "statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
 "statusLine:node \"<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs\""

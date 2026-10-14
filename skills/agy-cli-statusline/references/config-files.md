@@ -59,19 +59,30 @@ Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更�
 
 ## 3. statusLine 物件結構（Windows）
 
-詳見 [windows.md §5](windows.md#5-settingsjson-中-windows-路徑跳脫範本)。Windows 上寫入裸命令 `node`（若掛鉤腳本路徑含空白則為腳本路徑加上雙引號）：
+詳見 [windows.md §5](windows.md#5-settingsjson-中-windows-路徑跳脫範本)。Windows 上因 `agy.exe` 底層透過 Go `exec.CommandContext(ctx, "cmd", "/c", command)` 呼叫，任何雙引號 `"` 都會被 Go 的 `syscall.EscapeArg` 轉義為 `\"` 並被 `node.exe`（MSVC CRT）當作字面上的雙引號字元，導致 `Cannot find module 'D:\cwd\"C:\...\statusline-quota.mjs"'` 錯誤。因此 Windows 指令**絕對禁止包含雙引號 `"`**：
+- 若掛鉤腳本路徑**不含空白**，寫入無雙引號的 `node <腳本絕對路徑>`：
 
 ```json
 "statusLine": {
   "enabled": true,
   "type": "command",
-  "command": "node \"<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
+  "command": "node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
+}
+```
+
+- 若掛鉤腳本路徑**包含空白**（例如 `C:\Users\John Doe`），則將路徑轉為 `file:///` URL（空格編碼為 `%20`），寫入無雙引號的 `node --import <fileUrl> -e 0`：
+
+```json
+"statusLine": {
+  "enabled": true,
+  "type": "command",
+  "command": "node --import file:///C:/Users/John%20Doe/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0"
 }
 ```
 
 > [!NOTE]
-> Windows 系統中，Node.js 官方安裝程式與版本管理工具（`nvm-windows`、`fnm`、`scoop`）皆會將 `node.exe` 登錄至系統/使用者環境變數（Windows 登錄檔 `PATH`），所有子行程（包含 `cmd.exe`）皆會繼承。
-> 在 Windows 上使用 `node` 裸命令能完全避開 `C:\Program Files\nodejs\node.exe` 空白字元引發的 `cmd.exe /c` 雙引號剝除陷阱，以及 Git Bash `sh.exe` 反斜線 `\n` 換行跳脫問題。
+> Windows 系統中，Node.js 官方安裝程式與版本管理工具（`nvm-windows`、`fnm`、`scoop`）皆會將 `node.exe` 登錄至系統或使用者環境變數（Windows 登錄檔 `PATH`），所有子行程（包含 `cmd.exe`）皆會繼承。
+> 在 Windows 上使用無雙引號的 `node` 裸命令（含空格時搭配 `--import file:///... -e 0`）能完全避開 Go `EscapeArg` 的 `\"` 字面引號污染陷阱以及 `C:\Program Files\nodejs\node.exe` 空白字元引發的 `cmd.exe /c` 雙引號剝除陷阱。
 
 ---
 
@@ -122,9 +133,10 @@ statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cl
 statusLine:node $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs
 ```
 
-**Windows**（精確指令 + 雙反斜線 + forward slash + `%USERPROFILE%` + 引號變體）：
+**Windows**（精確指令 + `--import file:///` + 雙反斜線 + forward slash + `%USERPROFILE%` + 引號變體）：
 ```text
 statusLine:node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs
+statusLine:node --import file:///<真實的使用者家目錄正斜線且空格轉%20路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0
 statusLine:node "<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
 statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs
 statusLine:node "<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
@@ -140,8 +152,8 @@ statusLine:node "%USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quot
 
 ### 寫入 `settings.json` 時
 
-- **macOS / Linux**：使用目前環境 Node.js 執行檔絕對路徑（`process.execPath`）搭配腳本絕對路徑，若路徑含空格以引號包裹。免去 non-interactive `sh` 遺失 PATH 的問題（exit status 127）。
-- **Windows**：使用 `node` 裸命令搭配腳本絕對路徑（含空格加引號）。免去 `C:\Program Files\nodejs\node.exe` 空白引號剝除與 Git Bash 換行跳脫問題。
+- **macOS / Linux**：使用目前環境 Node.js 執行檔絕對路徑（`process.execPath`）搭配腳本絕對路徑，若路徑含空格以引號包裹。免去 non-interactive `sh` 遺失 `PATH` 的問題（exit status 127）。
+- **Windows**：使用無雙引號的 `node` 裸命令搭配腳本絕對路徑（含空格時轉為 `node --import file:///... -e 0`）。免去 Go `exec.Command("cmd", "/c", command)` 的 `\"` 字面引號污染與 `C:\Program Files\nodejs\node.exe` 空白引號剝除問題。
 
 ### 寫入 `trusted_hooks.json` 時：全方位註冊
 
