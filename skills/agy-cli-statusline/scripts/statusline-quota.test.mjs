@@ -13,7 +13,10 @@ import {
   stripAnsi,
   getDisplayWidth,
   normalizeLabelStyle,
-  EMOJI_MAP
+  EMOJI_MAP,
+  getGitBranch,
+  getGitDirty,
+  resolveTerminalWidth
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
@@ -1003,6 +1006,113 @@ async function main() {
       console.log("✅ R22 passed! (E2E Emoji statusline rendered cleanly)");
     } finally {
       try { rmSync(homeR22, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // =========================================================================
+    // Test R23: getDisplayWidth accuracy for block elements, box drawing & checkmarks
+    // =========================================================================
+    console.log("Running Test R23: getDisplayWidth accuracy for block elements & quota line wrapping...");
+    assert.strictEqual(getDisplayWidth("█"), 1, "Block element █ must have display width 1");
+    assert.strictEqual(getDisplayWidth("░"), 1, "Block element ░ must have display width 1");
+    assert.strictEqual(getDisplayWidth("│"), 1, "Box drawing │ must have display width 1");
+    assert.strictEqual(getDisplayWidth("✓"), 1, "Checkmark ✓ must have display width 1");
+    assert.strictEqual(getDisplayWidth("✗"), 1, "Cross ✗ must have display width 1");
+    assert.strictEqual(getDisplayWidth("[█████████░]"), 12, "10-char progress bar with brackets must have display width 12");
+    assert.strictEqual(getDisplayWidth("脈絡用量"), 8, "4 CJK chars must have display width 8");
+    assert.strictEqual(getDisplayWidth("🤖"), 2, "Emoji must have display width 2");
+
+    // Verify the exact 4-item quota row from the user's bug report fits within 120 columns (termWidth for 135-col terminal)
+    const quotaRowLine1 = "脈絡用量: 0.0% [░░░░░░░░░░] │ 權杖數: 0 / 1.0M [░░░░░░░░░░] │ 小時倒數: 3h 52m │ 小時重置: 2026/10/16 01:09";
+    const quotaRowLine2 = "小時可用: 88% [████████░░] │ 每週可用: 94% [█████████░] │ 每週倒數: 5d 17h │ 每週重置: 2026/10/21 14:47";
+    assert.ok(getDisplayWidth(quotaRowLine1) <= 120, `Quota line 1 width (${getDisplayWidth(quotaRowLine1)}) must fit in 120 cols`);
+    assert.ok(getDisplayWidth(quotaRowLine2) <= 120, `Quota line 2 width (${getDisplayWidth(quotaRowLine2)}) must fit in 120 cols`);
+    console.log("✅ R23 passed! (getDisplayWidth accurately counts 1-col symbols and prevents premature wrapping)");
+
+    // =========================================================================
+    // Test R24: getGitDirty & getGitBranch do NOT retry fallback binaries when git succeeds or exits non-ENOENT
+    // =========================================================================
+    console.log("Running Test R24: getGitDirty clean repo & getGitBranch non-repo single invocation...");
+    let dirtyCalls = 0;
+    const mockCleanGitExec = async (cmd) => {
+      dirtyCalls++;
+      return { stdout: "", ok: true, notFound: false };
+    };
+    const isDirtyClean = await getGitDirty({ vcs: { type: "git" } }, mockCleanGitExec);
+    assert.strictEqual(isDirtyClean, false, "Clean repo should return false for dirty");
+    assert.strictEqual(dirtyCalls, 1, "Clean repo must invoke git status only once (no fallback path retries)");
+
+    let branchCalls = 0;
+    const mockNonGitExec = async (cmd) => {
+      branchCalls++;
+      return { stdout: "", ok: false, notFound: false }; // git found, but non-zero exit (e.g. not a git repo)
+    };
+    const branchRes = await getGitBranch('zh-tw', '/tmp', mockNonGitExec);
+    assert.strictEqual(branchRes, "無版本控制", "Non-git repo should return '無版本控制'");
+    assert.strictEqual(branchCalls, 1, "Must only run git branch --show-current once with PATH git without probing fallback binaries");
+    console.log("✅ R24 passed! (Subprocess fallback storm eliminated)");
+
+    // =========================================================================
+    // Test R25: resolveTerminalWidth & E2E startup terminal_width fallback from account cache
+    // =========================================================================
+    console.log("Running Test R25: resolveTerminalWidth & E2E startup width stability...");
+    assert.strictEqual(resolveTerminalWidth({ terminal_width: 140 }, { terminalWidth: 160 }), 125, "Explicit width > 80 uses meta.terminal_width - 15");
+    assert.strictEqual(resolveTerminalWidth({ terminal_width: 80 }, { terminalWidth: 150 }), 135, "Default 80 width at startup falls back to cached terminalWidth - 15");
+    assert.strictEqual(resolveTerminalWidth({}, { terminalWidth: 150 }), 135, "Missing terminal_width falls back to cached terminalWidth - 15");
+    assert.strictEqual(resolveTerminalWidth({ terminal_width: 80 }, {}), 65, "Uncached 80 width preserves 80 - 15 = 65");
+
+    // E2E verify: First run with terminal_width=150 caches width; second run with terminal_width=80 (conversation start) keeps 2-line quota block
+    const settingsR25 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: [
+            "context-used", "context-used-bar", "token-count", "token-count-bar", "quota-countdown", "quota-reset-time", "n",
+            "quota", "quota-bar", "quota-weekly", "quota-weekly-bar", "quota-weekly-countdown", "quota-weekly-reset-time"
+          ],
+          barLength: 10,
+          timeFormat: "smart"
+        }
+      }
+    };
+    const cacheR25 = {
+      shortTerm: {
+        gemini: {
+          remaining_percentage: 88,
+          reset_time: "2026-10-16T01:09:00.000Z",
+          refreshes_in: "3h 52m"
+        }
+      },
+      weekly: {
+        gemini: {
+          remaining_percentage: 94,
+          reset_time: "2026-10-21T06:47:00.000Z",
+          refreshes_in: "5d 17h"
+        }
+      },
+      updatedAt: Date.now()
+    };
+    const homeR25 = makeTempHome(cacheR25, settingsR25);
+    try {
+      // Step 1: Normal session with 150-col terminal caches terminalWidth=150
+      await runStatusline({
+        model: { display_name: "Gemini 3.5 Flash (High)" },
+        context_window: { total_input_tokens: 50000, context_window_size: 1000000, used_percentage: 5 },
+        terminal_width: 150
+      }, homeR25);
+
+      // Step 2: Simulate new conversation start where CLI initially passes terminal_width: 80 and 0 context tokens
+      const metaR25Start = {
+        model: { display_name: "Gemini 3.5 Flash (High)" },
+        context_window: { total_input_tokens: 0, context_window_size: 1000000, used_percentage: 0 },
+        terminal_width: 80
+      };
+      const resR25 = await runStatusline(metaR25Start, homeR25);
+      const plainR25Lines = stripAnsi(resR25.stdout).trim().split("\n");
+      assert.strictEqual(resR25.code, 0);
+      assert.strictEqual(plainR25Lines.length, 2, `Expected 2 lines for quota block at conversation start, got ${plainR25Lines.length}:\n${plainR25Lines.join("\n")}`);
+      console.log("✅ R25 passed! (Initial conversation startup maintains stable 2-line quota layout)");
+    } finally {
+      try { rmSync(homeR25, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
   } catch (err) {
