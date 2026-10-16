@@ -69,8 +69,18 @@ export function getDisplayWidth(str) {
   let width = 0;
   for (const ch of str) {
     const cp = ch.codePointAt(0);
-    if (cp === 0xFE0F || cp === 0xFE0E || cp === 0x200D) continue;
-    width += cp > 0x7F ? 2 : 1;
+    if (cp === 0xFE0F || cp === 0xFE0E || cp === 0x200D || (cp >= 0x0300 && cp <= 0x036F)) continue;
+    if (cp <= 0x7F) {
+      width += 1;
+    } else if (
+      (cp >= 0x0080 && cp <= 0x024F) ||
+      (cp >= 0x2500 && cp <= 0x259F) ||
+      cp === 0x2713 || cp === 0x2714 || cp === 0x2717 || cp === 0x2718
+    ) {
+      width += 1;
+    } else {
+      width += 2;
+    }
   }
   return width;
 }
@@ -176,119 +186,120 @@ export const EMOJI_MAP = {
 // ==========================================
 const execAsync = promisify(exec);
 
-async function runCmdAsync(cmd, options = {}) {
+function withTimeout(promise, ms, fallbackVal) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallbackVal), ms);
+  });
+  return Promise.race([
+    promise.then((val) => {
+      clearTimeout(timer);
+      return val;
+    }).catch(() => {
+      clearTimeout(timer);
+      return fallbackVal;
+    }),
+    timeoutPromise
+  ]);
+}
+
+async function runCmdDetailedAsync(cmd, options = {}) {
   const defaultOpts = {
     encoding: 'utf8',
     windowsHide: true,
-    timeout: 1000
+    timeout: 500
   };
   try {
     const { stdout } = await execAsync(cmd, { ...defaultOpts, ...options });
-    return (stdout || '').trim();
+    return { stdout: (stdout || '').trim(), ok: true, notFound: false };
   } catch (err) {
-    return '';
+    const errMsg = `${err?.stderr || ''} ${err?.message || ''}`;
+    const notFound =
+      err?.code === 'ENOENT' ||
+      err?.code === 127 ||
+      /not found|not recognized|找不到|不是內部或外部命令|不是内部或外部命令/i.test(errMsg);
+    return { stdout: (err?.stdout || '').trim(), ok: false, notFound };
   }
 }
 
-async function getGitBranch(lang, projectPath) {
+async function runCmdAsync(cmd, options = {}) {
+  const res = await runCmdDetailedAsync(cmd, options);
+  return res.ok ? res.stdout : '';
+}
+
+function getGitFallbackPaths() {
+  if (process.platform === 'win32') {
+    return [
+      'C:\\Program Files\\Git\\cmd\\git.exe',
+      'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+      'C:\\Program Files\\Git\\bin\\git.exe',
+      '%USERPROFILE%\\AppData\\Local\\Programs\\Git\\cmd\\git.exe',
+      '%USERPROFILE%\\scoop\\apps\\git\\current\\cmd\\git.exe'
+    ].map(p => p.replace(/%USERPROFILE%/g, process.env.USERPROFILE || os.homedir()));
+  }
+  return [
+    '/usr/local/bin/git',
+    '/opt/homebrew/bin/git',
+    '/usr/bin/git'
+  ];
+}
+
+export async function getGitBranch(lang, projectPath, execFn = runCmdDetailedAsync) {
   const normLang = normalizeLanguage(lang);
+  const noVcStr = normLang === 'zh-tw' ? '無版本控制' : (normLang === 'zh-cn' ? '无版本控制' : (normLang === 'jp' ? 'バージョン管理なし' : 'No VC'));
   try {
     const opts = {
       cwd: projectPath || process.cwd()
     };
-    let branch = '';
-    try {
-      branch = await runCmdAsync('git branch --show-current', opts);
-      if (!branch) {
-        branch = await runCmdAsync('git rev-parse --abbrev-ref HEAD', opts);
-      }
-    } catch (e) {}
+    const res = await execFn('git branch --show-current', opts);
+    if (res.ok) {
+      if (res.stdout) return res.stdout;
+      const revRes = await execFn('git rev-parse --abbrev-ref HEAD', opts);
+      return (revRes.ok && revRes.stdout) ? revRes.stdout : noVcStr;
+    }
 
-    if (!branch) {
-      if (process.platform === 'win32') {
-        const paths = [
-          'C:\\Program Files\\Git\\cmd\\git.exe',
-          'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-          'C:\\Program Files\\Git\\bin\\git.exe',
-          '%USERPROFILE%\\AppData\\Local\\Programs\\Git\\cmd\\git.exe',
-          '%USERPROFILE%\\scoop\\apps\\git\\current\\cmd\\git.exe'
-        ].map(p => p.replace(/%USERPROFILE%/g, process.env.USERPROFILE || os.homedir()));
-        for (const gitPath of paths) {
-          try {
-            await fs.access(gitPath);
-            branch = await runCmdAsync(`"${gitPath}" branch --show-current`, opts);
-            if (!branch) {
-              branch = await runCmdAsync(`"${gitPath}" rev-parse --abbrev-ref HEAD`, opts);
-            }
-            if (branch) break;
-          } catch (e) {}
-        }
-      } else {
-        const paths = [
-          '/usr/local/bin/git',
-          '/opt/homebrew/bin/git',
-          '/usr/bin/git'
-        ];
-        for (const gitPath of paths) {
-          try {
-            await fs.access(gitPath);
-            branch = await runCmdAsync(`"${gitPath}" branch --show-current`, opts);
-            if (!branch) {
-              branch = await runCmdAsync(`"${gitPath}" rev-parse --abbrev-ref HEAD`, opts);
-            }
-            if (branch) break;
-          } catch (e) {}
-        }
+    if (res.notFound) {
+      const paths = getGitFallbackPaths();
+      for (const gitPath of paths) {
+        try {
+          await fs.access(gitPath);
+          const fbRes = await execFn(`"${gitPath}" branch --show-current`, opts);
+          if (fbRes.ok && fbRes.stdout) return fbRes.stdout;
+          if (fbRes.ok) {
+            const fbRev = await execFn(`"${gitPath}" rev-parse --abbrev-ref HEAD`, opts);
+            return (fbRev.ok && fbRev.stdout) ? fbRev.stdout : noVcStr;
+          }
+          break;
+        } catch (e) {}
       }
     }
-    return branch || (normLang === 'zh-tw' ? '無版本控制' : (normLang === 'zh-cn' ? '无版本控制' : (normLang === 'jp' ? 'バージョン管理なし' : 'No VC')));
+    return noVcStr;
   } catch (e) {
-    return normLang === 'zh-tw' ? '無版本控制' : (normLang === 'zh-cn' ? '无版本控制' : (normLang === 'jp' ? 'バージョン管理なし' : 'No VC'));
+    return noVcStr;
   }
 }
 
-async function getGitDirty(projectPath) {
+export async function getGitDirty(projectPath, execFn = runCmdDetailedAsync) {
   try {
     const opts = {
       cwd: projectPath || process.cwd()
     };
-    let out = '';
-    try {
-      out = await runCmdAsync('git status --porcelain', opts);
-    } catch (err) {}
+    const res = await execFn('git status --porcelain', opts);
+    if (res.ok) {
+      return res.stdout.length > 0;
+    }
 
-    if (!out) {
-      if (process.platform === 'win32') {
-        const paths = [
-          'C:\\Program Files\\Git\\cmd\\git.exe',
-          'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-          'C:\\Program Files\\Git\\bin\\git.exe',
-          '%USERPROFILE%\\AppData\\Local\\Programs\\Git\\cmd\\git.exe',
-          '%USERPROFILE%\\scoop\\apps\\git\\current\\cmd\\git.exe'
-        ].map(p => p.replace(/%USERPROFILE%/g, process.env.USERPROFILE || os.homedir()));
-        for (const gitPath of paths) {
-          try {
-            await fs.access(gitPath);
-            out = await runCmdAsync(`"${gitPath}" status --porcelain`, opts);
-            if (out) break;
-          } catch (e) {}
-        }
-      } else {
-        const paths = [
-          '/usr/local/bin/git',
-          '/opt/homebrew/bin/git',
-          '/usr/bin/git'
-        ];
-        for (const gitPath of paths) {
-          try {
-            await fs.access(gitPath);
-            out = await runCmdAsync(`"${gitPath}" status --porcelain`, opts);
-            if (out) break;
-          } catch (e) {}
-        }
+    if (res.notFound) {
+      const paths = getGitFallbackPaths();
+      for (const gitPath of paths) {
+        try {
+          await fs.access(gitPath);
+          const fbRes = await execFn(`"${gitPath}" status --porcelain`, opts);
+          return fbRes.ok ? fbRes.stdout.length > 0 : false;
+        } catch (e) {}
       }
     }
-    return out.trim().length > 0;
+    return false;
   } catch (e) {
     return false;
   }
@@ -701,6 +712,21 @@ async function calculateContextUsageAsync(meta, conversationId) {
   return { totalInput, contextSize, usedPctNum };
 }
 
+export function resolveTerminalWidth(meta, cachedAccount = {}) {
+  const rawWidth = typeof meta?.terminal_width === 'number' ? meta.terminal_width : 0;
+  if (rawWidth > 80) {
+    return Math.max(40, rawWidth - 15);
+  }
+  if (cachedAccount?.terminalWidth && cachedAccount.terminalWidth > 80) {
+    return Math.max(40, cachedAccount.terminalWidth - 15);
+  }
+  if (rawWidth > 0) {
+    return Math.max(40, rawWidth - 15);
+  }
+  const fallbackCols = process.stdout?.columns || 135;
+  return Math.max(40, fallbackCols - 15);
+}
+
 async function manageAccountMetaCacheAsync(meta) {
   const accountMetaPath = join(os.homedir(), '.gemini', 'tmp', 'account_meta_cache.json');
   let cachedAccount = {};
@@ -711,10 +737,23 @@ async function manageAccountMetaCacheAsync(meta) {
   
   const email = meta?.email || meta?.account?.email;
   const planTier = meta?.plan_tier || meta?.account?.plan_tier;
+  const termWidth = (typeof meta?.terminal_width === 'number' && meta.terminal_width > 80) ? meta.terminal_width : 0;
 
-  if (email || planTier) {
-    if (email) cachedAccount.email = email;
-    if (planTier) cachedAccount.planTier = planTier;
+  let updated = false;
+  if (email && cachedAccount.email !== email) {
+    cachedAccount.email = email;
+    updated = true;
+  }
+  if (planTier && cachedAccount.planTier !== planTier) {
+    cachedAccount.planTier = planTier;
+    updated = true;
+  }
+  if (termWidth && cachedAccount.terminalWidth !== termWidth) {
+    cachedAccount.terminalWidth = termWidth;
+    updated = true;
+  }
+
+  if (updated) {
     try {
       await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
       await writeFileAndVerifyNoBOM(accountMetaPath, JSON.stringify(cachedAccount));
@@ -757,6 +796,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const normLang = normalizeLanguage(lang);
   const unknownStr = (normLang === 'zh-tw' || normLang === 'zh-cn') ? '未知' : (normLang === 'jp' ? '不明' : 'Unknown');
   const noneStr = normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A'));
+  const noVcFallback = normLang === 'zh-tw' ? '無版本控制' : (normLang === 'zh-cn' ? '无版本控制' : (normLang === 'jp' ? 'バージョン管理なし' : 'No VC'));
 
   // Quota
   const quotaPct = quotaInfo.remaining_percentage;
@@ -809,7 +849,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
 
   const countersCachePath = join(os.homedir(), '.gemini', 'tmp', 'statusline_counters.json');
 
-  // 併行執行非同步操作
+  // 併行執行非同步操作（含逾時保護避免系統休眠喚醒時被 CLI SIGKILL）
   const [
     gitBranch,
     vcsDirtyFlag,
@@ -822,15 +862,15 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     // 1. Git 分支
     (typeof meta?.vcs?.branch === 'string' && meta.vcs.branch)
       ? Promise.resolve(meta.vcs.branch)
-      : getGitBranch(normLang, projectPath),
+      : withTimeout(getGitBranch(normLang, projectPath), 600, noVcFallback),
 
     // 2. Git Dirty
     (typeof meta?.vcs?.dirty === 'boolean')
       ? Promise.resolve(meta.vcs.dirty)
-      : getGitDirty(projectPath),
+      : withTimeout(getGitDirty(projectPath), 600, false),
 
     // 3. Memory
-    getCliMemoryMB(),
+    withTimeout(getCliMemoryMB(), 600, Math.round(process.memoryUsage().rss / 1024 / 1024)),
 
     // 4. Pending Input
     getMetricValueAsync(
@@ -1251,8 +1291,11 @@ async function main() {
     const stdinStr = await readStdin();
     try { if (stdinStr.trim()) meta = JSON.parse(stdinStr.replace(/^\uFEFF/, '')); } catch (e) {}
 
-    const settings = await getSettingsAsync(meta);
-    const termWidth = Math.max(40, (meta?.terminal_width || process.stdout.columns || 80) - 15);
+    const [settings, cachedAccount] = await Promise.all([
+      getSettingsAsync(meta),
+      manageAccountMetaCacheAsync(meta)
+    ]);
+    const termWidth = resolveTerminalWidth(meta, cachedAccount);
     
     let fallbackModel = 'Gemini 3.5 Flash (High)';
     if (meta?.model?.display_name) fallbackModel = meta.model.display_name;
@@ -1304,7 +1347,6 @@ async function main() {
     const quotaInfo = resolveModelQuota(fallbackModel, cache);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
     const contextInfo = await calculateContextUsageAsync(meta, conversationId);
-    const cachedAccount = await manageAccountMetaCacheAsync(meta);
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
     const barLength = settings?.ui?.footer?.barLength || settings?.ui?.barLength || 10;
