@@ -80,6 +80,7 @@ function inspectSettings(label, path) {
   console.log(describeStatusLine(p.value.statusLine));
   console.log('ui.language: ' + JSON.stringify(p.value?.ui?.language));
   console.log('ui.footer.labelStyle: ' + JSON.stringify(p.value?.ui?.footer?.labelStyle));
+  console.log('ui.footer.itemStyles: ' + JSON.stringify(p.value?.ui?.footer?.itemStyles));
   console.log(describeFooterItems(p.value?.ui));
   return { exists: true, readable: true, parsed: true, data: p.value };
 }
@@ -140,6 +141,7 @@ function diagnose(layers) {
   const effectiveEnabled = cli?.statusLine?.enabled ?? project?.statusLine?.enabled ?? global?.statusLine?.enabled;
   const effectiveItems = cli?.ui?.footer?.items ?? project?.ui?.footer?.items ?? global?.ui?.footer?.items;
   const effectiveLabelStyle = cli?.ui?.footer?.labelStyle ?? project?.ui?.footer?.labelStyle ?? global?.ui?.footer?.labelStyle ?? 'text';
+  const effectiveItemStyles = cli?.ui?.footer?.itemStyles ?? project?.ui?.footer?.itemStyles ?? global?.ui?.footer?.itemStyles;
 
   if (cli && 'statusLine' in cli && (cli.statusLine?.command === '' || cli.statusLine?.command === undefined)) {
     findings.push(alert('CLI 專屬層的 statusLine.command 為空或缺失 → agy CLI 不會呼叫 hook → 狀態列空白'));
@@ -155,6 +157,7 @@ function diagnose(layers) {
     findings.push(ok('三層合併後狀態列設定看似完整。'));
     findings.push(`   有效 command: ${effectiveCmd}`);
     findings.push(`   有效 labelStyle: ${effectiveLabelStyle}`);
+    findings.push(`   有效 itemStyles: ${JSON.stringify(effectiveItemStyles)}`);
     findings.push(`   有效 items（${effectiveItems.length}）: ${effectiveItems.join(', ')}`);
     findings.push(dim('   若仍看不到狀態列，請確認：(a) Node.js 是否可在 agy 環境中執行 (b) hook 檔案是否存在'));
   }

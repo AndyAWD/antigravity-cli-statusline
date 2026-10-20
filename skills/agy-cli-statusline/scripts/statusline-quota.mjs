@@ -336,7 +336,7 @@ async function getCliMemoryMB() {
 async function readStdin() {
   return new Promise((resolve) => {
     let data = '';
-    let timer = setTimeout(() => resolve(data), 50);
+    let timer = setTimeout(() => resolve(data), 300);
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', chunk => data += chunk);
     process.stdin.on('end', () => { clearTimeout(timer); resolve(data); });
@@ -384,6 +384,12 @@ async function getSettingsAsync(meta) {
   // 防禦：若設定檔中遺留測試主題（如 dino 或非標準屬性），主動清除以避免干擾
   if (settings?.ui?.footer?.theme) {
     delete settings.ui.footer.theme;
+  }
+  if (settings?.ui?.footer?.style) {
+    delete settings.ui.footer.style;
+  }
+  if (settings?.ui?.labelStyle) {
+    delete settings.ui.labelStyle;
   }
 
   return settings;
@@ -1026,7 +1032,12 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   };
 }
 
-export function buildI18nDict(lang, m, labelStyle = 'text') {
+export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefined) {
+  if (typeof labelStyle === 'object' && labelStyle !== null && !Array.isArray(labelStyle)) {
+    itemStyles = labelStyle;
+    labelStyle = 'text';
+  }
+  const normGlobalStyle = normalizeLabelStyle(labelStyle);
   const dicts = {
     'zh-tw': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
@@ -1183,33 +1194,83 @@ export function buildI18nDict(lang, m, labelStyle = 'text') {
   };
   const normLang = normalizeLanguage(lang);
   const baseDict = dicts[normLang] || dicts['zh-tw'];
-  if (normalizeLabelStyle(labelStyle) === 'emoji') {
-    const emojiDict = {};
-    for (const [key, val] of Object.entries(baseDict)) {
-      const emoji = EMOJI_MAP[key];
-      if (emoji && val.startsWith(WHITE)) {
-        const afterWhite = val.slice(WHITE.length);
-        const colonIdx = afterWhite.indexOf(':');
-        if (colonIdx !== -1) {
-          emojiDict[key] = `${WHITE}${emoji}${afterWhite.slice(colonIdx + 1)}`;
-          continue;
-        }
+
+  const emojiDict = {};
+  for (const [key, val] of Object.entries(baseDict)) {
+    const emoji = EMOJI_MAP[key];
+    if (emoji && val.startsWith(WHITE)) {
+      const afterWhite = val.slice(WHITE.length);
+      const colonIdx = afterWhite.indexOf(':');
+      if (colonIdx !== -1) {
+        emojiDict[key] = `${WHITE}${emoji}${afterWhite.slice(colonIdx + 1)}`;
+        continue;
       }
-      emojiDict[key] = val;
     }
+    emojiDict[key] = val;
+  }
+
+  const hasItemStyles = itemStyles !== undefined && itemStyles !== null && typeof itemStyles === 'object' && !Array.isArray(itemStyles);
+
+  if (!hasItemStyles && normGlobalStyle === 'emoji') {
     return emojiDict;
   }
-  return baseDict;
+  if (!hasItemStyles && normGlobalStyle === 'text') {
+    return baseDict;
+  }
+
+  const resultDict = {};
+  for (const key of Object.keys(baseDict)) {
+    let effectiveStyle;
+    if (itemStyles && itemStyles[key]) {
+      effectiveStyle = normalizeLabelStyle(itemStyles[key]);
+    } else if (key.includes('+')) {
+      const pair = ADJACENT_PAIRS.find(p => p.merged === key);
+      const valKey = pair ? pair.val : key.split('+')[0];
+      const barKey = pair ? pair.bar : (key.split('+')[0] + '-bar');
+      const valStyle = (itemStyles && itemStyles[valKey]) ? normalizeLabelStyle(itemStyles[valKey]) : (hasItemStyles ? 'text' : normGlobalStyle);
+      const barStyle = (itemStyles && itemStyles[barKey]) ? normalizeLabelStyle(itemStyles[barKey]) : (hasItemStyles ? 'text' : normGlobalStyle);
+      if (valStyle === barStyle) {
+        effectiveStyle = valStyle;
+      } else {
+        effectiveStyle = 'text';
+      }
+    } else if (hasItemStyles) {
+      effectiveStyle = 'text'; // 未設定者一律強制以文字為預設
+    } else {
+      effectiveStyle = normGlobalStyle;
+    }
+
+    resultDict[key] = (effectiveStyle === 'emoji') ? emojiDict[key] : baseDict[key];
+  }
+
+  return resultDict;
 }
 
-export function preprocessAdjacentItems(items) {
+export const ADJACENT_PAIRS = [
+  { val: 'quota', bar: 'quota-bar', merged: 'quota+bar' },
+  { val: 'context-used', bar: 'context-used-bar', merged: 'context-used+bar' },
+  { val: 'quota-weekly', bar: 'quota-weekly-bar', merged: 'quota-weekly+bar' },
+  { val: 'token-count', bar: 'token-count-bar', merged: 'token-count+bar' }
+];
+
+export function preprocessAdjacentItems(items, itemStyles = undefined, defaultStyle = 'text') {
   if (!Array.isArray(items)) return [];
-  const pairs = [
-    { val: 'quota', bar: 'quota-bar', merged: 'quota+bar' },
-    { val: 'context-used', bar: 'context-used-bar', merged: 'context-used+bar' },
-    { val: 'quota-weekly', bar: 'quota-weekly-bar', merged: 'quota-weekly+bar' },
-    { val: 'token-count', bar: 'token-count-bar', merged: 'token-count+bar' }
-  ];
+  if (typeof itemStyles === 'string') {
+    defaultStyle = itemStyles;
+    itemStyles = undefined;
+  }
+  const pairs = ADJACENT_PAIRS;
+
+  const hasItemStyles = itemStyles !== undefined && itemStyles !== null && typeof itemStyles === 'object' && !Array.isArray(itemStyles);
+  function getItemEffectiveStyle(item) {
+    if (itemStyles && itemStyles[item]) {
+      return normalizeLabelStyle(itemStyles[item]);
+    }
+    if (hasItemStyles) {
+      return 'text'; // 未設定者一律強制以文字為預設
+    }
+    return normalizeLabelStyle(defaultStyle || 'text');
+  }
 
   const result = [];
   for (let i = 0; i < items.length; i++) {
@@ -1221,9 +1282,14 @@ export function preprocessAdjacentItems(items) {
         (cur === p.val && next === p.bar) || (cur === p.bar && next === p.val)
       );
       if (match) {
-        result.push(match.merged);
-        i++;
-        continue;
+        const curStyle = getItemEffectiveStyle(cur);
+        const nextStyle = getItemEffectiveStyle(next);
+        if (curStyle === nextStyle) {
+          result.push(match.merged);
+          i++;
+          continue;
+        }
+        // 若樣式衝突（一為 text、一為 emoji）則不合併，拆開為兩個獨立區塊顯示
       }
     }
     result.push(cur);
@@ -1231,10 +1297,10 @@ export function preprocessAdjacentItems(items) {
   return result;
 }
 
-export function renderStatusLine(footerItems, activeDict, termWidth, fallbackModel) {
+export function renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, itemStyles = undefined, defaultStyle = 'text') {
   const lines = [];
   let currentLine = '';
-  const processedItems = preprocessAdjacentItems(footerItems || []);
+  const processedItems = preprocessAdjacentItems(footerItems || [], itemStyles, defaultStyle);
   
   for (let i = 0; i < processedItems.length; i++) {
     const item = processedItems[i];
@@ -1351,11 +1417,12 @@ async function main() {
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
     const barLength = settings?.ui?.footer?.barLength || settings?.ui?.barLength || 10;
     const labelStyle = normalizeLabelStyle(settings?.ui?.footer?.labelStyle || settings?.ui?.footer?.style || settings?.ui?.labelStyle || 'text');
+    const rawItemStyles = settings?.ui?.footer?.itemStyles;
 
     // 格式化指標並繪製
     const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength });
-    const activeDict = buildI18nDict(lang, metrics, labelStyle);
-    renderStatusLine(footerItems, activeDict, termWidth, fallbackModel);
+    const activeDict = buildI18nDict(lang, metrics, labelStyle, rawItemStyles);
+    renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, rawItemStyles, labelStyle);
 
   } catch (err) {
     try {
