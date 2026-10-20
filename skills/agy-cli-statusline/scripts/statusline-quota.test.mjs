@@ -1115,6 +1115,314 @@ async function main() {
       try { rmSync(homeR25, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
+    // =========================================================================
+    // Test R26: Verifying itemStyles, style conflict in adjacent items (no merge on conflict, merge when matched)
+    // =========================================================================
+    console.log("\n[Test R26] Verifying itemStyles, style conflict in adjacent items & E2E rendering...");
+    
+    // 1. preprocessAdjacentItems with itemStyles
+    // Case A: Style conflict (quota is emoji, quota-bar is text / default) -> DO NOT MERGE
+    assert.deepStrictEqual(
+      preprocessAdjacentItems(['quota', 'quota-bar'], { quota: 'emoji' }),
+      ['quota', 'quota-bar'],
+      'Style conflict (emoji vs text) must NOT merge into quota+bar'
+    );
+    assert.deepStrictEqual(
+      preprocessAdjacentItems(['quota', 'quota-bar'], { 'quota-bar': 'emoji' }),
+      ['quota', 'quota-bar'],
+      'Style conflict (text vs emoji) must NOT merge into quota+bar'
+    );
+
+    // Case B: Same style (both emoji) -> DO MERGE
+    assert.deepStrictEqual(
+      preprocessAdjacentItems(['quota', 'quota-bar'], { quota: 'emoji', 'quota-bar': 'emoji' }),
+      ['quota+bar'],
+      'Matching emoji styles must merge into quota+bar'
+    );
+
+    // Case C: Same style (both text / empty itemStyles) -> DO MERGE
+    assert.deepStrictEqual(
+      preprocessAdjacentItems(['quota', 'quota-bar'], {}),
+      ['quota+bar'],
+      'Default matching text styles must merge into quota+bar'
+    );
+
+    // Case D: Other adjacent pairs with conflict
+    assert.deepStrictEqual(
+      preprocessAdjacentItems(['context-used', 'context-used-bar'], { 'context-used': 'emoji' }),
+      ['context-used', 'context-used-bar'],
+      'Context bar conflict must NOT merge'
+    );
+    assert.deepStrictEqual(
+      preprocessAdjacentItems(['quota-weekly', 'quota-weekly-bar'], { 'quota-weekly': 'emoji' }),
+      ['quota-weekly', 'quota-weekly-bar'],
+      'Weekly quota bar conflict must NOT merge'
+    );
+    assert.deepStrictEqual(
+      preprocessAdjacentItems(['token-count', 'token-count-bar'], { 'token-count-bar': 'emoji' }),
+      ['token-count', 'token-count-bar'],
+      'Token count bar conflict must NOT merge'
+    );
+
+    // 2. buildI18nDict with itemStyles
+    const dictR26 = buildI18nDict('zh-tw', dummyMetrics, 'text', { quota: 'emoji' });
+    const plainQuotaR26 = stripAnsi(dictR26['quota']);
+    const plainBarR26 = stripAnsi(dictR26['quota-bar']);
+    const plainModelR26 = stripAnsi(dictR26['model-name']);
+
+    assert.ok(plainQuotaR26.includes('🔋 88%'), 'Quota with emoji style must render 🔋 88%');
+    assert.ok(!plainQuotaR26.includes('小時可用:'), 'Quota with emoji style must not have text label');
+    assert.ok(plainBarR26.includes('小時可用: [████████░░]'), 'Quota-bar without emoji style must default to text label');
+    assert.ok(plainModelR26.includes('模型: Gemini 3.5 Flash'), 'Model without emoji style must default to text label');
+
+    // 2b. buildI18nDict when both paired items are emoji -> MUST render with emoji prefix
+    const dictR26Both = buildI18nDict('zh-tw', dummyMetrics, 'text', {
+      'quota': 'emoji',
+      'quota-bar': 'emoji',
+      'context-used': 'emoji',
+      'context-used-bar': 'emoji',
+      'quota-weekly': 'emoji',
+      'quota-weekly-bar': 'emoji',
+      'token-count': 'emoji',
+      'token-count-bar': 'emoji'
+    });
+    const plainQuotaBarBoth = stripAnsi(dictR26Both['quota+bar']);
+    const plainContextBarBoth = stripAnsi(dictR26Both['context-used+bar']);
+    const plainWeeklyBarBoth = stripAnsi(dictR26Both['quota-weekly+bar']);
+    const plainTokenBarBoth = stripAnsi(dictR26Both['token-count+bar']);
+
+    assert.ok(plainQuotaBarBoth.includes('🔋 88% [████████░░]'), 'Merged quota+bar when both are emoji must render 🔋');
+    assert.ok(!plainQuotaBarBoth.includes('小時可用:'), 'Merged quota+bar with emoji must not contain text label');
+    assert.ok(plainContextBarBoth.includes('🧠 15.2% [█░░░░░░░░░]'), 'Merged context-used+bar when both are emoji must render 🧠');
+    assert.ok(plainWeeklyBarBoth.includes('📅 90% [█████████░]'), 'Merged quota-weekly+bar when both are emoji must render 📅');
+    assert.ok(plainTokenBarBoth.includes('🪙 12.5k / 1.0M [██░░░░░░░░]'), 'Merged token-count+bar when both are emoji must render 🪙');
+
+    // 3. E2E execution with itemStyles
+    // 3a. Style conflict test: quota=emoji, quota-bar=text -> separate
+    const settingsR26 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: [
+            "model-name",
+            "quota",
+            "quota-bar",
+            "git-branch"
+          ],
+          itemStyles: {
+            "quota": "emoji",
+            "git-branch": "emoji"
+          }
+        }
+      }
+    };
+    const cacheR26 = {
+      updatedAt: Date.now(),
+      accountEmail: "dev@example.com",
+      planTier: "Pro",
+      models: {
+        "gemini 3.1 pro": {
+          remaining_percentage: 90,
+          reset_time: new Date(Date.now() + 3600 * 1000).toISOString()
+        }
+      }
+    };
+    const metaR26 = {
+      model: { display_name: "Gemini 3.1 Pro" },
+      vcs: { type: "git", branch: "feat/styles", dirty: false },
+      terminal_width: 140
+    };
+    const homeR26 = makeTempHome(cacheR26, settingsR26);
+    try {
+      const resR26 = await runStatusline(metaR26, homeR26);
+      const plainR26 = stripAnsi(resR26.stdout).trim();
+      console.log("R26 Output:", JSON.stringify(resR26.stdout));
+
+      assert.strictEqual(resR26.code, 0);
+      assert.ok(plainR26.includes("模型: Gemini 3.1 Pro"), "model-name without override must be text");
+      assert.ok(plainR26.includes("🔋 90%"), "quota with emoji override must be emoji");
+      assert.ok(plainR26.includes("小時可用: [█████████░]"), "quota-bar without override must be text");
+      assert.ok(plainR26.includes("🌿 feat/styles"), "git-branch with emoji override must be emoji");
+      assert.ok(plainR26.includes("🔋 90% │ 小時可用: [█████████░]"), "Style conflict must prevent merge and render as two separate blocks");
+      console.log("✅ R26 style conflict separation passed!");
+    } finally {
+      try { rmSync(homeR26, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // 3b. Matching emoji test: both quota and quota-bar are emoji -> merged with 🔋
+    const settingsR26Merged = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: [
+            "model-name",
+            "quota",
+            "quota-bar",
+            "git-branch"
+          ],
+          itemStyles: {
+            "quota": "emoji",
+            "quota-bar": "emoji",
+            "git-branch": "emoji"
+          }
+        }
+      }
+    };
+    const homeR26Merged = makeTempHome(cacheR26, settingsR26Merged);
+    try {
+      const resR26Merged = await runStatusline(metaR26, homeR26Merged);
+      const plainR26Merged = stripAnsi(resR26Merged.stdout).trim();
+      console.log("R26 Merged Output:", JSON.stringify(resR26Merged.stdout));
+
+      assert.strictEqual(resR26Merged.code, 0);
+      assert.ok(plainR26Merged.includes("模型: Gemini 3.1 Pro"), "model-name without override must be text");
+      assert.ok(plainR26Merged.includes("🔋 90% [█████████░]"), "Both quota and quota-bar with emoji override must merge into 🔋 90% [█████████░]");
+      assert.ok(!plainR26Merged.includes("小時可用:"), "Merged emoji bar must not contain text label");
+      assert.ok(plainR26Merged.includes("🌿 feat/styles"), "git-branch with emoji override must be emoji");
+      console.log("✅ R26 matching emoji merged passed!");
+    } finally {
+      try { rmSync(homeR26Merged, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // =========================================================================
+    // Test R27: All pure numbers / skipped sorting with itemStyles: {} and residual labelStyle: "emoji"
+    // MUST strictly enforce text style across all indicators (Defects 1 & 2 regression test)
+    // =========================================================================
+    console.log("\n[Test R27] Verifying pure numbers / skipped sorting (itemStyles: {}) with residual labelStyle: 'emoji' enforces text style...");
+
+    // 1. Unit test: buildI18nDict with itemStyles: {} and global labelStyle: 'emoji'
+    const dictR27 = buildI18nDict('zh-tw', dummyMetrics, 'emoji', {});
+    const baseTextDict = buildI18nDict('zh-tw', dummyMetrics, 'text');
+    for (const key of Object.keys(baseTextDict)) {
+      const rendered = stripAnsi(dictR27[key]);
+      const expectedText = stripAnsi(baseTextDict[key]);
+      assert.strictEqual(
+        rendered,
+        expectedText,
+        `Metric "${key}" with itemStyles: {} must strictly match base text dict, got: "${rendered}"`
+      );
+      if (EMOJI_MAP[key]) {
+        assert.ok(
+          !rendered.startsWith(EMOJI_MAP[key]),
+          `Metric "${key}" must NOT start with emoji "${EMOJI_MAP[key]}" when itemStyles is {}`
+        );
+      }
+    }
+
+    // 2. Unit test: preprocessAdjacentItems with itemStyles: {} and defaultStyle: 'emoji'
+    const mergedR27 = preprocessAdjacentItems(['quota', 'quota-bar'], {}, 'emoji');
+    assert.deepStrictEqual(
+      mergedR27,
+      ['quota+bar'],
+      'preprocessAdjacentItems with itemStyles: {} and defaultStyle: "emoji" must resolve items to "text" and merge'
+    );
+
+    // 2b. Unit test: preprocessAdjacentItems with 2nd argument as defaultStyle string 'emoji'
+    const mergedStringStyle = preprocessAdjacentItems(['quota', 'quota-bar'], 'emoji');
+    assert.deepStrictEqual(
+      mergedStringStyle,
+      ['quota+bar'],
+      'preprocessAdjacentItems with 2nd argument as string "emoji" must correctly treat it as defaultStyle'
+    );
+
+    // 2c. Unit test: Array defense for itemStyles in buildI18nDict and preprocessAdjacentItems
+    const arrayGuardDict = buildI18nDict('zh-tw', dummyMetrics, 'emoji', []);
+    assert.strictEqual(
+      stripAnsi(arrayGuardDict['model-name']),
+      '🤖 Gemini 3.5 Flash',
+      'buildI18nDict with itemStyles as array [] must NOT be treated as sparse style object'
+    );
+    const arrayGuardMerged = preprocessAdjacentItems(['quota', 'quota-bar'], []);
+    assert.deepStrictEqual(
+      arrayGuardMerged,
+      ['quota+bar'],
+      'preprocessAdjacentItems with array [] itemStyles must safely merge without throwing'
+    );
+
+    // 3. E2E test: settings containing residual labelStyle: "emoji" and itemStyles: {}
+    const settingsR27 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          labelStyle: "emoji", // residual old setting
+          itemStyles: {},      // Step 4 pure numbers generates empty sparse dictionary
+          items: [
+            "model-name",
+            "quota",
+            "quota-bar",
+            "git-branch",
+            "vcs-dirty",
+            "tool-confirmation"
+          ]
+        }
+      }
+    };
+    const cacheR27 = {
+      updatedAt: Date.now(),
+      accountEmail: "dev@example.com",
+      planTier: "Pro",
+      models: {
+        "gemini 3.1 pro": {
+          remaining_percentage: 90,
+          reset_time: new Date(Date.now() + 3600 * 1000).toISOString()
+        }
+      }
+    };
+    const metaR27 = {
+      model: { display_name: "Gemini 3.1 Pro" },
+      vcs: { type: "git", branch: "feat/pure-numbers", dirty: false },
+      has_tool_confirmation: false,
+      terminal_width: 140
+    };
+    const homeR27 = makeTempHome(cacheR27, settingsR27);
+    try {
+      const resR27 = await runStatusline(metaR27, homeR27);
+      const plainR27 = stripAnsi(resR27.stdout).trim();
+      console.log("R27 Output:", JSON.stringify(resR27.stdout));
+
+      assert.strictEqual(resR27.code, 0);
+      assert.ok(plainR27.includes("模型: Gemini 3.1 Pro"), "Must render text label '模型:'");
+      assert.ok(plainR27.includes("小時可用: 90% [█████████░]"), "Must render merged quota+bar with text label '小時可用:'");
+      assert.ok(plainR27.includes("Git: feat/pure-numbers"), "Must render text label 'Git:'");
+      assert.ok(plainR27.includes("工作區狀態: ✓ 乾淨"), "Must render text label '工作區狀態:'");
+      assert.ok(plainR27.includes("工具待確認: 都好了"), "Must render text label '工具待確認:'");
+
+      // Verify no emoji prefixes leaked into the statusline
+      assert.ok(!plainR27.includes("🤖"), "Must NOT contain robot emoji");
+      assert.ok(!plainR27.includes("🔋"), "Must NOT contain battery emoji");
+      assert.ok(!plainR27.includes("🌿"), "Must NOT contain branch emoji");
+      assert.ok(!plainR27.includes("📝"), "Must NOT contain dirty emoji");
+      assert.ok(!plainR27.includes("🔔"), "Must NOT contain bell emoji");
+      console.log("✅ R27 pure numbers text enforcement passed!");
+    } finally {
+      try { rmSync(homeR27, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // 4. Backward compatibility E2E test: legacy settings with labelStyle: "emoji" and NO itemStyles key
+    const settingsLegacy = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          labelStyle: "emoji",
+          items: ["model-name", "quota", "quota-bar", "git-branch"]
+        }
+      }
+    };
+    const homeLegacy = makeTempHome(cacheR27, settingsLegacy);
+    try {
+      const resLegacy = await runStatusline(metaR27, homeLegacy);
+      const plainLegacy = stripAnsi(resLegacy.stdout).trim();
+      console.log("Legacy Emoji Output:", JSON.stringify(resLegacy.stdout));
+
+      assert.strictEqual(resLegacy.code, 0);
+      assert.ok(plainLegacy.includes("🤖 Gemini 3.1 Pro"), "Legacy config without itemStyles must preserve emoji mode");
+      assert.ok(plainLegacy.includes("🔋 90% [█████████░]"), "Legacy config must preserve merged emoji bar");
+      assert.ok(plainLegacy.includes("🌿 feat/pure-numbers"), "Legacy config must preserve emoji branch");
+      console.log("✅ Legacy emoji backward compatibility passed!");
+    } finally {
+      try { rmSync(homeLegacy, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;
