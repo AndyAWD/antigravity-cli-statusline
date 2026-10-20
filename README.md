@@ -122,8 +122,8 @@ Once installed, trigger the configuration workflow using the slash command:
 - **How It Works**:
   1. Prompts for display language selection and locks the session output to that locale.
   2. Verifies Node.js environment availability and inspects the three-layer `settings.json` files.
-  3. Prompts for label display style (`text` vs. `emoji`) and presents a 32-item multi-select checklist of statusline indicators.
-  4. Accepts a custom comma-separated sort order (supporting `n` newline tokens), writes `ui.footer.labelStyle` and `ui.footer.items` across all three `settings.json` layers, and deploys hook scripts to `~/.gemini/antigravity-cli/hooks/`.
+  3. Sequentially prompts for indicator selection across 5 categorized tabs from `questions.json`, avoiding terminal screen height truncation (Issue #1262).
+  4. Displays selected indicators and accepts a custom sort order with individual style prefixes (supporting plain numbers, `t` text prefix, `e` emoji prefix, and `n` newline tokens), writing `ui.footer.items` and `ui.footer.itemStyles` across all three `settings.json` layers, and deploys hook scripts to `~/.gemini/antigravity-cli/hooks/`.
 
 ---
 
@@ -131,66 +131,67 @@ Once installed, trigger the configuration workflow using the slash command:
 
 ### Available Indicators (1–32)
 
-The numbers below correspond to the 1-based option indices in Step 3 (`resources/questions.json`), along with each indicator's Emoji prefix used in `emoji` mode:
+The numbers below correspond to the 1-based option indices across the 5 categories in Step 3 (`resources/questions.json`), along with each indicator's Emoji prefix used in `emoji` mode:
 
-**AI Model & Agent**
+**1. Model & Agent (4 items)**
 - `1.` 🤖 **Current AI model name (`model-name`)** — the model serving the current conversation
 - `2.` 🎭 **Active agent profile (`agent-profile`)** — the loaded Agent Profile name
 - `3.` ⚡ **Agent state (`agent-state`)** — `idle / thinking / working / tool_use / initializing`
-- `4.` 🔒 **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
-- `32.` 🧭 **Current running mode (`mode`)** — `default / code-only / plan / interactive / accept-edits`
+- `4.` 🧭 **Current running mode (`mode`)** — `default / code-only / plan / interactive / accept-edits`
 
-**Quota & Tokens**
-- `5.` 🧠 **Context used percentage (`context-used`)** — percentage of context window consumed
-- `6.` 🧠 **Context used bar graph (`context-used-bar`)** — 10-block context consumed bar (`[█░░░░░░░░░]`)
-- `7.` 🪙 **Exact token count (`token-count`)** — token usage in the current session
-- `8.` 🪙 **Token count bar graph (`token-count-bar`)** — 10-block token consumed bar (`[█░░░░░░░░░]`)
-- `9.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
-- `11.` 💎 **Subscription plan tier (`plan-tier`)** — current subscription plan level
-- `12.` 🔋 **Hourly available quota (`quota`)** — 5-hour API remaining percentage, four-tier color-coded
-- `13.` 🔋 **Hourly available quota bar graph (`quota-bar`)** — 10-block hourly quota bar (`[████████░░]`)
-- `14.` ⏳ **Hourly quota reset countdown (`quota-reset-countdown`)** — time remaining until 5-hour quota refresh
-- `15.` 🕒 **Hourly reset time (`quota-reset-time`)** — local timezone reset timestamp (`HH:mm` same day, `yyyy/MM/dd HH:mm` across days)
-- `16.` 📅 **Weekly available quota (`quota-weekly`)** — weekly API remaining percentage, four-tier color-coded
-- `17.` 📅 **Weekly available quota bar graph (`quota-weekly-bar`)** — 10-block weekly quota bar (`[███████░░░]`)
-- `18.` 📆 **Weekly quota reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
-- `19.` ⏰ **Weekly reset time (`quota-weekly-reset-time`)** — weekly local reset timestamp (e.g., `2026/10/18 16:00`)
+**2. Quota, Billing & Account (10 items)**
+- `5.` 🔋 **Hourly available quota (`quota`)** — 5-hour API remaining percentage, four-tier color-coded
+- `6.` 🔋 **Hourly available quota bar graph (`quota-bar`)** — 10-block hourly quota bar (`[████████░░]`)
+- `7.` ⏳ **Hourly quota reset countdown (`quota-reset-countdown`)** — time remaining until 5-hour quota refresh
+- `8.` 🕒 **Hourly reset time (`quota-reset-time`)** — local timezone reset timestamp (`HH:mm` same day, `yyyy/MM/dd HH:mm` across days)
+- `9.` 📅 **Weekly available quota (`quota-weekly`)** — weekly API remaining percentage, four-tier color-coded
+- `10.` 📅 **Weekly available quota bar graph (`quota-weekly-bar`)** — 10-block weekly quota bar (`[███████░░░]`)
+- `11.` 📆 **Weekly quota reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
+- `12.` ⏰ **Weekly reset time (`quota-weekly-reset-time`)** — weekly local reset timestamp (e.g., `2026/10/18 16:00`)
+- `13.` 💎 **Subscription plan tier (`plan-tier`)** — current subscription plan level
+- `14.` 👤 **Account email (`account-email`)** — logged-in account email address
 
-**Interactive State**
-- `20.` 🔔 **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
-- `21.` 📥 **Pending user inputs (`pending-input`)** — queued user inputs waiting to run
-- `22.` 🔧 **Running background tasks (`background-tasks`)** — active background task count
-- `23.` 👥 **Active subagents (`subagents`)** — running subagent count
+**3. Context & Tokens (4 items)**
+- `15.` 🧠 **Context used percentage (`context-used`)** — percentage of context window consumed
+- `16.` 🧠 **Context used bar graph (`context-used-bar`)** — 10-block context consumed bar (`[█░░░░░░░░░]`)
+- `17.` 🪙 **Exact token count (`token-count`)** — token usage in the current session
+- `18.` 🪙 **Token count bar graph (`token-count-bar`)** — 10-block token consumed bar (`[█░░░░░░░░░]`)
 
-**Project & VCS**
-- `24.` 📁 **Workspace short path (`project-path`)** — current workspace directory basename
-- `25.` 📂 **Workspace full path (`project-full-path`)** — absolute workspace directory path
-- `26.` 🌱 **VCS type (`vcs-type`)** — `git / jj / fig`
-- `27.` 🌿 **Current Git branch (`git-branch`)** — active branch name
-- `28.` 📝 **Workspace dirty status (`vcs-dirty`)** — `✗ dirty / ✓ clean`
+**4. Workspace & VCS (5 items)**
+- `19.` 📁 **Workspace short path (`project-path`)** — current workspace directory basename
+- `20.` 📂 **Workspace full path (`project-full-path`)** — absolute workspace directory path
+- `21.` 🌿 **Current Git branch (`git-branch`)** — active branch name
+- `22.` 📝 **Workspace dirty status (`vcs-dirty`)** — `✗ dirty / ✓ clean`
+- `23.` 🌱 **VCS type (`vcs-type`)** — `git / jj / fig`
 
-**System & Account**
-- `10.` 👤 **Account email (`account-email`)** — logged-in account email address
-- `29.` 💾 **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
-- `30.` 🚀 **Antigravity CLI version (`cli-version`)** — current CLI version string
-- `31.` 💬 **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
+**5. System Status & Background Tasks (9 items)**
+- `24.` 💾 **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
+- `25.` 🚀 **Antigravity CLI version (`cli-version`)** — current CLI version string
+- `26.` 💬 **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
+- `27.` 🔒 **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
+- `28.` 🔔 **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
+- `29.` 📥 **Pending user inputs (`pending-input`)** — queued user inputs waiting to run
+- `30.` 🔧 **Running background tasks (`background-tasks`)** — active background task count
+- `31.` 👥 **Active subagents (`subagents`)** — running subagent count
+- `32.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
 
 ### Label Display Styles: Text (`text`) vs. Emoji (`emoji`)
 
-You can choose between two label display styles in Step 3 of the skill questionnaire (stored in `ui.footer.labelStyle` across `settings.json`):
+Individual indicator styles can be customized during Step 4 sorting via style prefixes (saved in the `ui.footer.itemStyles` map across `settings.json`; unconfigured items strictly default to text):
 
-- **Text labels (`text`, default)**: Displays localized text prefixes with a colon (e.g., `Model: Gemini 3.1 Pro │ Hourly Available: 88% │ Git: main`).
-- **Emoji labels (`emoji`)**: Replaces text label prefixes and colons with the indicator's Emoji followed by a single space (e.g., `🤖 Gemini 3.1 Pro │ 🔋 88% │ 🌿 main`), while keeping status values (`all clear`, `✓ clean`, `off`, `Default`) localized in your chosen language.
+- **Text label style (`text`, default)**: Displays localized text prefixes with a colon (e.g., `Model: Gemini 3.1 Pro │ Hourly Available: 88% │ Git: main`). Plain numeric indices (e.g. `1`), `t` prefix (e.g. `t1`), or plain English IDs (`quota`, `t:quota`) all resolve to text style.
+- **Emoji label style (`emoji`)**: Replaces text label prefixes and colons with the indicator's Emoji followed by a single space (e.g., `🤖 Gemini 3.1 Pro │ 🔋 88% │ 🌿 main`), while keeping status values (`all clear`, `✓ clean`, `off`, `Default`) localized in your chosen language. Use an `e` prefix (e.g. `e1`, `e:quota`) to assign emoji style. Items can be mixed freely (e.g. `1, e2, t3, e:git-branch`).
+- **Bar Graph Style Conflict Handling**: If adjacent bar graph indicators have conflicting styles (one text, one emoji), they will not merge; they render as two separate blocks.
 
 ### Percentage Bar Graphs: Merged vs. Separate Display
 
 Default bar length is 10 blocks (`[████████░░]`), configurable via `ui.footer.barLength` in `settings.json`. Solid block `█` represents capacity or usage, while shaded block `░` represents empty space. Reset time format is configurable via `ui.footer.timeFormat` (`"smart"`, `"yyyy/MM/dd HH:mm"`, `"12h"`, or `"24h"`).
 
 Four indicator pairs support percentage bar graphs:
-- `quota` (`12`) + `quota-bar` (`13`)
-- `quota-weekly` (`16`) + `quota-weekly-bar` (`17`)
-- `context-used` (`5`) + `context-used-bar` (`6`)
-- `token-count` (`7`) + `token-count-bar` (`8`)
+- `quota` (`5`) + `quota-bar` (`6`)
+- `quota-weekly` (`9`) + `quota-weekly-bar` (`10`)
+- `context-used` (`15`) + `context-used-bar` (`16`)
+- `token-count` (`17`) + `token-count-bar` (`18`)
 
 #### 1. Merged Display Example (Adjacent Auto-Merge)
 
@@ -198,7 +199,7 @@ When a numeric indicator and its corresponding bar graph are placed **adjacent**
 
 - **Sort Input**:
   ```text
-  5,6,7,8,n,12,13,16,17
+  15,16,17,18,n,5,6,9,10
   ```
 - **Merged Output Preview (Text Mode `text`)**:
   ```text
@@ -217,7 +218,7 @@ When a numeric indicator and its corresponding bar graph are **separated** by an
 
 - **Sort Input**:
   ```text
-  5,7,n,6,8,n,12,14,13,n,16,18,17
+  15,17,n,16,18,n,5,7,6,n,9,11,10
   ```
 - **Separate Output Preview**:
   ```text
