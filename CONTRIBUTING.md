@@ -23,7 +23,7 @@ Since this project dynamically handles multiple languages within existing files,
 
 ### 2. Modify `skills/agy-cli-statusline/resources/questions.json`
 - Add a new `"[LANG_CODE]"` object at the root level with `"style_question"`, `"style_options"` (2 items ending with `(text)` and `(emoji)`), `"question"`, and `"options"`.
-- Translate all **32 statusline indicators** in `"options"` into [Target Language] using the exact format `"<Emoji> <Localized Description> (<indicator-id>)"` (keep the `(Recommended)` prefix on the first 4 items).
+- Translate all **32 statusline indicators** in `"options"` into [Target Language] using the exact format `"<Emoji> <Localized Description> (<indicator-id>)"`.
 
 ### 3. Modify `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **Find `normalizeLanguage(lang)`**: Add matching rules to normalize `[LANG_CODE]` and related locale aliases to `'[LANG_CODE]'`.
@@ -97,7 +97,7 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 
 ### 2. 修改 `skills/agy-cli-statusline/resources/questions.json`
 - 在根物件下新增 `"[LANG_CODE]"` 子物件，包含 `"style_question"`、`"style_options"`（2 個選項，結尾維持 `（text）` 與 `（emoji）`）、`"question"` 與 `"options"` 陣列。
-- 將 `"options"` 中的全部 **32 個狀態列指標**翻譯成【目標語言】，格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`（前 4 項請保留 `(Recommended)` 前綴）。
+- 將 `"options"` 中的全部 **32 個狀態列指標**翻譯成【目標語言】，格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **尋找 `normalizeLanguage(lang)` 函式**：新增對應判斷條件，將 `[LANG_CODE]` 及相關語系別名標準化為 `'[LANG_CODE]'`。
@@ -171,7 +171,7 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 
 ### 2. 修改 `skills/agy-cli-statusline/resources/questions.json`
 - 在根对象下新增 `"[LANG_CODE]"` 子对象，包含 `"style_question"`、`"style_options"`（2 个选项，结尾维持 `（text）` 与 `（emoji）`）、`"question"` 与 `"options"` 数组。
-- 将 `"options"` 中的全部 **32 个状态栏指标**翻译成【目标语言】，格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`（前 4 项请保留 `(Recommended)` 前缀）。
+- 将 `"options"` 中的全部 **32 个状态栏指标**翻译成【目标语言】，格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **寻找 `normalizeLanguage(lang)` 函数**：新增对应判断条件，将 `[LANG_CODE]` 及相关语系别名标准化为 `'[LANG_CODE]'`。
