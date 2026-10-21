@@ -233,9 +233,15 @@ antigravity-cli-statusline/
 
 在技能流程第三阶段（步骤 4），在 Write-in 输入框填入以逗号分隔的序号即可自定义排序与个别样式：
 
-```text
-1,14,13,27,n,2,3,31,32,29,30,28,n,n,15,16,17,18,7,8,n,5,6,9,10,11,12,n,n,22,21,23,19,20,n,4,26,24,25
-```
+- **数字序号版本**：
+  ```text
+  e1,e14,e13,e27,n,e2,3,31,32,29,30,28,n,n,15,16,17,18,7,8,n,5,6,e9,e10,11,12,n,n,22,23,e19,n,e20,21,n,e4,e26,24,25
+  ```
+
+- **英文标识码版本**：
+  ```text
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,quota-reset-countdown,quota-reset-time,n,quota,quota-bar,e:quota-weekly,e:quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,memory-usage,cli-version
+  ```
 
 - **数字序号**：代表步骤 3 勾选列表中的序号（从 1 起算；若全选 32 项指标，即对应上方 `1`～`32` 编号）。
 - **样式前缀**：
@@ -248,30 +254,18 @@ antigravity-cli-statusline/
 - 若留空或选择 `跳过`，则沿用原勾选顺序并启用全部已勾选指标（默认文字样式）。
 - **顺序记录保存**：设置完成时，技能会自动输出先前与本次的排版顺序字符串，日后若需微调可直接复制粘贴重现。
 
-排序后显示效果预览——**文字模式（`text`）**（三大逻辑分区、共 6 行信息并搭配空行分隔）：
-
-```text
-模型: Gemini 3.8 Flash (High) │ 账号: anandydy529@gmail.com │ 订阅计划: Google AI Pro │ 沙箱状态: 关闭
-代理角色: Default │ 代理状态: 执行中 │ 子代理: 2 │ 产出文件: 0 │ 待处理输入: 0 │ 后台任务: 0 │ 工具待确认: 无
-
-上下文用量: 18.5% [█░░░░░░░░░] │ 令牌数: 185.0k / 1.0M [█░░░░░░░░░] │ 五小时倒计时: 4h 50m │ 五小时重置: 15:50
-五小时可用: 88% [████████░░] │ 每周可用: 78% [███████░░░] │ 每周倒计时: 4d 5h │ 每周重置: 2026/10/18 16:00
-
-版控状态: 无变更 │ 分支: main │ 版控类型: git │ 项目: antigravity-cli-statusline │ 完整路径: /Users/andyawd/Project/antigravity-cli-statusline
-模式: Accept-edits │ 对话编号: c5168b1c │ 内存: 279MB │ 版本: v1.3.2
-```
-
-相同排序在**表情符号模式（`emoji`）**下的显示效果预览：
+排序后显示效果预览——**混搭／个别样式模式**（四大逻辑分区、共 7 行信息并搭配空行分隔）：
 
 ```text
 🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ 关闭
-🪪 Default │ ⚡ 执行中 │ 👥 2 │ 📄 0 │ 📥 0 │ 🔄 0 │ 🔔 无
+🪪 Default │ 代理状态: 执行中 │ 子代理: 2 │ 产出文件: 0 │ 待处理输入: 0 │ 后台任务: 0 │ 工具待确认: 无
 
-🧠 18.5% [█░░░░░░░░░] │ 💰 185.0k / 1.0M [█░░░░░░░░░] │ ⏳ 4h 50m │ 🕒 15:50
-🔋 88% [████████░░] │ 📅 78% [███████░░░] │ ⏲️ 4d 5h │ 🗓️ 2026/10/18 16:00
+上下文用量: 18.5% [█░░░░░░░░░] │ 令牌数: 185.0k / 1.0M [█░░░░░░░░░] │ 五小时倒计时: 4h 50m │ 五小时重置: 15:50
+五小时可用: 88% [████████░░] │ 📅 78% [███████░░░] │ 每周倒计时: 4d 5h │ 每周重置: 2026/10/18 16:00
 
-🔍 无变更 │ 🔀 main │ 🗃️ git │ 📁 antigravity-cli-statusline │ 📍 /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ 🚀 v1.3.2
+版控状态: 无变更 │ 版控类型: git │ 🔀 main
+📁 antigravity-cli-statusline │ 完整路径: /Users/andyawd/Project/antigravity-cli-statusline
+⚙️ Accept-edits │ 💬 c5168b1c │ 内存: 279MB │ 版本: v1.3.2
 ```
 
 ### 换行

@@ -233,9 +233,15 @@ When a numeric indicator and its corresponding bar graph are **separated** by an
 
 In Step 4 of the skill workflow, enter a comma-separated list of numbers in the Write-in box to customize the layout and individual styles:
 
-```text
-1,14,13,27,n,2,3,31,32,29,30,28,n,n,15,16,17,18,7,8,n,5,6,9,10,11,12,n,n,22,21,23,19,20,n,4,26,24,25
-```
+- **Numeric Version**:
+  ```text
+  e1,e14,e13,e27,n,e2,3,31,32,29,30,28,n,n,15,16,17,18,7,8,n,5,6,e9,e10,11,12,n,n,22,23,e19,n,e20,21,n,e4,e26,24,25
+  ```
+
+- **Identifier Version**:
+  ```text
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,quota-reset-countdown,quota-reset-time,n,quota,quota-bar,e:quota-weekly,e:quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,memory-usage,cli-version
+  ```
 
 - **Numbers** refer to the 1-based position in your Step 3 selection (when all 32 indicators are selected, numbers `1`–`32` match the list above).
 - **Style Prefixes**:
@@ -248,30 +254,18 @@ In Step 4 of the skill workflow, enter a comma-separated list of numbers in the 
 - Leave blank or choose `Skip` to keep the original selection order with all selected indicators enabled (default text style).
 - **Configuration History**: The skill automatically displays both the previous and newly configured order strings upon completion, allowing instant copy-pasting for future adjustments.
 
-Preview of the sorted statusline in **Text Mode (`text`)** (3 logical groups across 6 content lines separated by blank lines):
-
-```text
-Model: Gemini 3.8 Flash (High) │ Account: anandydy529@gmail.com │ Plan: Google AI Pro │ Sandbox: off
-Profile: Default │ Agent: working │ Subagents: 2 │ Outputs: 0 │ Queue: 0 │ BG: 0 │ Awaiting You: none
-
-Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 185.0k / 1.0M [█░░░░░░░░░] │ 5h Reset: 4h 50m │ 5h Reset Time: 15:50
-5h Available: 88% [████████░░] │ Weekly Available: 78% [███████░░░] │ Weekly Reset: 4d 5h │ Weekly Reset Time: 2026/10/18 16:00
-
-VCS Status: no changes │ Branch: main │ VCS: git │ Project: antigravity-cli-statusline │ Project Path: /Users/andyawd/Project/antigravity-cli-statusline
-Mode: Accept-edits │ Conv: c5168b1c │ RAM: 279MB │ Version: v1.3.2
-```
-
-Preview of the same sorted statusline in **Emoji Mode (`emoji`)**:
+Preview of the sorted statusline in **Mixed / Individual Style Mode** (4 logical groups across 7 content lines separated by blank lines):
 
 ```text
 🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ off
-🪪 Default │ ⚡ working │ 👥 2 │ 📄 0 │ 📥 0 │ 🔄 0 │ 🔔 none
+🪪 Default │ Agent: working │ Subagents: 2 │ Outputs: 0 │ Queue: 0 │ BG: 0 │ Awaiting You: none
 
-🧠 18.5% [█░░░░░░░░░] │ 💰 185.0k / 1.0M [█░░░░░░░░░] │ ⏳ 4h 50m │ 🕒 15:50
-🔋 88% [████████░░] │ 📅 78% [███████░░░] │ ⏲️ 4d 5h │ 🗓️ 2026/10/18 16:00
+Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 185.0k / 1.0M [█░░░░░░░░░] │ 5h Reset: 4h 50m │ 5h Reset Time: 15:50
+5h Available: 88% [████████░░] │ 📅 78% [███████░░░] │ Weekly Reset: 4d 5h │ Weekly Reset Time: 2026/10/18 16:00
 
-🔍 no changes │ 🔀 main │ 🗃️ git │ 📁 antigravity-cli-statusline │ 📍 /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ 🚀 v1.3.2
+VCS Status: no changes │ VCS: git │ 🔀 main
+📁 antigravity-cli-statusline │ Project Path: /Users/andyawd/Project/antigravity-cli-statusline
+⚙️ Accept-edits │ 💬 c5168b1c │ RAM: 279MB │ Version: v1.3.2
 ```
 
 ### Line Wrapping
