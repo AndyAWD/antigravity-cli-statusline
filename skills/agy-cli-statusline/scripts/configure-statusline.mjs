@@ -307,7 +307,7 @@ export function parseOrderAndStyles(orderStr, selectedIds) {
   let items = [];
   let itemStyles = {};
   const seen = new Set();
-  const isDefaultOrder = !orderStr || orderStr.trim() === '' || orderStr.includes('(Recommended)') || orderStr.includes('略過') || orderStr.includes('跳过') || orderStr.toLowerCase().includes('skip');
+  const isDefaultOrder = !orderStr || orderStr.trim() === '' || orderStr.includes('(Recommended)') || orderStr.includes('略過') || orderStr.includes('跳过') || orderStr.toLowerCase().includes('skip') || orderStr.includes('スキップ');
 
   if (isDefaultOrder) {
     items = [...selectedIds];
