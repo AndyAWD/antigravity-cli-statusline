@@ -288,8 +288,8 @@ async function main() {
       const resR5 = await runStatusline(metaR5, homeR5);
       console.log("R5 Output:", JSON.stringify(resR5.stdout));
 
-      const expectedR5Quota = `${WHITE}Hourly Available:${RESET} ${YELLOW}\x1b[1m32%${RESET}`;
-      const expectedR5Reset = `${WHITE}Hourly Reset:${RESET} ${BLUE_BOLD}2h 2m${RESET}`;
+      const expectedR5Quota = `${WHITE}5h Available:${RESET} ${YELLOW}\x1b[1m32%${RESET}`;
+      const expectedR5Reset = `${WHITE}5h Reset:${RESET} ${BLUE_BOLD}2h 2m${RESET}`;
       if (resR5.code === 0 && resR5.stdout.includes(expectedR5Quota) && resR5.stdout.includes(expectedR5Reset)) {
         console.log("✅ R5 passed!");
       } else {
@@ -334,8 +334,8 @@ async function main() {
       const resR6 = await runStatusline(metaR6, homeR6);
       console.log("R6 Output:", JSON.stringify(resR6.stdout));
 
-      const expectedR6Hourly = `${WHITE}Hourly Available:${RESET} ${BLUE_BOLD}75%${RESET}`;
-      const expectedR6HourlyReset = `${WHITE}Hourly Reset:${RESET} ${BLUE_BOLD}2h${RESET}`;
+      const expectedR6Hourly = `${WHITE}5h Available:${RESET} ${BLUE_BOLD}75%${RESET}`;
+      const expectedR6HourlyReset = `${WHITE}5h Reset:${RESET} ${BLUE_BOLD}2h${RESET}`;
       const expectedR6Weekly = `${WHITE}Weekly Available:${RESET} ${BLUE_BOLD}82%${RESET}`;
       const expectedR6WeeklyReset = `${WHITE}Weekly Reset:${RESET} ${BLUE_BOLD}4d 4h${RESET}`;
 
@@ -436,11 +436,11 @@ async function main() {
       console.log("R8 Output:", JSON.stringify(resR8.stdout));
 
       const expectedR8Labels = [
-        "模型:", "小时可用:", "上下文用量:", "内存:", "令牌数:",
-        "小时倒计时:", "每周可用:", "每周倒计时:", "Git:",
+        "模型:", "五小时可用:", "上下文用量:", "内存:", "令牌数:",
+        "五小时倒计时:", "每周可用:", "每周倒计时:", "分支:",
         "项目:", "完整路径:", "订阅计划:", "账号:", "代理状态:",
-        "工具待确认:", "待处理输入:", "后台任务:", "子代理:", "产出文件数:",
-        "工作区状态:", "VCS类型:", "沙箱状态:", "CLI版本:", "对话ID:",
+        "工具待确认:", "待处理输入:", "后台任务:", "子代理:", "产出文件:",
+        "版控状态:", "版控类型:", "沙箱状态:", "版本:", "对话编号:",
         "代理角色:", "模式:"
       ];
       const missingLabels = expectedR8Labels.filter(item => !resR8.stdout.includes(item));
@@ -474,12 +474,12 @@ async function main() {
         const resVar = await runStatusline(metaR8, homeVar);
         console.log(`R9 (${testLang}) Output:`, JSON.stringify(resVar.stdout));
 
-        const hasZhCnQuota = resVar.stdout.includes("小时可用:");
+        const hasZhCnQuota = resVar.stdout.includes("五小时可用:");
         const hasZhCnCtx = resVar.stdout.includes("上下文用量:");
         const hasZhCnMem = resVar.stdout.includes("内存:");
-        const hasZhCnClean = resVar.stdout.includes("干净");
+        const hasZhCnClean = resVar.stdout.includes("无变更");
         const hasZhCnSandbox = resVar.stdout.includes("关闭");
-        const hasZhCnProfile = resVar.stdout.includes("默认");
+        const hasZhCnProfile = resVar.stdout.includes("代理角色:") && resVar.stdout.includes("Default");
 
         if (resVar.code === 0 && hasZhCnQuota && hasZhCnCtx && hasZhCnMem && hasZhCnClean && hasZhCnSandbox && hasZhCnProfile) {
           console.log(`✅ R9 passed for "${testLang}"! (Properly normalized to Simplified Chinese zh-cn)`);
@@ -625,7 +625,7 @@ async function main() {
     const zhTwDict = buildI18nDict('zh-tw', dummyMetrics);
     const renderedLines = renderStatusLine(['quota', 'quota-bar', 'context-used', 'context-used-bar'], zhTwDict, 200);
     const plainRendered = stripAnsi(renderedLines[0]);
-    assert.ok(plainRendered.includes('小時可用: 88% [████████░░]'), `Expected merged quota text in: ${plainRendered}`);
+    assert.ok(plainRendered.includes('五小時可用: 88% [████████░░]'), `Expected merged quota text in: ${plainRendered}`);
     assert.ok(plainRendered.includes('脈絡用量: 15.2% [█░░░░░░░░░]'), `Expected merged context text in: ${plainRendered}`);
     console.log("✅ R13 passed! (Adjacent items merged cleanly without directional constraint)");
 
@@ -680,8 +680,8 @@ async function main() {
       const plainOut = stripAnsi(resR14.stdout);
 
       assert.strictEqual(resR14.code, 0);
-      assert.ok(plainOut.includes('小時可用: 88% [████████░░]'), 'Output must contain merged hourly quota and bar');
-      assert.ok(plainOut.includes('小時重置:'), 'Output must contain hourly reset time label');
+      assert.ok(plainOut.includes('五小時可用: 88% [████████░░]'), 'Output must contain merged hourly quota and bar');
+      assert.ok(plainOut.includes('五小時重置:'), 'Output must contain hourly reset time label');
       assert.ok(plainOut.includes('每週可用: 90% [█████████░]'), 'Output must contain merged weekly quota and bar');
       assert.ok(plainOut.includes('每週重置:'), 'Output must contain weekly reset time label');
       assert.ok(plainOut.includes('脈絡用量: 15.2% [█░░░░░░░░░]'), 'Output must contain merged context used and bar');
@@ -726,8 +726,8 @@ async function main() {
       const plainR15 = stripAnsi(resR15.stdout);
 
       assert.strictEqual(resR15.code, 0);
-      assert.ok(plainR15.includes('Hourly Reset Time:'), 'Must include Hourly Reset Time label');
-      assert.ok(!plainR15.includes('Hourly Reset Time: N/A'), 'Hourly Reset Time must not be N/A when reset_in_seconds is provided');
+      assert.ok(plainR15.includes('5h Reset Time:'), 'Must include 5h Reset Time label');
+      assert.ok(!plainR15.includes('5h Reset Time: N/A'), '5h Reset Time must not be N/A when reset_in_seconds is provided');
       assert.ok(plainR15.includes('Weekly Reset Time:'), 'Must include Weekly Reset Time label');
       assert.ok(!plainR15.includes('Weekly Reset Time: N/A'), 'Weekly Reset Time must not be N/A when reset_in_seconds is provided');
       console.log("✅ R15 passed! (meta.quota reset_in_seconds derived valid absolute reset times)");
@@ -902,8 +902,8 @@ async function main() {
       artifactsCount: 4,
       gitBranch: 'main',
       vcsDirtyFlag: false,
-      vcsDirtyGlyph: '✓',
-      vcsDirtyLabel: '乾淨',
+      vcsDirtyGlyph: '',
+      vcsDirtyLabel: '無變更',
       vcsType: 'git',
       projectName: 'my/proj',
       projectFullPath: '/Users/dev/my/proj',
@@ -913,7 +913,7 @@ async function main() {
       sandboxStatusVal: '啟用（聯網）',
       cliVersion: 'v1.2.3',
       conversationIdShort: 'c4a861dd',
-      agentProfileName: '預設',
+      agentProfileName: 'Default',
       mode: 'Interactive'
     };
 
@@ -939,10 +939,11 @@ async function main() {
 
     // Verify localized status values are preserved in emoji mode
     const zhTwEmojiDict = buildI18nDict('zh-tw', mockMetricsR21, 'emoji');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['tool-confirmation']), '🔔 在等你');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['vcs-dirty']), '📝 ✓ 乾淨');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['sandbox-status']), '🔒 啟用（聯網）');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['agent-profile']), '🎭 預設');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['agent-state']), '⚡ 執行中');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['tool-confirmation']), '🔔 待確認');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['vcs-dirty']), '🔍 無變更');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['sandbox-status']), '🛡️ 啟用（聯網）');
+    assert.strictEqual(stripAnsi(zhTwEmojiDict['agent-profile']), '🪪 Default');
     assert.strictEqual(stripAnsi(zhTwEmojiDict['quota+bar']), '🔋 100% [██████████]');
 
     // Verify renderStatusLine fallback rawModel extraction works with emoji dict
@@ -998,11 +999,11 @@ async function main() {
       assert.strictEqual(resR22.code, 0);
       assert.ok(plainR22.includes("🤖 Gemini 3.1 Pro"), "Must render model with 🤖 and no colon");
       assert.ok(plainR22.includes("🔋 90% [█████████░]"), "Must render merged quota+bar with 🔋 and no colon");
-      assert.ok(plainR22.includes("🌿 feat/emoji"), "Must render git-branch with 🌿 and no colon");
-      assert.ok(plainR22.includes("📝 ✓ 乾淨"), "Must render vcs-dirty with 📝 and localized value");
-      assert.ok(plainR22.includes("🔔 都好了"), "Must render tool-confirmation with 🔔 and localized value");
+      assert.ok(plainR22.includes("🔀 feat/emoji"), "Must render git-branch with 🔀 and no colon");
+      assert.ok(plainR22.includes("🔍 無變更"), "Must render vcs-dirty with 🔍 and localized value");
+      assert.ok(plainR22.includes("🔔 無"), "Must render tool-confirmation with 🔔 and localized value");
       assert.ok(!plainR22.includes("模型:"), "Must NOT contain text label '模型:'");
-      assert.ok(!plainR22.includes("小時可用:"), "Must NOT contain text label '小時可用:'");
+      assert.ok(!plainR22.includes("五小時可用:"), "Must NOT contain text label '五小時可用:'");
       console.log("✅ R22 passed! (E2E Emoji statusline rendered cleanly)");
     } finally {
       try { rmSync(homeR22, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
@@ -1022,8 +1023,8 @@ async function main() {
     assert.strictEqual(getDisplayWidth("🤖"), 2, "Emoji must have display width 2");
 
     // Verify the exact 4-item quota row from the user's bug report fits within 120 columns (termWidth for 135-col terminal)
-    const quotaRowLine1 = "脈絡用量: 0.0% [░░░░░░░░░░] │ 權杖數: 0 / 1.0M [░░░░░░░░░░] │ 小時倒數: 3h 52m │ 小時重置: 2026/10/16 01:09";
-    const quotaRowLine2 = "小時可用: 88% [████████░░] │ 每週可用: 94% [█████████░] │ 每週倒數: 5d 17h │ 每週重置: 2026/10/21 14:47";
+    const quotaRowLine1 = "脈絡用量: 0.0% [░░░░░░░░░░] │ 權杖數: 0 / 1.0M [░░░░░░░░░░] │ 五小時倒數: 3h 52m │ 五小時重置: 2026/10/16 01:09";
+    const quotaRowLine2 = "五小時可用: 88% [████████░░] │ 每週可用: 94% [█████████░] │ 每週倒數: 5d 17h │ 每週重置: 2026/10/21 14:47";
     assert.ok(getDisplayWidth(quotaRowLine1) <= 120, `Quota line 1 width (${getDisplayWidth(quotaRowLine1)}) must fit in 120 cols`);
     assert.ok(getDisplayWidth(quotaRowLine2) <= 120, `Quota line 2 width (${getDisplayWidth(quotaRowLine2)}) must fit in 120 cols`);
     console.log("✅ R23 passed! (getDisplayWidth accurately counts 1-col symbols and prevents premature wrapping)");
@@ -1171,8 +1172,8 @@ async function main() {
     const plainModelR26 = stripAnsi(dictR26['model-name']);
 
     assert.ok(plainQuotaR26.includes('🔋 88%'), 'Quota with emoji style must render 🔋 88%');
-    assert.ok(!plainQuotaR26.includes('小時可用:'), 'Quota with emoji style must not have text label');
-    assert.ok(plainBarR26.includes('小時可用: [████████░░]'), 'Quota-bar without emoji style must default to text label');
+    assert.ok(!plainQuotaR26.includes('五小時可用:'), 'Quota with emoji style must not have text label');
+    assert.ok(plainBarR26.includes('五小時可用: [████████░░]'), 'Quota-bar without emoji style must default to text label');
     assert.ok(plainModelR26.includes('模型: Gemini 3.5 Flash'), 'Model without emoji style must default to text label');
 
     // 2b. buildI18nDict when both paired items are emoji -> MUST render with emoji prefix
@@ -1192,10 +1193,10 @@ async function main() {
     const plainTokenBarBoth = stripAnsi(dictR26Both['token-count+bar']);
 
     assert.ok(plainQuotaBarBoth.includes('🔋 88% [████████░░]'), 'Merged quota+bar when both are emoji must render 🔋');
-    assert.ok(!plainQuotaBarBoth.includes('小時可用:'), 'Merged quota+bar with emoji must not contain text label');
+    assert.ok(!plainQuotaBarBoth.includes('五小時可用:'), 'Merged quota+bar with emoji must not contain text label');
     assert.ok(plainContextBarBoth.includes('🧠 15.2% [█░░░░░░░░░]'), 'Merged context-used+bar when both are emoji must render 🧠');
     assert.ok(plainWeeklyBarBoth.includes('📅 90% [█████████░]'), 'Merged quota-weekly+bar when both are emoji must render 📅');
-    assert.ok(plainTokenBarBoth.includes('🪙 12.5k / 1.0M [██░░░░░░░░]'), 'Merged token-count+bar when both are emoji must render 🪙');
+    assert.ok(plainTokenBarBoth.includes('💰 12.5k / 1.0M [██░░░░░░░░]'), 'Merged token-count+bar when both are emoji must render 💰');
 
     // 3. E2E execution with itemStyles
     // 3a. Style conflict test: quota=emoji, quota-bar=text -> separate
@@ -1241,9 +1242,9 @@ async function main() {
       assert.strictEqual(resR26.code, 0);
       assert.ok(plainR26.includes("模型: Gemini 3.1 Pro"), "model-name without override must be text");
       assert.ok(plainR26.includes("🔋 90%"), "quota with emoji override must be emoji");
-      assert.ok(plainR26.includes("小時可用: [█████████░]"), "quota-bar without override must be text");
-      assert.ok(plainR26.includes("🌿 feat/styles"), "git-branch with emoji override must be emoji");
-      assert.ok(plainR26.includes("🔋 90% │ 小時可用: [█████████░]"), "Style conflict must prevent merge and render as two separate blocks");
+      assert.ok(plainR26.includes("五小時可用: [█████████░]"), "quota-bar without override must be text");
+      assert.ok(plainR26.includes("🔀 feat/styles"), "git-branch with emoji override must be emoji");
+      assert.ok(plainR26.includes("🔋 90% │ 五小時可用: [█████████░]"), "Style conflict must prevent merge and render as two separate blocks");
       console.log("✅ R26 style conflict separation passed!");
     } finally {
       try { rmSync(homeR26, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
@@ -1277,8 +1278,8 @@ async function main() {
       assert.strictEqual(resR26Merged.code, 0);
       assert.ok(plainR26Merged.includes("模型: Gemini 3.1 Pro"), "model-name without override must be text");
       assert.ok(plainR26Merged.includes("🔋 90% [█████████░]"), "Both quota and quota-bar with emoji override must merge into 🔋 90% [█████████░]");
-      assert.ok(!plainR26Merged.includes("小時可用:"), "Merged emoji bar must not contain text label");
-      assert.ok(plainR26Merged.includes("🌿 feat/styles"), "git-branch with emoji override must be emoji");
+      assert.ok(!plainR26Merged.includes("五小時可用:"), "Merged emoji bar must not contain text label");
+      assert.ok(plainR26Merged.includes("🔀 feat/styles"), "git-branch with emoji override must be emoji");
       console.log("✅ R26 matching emoji merged passed!");
     } finally {
       try { rmSync(homeR26Merged, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
@@ -1382,16 +1383,16 @@ async function main() {
 
       assert.strictEqual(resR27.code, 0);
       assert.ok(plainR27.includes("模型: Gemini 3.1 Pro"), "Must render text label '模型:'");
-      assert.ok(plainR27.includes("小時可用: 90% [█████████░]"), "Must render merged quota+bar with text label '小時可用:'");
-      assert.ok(plainR27.includes("Git: feat/pure-numbers"), "Must render text label 'Git:'");
-      assert.ok(plainR27.includes("工作區狀態: ✓ 乾淨"), "Must render text label '工作區狀態:'");
-      assert.ok(plainR27.includes("工具待確認: 都好了"), "Must render text label '工具待確認:'");
+      assert.ok(plainR27.includes("五小時可用: 90% [█████████░]"), "Must render merged quota+bar with text label '五小時可用:'");
+      assert.ok(plainR27.includes("分支: feat/pure-numbers"), "Must render text label '分支:'");
+      assert.ok(plainR27.includes("版控狀態: 無變更"), "Must render text label '版控狀態:'");
+      assert.ok(plainR27.includes("工具待確認: 無"), "Must render text label '工具待確認:'");
 
       // Verify no emoji prefixes leaked into the statusline
       assert.ok(!plainR27.includes("🤖"), "Must NOT contain robot emoji");
       assert.ok(!plainR27.includes("🔋"), "Must NOT contain battery emoji");
-      assert.ok(!plainR27.includes("🌿"), "Must NOT contain branch emoji");
-      assert.ok(!plainR27.includes("📝"), "Must NOT contain dirty emoji");
+      assert.ok(!plainR27.includes("🔀"), "Must NOT contain branch emoji");
+      assert.ok(!plainR27.includes("🔍"), "Must NOT contain dirty emoji");
       assert.ok(!plainR27.includes("🔔"), "Must NOT contain bell emoji");
       console.log("✅ R27 pure numbers text enforcement passed!");
     } finally {
@@ -1417,7 +1418,7 @@ async function main() {
       assert.strictEqual(resLegacy.code, 0);
       assert.ok(plainLegacy.includes("🤖 Gemini 3.1 Pro"), "Legacy config without itemStyles must preserve emoji mode");
       assert.ok(plainLegacy.includes("🔋 90% [█████████░]"), "Legacy config must preserve merged emoji bar");
-      assert.ok(plainLegacy.includes("🌿 feat/pure-numbers"), "Legacy config must preserve emoji branch");
+      assert.ok(plainLegacy.includes("🔀 feat/pure-numbers"), "Legacy config must preserve emoji branch");
       console.log("✅ Legacy emoji backward compatibility passed!");
     } finally {
       try { rmSync(homeLegacy, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}

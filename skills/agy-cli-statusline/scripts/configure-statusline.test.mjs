@@ -896,9 +896,12 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
   const testIds = ['model-name', 'quota', 'context-used', 'git-branch', 'memory-usage'];
   
   // 1. 預設/略過排序：全部為 text，itemStyles 為空物件
-  const resSkip = parseOrderAndStyles('(Recommended) 略過', testIds);
+  const resSkip = parseOrderAndStyles('略過，使用原勾選順序啟用全部指標（預設文字樣式）', testIds);
   assert.deepStrictEqual(resSkip.items, testIds);
   assert.deepStrictEqual(resSkip.itemStyles, {});
+  assert.deepStrictEqual(parseOrderAndStyles('(Recommended) 略過', testIds).items, testIds);
+  assert.deepStrictEqual(parseOrderAndStyles('Skip', testIds).items, testIds);
+  assert.deepStrictEqual(parseOrderAndStyles('スキップ', testIds).items, testIds);
 
   // 2. 混合前綴（純數字=text、t前綴=text、e前綴=emoji、英文ID前綴、換行）
   const resMixed = parseOrderAndStyles('e1, 2, t3, e:git-branch, n, e:memory-usage', testIds);
@@ -1032,7 +1035,7 @@ async function testCase11ItemStylesPrefixAndConfig() {
     const selected = JSON.stringify([
       "🤖 目前使用的人工智慧模型名稱（model-name）",
       "🔋 帳號五小時可用額度百分比（quota）",
-      "🌿 目前工作區專案的 Git 分支（git-branch）"
+      "🔀 目前工作區專案的 Git 分支（git-branch）"
     ]);
 
     // 1. 執行帶有 emoji 前綴 (e1, 2, e:git-branch) 的排序
@@ -1064,7 +1067,7 @@ async function testCase11ItemStylesPrefixAndConfig() {
     const args2 = [
       '--lang', 'zh-tw',
       '--selected', selected,
-      '--order', '(Recommended) 略過，使用原勾選順序啟用全部指標',
+      '--order', '略過，使用原勾選順序啟用全部指標（預設文字樣式）',
       '--workspace', sandbox
     ];
     const res2 = await runScript(configureScriptSrc, args2, env);
@@ -1130,7 +1133,7 @@ async function testCase12PureNumbersOverwritesResidualEmojiStyle() {
     const selected = JSON.stringify([
       "🤖 目前使用的人工智慧模型名稱（model-name）",
       "🔋 帳號五小時可用額度百分比（quota）",
-      "🌿 目前工作區專案的 Git 分支（git-branch）"
+      "🔀 目前工作區專案的 Git 分支（git-branch）"
     ]);
 
     // 1. 使用者在步驟 4 輸入純數字排序（未傳入 --style）
@@ -1163,7 +1166,7 @@ async function testCase12PureNumbersOverwritesResidualEmojiStyle() {
     const args2 = [
       '--lang', 'zh-tw',
       '--selected', selected,
-      '--order', '(Recommended) 略過，使用原勾選順序啟用全部指標',
+      '--order', '略過，使用原勾選順序啟用全部指標（預設文字樣式）',
       '--workspace', sandbox
     ];
     const res2 = await runScript(configureScriptSrc, args2, env);
