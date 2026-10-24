@@ -296,6 +296,7 @@ export const ALL_STANDARD_METRIC_IDS = [
   'model-name', 'agent-profile', 'agent-state', 'mode',
   'quota', 'quota-bar', 'quota-reset-countdown', 'quota-reset-time',
   'quota-weekly', 'quota-weekly-bar', 'quota-weekly-countdown', 'quota-weekly-reset-time',
+  'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time',
   'plan-tier', 'account-email',
   'context-used', 'context-used-bar', 'token-count', 'token-count-bar',
   'project-path', 'project-full-path', 'git-branch', 'vcs-dirty', 'vcs-type',

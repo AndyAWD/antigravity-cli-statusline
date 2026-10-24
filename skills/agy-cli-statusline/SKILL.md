@@ -209,9 +209,9 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 2. **根據步驟 1 的語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的 `categories`（五大分類清單）。
 
 > [!NOTE]
-> **螢幕高度限制與分頁設計（Issue #1262）**：目前 Antigravity CLI 的 `ask_question` 在選項超過螢幕可容納行數（約 31 項）時存在無法滾動顯示的限制。為提供良好互動體驗，32 項指標拆分為五個分類頁籤（每個分頁 4~10 項，保證在任何終端機螢幕均能完整顯示），由代理依序呼叫 `ask_question` 引導使用者勾選：
+> **螢幕高度限制與分頁設計（Issue #1262）**：目前 Antigravity CLI 的 `ask_question` 在選項超過螢幕可容納行數（約 31 項）時存在無法滾動顯示的限制。為提供良好互動體驗，36 項指標拆分為五個分類頁籤（每個分頁 4~14 項，保證在任何終端機螢幕均能完整顯示），由代理依序呼叫 `ask_question` 引導使用者勾選：
 > - 分類 1：模型與代理（4 項，`model-name`, `agent-profile`, `agent-state`, `mode`）
-> - 分類 2：額度、計費與帳號（10 項，`quota`, `quota-bar`, `quota-reset-countdown`, `quota-reset-time`, `quota-weekly`, `quota-weekly-bar`, `quota-weekly-countdown`, `quota-weekly-reset-time`, `plan-tier`, `account-email`）
+> - 分類 2：額度、計費與帳號（14 項，`quota`, `quota-bar`, `quota-reset-countdown`, `quota-reset-time`, `quota-weekly`, `quota-weekly-bar`, `quota-weekly-countdown`, `quota-weekly-reset-time`, `quota-argon`, `quota-argon-bar`, `quota-argon-countdown`, `quota-argon-reset-time`, `plan-tier`, `account-email`）
 > - 分類 3：脈絡與權杖（4 項，`context-used`, `context-used-bar`, `token-count`, `token-count-bar`）
 > - 分類 4：工作區與版本控制（5 項，`project-path`, `project-full-path`, `git-branch`, `vcs-dirty`, `vcs-type`）
 > - 分類 5：系統狀態與背景任務（9 項，`memory-usage`, `cli-version`, `conversation-id`, `sandbox-status`, `tool-confirmation`, `pending-input`, `background-tasks`, `subagents`, `artifacts`）

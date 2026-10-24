@@ -167,6 +167,11 @@ export const EMOJI_MAP = {
   'quota-weekly+bar': '📅',
   'quota-weekly-countdown': '⏲️',
   'quota-weekly-reset-time': '🗓️',
+  'quota-argon': '✨',
+  'quota-argon-bar': '✨',
+  'quota-argon+bar': '✨',
+  'quota-argon-countdown': '⏱️',
+  'quota-argon-reset-time': '⏰',
   'context-used': '🧠',
   'context-used-bar': '🧠',
   'context-used+bar': '🧠',
@@ -667,9 +672,11 @@ export function resolveWeeklyQuota(fallbackModel, cache) {
     return cache.weekly[pool];
   }
 
-  // A4 Fallback (lowest remaining_percentage among available weekly pools)
+  // A4 Fallback (lowest remaining_percentage among available non-argon weekly pools, or all pools if none)
   if (cache && cache.weekly) {
-    const pools = Object.keys(cache.weekly);
+    const allPools = Object.keys(cache.weekly).filter(p => cache.weekly[p] && typeof cache.weekly[p] === 'object');
+    const generalPools = allPools.filter(p => !p.toLowerCase().includes('argon'));
+    const pools = generalPools.length > 0 ? generalPools : allPools;
     if (pools.length > 0) {
       let minPool = pools[0];
       for (const p of pools) {
@@ -678,6 +685,57 @@ export function resolveWeeklyQuota(fallbackModel, cache) {
         }
       }
       return cache.weekly[minPool];
+    }
+  }
+
+  return { remaining_percentage: 100, refreshes_in: '' };
+}
+
+/**
+ * Resolves the Gemini 4 Argon quota pool ('gemini-argon-wtu' or any argon bucket) from cache.
+ * @param {object} cache - the local quota cache object
+ * @returns {{remaining_percentage:number,reset_time?:string,refreshes_in?:string}}
+ */
+export function resolveArgonQuota(cache) {
+  if (cache && cache.weekly && typeof cache.weekly === 'object') {
+    if (cache.weekly['gemini-argon-wtu']) {
+      return cache.weekly['gemini-argon-wtu'];
+    }
+    const argonPools = Object.keys(cache.weekly).filter(
+      p => p.toLowerCase().includes('argon') && cache.weekly[p] && typeof cache.weekly[p] === 'object'
+    );
+    if (argonPools.length > 0) {
+      let minPool = argonPools[0];
+      for (const p of argonPools) {
+        if (cache.weekly[p].remaining_percentage < cache.weekly[minPool].remaining_percentage) {
+          minPool = p;
+        }
+      }
+      return cache.weekly[minPool];
+    }
+  }
+
+  if (cache && cache.shortTerm && typeof cache.shortTerm === 'object') {
+    const argonShortPools = Object.keys(cache.shortTerm).filter(
+      p => p.toLowerCase().includes('argon') && cache.shortTerm[p] && typeof cache.shortTerm[p] === 'object'
+    );
+    if (argonShortPools.length > 0) {
+      return cache.shortTerm[argonShortPools[0]];
+    }
+  }
+
+  if (cache && cache.models && typeof cache.models === 'object') {
+    const argonModelKeys = Object.keys(cache.models).filter(
+      k => k.toLowerCase().includes('argon') && cache.models[k] && typeof cache.models[k] === 'object'
+    );
+    if (argonModelKeys.length > 0) {
+      let minKey = argonModelKeys[0];
+      for (const k of argonModelKeys) {
+        if (cache.models[k].remaining_percentage < cache.models[minKey].remaining_percentage) {
+          minKey = k;
+        }
+      }
+      return cache.models[minKey];
     }
   }
 
@@ -834,6 +892,16 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const formattedWeeklyReset = weeklyInfo.reset_time ? formatAbsoluteResetTime(weeklyInfo.reset_time, timeFormat) : '';
   const weeklyResetTimeVal = formattedWeeklyReset || noneStr;
   const weeklyQuotaBarVal = renderBarGraph(weeklyPct, barLength, weeklyQuotaColor);
+
+  // Argon Quota
+  const resolvedArgon = options?.argonInfo || resolveArgonQuota(cache);
+  const argonPct = resolvedArgon.remaining_percentage ?? 100;
+  const argonQuotaColor = getColorByPercentage(argonPct);
+  const argonQuotaVal = `${Math.round(argonPct)}%`;
+  const argonCountdownVal = resolvedArgon.refreshes_in || noneStr;
+  const formattedArgonReset = resolvedArgon.reset_time ? formatAbsoluteResetTime(resolvedArgon.reset_time, timeFormat) : '';
+  const argonResetTimeVal = formattedArgonReset || noneStr;
+  const argonQuotaBarVal = renderBarGraph(argonPct, barLength, argonQuotaColor);
 
   // Context
   const remainCtx = Math.max(0, 100 - contextInfo.usedPctNum);
@@ -1041,7 +1109,8 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
     sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName,
     weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode,
-    quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal
+    quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal,
+    argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal
   };
 }
 
@@ -1053,6 +1122,11 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   const normGlobalStyle = normalizeLabelStyle(labelStyle);
   const normLang = normalizeLanguage(lang);
   const localizedAgentState = formatAgentState(m.agentState, normLang);
+  const argonColor = m.argonQuotaColor ?? BLUE;
+  const argonVal = m.argonQuotaVal ?? '100%';
+  const argonCountdown = m.argonCountdownVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
+  const argonResetTime = m.argonResetTimeVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
+  const argonBar = m.argonQuotaBarVal ?? '[██████████]';
   const dicts = {
     'zh-tw': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
@@ -1063,15 +1137,20 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'quota-reset-countdown': `${WHITE}五小時倒數:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
       'quota-reset-time': `${WHITE}五小時重置:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
       'quota-bar': `${WHITE}五小時可用:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}每週倒數:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}每週重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly': `${WHITE}七日內可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}七日內倒數:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}七日內重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}七日內可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon 倒數:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon 重置:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon 可用:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}脈絡用量:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}權杖數:${RESET} ${m.tokenBarVal}`,
       'quota+bar': `${WHITE}五小時可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}脈絡用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}七日內可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}權杖數:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}分支: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}專案: ${BOLD}${m.projectName}${RESET}`,
@@ -1098,18 +1177,23 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'context-used': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}内存:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}令牌数:${RESET} ${m.tokenCount}`,
-      'quota-reset-countdown': `${WHITE}五小时倒计时:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-countdown': `${WHITE}五小时倒数:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
       'quota-reset-time': `${WHITE}五小时重置:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
       'quota-bar': `${WHITE}五小时可用:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}每周倒计时:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}每周重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly': `${WHITE}七日内可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}七日内倒数:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}七日内重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}七日内可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon 倒数:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon 重置:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon 可用:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}上下文用量:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}令牌数:${RESET} ${m.tokenBarVal}`,
       'quota+bar': `${WHITE}五小时可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}七日内可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}令牌数:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}分支: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}项目: ${BOLD}${m.projectName}${RESET}`,
@@ -1132,22 +1216,27 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'us': {
       'model-name': `${WHITE}Model:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
-      'quota': `${WHITE}5h Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
+      'quota': `${WHITE}5-hr Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}Context Used:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}RAM:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}Tokens:${RESET} ${m.tokenCount}`,
-      'quota-reset-countdown': `${WHITE}5h Reset:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
-      'quota-reset-time': `${WHITE}5h Reset Time:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
-      'quota-bar': `${WHITE}5h Available:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}Weekly Reset:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}Weekly Reset Time:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-reset-countdown': `${WHITE}5-hr Reset:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}5-hr Reset Time:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}5-hr Available:${RESET} ${m.quotaBarVal}`,
+      'quota-weekly': `${WHITE}7-day Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}7-day Reset:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}7-day Reset Time:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}7-day Available:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon Available:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon Reset:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon Reset Time:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon Available:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon Available:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}Context Used:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}Tokens:${RESET} ${m.tokenBarVal}`,
-      'quota+bar': `${WHITE}5h Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'quota+bar': `${WHITE}5-hr Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}Context Used:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}7-day Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}Tokens:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}Branch: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}Project: ${BOLD}${m.projectName}${RESET}`,
@@ -1170,22 +1259,27 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'jp': {
       'model-name': `${WHITE}モデル:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
-      'quota': `${WHITE}5時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
+      'quota': `${WHITE}五時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}コンテキスト使用:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}メモリ:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}トークン:${RESET} ${m.tokenCount}`,
-      'quota-reset-countdown': `${WHITE}5時間リセット:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
-      'quota-reset-time': `${WHITE}5時間リセット時刻:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
-      'quota-bar': `${WHITE}5時間残量:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}週間リセット:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}週間リセット時刻:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-reset-countdown': `${WHITE}五時間リセット:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}五時間リセット時刻:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}五時間残量:${RESET} ${m.quotaBarVal}`,
+      'quota-weekly': `${WHITE}七日間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}七日間リセット:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}七日間リセット時刻:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}七日間残量:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon 残量:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon リセット:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon リセット時刻:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon 残量:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon 残量:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}コンテキスト使用:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}トークン:${RESET} ${m.tokenBarVal}`,
-      'quota+bar': `${WHITE}5時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'quota+bar': `${WHITE}五時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}コンテキスト使用:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}七日間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}トークン:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}ブランチ: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}プロジェクト: ${BOLD}${m.projectName}${RESET}`,
@@ -1264,6 +1358,7 @@ export const ADJACENT_PAIRS = [
   { val: 'quota', bar: 'quota-bar', merged: 'quota+bar' },
   { val: 'context-used', bar: 'context-used-bar', merged: 'context-used+bar' },
   { val: 'quota-weekly', bar: 'quota-weekly-bar', merged: 'quota-weekly+bar' },
+  { val: 'quota-argon', bar: 'quota-argon-bar', merged: 'quota-argon+bar' },
   { val: 'token-count', bar: 'token-count-bar', merged: 'token-count+bar' }
 ];
 
@@ -1426,6 +1521,7 @@ async function main() {
     // 解析核心資料
     const quotaInfo = resolveModelQuota(fallbackModel, cache);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
+    const argonInfo = resolveArgonQuota(cache);
     const contextInfo = await calculateContextUsageAsync(meta, conversationId);
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
@@ -1434,7 +1530,7 @@ async function main() {
     const rawItemStyles = settings?.ui?.footer?.itemStyles;
 
     // 格式化指標並繪製
-    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength });
+    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo });
     const activeDict = buildI18nDict(lang, metrics, labelStyle, rawItemStyles);
     renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, rawItemStyles, labelStyle);
 

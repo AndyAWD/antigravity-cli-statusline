@@ -6,7 +6,7 @@
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-一個專為 Google Antigravity（AGY）設計的外掛程式（Plugin），用於客製化 Antigravity 命令列介面（Command-Line Interface）（`agy`）的狀態列（Statusline / Footer）——支援從 32 項即時指標中自由勾選、切換文字（`text`）或繪圖符號（Emoji）（`emoji`）標籤顯示風格、自訂排序、切換百分比長條圖的合併或分開顯示模式，並具備自動與手動換行機制，提供 4 種顯示語系（`zh-tw`、`zh-cn`、`us`、`jp`）。
+一個專為 Google Antigravity（AGY）設計的外掛程式（Plugin），用於客製化 Antigravity 命令列介面（Command-Line Interface）（`agy`）的狀態列（Statusline / Footer）——支援從 36 項即時指標中自由勾選、切換文字（`text`）或繪圖符號（Emoji）（`emoji`）標籤顯示風格、自訂排序、切換百分比長條圖的合併或分開顯示模式，並具備自動與手動換行機制，提供 4 種顯示語系（`zh-tw`、`zh-cn`、`us`、`jp`）。
 
 全面支援 Google Antigravity 的三大核心平台：Antigravity 命令列介面（`agy`）、Antigravity 整合開發環境（Integrated Development Environment）以及 Antigravity 2.0 桌面應用程式。
 
@@ -45,8 +45,8 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## 特色亮點
 
 1. **跨平台相容**：支援 Antigravity 命令列介面終端機、整合開發環境側邊欄對話方塊（Dialog Box）以及 Antigravity 2.0 桌面應用程式，涵蓋 Windows、macOS 與 Linux 作業系統。
-2. **32 項即時指標、4 種語系與雙標籤顯示風格**：涵蓋人工智慧（Artificial Intelligence）模型狀態、應用程式介面（Application Programming Interface）配額、脈絡（Context）與權杖（Token）消耗、互動佇列、Git 版本控制狀態及系統資源，支援繁體中文（`zh-tw`）、簡體中文（`zh-cn`）、英文（`us`）與日文（`jp`），並可自由切換**文字標籤（`text`）**或**繪圖符號標籤（`emoji`，無冒號精簡排版）**顯示風格（`ui.footer.labelStyle`）。
-3. **彈性百分比長條圖（支援合併與分開顯示）**：針對五小時額度、每週額度、脈絡用量與權杖數提供預設 10 格視覺長條圖（`[████████░░]`）；當數值與長條圖相鄰時自動合併為單一標籤，未相鄰時則各自以獨立標籤顯示。
+2. **36 項即時指標、4 種語系與雙標籤顯示風格**：涵蓋人工智慧（Artificial Intelligence）模型狀態、應用程式介面（Application Programming Interface）配額（含五小時、每週與 Gemini 4 Argon 專屬配額）、脈絡（Context）與權杖（Token）消耗、互動佇列、Git 版本控制狀態及系統資源，支援繁體中文（`zh-tw`）、簡體中文（`zh-cn`）、英文（`us`）與日文（`jp`），並可自由切換**文字標籤（`text`）**或**繪圖符號標籤（`emoji`，無冒號精簡排版）**顯示風格（`ui.footer.labelStyle`）。
+3. **彈性百分比長條圖（支援合併與分開顯示）**：針對五小時額度、每週額度、Gemini 4 Argon 額度、脈絡用量與權杖數提供預設 10 格視覺長條圖（`[████████░░]`）；當數值與長條圖相鄰時自動合併為單一標籤，未相鄰時則各自以獨立標籤顯示。
 4. **自訂排序與雙軌換行機制**：支援以數字序號或英文識別碼（Identifier）排序、使用 `n` 強制換行、使用 `n,n` 建立空白分隔行，並依終端機寬度自動折行。
 5. **24-bit 四階動態色彩**：依據配額剩餘比例或脈絡消耗程度自動切換 4 個色階（`100~75%` 藍色、`74~50%` 綠色、`49~25%` 黃色、`24~0%` 粉紅色），並為不同人工智慧模型家族套用專屬品牌識別色。
 6. **三層設定檔同步與系統防護**：自動同步命令列介面專屬、全域與專案三層 `settings.json` 及 `trusted_hooks.json`，內建 macOS/Linux NVM 絕對路徑解析與 Windows UTF-8 位元組順序記號（Byte Order Mark）自動剝除機制。
@@ -130,7 +130,7 @@ antigravity-cli-statusline/
 
 ## 指標、排序與換行
 
-### 可顯示的指標（1–32）
+### 可顯示的指標（1–36）
 
 以下編號對應技能步驟 3 問卷（`resources/questions.json`）中五大分類分頁選項序號（從 1 起算），以及各指標在 `emoji` 模式下對應的繪圖符號：
 
@@ -140,7 +140,7 @@ antigravity-cli-statusline/
 - `3.` ⚡ **代理當前狀態（`agent-state`）**：`閒置 / 思考中 / 執行中 / 呼叫工具 / 初始化`
 - `4.` ⚙️ **目前運行模式（`mode`）**：`default / code-only / plan / interactive / accept-edits`
 
-**2. 額度、計費與帳號（10 項）**
+**2. 額度、計費與帳號（14 項）**
 - `5.` 🔋 **帳號五小時可用額度百分比（`quota`）**：五小時應用程式介面可用額度百分比，搭配四階配色
 - `6.` 🔋 **五小時可用額度長條圖（`quota-bar`）**：10 格五小時可用額度長條圖（`[████████░░]`）
 - `7.` ⏳ **帳號五小時額度重置時間倒數（`quota-reset-countdown`）**：距離五小時額度重置的剩餘時間
@@ -149,32 +149,36 @@ antigravity-cli-statusline/
 - `10.` 📅 **每週可用額度長條圖（`quota-weekly-bar`）**：10 格每週可用額度長條圖（`[███████░░░]`）
 - `11.` ⏲️ **帳號每週額度重置時間倒數（`quota-weekly-countdown`）**：距離每週額度重置的剩餘時間
 - `12.` 🗓️ **每週重置時間（`quota-weekly-reset-time`）**：每週額度重置的本機絕對時間（如 `2026/10/18 16:00`）
-- `13.` 💎 **目前訂閱方案等級（`plan-tier`）**：目前帳號的訂閱等級
-- `14.` 📧 **帳號電子郵件（`account-email`）**：目前登入的帳號信箱
+- `13.` ✨ **Gemini 4 Argon 可用額度百分比（`quota-argon`）**：Gemini 4 Argon 專屬配額百分比，搭配四階配色
+- `14.` ✨ **Gemini 4 Argon 可用額度長條圖（`quota-argon-bar`）**：10 格 Argon 可用額度長條圖（`[█████░░░░░]`）
+- `15.` ⏱️ **Gemini 4 Argon 額度重置倒數（`quota-argon-countdown`）**：距離 Argon 額度重置的剩餘時間
+- `16.` ⏰ **Gemini 4 Argon 重置時間（`quota-argon-reset-time`）**：Argon 額度重置的本機絕對時間（如 `2026/10/30 23:57`）
+- `17.` 💎 **目前訂閱方案等級（`plan-tier`）**：目前帳號的訂閱等級
+- `18.` 📧 **帳號電子郵件（`account-email`）**：目前登入的帳號信箱
 
 **3. 脈絡與權杖（4 項）**
-- `15.` 🧠 **目前對話已消耗的脈絡用量比例（`context-used`）**：脈絡視窗已消耗百分比
-- `16.` 🧠 **脈絡用量長條圖（`context-used-bar`）**：10 格脈絡消耗長條圖（`[█░░░░░░░░░]`）
-- `17.` 💰 **目前工作階段（Session）消耗的精確權杖數量（`token-count`）**：目前對話累計權杖數
-- `18.` 💰 **權杖數長條圖（`token-count-bar`）**：10 格權杖消耗長條圖（`[█░░░░░░░░░]`）
+- `19.` 🧠 **目前對話已消耗的脈絡用量比例（`context-used`）**：脈絡視窗已消耗百分比
+- `20.` 🧠 **脈絡用量長條圖（`context-used-bar`）**：10 格脈絡消耗長條圖（`[█░░░░░░░░░]`）
+- `21.` 💰 **目前工作階段（Session）消耗的精確權杖數量（`token-count`）**：目前對話累計權杖數
+- `22.` 💰 **權杖數長條圖（`token-count-bar`）**：10 格權杖消耗長條圖（`[█░░░░░░░░░]`）
 
 **4. 工作區與版本控制（5 項）**
-- `19.` 📁 **目前工作區專案短路徑（`project-path`）**：工作區資料夾名稱
-- `20.` 📍 **目前工作區專案完整路徑（`project-full-path`）**：工作區絕對路徑
-- `21.` 🔀 **目前工作區專案的 Git 分支（`git-branch`）**：目前所在的 Git 分支名稱
-- `22.` 🔍 **工作區是否有未提交變更（`vcs-dirty`）**：`未提交 / 無變更`
-- `23.` 🗃️ **版本控制類型（`vcs-type`）**：`git / jj / fig`
+- `23.` 📁 **目前工作區專案短路徑（`project-path`）**：工作區資料夾名稱
+- `24.` 📍 **目前工作區專案完整路徑（`project-full-path`）**：工作區絕對路徑
+- `25.` 🔀 **目前工作區專案的 Git 分支（`git-branch`）**：目前所在的 Git 分支名稱
+- `26.` 🔍 **工作區是否有未提交變更（`vcs-dirty`）**：`未提交 / 無變更`
+- `27.` 🗃️ **版本控制類型（`vcs-type`）**：`git / jj / fig`
 
 **5. 系統狀態與背景任務（9 項）**
-- `24.` 💾 **命令列介面行程所消耗的隨機存取記憶體量（`memory-usage`）**：`agy` 行程佔用的記憶體大小
-- `25.` 🚀 **Antigravity 命令列介面版本號（`cli-version`）**：目前執行的命令列介面版本
-- `26.` 💬 **目前對話識別碼前 8 碼（`conversation-id`）**：供除錯定位使用
-- `27.` 🛡️ **沙盒模式狀態（`sandbox-status`）**：`off / on (net) / on (no-net)`
-- `28.` 🔔 **是否有等你回應的工具確認對話方塊（`tool-confirmation`）**：提示是否有工具正在等待使用者確認
-- `29.` 📥 **佇列中待處理的使用者輸入數（`pending-input`）**：排隊等待執行的輸入數量
-- `30.` 🔄 **進行中的背景任務數（`background-tasks`）**：執行中的背景程序數量
-- `31.` 👥 **活躍子代理數（`subagents`）**：運行中的子代理數量
-- `32.` 📄 **本次對話人工智慧累計產出的檔案數量（`artifacts`）**：本次對話產出的 Artifacts 數量
+- `28.` 💾 **命令列介面行程所消耗的隨機存取記憶體量（`memory-usage`）**：`agy` 行程佔用的記憶體大小
+- `29.` 🚀 **Antigravity 命令列介面版本號（`cli-version`）**：目前執行的命令列介面版本
+- `30.` 💬 **目前對話識別碼前 8 碼（`conversation-id`）**：供除錯定位使用
+- `31.` 🛡️ **沙盒模式狀態（`sandbox-status`）**：`off / on (net) / on (no-net)`
+- `32.` 🔔 **是否有等你回應的工具確認對話方塊（`tool-confirmation`）**：提示是否有工具正在等待使用者確認
+- `33.` 📥 **佇列中待處理的使用者輸入數（`pending-input`）**：排隊等待執行的輸入數量
+- `34.` 🔄 **進行中的背景任務數（`background-tasks`）**：執行中的背景程序數量
+- `35.` 👥 **活躍子代理數（`subagents`）**：運行中的子代理數量
+- `36.` 📄 **本次對話人工智慧累計產出的檔案數量（`artifacts`）**：本次對話產出的 Artifacts 數量
 
 ### 標籤顯示風格：文字（`text`）與繪圖符號（`emoji`）
 
@@ -188,11 +192,12 @@ antigravity-cli-statusline/
 
 長條圖預設長度為 10 格（`[████████░░]`），可於設定檔 `ui.footer.barLength` 自訂格數；實心方塊 `█` 代表目前容量或消耗進度，淺色方塊 `░` 代表剩餘空間。絕對重置時間格式可透過 `ui.footer.timeFormat` 設定為 `"smart"`（預設）、`"yyyy/MM/dd HH:mm"`、`"12h"` 或 `"24h"`。
 
-系統支援四組百分比長條圖配對：
+系統支援五組百分比長條圖配對：
 - `quota`（`5`）+ `quota-bar`（`6`）
 - `quota-weekly`（`9`）+ `quota-weekly-bar`（`10`）
-- `context-used`（`15`）+ `context-used-bar`（`16`）
-- `token-count`（`17`）+ `token-count-bar`（`18`）
+- `quota-argon`（`13`）+ `quota-argon-bar`（`14`）
+- `context-used`（`19`）+ `context-used-bar`（`20`）
+- `token-count`（`21`）+ `token-count-bar`（`22`）
 
 #### 1. 合併顯示範例（相鄰自動合併）
 
@@ -200,17 +205,19 @@ antigravity-cli-statusline/
 
 - **排序輸入範例**：
   ```text
-  15,16,17,18,n,5,6,9,10
+  19,20,21,22,n,5,6,9,10,n,13,14
   ```
 - **合併顯示效果預覽（文字模式 `text`）**：
   ```text
   脈絡用量: 18.5% [█░░░░░░░░░] │ 權杖數: 185.0k / 1.0M [█░░░░░░░░░]
-  五小時可用: 88% [████████░░] │ 每週可用: 78% [███████░░░]
+  五小時可用: 88% [████████░░] │ 七日內可用: 78% [███████░░░]
+  Argon 可用: 59% [█████░░░░░]
   ```
 - **合併顯示效果預覽（繪圖符號模式 `emoji`）**：
   ```text
   🧠 18.5% [█░░░░░░░░░] │ 💰 185.0k / 1.0M [█░░░░░░░░░]
   🔋 88% [████████░░] │ 📅 78% [███████░░░]
+  ✨ 59% [█████░░░░░]
   ```
 
 #### 2. 分開顯示範例（非相鄰／獨立標籤顯示）
@@ -219,14 +226,15 @@ antigravity-cli-statusline/
 
 - **排序輸入範例**：
   ```text
-  15,17,n,16,18,n,5,7,6,n,9,11,10
+  19,21,n,20,22,n,5,7,6,n,9,11,10,n,13,15,14
   ```
 - **分開顯示效果預覽**：
   ```text
   脈絡用量: 18.5% │ 權杖數: 185.0k / 1.0M
   脈絡用量: [█░░░░░░░░░] │ 權杖數: [█░░░░░░░░░]
   五小時可用: 88% │ 五小時倒數: 4h 50m │ 五小時可用: [████████░░]
-  每週可用: 78% │ 每週倒數: 4d 5h │ 每週可用: [███████░░░]
+  七日內可用: 78% │ 七日內倒數: 4d 5h │ 七日內可用: [███████░░░]
+  Argon 可用: 59% │ Argon 倒數: 6d 1h │ Argon 可用: [█████░░░░░]
   ```
 
 ### 排序與個別樣式前綴
@@ -235,33 +243,34 @@ antigravity-cli-statusline/
 
 - **數字序號版本**：
   ```text
-  e1,e14,e13,e27,n,e2,3,31,32,29,30,28,n,n,15,16,17,18,7,8,n,5,6,e9,e10,11,12,n,n,22,23,e19,n,e20,21,n,e4,e26,24,25
+  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,7,8,n,5,6,e9,e10,11,12,n,13,14,15,16,n,n,26,27,e23,n,e24,25,n,e4,e30,28,29
   ```
 
 - **英文識別碼版本**：
   ```text
-  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,quota-reset-countdown,quota-reset-time,n,quota,quota-bar,e:quota-weekly,e:quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,memory-usage,cli-version
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,quota-reset-countdown,quota-reset-time,n,quota,quota-bar,e:quota-weekly,e:quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,memory-usage,cli-version
   ```
 
-- **數字序號**：代表步驟 3 勾選清單中的序號（從 1 起算；若全選 32 項指標，即對應上方 `1`～`32` 編號）。
+- **數字序號**：代表步驟 3 勾選清單中的序號（從 1 起算；若全選 36 項指標，即對應上方 `1`～`36` 編號）。
 - **樣式前綴**：
   - 純數字（如 `1`）或 `t1` 或純英文識別碼（如 `quota`）或 `t:quota` 均為**文字標籤樣式**。
   - `e1` 或 `e:quota` 為**繪圖符號（Emoji）樣式**（大小寫不分）。
-  - 可自由混搭（例如 `e1, 14, e13, 27`），未指定樣式者一律預設為文字樣式。
+  - 可自由混搭（例如 `e1, 18, e17, 31`），未指定樣式者一律預設為文字樣式。
 - **英文識別碼**：可混用如 `quota`、`model-name` 等識別碼，但使用數字序號最簡潔。
 - **`n` 換行符號**：插入 `n` 可在該位置強制換行；連續輸入 `n,n` 可產生一行空行作為分區間隔。
 - **未列入的指標將不予顯示**：排序字串的結果即為最終顯示集合。
 - 若留白或選擇 `略過`，則沿用原勾選順序並啟用全部已勾選指標（預設文字樣式）。
 - **順序紀錄保存**：設定完成時，技能會自動輸出先前與本次的排版順序字串，日後若需微調可直接複製貼上重現。
 
-排序後顯示效果預覽——**混搭／個別樣式模式**（四大邏輯分區、共 7 行資訊並搭配空行區隔）：
+排序後顯示效果預覽——**混搭／個別樣式模式**（四大邏輯分區、共 8 行資訊並搭配空行區隔）：
 
 ```text
 🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ 關閉
 🪪 Default │ 代理狀態: 執行中 │ 子代理: 2 │ 產出檔案: 0 │ 待處理輸入: 0 │ 背景任務: 0 │ 工具待確認: 無
 
 脈絡用量: 18.5% [█░░░░░░░░░] │ 權杖數: 185.0k / 1.0M [█░░░░░░░░░] │ 五小時倒數: 4h 50m │ 五小時重置: 15:50
-五小時可用: 88% [████████░░] │ 📅 78% [███████░░░] │ 每週倒數: 4d 5h │ 每週重置: 2026/10/18 16:00
+五小時可用: 88% [████████░░] │ 📅 78% [███████░░░] │ 七日內倒數: 4d 5h │ 七日內重置: 2026/10/18 16:00
+Argon 可用: 59% [█████░░░░░] │ Argon 倒數: 6d 1h │ Argon 重置: 2026/10/30 23:57
 
 版控狀態: 無變更 │ 版控類型: git │ 🔀 main
 📁 antigravity-cli-statusline │ 完整路徑: /Users/andyawd/Project/antigravity-cli-statusline

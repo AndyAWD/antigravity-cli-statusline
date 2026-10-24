@@ -16,7 +16,8 @@ import {
   EMOJI_MAP,
   getGitBranch,
   getGitDirty,
-  resolveTerminalWidth
+  resolveTerminalWidth,
+  resolveArgonQuota
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
@@ -112,7 +113,7 @@ async function main() {
       const resR1 = await runStatusline(metaR1, homeR1);
       console.log("R1 Output:", JSON.stringify(resR1.stdout));
 
-      const expectedR1 = `${WHITE}Weekly Reset:${RESET} ${BLUE_BOLD}4d 11h${RESET}`;
+      const expectedR1 = `${WHITE}7-day Reset:${RESET} ${BLUE_BOLD}4d 11h${RESET}`;
       if (resR1.code === 0 && resR1.stdout.includes(expectedR1)) {
         console.log("✅ R1 passed!");
       } else {
@@ -156,7 +157,7 @@ async function main() {
       const resR2 = await runStatusline(metaR2, homeR2);
       console.log("R2 Output:", JSON.stringify(resR2.stdout));
 
-      const expectedR2 = `${WHITE}Weekly Available:${RESET} ${BLUE_BOLD}90%${RESET}`;
+      const expectedR2 = `${WHITE}7-day Available:${RESET} ${BLUE_BOLD}90%${RESET}`;
       if (resR2.code === 0 && resR2.stdout.includes(expectedR2)) {
         console.log("✅ R2 passed!");
       } else {
@@ -200,7 +201,7 @@ async function main() {
       const resR3 = await runStatusline(metaR3, homeR3);
       console.log("R3 Output:", JSON.stringify(resR3.stdout));
 
-      const expectedR3 = `${WHITE}Weekly Available:${RESET} ${GREEN_BOLD}61%${RESET}`;
+      const expectedR3 = `${WHITE}7-day Available:${RESET} ${GREEN_BOLD}61%${RESET}`;
       if (resR3.code === 0 && resR3.stdout.includes(expectedR3)) {
         console.log("✅ R3 passed!");
       } else {
@@ -237,7 +238,7 @@ async function main() {
       const resR4 = await runStatusline(metaR4, homeR4);
       console.log("R4 Output:", JSON.stringify(resR4.stdout));
 
-      const expectedR4 = `${WHITE}Weekly Reset:${RESET} ${BLUE_BOLD}N/A${RESET}`;
+      const expectedR4 = `${WHITE}7-day Reset:${RESET} ${BLUE_BOLD}N/A${RESET}`;
       if (resR4.code === 0 && resR4.stdout.includes(expectedR4)) {
         console.log("✅ R4 passed!");
       } else {
@@ -288,8 +289,8 @@ async function main() {
       const resR5 = await runStatusline(metaR5, homeR5);
       console.log("R5 Output:", JSON.stringify(resR5.stdout));
 
-      const expectedR5Quota = `${WHITE}5h Available:${RESET} ${YELLOW}\x1b[1m32%${RESET}`;
-      const expectedR5Reset = `${WHITE}5h Reset:${RESET} ${BLUE_BOLD}2h 2m${RESET}`;
+      const expectedR5Quota = `${WHITE}5-hr Available:${RESET} ${YELLOW}\x1b[1m32%${RESET}`;
+      const expectedR5Reset = `${WHITE}5-hr Reset:${RESET} ${BLUE_BOLD}2h 2m${RESET}`;
       if (resR5.code === 0 && resR5.stdout.includes(expectedR5Quota) && resR5.stdout.includes(expectedR5Reset)) {
         console.log("✅ R5 passed!");
       } else {
@@ -334,10 +335,10 @@ async function main() {
       const resR6 = await runStatusline(metaR6, homeR6);
       console.log("R6 Output:", JSON.stringify(resR6.stdout));
 
-      const expectedR6Hourly = `${WHITE}5h Available:${RESET} ${BLUE_BOLD}75%${RESET}`;
-      const expectedR6HourlyReset = `${WHITE}5h Reset:${RESET} ${BLUE_BOLD}2h${RESET}`;
-      const expectedR6Weekly = `${WHITE}Weekly Available:${RESET} ${BLUE_BOLD}82%${RESET}`;
-      const expectedR6WeeklyReset = `${WHITE}Weekly Reset:${RESET} ${BLUE_BOLD}4d 4h${RESET}`;
+      const expectedR6Hourly = `${WHITE}5-hr Available:${RESET} ${BLUE_BOLD}75%${RESET}`;
+      const expectedR6HourlyReset = `${WHITE}5-hr Reset:${RESET} ${BLUE_BOLD}2h${RESET}`;
+      const expectedR6Weekly = `${WHITE}7-day Available:${RESET} ${BLUE_BOLD}82%${RESET}`;
+      const expectedR6WeeklyReset = `${WHITE}7-day Reset:${RESET} ${BLUE_BOLD}4d 4h${RESET}`;
 
       if (resR6.code === 0 && 
           resR6.stdout.includes(expectedR6Hourly) && 
@@ -437,7 +438,7 @@ async function main() {
 
       const expectedR8Labels = [
         "模型:", "五小时可用:", "上下文用量:", "内存:", "令牌数:",
-        "五小时倒计时:", "每周可用:", "每周倒计时:", "分支:",
+        "五小时倒数:", "七日内可用:", "七日内倒数:", "分支:",
         "项目:", "完整路径:", "订阅计划:", "账号:", "代理状态:",
         "工具待确认:", "待处理输入:", "后台任务:", "子代理:", "产出文件:",
         "版控状态:", "版控类型:", "沙箱状态:", "版本:", "对话编号:",
@@ -591,7 +592,8 @@ async function main() {
       'quota-reset-time', 'quota-weekly-reset-time',
       'quota-bar', 'quota-weekly-bar',
       'context-used-bar', 'token-count-bar',
-      'quota+bar', 'context-used+bar', 'quota-weekly+bar', 'token-count+bar'
+      'quota+bar', 'context-used+bar', 'quota-weekly+bar', 'token-count+bar',
+      'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'quota-argon+bar'
     ];
 
     for (const testLang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
@@ -613,6 +615,8 @@ async function main() {
     assert.deepStrictEqual(preprocessAdjacentItems(['context-used-bar', 'context-used']), ['context-used+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['quota-weekly', 'quota-weekly-bar']), ['quota-weekly+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['quota-weekly-bar', 'quota-weekly']), ['quota-weekly+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota-argon', 'quota-argon-bar']), ['quota-argon+bar']);
+    assert.deepStrictEqual(preprocessAdjacentItems(['quota-argon-bar', 'quota-argon']), ['quota-argon+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['token-count', 'token-count-bar']), ['token-count+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['token-count-bar', 'token-count']), ['token-count+bar']);
 
@@ -682,8 +686,8 @@ async function main() {
       assert.strictEqual(resR14.code, 0);
       assert.ok(plainOut.includes('五小時可用: 88% [████████░░]'), 'Output must contain merged hourly quota and bar');
       assert.ok(plainOut.includes('五小時重置:'), 'Output must contain hourly reset time label');
-      assert.ok(plainOut.includes('每週可用: 90% [█████████░]'), 'Output must contain merged weekly quota and bar');
-      assert.ok(plainOut.includes('每週重置:'), 'Output must contain weekly reset time label');
+      assert.ok(plainOut.includes('七日內可用: 90% [█████████░]'), 'Output must contain merged weekly quota and bar');
+      assert.ok(plainOut.includes('七日內重置:'), 'Output must contain weekly reset time label');
       assert.ok(plainOut.includes('脈絡用量: 15.2% [█░░░░░░░░░]'), 'Output must contain merged context used and bar');
       assert.ok(plainOut.includes('權杖數:'), 'Output must contain token count');
       assert.ok(plainOut.includes('[█░░░░░░░░░]'), 'Output must contain token bar graph');
@@ -726,10 +730,10 @@ async function main() {
       const plainR15 = stripAnsi(resR15.stdout);
 
       assert.strictEqual(resR15.code, 0);
-      assert.ok(plainR15.includes('5h Reset Time:'), 'Must include 5h Reset Time label');
-      assert.ok(!plainR15.includes('5h Reset Time: N/A'), '5h Reset Time must not be N/A when reset_in_seconds is provided');
-      assert.ok(plainR15.includes('Weekly Reset Time:'), 'Must include Weekly Reset Time label');
-      assert.ok(!plainR15.includes('Weekly Reset Time: N/A'), 'Weekly Reset Time must not be N/A when reset_in_seconds is provided');
+      assert.ok(plainR15.includes('5-hr Reset Time:'), 'Must include 5h Reset Time label');
+      assert.ok(!plainR15.includes('5-hr Reset Time: N/A'), '5h Reset Time must not be N/A when reset_in_seconds is provided');
+      assert.ok(plainR15.includes('7-day Reset Time:'), 'Must include Weekly Reset Time label');
+      assert.ok(!plainR15.includes('7-day Reset Time: N/A'), 'Weekly Reset Time must not be N/A when reset_in_seconds is provided');
       console.log("✅ R15 passed! (meta.quota reset_in_seconds derived valid absolute reset times)");
     } finally {
       try { rmSync(homeR15, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
@@ -887,6 +891,11 @@ async function main() {
       weeklyQuotaBarVal: `${GREEN_BOLD}[███████░░░]${RESET}`,
       weeklyCountdownVal: '5d 12h',
       weeklyResetTimeVal: '2026/10/20 12:00',
+      argonQuotaColor: GREEN_BOLD,
+      argonQuotaVal: '59%',
+      argonQuotaBarVal: `${GREEN_BOLD}[█████░░░░░]${RESET}`,
+      argonCountdownVal: '6d 1h',
+      argonResetTimeVal: '2026/10/30 23:57',
       contextColor: BLUE_BOLD,
       usedPct: '15%',
       contextBarVal: `${BLUE_BOLD}[██░░░░░░░░]${RESET}`,
@@ -920,7 +929,7 @@ async function main() {
     for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
       const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
       const allKeys = Object.keys(EMOJI_MAP);
-      assert.strictEqual(allKeys.length, 36, 'EMOJI_MAP must contain 32 metrics + 4 merged bar keys (36 total)');
+      assert.strictEqual(allKeys.length, 41, 'EMOJI_MAP must contain 36 metrics + 5 merged bar keys (41 total)');
 
       for (const key of allKeys) {
         const rendered = stripAnsi(emojiDict[key]);
@@ -1024,7 +1033,7 @@ async function main() {
 
     // Verify the exact 4-item quota row from the user's bug report fits within 120 columns (termWidth for 135-col terminal)
     const quotaRowLine1 = "脈絡用量: 0.0% [░░░░░░░░░░] │ 權杖數: 0 / 1.0M [░░░░░░░░░░] │ 五小時倒數: 3h 52m │ 五小時重置: 2026/10/16 01:09";
-    const quotaRowLine2 = "五小時可用: 88% [████████░░] │ 每週可用: 94% [█████████░] │ 每週倒數: 5d 17h │ 每週重置: 2026/10/21 14:47";
+    const quotaRowLine2 = "五小時可用: 88% [████████░░] │ 七日內可用: 94% [█████████░] │ 七日內倒數: 5d 17h │ 七日內重置: 2026/10/21 14:47";
     assert.ok(getDisplayWidth(quotaRowLine1) <= 120, `Quota line 1 width (${getDisplayWidth(quotaRowLine1)}) must fit in 120 cols`);
     assert.ok(getDisplayWidth(quotaRowLine2) <= 120, `Quota line 2 width (${getDisplayWidth(quotaRowLine2)}) must fit in 120 cols`);
     console.log("✅ R23 passed! (getDisplayWidth accurately counts 1-col symbols and prevents premature wrapping)");
@@ -1423,6 +1432,100 @@ async function main() {
     } finally {
       try { rmSync(homeLegacy, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
+
+    console.log("\n[Test R28] Verifying Gemini 4 Argon quota resolution, auto-merge, and 4-locale rendering...");
+    // 1. Direct function test for resolveArgonQuota
+    const mockArgonCache = {
+      updatedAt: Date.now(),
+      weekly: {
+        "gemini-argon-wtu": {
+          remaining_percentage: 58.93,
+          reset_time: "2026-10-30T14:57:31Z",
+          refreshes_in: "6d 1h"
+        },
+        "gemini": {
+          remaining_percentage: 90,
+          reset_time: "2026-10-25T12:00:00Z",
+          refreshes_in: "4d 11h"
+        }
+      }
+    };
+    const argonRes = resolveArgonQuota(mockArgonCache);
+    assert.ok(argonRes !== null, "resolveArgonQuota should find gemini-argon-wtu pool");
+    assert.strictEqual(Math.round(argonRes.remaining_percentage), 59, "Argon percentage should round to 59");
+    assert.strictEqual(argonRes.refreshes_in, "6d 1h");
+    assert.strictEqual(argonRes.reset_time, "2026-10-30T14:57:31Z");
+
+    // Test missing Argon pool
+    const mockNoArgonCache = {
+      updatedAt: Date.now(),
+      weekly: {
+        "gemini": {
+          remaining_percentage: 90,
+          reset_time: "2026-10-25T12:00:00Z",
+          refreshes_in: "4d 11h"
+        }
+      }
+    };
+    const noArgonRes = resolveArgonQuota(mockNoArgonCache);
+    assert.strictEqual(noArgonRes.remaining_percentage, 100);
+    assert.strictEqual(noArgonRes.refreshes_in, "");
+
+    // 2. E2E rendering with 4 locales and Emoji mode
+    const localesR28 = [
+      { lang: 'zh-tw', quotaPrefix: 'Argon 可用: 59%', countdownPrefix: 'Argon 倒數: 6d 1h', resetPrefix: 'Argon 重置:' },
+      { lang: 'zh-cn', quotaPrefix: 'Argon 可用: 59%', countdownPrefix: 'Argon 倒数: 6d 1h', resetPrefix: 'Argon 重置:' },
+      { lang: 'us', quotaPrefix: 'Argon Available: 59%', countdownPrefix: 'Argon Reset: 6d 1h', resetPrefix: 'Argon Reset Time:' },
+      { lang: 'jp', quotaPrefix: 'Argon 残量: 59%', countdownPrefix: 'Argon リセット: 6d 1h', resetPrefix: 'Argon リセット時刻:' }
+    ];
+
+    for (const loc of localesR28) {
+      const settingsLoc = {
+        ui: {
+          language: loc.lang,
+          footer: {
+            labelStyle: "text",
+            items: ["quota-argon", "quota-argon-bar", "quota-argon-countdown", "quota-argon-reset-time"]
+          }
+        }
+      };
+      const homeLoc = makeTempHome(mockArgonCache, settingsLoc);
+      try {
+        const resLoc = await runStatusline(metaR27, homeLoc);
+        const plainLoc = stripAnsi(resLoc.stdout).trim();
+        assert.strictEqual(resLoc.code, 0);
+        assert.ok(plainLoc.includes(loc.quotaPrefix), `[${loc.lang}] Should contain "${loc.quotaPrefix}", got: "${plainLoc}"`);
+        assert.ok(plainLoc.includes("[█████░░░░░]"), `[${loc.lang}] Should contain auto-merged bar "[█████░░░░░]", got: "${plainLoc}"`);
+        assert.ok(plainLoc.includes(loc.countdownPrefix), `[${loc.lang}] Should contain "${loc.countdownPrefix}", got: "${plainLoc}"`);
+        assert.ok(plainLoc.includes(loc.resetPrefix), `[${loc.lang}] Should contain "${loc.resetPrefix}", got: "${plainLoc}"`);
+      } finally {
+        try { rmSync(homeLoc, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+      }
+    }
+
+    // Emoji mode E2E test for Argon
+    const settingsEmoji = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          labelStyle: "emoji",
+          items: ["quota-argon", "quota-argon-bar", "quota-argon-countdown", "quota-argon-reset-time"]
+        }
+      }
+    };
+    const homeEmoji = makeTempHome(mockArgonCache, settingsEmoji);
+    try {
+      const resEmoji = await runStatusline(metaR27, homeEmoji);
+      const plainEmoji = stripAnsi(resEmoji.stdout).trim();
+      assert.strictEqual(resEmoji.code, 0);
+      assert.ok(plainEmoji.includes("✨ 59% [█████░░░░░]"), `Emoji mode should merge quota-argon+bar into "✨ 59% [█████░░░░░]", got: "${plainEmoji}"`);
+      assert.ok(plainEmoji.includes("⏱️ "), `Emoji mode should format countdown with "⏱️ ", got: "${plainEmoji}"`);
+      assert.ok(plainEmoji.includes("⏰ "), `Emoji mode should format reset-time with "⏰ ", got: "${plainEmoji}"`);
+    } finally {
+      try { rmSync(homeEmoji, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    console.log("✅ Test R28 passed! Gemini 4 Argon quota, countdown, and rendering work across all 4 locales!");
 
   } catch (err) {
     console.error("Test execution failed:", err);
