@@ -1,6 +1,6 @@
 {
   "name": "antigravity-cli-statusline",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Customize the Antigravity CLI statusline (footer) across macOS / Linux / Windows.",
   "type": "module",
   "scripts": {

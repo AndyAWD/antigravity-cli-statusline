@@ -167,6 +167,11 @@ export const EMOJI_MAP = {
   'quota-weekly+bar': '📅',
   'quota-weekly-countdown': '⏲️',
   'quota-weekly-reset-time': '🗓️',
+  'quota-argon': '✨',
+  'quota-argon-bar': '✨',
+  'quota-argon+bar': '✨',
+  'quota-argon-countdown': '⏱️',
+  'quota-argon-reset-time': '⏰',
   'context-used': '🧠',
   'context-used-bar': '🧠',
   'context-used+bar': '🧠',
@@ -550,7 +555,15 @@ export function parseMetaQuota(meta) {
     if (resetTime) entry.reset_time = resetTime;
     if (refreshesIn) entry.refreshes_in = refreshesIn;
 
-    if (key.endsWith('-weekly')) {
+    const lowerKey = key.toLowerCase();
+    const isWeeklyWindow = bucket.window === 'weekly' || bucket.windowVal === 'weekly';
+    const isShortTermSuffix = /-(5h|3h|hourly|shortterm)$/i.test(key);
+    const isWeeklyBucket =
+      key.endsWith('-weekly') ||
+      isWeeklyWindow ||
+      ((lowerKey.includes('argon') || lowerKey.endsWith('-wtu')) && !isShortTermSuffix);
+
+    if (isWeeklyBucket) {
       const pool = key.replace(/-weekly$/, '');
       weekly[pool] = entry;
     } else {
@@ -563,24 +576,114 @@ export function parseMetaQuota(meta) {
   return { shortTerm, weekly };
 }
 
-async function triggerQuotaUpdateIfNeededAsync(cacheInfo) {
-  let needUpdate = true;
-  if (cacheInfo && Date.now() - (cacheInfo.updatedAt || 0) < 30000) needUpdate = false;
+export function mergeQuotaBuckets(baseBuckets = {}, incomingBuckets = {}, preferLowerWhenSameReset = false) {
+  const safeBase = (baseBuckets && typeof baseBuckets === 'object' && !Array.isArray(baseBuckets)) ? baseBuckets : {};
+  const safeIncoming = (incomingBuckets && typeof incomingBuckets === 'object' && !Array.isArray(incomingBuckets)) ? incomingBuckets : {};
+  const merged = { ...safeBase };
 
-  if (needUpdate) {
-    try {
-      const updaterScript = join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs');
-      await fs.access(updaterScript);
-      const proc = spawn('node', [updaterScript], {
-        env: { ...process.env, DISABLE_QUOTA_HOOK: '1' },
-        stdio: 'ignore',
-        detached: true,
-        windowsHide: true
-      });
-      proc.on('error', () => {});
-      proc.unref();
-    } catch (e) {}
+  for (const [pool, inc] of Object.entries(safeIncoming)) {
+    if (!inc || typeof inc !== 'object') continue;
+    const existing = merged[pool];
+    if (!existing || typeof existing !== 'object' || !preferLowerWhenSameReset) {
+      merged[pool] = inc;
+      continue;
+    }
+    const existResetMs = existing.reset_time ? new Date(existing.reset_time).getTime() : 0;
+    const incResetMs = inc.reset_time ? new Date(inc.reset_time).getTime() : 0;
+    if (existResetMs > 0 && incResetMs > 0 && !isNaN(existResetMs) && !isNaN(incResetMs) && Math.abs(incResetMs - existResetMs) > 300000) {
+      merged[pool] = incResetMs > existResetMs ? inc : existing;
+      continue;
+    }
+    if (typeof existing.remaining_percentage === 'number' && typeof inc.remaining_percentage === 'number') {
+      merged[pool] = existing.remaining_percentage <= inc.remaining_percentage ? existing : inc;
+    } else {
+      merged[pool] = inc;
+    }
   }
+  return merged;
+}
+
+export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, options = {}) {
+  const now = Date.now();
+  const lastUpdatedAt = cacheInfo?.lsUpdatedAt || cacheInfo?.updatedAt || 0;
+  const ageMs = now - lastUpdatedAt;
+
+  const currentState = typeof meta?.agent_state === 'string' ? meta.agent_state.trim().toLowerCase() : '';
+  const prevState = typeof cacheInfo?.lastAgentState === 'string' ? cacheInfo.lastAgentState.trim().toLowerCase() : '';
+  const currentOutputTokens = Number(meta?.context_window?.total_output_tokens || 0);
+  const currentInputTokens = Number(meta?.context_window?.total_input_tokens || 0);
+  const currentTotalTokens = currentInputTokens + currentOutputTokens;
+  const prevOutputTokens = Number(cacheInfo?.lastOutputTokens || 0);
+  const prevTotalTokens = Number(cacheInfo?.lastTotalTokens || 0);
+
+  const stateJustBecameIdle = currentState === 'idle' && prevState !== '' && prevState !== 'idle';
+  const tokensJustChanged =
+    (currentOutputTokens > 0 && currentOutputTokens !== prevOutputTokens) ||
+    (currentTotalTokens > 0 && currentTotalTokens !== prevTotalTokens);
+  const missingBuckets = Boolean(options?.missingRequiredBuckets);
+
+  let needUpdate = false;
+  if (!cacheInfo || !lastUpdatedAt || ageMs >= 15000) {
+    needUpdate = true;
+  } else if ((stateJustBecameIdle || tokensJustChanged || missingBuckets) && ageMs >= 1500) {
+    needUpdate = true;
+  }
+
+  if (!needUpdate) {
+    return { cache: cacheInfo, freshlyFetchedFromLs: false, timedOut: false };
+  }
+
+  let timedOut = false;
+  let freshlyFetchedFromLs = false;
+  const cachePath = options?.cachePath || join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
+  const waitMs = typeof options?.waitMs === 'number' ? options.waitMs : 400;
+
+  try {
+    const updaterScript = options?.updaterScript || join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs');
+    await fs.access(updaterScript);
+
+    await new Promise((resolve) => {
+      let settled = false;
+      const finish = (didTimeOut = false) => {
+        if (!settled) {
+          settled = true;
+          timedOut = didTimeOut;
+          clearTimeout(timer);
+          resolve();
+        }
+      };
+      const timer = setTimeout(() => finish(true), waitMs);
+      try {
+        const proc = spawn(process.execPath, [updaterScript], {
+          env: { ...process.env, DISABLE_QUOTA_HOOK: '1' },
+          stdio: 'ignore',
+          detached: true,
+          windowsHide: true
+        });
+        proc.on('error', () => finish(false));
+        proc.on('close', () => finish(false));
+        proc.unref();
+      } catch (_) {
+        finish(false);
+      }
+    });
+
+    if (!timedOut && cachePath) {
+      try {
+        const freshContent = await fs.readFile(cachePath, 'utf8');
+        const freshCache = JSON.parse(freshContent.replace(/^\uFEFF/, ''));
+        if (freshCache && typeof freshCache === 'object' && !Array.isArray(freshCache)) {
+          const freshTs = freshCache.lsUpdatedAt || freshCache.updatedAt || 0;
+          if (freshTs >= lastUpdatedAt) {
+            freshlyFetchedFromLs = true;
+            return { cache: freshCache, freshlyFetchedFromLs, timedOut };
+          }
+        }
+      } catch (_) {}
+    }
+  } catch (e) {}
+
+  return { cache: cacheInfo, freshlyFetchedFromLs, timedOut };
 }
 
 export function resolveModelQuota(fallbackModel, cache) {
@@ -667,9 +770,11 @@ export function resolveWeeklyQuota(fallbackModel, cache) {
     return cache.weekly[pool];
   }
 
-  // A4 Fallback (lowest remaining_percentage among available weekly pools)
+  // A4 Fallback (lowest remaining_percentage among available non-argon weekly pools, or all pools if none)
   if (cache && cache.weekly) {
-    const pools = Object.keys(cache.weekly);
+    const allPools = Object.keys(cache.weekly).filter(p => cache.weekly[p] && typeof cache.weekly[p] === 'object');
+    const generalPools = allPools.filter(p => !p.toLowerCase().includes('argon'));
+    const pools = generalPools.length > 0 ? generalPools : allPools;
     if (pools.length > 0) {
       let minPool = pools[0];
       for (const p of pools) {
@@ -678,6 +783,57 @@ export function resolveWeeklyQuota(fallbackModel, cache) {
         }
       }
       return cache.weekly[minPool];
+    }
+  }
+
+  return { remaining_percentage: 100, refreshes_in: '' };
+}
+
+/**
+ * Resolves the Gemini 4 Argon quota pool ('gemini-argon-wtu' or any argon bucket) from cache.
+ * @param {object} cache - the local quota cache object
+ * @returns {{remaining_percentage:number,reset_time?:string,refreshes_in?:string}}
+ */
+export function resolveArgonQuota(cache) {
+  if (cache && cache.weekly && typeof cache.weekly === 'object') {
+    if (cache.weekly['gemini-argon-wtu']) {
+      return cache.weekly['gemini-argon-wtu'];
+    }
+    const argonPools = Object.keys(cache.weekly).filter(
+      p => p.toLowerCase().includes('argon') && cache.weekly[p] && typeof cache.weekly[p] === 'object'
+    );
+    if (argonPools.length > 0) {
+      let minPool = argonPools[0];
+      for (const p of argonPools) {
+        if (cache.weekly[p].remaining_percentage < cache.weekly[minPool].remaining_percentage) {
+          minPool = p;
+        }
+      }
+      return cache.weekly[minPool];
+    }
+  }
+
+  if (cache && cache.shortTerm && typeof cache.shortTerm === 'object') {
+    const argonShortPools = Object.keys(cache.shortTerm).filter(
+      p => p.toLowerCase().includes('argon') && cache.shortTerm[p] && typeof cache.shortTerm[p] === 'object'
+    );
+    if (argonShortPools.length > 0) {
+      return cache.shortTerm[argonShortPools[0]];
+    }
+  }
+
+  if (cache && cache.models && typeof cache.models === 'object') {
+    const argonModelKeys = Object.keys(cache.models).filter(
+      k => k.toLowerCase().includes('argon') && cache.models[k] && typeof cache.models[k] === 'object'
+    );
+    if (argonModelKeys.length > 0) {
+      let minKey = argonModelKeys[0];
+      for (const k of argonModelKeys) {
+        if (cache.models[k].remaining_percentage < cache.models[minKey].remaining_percentage) {
+          minKey = k;
+        }
+      }
+      return cache.models[minKey];
     }
   }
 
@@ -834,6 +990,16 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const formattedWeeklyReset = weeklyInfo.reset_time ? formatAbsoluteResetTime(weeklyInfo.reset_time, timeFormat) : '';
   const weeklyResetTimeVal = formattedWeeklyReset || noneStr;
   const weeklyQuotaBarVal = renderBarGraph(weeklyPct, barLength, weeklyQuotaColor);
+
+  // Argon Quota
+  const resolvedArgon = options?.argonInfo || resolveArgonQuota(cache);
+  const argonPct = resolvedArgon.remaining_percentage ?? 100;
+  const argonQuotaColor = getColorByPercentage(argonPct);
+  const argonQuotaVal = `${Math.round(argonPct)}%`;
+  const argonCountdownVal = resolvedArgon.refreshes_in || noneStr;
+  const formattedArgonReset = resolvedArgon.reset_time ? formatAbsoluteResetTime(resolvedArgon.reset_time, timeFormat) : '';
+  const argonResetTimeVal = formattedArgonReset || noneStr;
+  const argonQuotaBarVal = renderBarGraph(argonPct, barLength, argonQuotaColor);
 
   // Context
   const remainCtx = Math.max(0, 100 - contextInfo.usedPctNum);
@@ -1041,7 +1207,8 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
     sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName,
     weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode,
-    quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal
+    quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal,
+    argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal
   };
 }
 
@@ -1053,6 +1220,11 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   const normGlobalStyle = normalizeLabelStyle(labelStyle);
   const normLang = normalizeLanguage(lang);
   const localizedAgentState = formatAgentState(m.agentState, normLang);
+  const argonColor = m.argonQuotaColor ?? BLUE;
+  const argonVal = m.argonQuotaVal ?? '100%';
+  const argonCountdown = m.argonCountdownVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
+  const argonResetTime = m.argonResetTimeVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
+  const argonBar = m.argonQuotaBarVal ?? '[██████████]';
   const dicts = {
     'zh-tw': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
@@ -1063,15 +1235,20 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'quota-reset-countdown': `${WHITE}五小時倒數:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
       'quota-reset-time': `${WHITE}五小時重置:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
       'quota-bar': `${WHITE}五小時可用:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}每週倒數:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}每週重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly': `${WHITE}七日內可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}七日內倒數:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}七日內重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}七日內可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon 倒數:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon 重置:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon 可用:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}脈絡用量:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}權杖數:${RESET} ${m.tokenBarVal}`,
       'quota+bar': `${WHITE}五小時可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}脈絡用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}每週可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}七日內可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}權杖數:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}分支: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}專案: ${BOLD}${m.projectName}${RESET}`,
@@ -1098,18 +1275,23 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'context-used': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}内存:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}令牌数:${RESET} ${m.tokenCount}`,
-      'quota-reset-countdown': `${WHITE}五小时倒计时:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-countdown': `${WHITE}五小时倒数:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
       'quota-reset-time': `${WHITE}五小时重置:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
       'quota-bar': `${WHITE}五小时可用:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}每周倒计时:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}每周重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly': `${WHITE}七日内可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}七日内倒数:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}七日内重置:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}七日内可用:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon 倒数:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon 重置:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon 可用:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon 可用:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}上下文用量:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}令牌数:${RESET} ${m.tokenBarVal}`,
       'quota+bar': `${WHITE}五小时可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}每周可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}七日内可用:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}令牌数:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}分支: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}项目: ${BOLD}${m.projectName}${RESET}`,
@@ -1132,22 +1314,27 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'us': {
       'model-name': `${WHITE}Model:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
-      'quota': `${WHITE}5h Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
+      'quota': `${WHITE}5-hr Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}Context Used:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}RAM:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}Tokens:${RESET} ${m.tokenCount}`,
-      'quota-reset-countdown': `${WHITE}5h Reset:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
-      'quota-reset-time': `${WHITE}5h Reset Time:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
-      'quota-bar': `${WHITE}5h Available:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}Weekly Reset:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}Weekly Reset Time:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-reset-countdown': `${WHITE}5-hr Reset:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}5-hr Reset Time:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}5-hr Available:${RESET} ${m.quotaBarVal}`,
+      'quota-weekly': `${WHITE}7-day Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}7-day Reset:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}7-day Reset Time:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}7-day Available:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon Available:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon Reset:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon Reset Time:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon Available:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon Available:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}Context Used:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}Tokens:${RESET} ${m.tokenBarVal}`,
-      'quota+bar': `${WHITE}5h Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'quota+bar': `${WHITE}5-hr Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}Context Used:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}Weekly Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}7-day Available:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}Tokens:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}Branch: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}Project: ${BOLD}${m.projectName}${RESET}`,
@@ -1170,22 +1357,27 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'jp': {
       'model-name': `${WHITE}モデル:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
-      'quota': `${WHITE}5時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
+      'quota': `${WHITE}五時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}コンテキスト使用:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}メモリ:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
       'token-count': `${WHITE}トークン:${RESET} ${m.tokenCount}`,
-      'quota-reset-countdown': `${WHITE}5時間リセット:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
-      'quota-reset-time': `${WHITE}5時間リセット時刻:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
-      'quota-bar': `${WHITE}5時間残量:${RESET} ${m.quotaBarVal}`,
-      'quota-weekly': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
-      'quota-weekly-countdown': `${WHITE}週間リセット:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
-      'quota-weekly-reset-time': `${WHITE}週間リセット時刻:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
-      'quota-weekly-bar': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-reset-countdown': `${WHITE}五時間リセット:${RESET} ${BLUE}${BOLD}${m.countdownVal}${RESET}`,
+      'quota-reset-time': `${WHITE}五時間リセット時刻:${RESET} ${BLUE}${BOLD}${m.quotaResetTimeVal}${RESET}`,
+      'quota-bar': `${WHITE}五時間残量:${RESET} ${m.quotaBarVal}`,
+      'quota-weekly': `${WHITE}七日間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET}`,
+      'quota-weekly-countdown': `${WHITE}七日間リセット:${RESET} ${BLUE}${BOLD}${m.weeklyCountdownVal}${RESET}`,
+      'quota-weekly-reset-time': `${WHITE}七日間リセット時刻:${RESET} ${BLUE}${BOLD}${m.weeklyResetTimeVal}${RESET}`,
+      'quota-weekly-bar': `${WHITE}七日間残量:${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-argon': `${WHITE}Argon 残量:${RESET} ${argonColor}${BOLD}${argonVal}${RESET}`,
+      'quota-argon-countdown': `${WHITE}Argon リセット:${RESET} ${BLUE}${BOLD}${argonCountdown}${RESET}`,
+      'quota-argon-reset-time': `${WHITE}Argon リセット時刻:${RESET} ${BLUE}${BOLD}${argonResetTime}${RESET}`,
+      'quota-argon-bar': `${WHITE}Argon 残量:${RESET} ${argonBar}`,
+      'quota-argon+bar': `${WHITE}Argon 残量:${RESET} ${argonColor}${BOLD}${argonVal}${RESET} ${argonBar}`,
       'context-used-bar': `${WHITE}コンテキスト使用:${RESET} ${m.contextBarVal}`,
       'token-count-bar': `${WHITE}トークン:${RESET} ${m.tokenBarVal}`,
-      'quota+bar': `${WHITE}5時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
+      'quota+bar': `${WHITE}五時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET} ${m.quotaBarVal}`,
       'context-used+bar': `${WHITE}コンテキスト使用:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET} ${m.contextBarVal}`,
-      'quota-weekly+bar': `${WHITE}週間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
+      'quota-weekly+bar': `${WHITE}七日間残量:${RESET} ${m.weeklyQuotaColor}${BOLD}${m.weeklyQuotaVal}${RESET} ${m.weeklyQuotaBarVal}`,
       'token-count+bar': `${WHITE}トークン:${RESET} ${m.tokenCount} ${m.tokenBarVal}`,
       'git-branch': `${WHITE}ブランチ: ${BOLD}${m.gitBranch}${RESET}`,
       'project-path': `${WHITE}プロジェクト: ${BOLD}${m.projectName}${RESET}`,
@@ -1264,6 +1456,7 @@ export const ADJACENT_PAIRS = [
   { val: 'quota', bar: 'quota-bar', merged: 'quota+bar' },
   { val: 'context-used', bar: 'context-used-bar', merged: 'context-used+bar' },
   { val: 'quota-weekly', bar: 'quota-weekly-bar', merged: 'quota-weekly+bar' },
+  { val: 'quota-argon', bar: 'quota-argon-bar', merged: 'quota-argon+bar' },
   { val: 'token-count', bar: 'token-count-bar', merged: 'token-count+bar' }
 ];
 
@@ -1402,30 +1595,107 @@ async function main() {
     let cache = null;
     try {
       const cacheContent = await fs.readFile(cachePath, 'utf8');
-      cache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
+      const parsedCache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
+      if (parsedCache && typeof parsedCache === 'object' && !Array.isArray(parsedCache)) {
+        cache = parsedCache;
+      }
     } catch (e) {}
 
+    const normFallbackModel = normalizeModelName(fallbackModel);
+    const activePool = normFallbackModel.includes('gemini') ? 'gemini' : ((normFallbackModel.includes('claude') || normFallbackModel.includes('gpt')) ? '3p' : '');
+    const needsArgon = Array.isArray(footerItems) && footerItems.some(item => typeof item === 'string' && item.startsWith('quota-argon'));
+
     const metaQuota = parseMetaQuota(meta);
+    const hasMetaShortTerm = activePool
+      ? Boolean(metaQuota?.shortTerm?.[activePool])
+      : Boolean(metaQuota?.shortTerm && Object.keys(metaQuota.shortTerm).length > 0);
+    const hasMetaWeekly = activePool
+      ? Boolean(metaQuota?.weekly?.[activePool])
+      : Boolean(metaQuota?.weekly && Object.keys(metaQuota.weekly).some(k => !k.toLowerCase().includes('argon')));
+    const hasMetaArgon = !needsArgon || Boolean(
+      metaQuota && (
+        Object.keys(metaQuota.weekly || {}).some(k => k.toLowerCase().includes('argon')) ||
+        Object.keys(metaQuota.shortTerm || {}).some(k => k.toLowerCase().includes('argon'))
+      )
+    );
+    const isMetaQuotaComplete = Boolean(metaQuota && hasMetaShortTerm && hasMetaWeekly && hasMetaArgon);
+
+    const hasCacheShortTerm = Boolean(
+      (activePool && cache?.shortTerm?.[activePool]) ||
+      (cache?.shortTerm && Object.keys(cache.shortTerm).length > 0) ||
+      (cache?.models && typeof cache.models === 'object' && Object.keys(cache.models).length > 0)
+    );
+    const hasCacheArgon = !needsArgon || Boolean(
+      (cache?.weekly && typeof cache.weekly === 'object' && Object.keys(cache.weekly).some(k => k.toLowerCase().includes('argon'))) ||
+      (cache?.shortTerm && typeof cache.shortTerm === 'object' && Object.keys(cache.shortTerm).some(k => k.toLowerCase().includes('argon'))) ||
+      (cache?.models && typeof cache.models === 'object' && Object.keys(cache.models).some(k => k.toLowerCase().includes('argon')))
+    );
+    const missingRequiredBuckets = (!hasMetaShortTerm && !hasCacheShortTerm) || (!hasMetaArgon && !hasCacheArgon);
+
+    const currentState = typeof meta?.agent_state === 'string' ? meta.agent_state.trim().toLowerCase() : '';
+    const prevState = typeof cache?.lastAgentState === 'string' ? cache.lastAgentState.trim().toLowerCase() : '';
+    const currentOutputTokens = Number(meta?.context_window?.total_output_tokens || 0);
+    const currentInputTokens = Number(meta?.context_window?.total_input_tokens || 0);
+    const currentTotalTokens = currentInputTokens + currentOutputTokens;
+    const prevOutputTokens = Number(cache?.lastOutputTokens || 0);
+    const prevTotalTokens = Number(cache?.lastTotalTokens || 0);
+    const stateOrTokensChanged =
+      (currentState === 'idle' && prevState !== '' && prevState !== 'idle') ||
+      (currentOutputTokens > 0 && currentOutputTokens !== prevOutputTokens) ||
+      (currentTotalTokens > 0 && currentTotalTokens !== prevTotalTokens);
+
+    let freshlyFetchedFromLs = false;
+    let timedOut = false;
+    if (!isMetaQuotaComplete || stateOrTokensChanged) {
+      const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
+        cachePath,
+        missingRequiredBuckets
+      });
+      cache = updateRes.cache;
+      freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
+      timedOut = updateRes.timedOut;
+    }
+
+    let shouldPersistCache = false;
     if (metaQuota) {
-      if (!cache) cache = {};
-      cache.shortTerm = { ...(cache.shortTerm || {}), ...metaQuota.shortTerm };
-      cache.weekly = { ...(cache.weekly || {}), ...metaQuota.weekly };
+      if (!cache || typeof cache !== 'object') cache = {};
+      cache.shortTerm = mergeQuotaBuckets(cache.shortTerm, metaQuota.shortTerm, freshlyFetchedFromLs);
+      cache.weekly = mergeQuotaBuckets(cache.weekly, metaQuota.weekly, freshlyFetchedFromLs);
       const planTier = meta?.plan_tier || meta?.account?.plan_tier;
       const email = meta?.email || meta?.account?.email;
       if (planTier) cache.planTier = planTier;
       if (email) cache.email = email;
-      cache.updatedAt = Date.now();
-      try {
-        await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-        await writeFileAndVerifyNoBOM(cachePath, JSON.stringify(cache, null, 2));
-      } catch (_) {}
-    } else {
-      await triggerQuotaUpdateIfNeededAsync(cache);
+      if (isMetaQuotaComplete || !cache.updatedAt) {
+        cache.updatedAt = Date.now();
+      }
+      shouldPersistCache = true;
+    }
+
+    if (cache && typeof cache === 'object') {
+      if (currentState && cache.lastAgentState !== currentState) {
+        cache.lastAgentState = currentState;
+        shouldPersistCache = true;
+      }
+      if (currentOutputTokens > 0 && cache.lastOutputTokens !== currentOutputTokens) {
+        cache.lastOutputTokens = currentOutputTokens;
+        shouldPersistCache = true;
+      }
+      if (currentTotalTokens > 0 && cache.lastTotalTokens !== currentTotalTokens) {
+        cache.lastTotalTokens = currentTotalTokens;
+        shouldPersistCache = true;
+      }
+      if (shouldPersistCache && !timedOut) {
+        try {
+          await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
+          await writeFileAndVerifyNoBOM(cachePath, JSON.stringify(cache, null, 2));
+        } catch (_) {}
+      }
     }
 
     // 解析核心資料
     const quotaInfo = resolveModelQuota(fallbackModel, cache);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
+    const argonInfo = resolveArgonQuota(cache);
     const contextInfo = await calculateContextUsageAsync(meta, conversationId);
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
@@ -1434,7 +1704,7 @@ async function main() {
     const rawItemStyles = settings?.ui?.footer?.itemStyles;
 
     // 格式化指標並繪製
-    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength });
+    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo });
     const activeDict = buildI18nDict(lang, metrics, labelStyle, rawItemStyles);
     renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, rawItemStyles, labelStyle);
 

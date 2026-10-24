@@ -209,9 +209,9 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 2. **根據步驟 1 的語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的 `categories`（五大分類清單）。
 
 > [!NOTE]
-> **螢幕高度限制與分頁設計（Issue #1262）**：目前 Antigravity CLI 的 `ask_question` 在選項超過螢幕可容納行數（約 31 項）時存在無法滾動顯示的限制。為提供良好互動體驗，32 項指標拆分為五個分類頁籤（每個分頁 4~10 項，保證在任何終端機螢幕均能完整顯示），由代理依序呼叫 `ask_question` 引導使用者勾選：
+> **螢幕高度限制與分頁設計（Issue #1262）**：目前 Antigravity CLI 的 `ask_question` 在選項超過螢幕可容納行數（約 31 項）時存在無法滾動顯示的限制。為提供良好互動體驗，36 項指標拆分為五個分類頁籤（每個分頁 4~14 項，保證在任何終端機螢幕均能完整顯示），由代理依序呼叫 `ask_question` 引導使用者勾選：
 > - 分類 1：模型與代理（4 項，`model-name`, `agent-profile`, `agent-state`, `mode`）
-> - 分類 2：額度、計費與帳號（10 項，`quota`, `quota-bar`, `quota-reset-countdown`, `quota-reset-time`, `quota-weekly`, `quota-weekly-bar`, `quota-weekly-countdown`, `quota-weekly-reset-time`, `plan-tier`, `account-email`）
+> - 分類 2：額度、計費與帳號（14 項，`quota`, `quota-bar`, `quota-reset-countdown`, `quota-reset-time`, `quota-weekly`, `quota-weekly-bar`, `quota-weekly-countdown`, `quota-weekly-reset-time`, `quota-argon`, `quota-argon-bar`, `quota-argon-countdown`, `quota-argon-reset-time`, `plan-tier`, `account-email`）
 > - 分類 3：脈絡與權杖（4 項，`context-used`, `context-used-bar`, `token-count`, `token-count-bar`）
 > - 分類 4：工作區與版本控制（5 項，`project-path`, `project-full-path`, `git-branch`, `vcs-dirty`, `vcs-type`）
 > - 分類 5：系統狀態與背景任務（9 項，`memory-usage`, `cli-version`, `conversation-id`, `sandbox-status`, `tool-confirmation`, `pending-input`, `background-tasks`, `subagents`, `artifacts`）
@@ -256,21 +256,52 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 ### 步驟 4：第三階段問卷（手動排序、樣式前綴與最終篩選）
 
-1. 將**步驟 3 中使用者在五個頁籤所勾選的全部指標選項**按順序整理出來，標上數字編號（例如 `1. 🤖 目前使用的人工智慧模型名稱（model-name）`），每項以 `\n` 分隔。
-2. 呼叫 `ask_question` 引導使用者進行排序與個別樣式設定（問卷以所選語系呈現）：
-   - **前綴規則**：
+> [!CAUTION]
+> **防截斷鐵則（Issue #1262）**：Antigravity 命令列介面（CLI）底層終端機使用者介面（TUI）在呼叫 `ask_question` 時，會將 `question` 文字**重複渲染兩次**（一次在對話歷史區 `? ...`，一次在底部 `Question 1/1: ...` 面板）。若 `question` 包含多行說明，重複兩次就會佔據 10~15 行垂直空間，進而把上方對話視窗的前幾行頂出畫面並遭終端機緩衝區裁切吃字！
+> 因此，必須嚴格遵守以下三點：
+> 1. **絕對禁止輸出單欄每項一行的長清單**（無論在對話視窗或 `ask_question` 內皆禁止）。
+> 2. **在同一回合呼叫 `ask_question` 之前，先在一般對話（Chat Response）輸出「單行填寫規則標題 ＋ 三欄 Markdown 表格（3-Column Markdown Table）」**，將最多 36 項壓縮在 **12 列以內**。
+> 3. **`ask_question` 的 `question` 欄位嚴格限制為「單純 1 行短句」（禁止包含換行 `\n` 或長篇規則說明）**，將底部面板高度壓到最低，確保上方三欄表格第 1~12 列 100% 留在可視畫面內、免捲動、零截斷！
+
+1. **在同一回合呼叫 `ask_question` 之前，先在一般對話（Chat Response）輸出「單行填寫規則標題 ＋ 三欄 Markdown 表格」**：
+   - 將步驟 3 中使用者在五個頁籤所勾選的全部指標選項（共 $N$ 項）按順序標上連續數字編號（從 `1` 到 $N$）。
+   - 計算每欄列數 $R = \lceil N / 3 \rceil$（例如 $N = 36$ 時 $R = 12$ 列），採**直向優先（Column-major：左欄 `1`~$R$、中欄 $R+1$~$2R$、右欄 $2R+1$~$N$）**組成三欄 Markdown 表格，每格格式為 `🤖 簡稱 (\`metric-id\`)`（保持文字精簡以免單行過寬折行）。
+   - **zh-tw 輸出範例（以全選 36 項為例，標題含填寫規則 + 12 列表格）**：
+     ```markdown
+     📋 **目前已選取的狀態列指標（共 36 項）** — *於下方 Write-in 輸入序號或代碼（如 `2, e1, n, e:quota`；純數字/`t` 為文字、`e` 為 Emoji、`n` 為換行）：*
+
+     | # | 指標名稱（識別碼） | # | 指標名稱（識別碼） | # | 指標名稱（識別碼） |
+     |---|---|---|---|---|---|
+     | **1** | 🤖 模型名稱 (`model-name`) | **13** | ✨ Argon 額度 (`quota-argon`) | **25** | 🔀 Git 分支 (`git-branch`) |
+     | **2** | 🪪 使用中代理 (`agent-profile`) | **14** | ✨ Argon 長條圖 (`quota-argon-bar`) | **26** | 🔍 未提交變更 (`vcs-dirty`) |
+     | **3** | ⚡ 代理狀態 (`agent-state`) | **15** | ⏱️ Argon 倒數 (`quota-argon-countdown`) | **27** | 🗃️ 版控類型 (`vcs-type`) |
+     | **4** | ⚙️ 運行模式 (`mode`) | **16** | ⏰ Argon 時間 (`quota-argon-reset-time`) | **28** | 💾 記憶體量 (`memory-usage`) |
+     | **5** | 🔋 五小時額度 (`quota`) | **17** | 💎 訂閱方案 (`plan-tier`) | **29** | 🚀 CLI 版本 (`cli-version`) |
+     | **6** | 🔋 五小時長條圖 (`quota-bar`) | **18** | 📧 帳號信箱 (`account-email`) | **30** | 💬 對話 ID (`conversation-id`) |
+     | **7** | ⏳ 五小時倒數 (`quota-reset-countdown`) | **19** | 🧠 脈絡比例 (`context-used`) | **31** | 🛡️ 沙盒狀態 (`sandbox-status`) |
+     | **8** | 🕒 五小時時間 (`quota-reset-time`) | **20** | 🧠 脈絡長條圖 (`context-used-bar`) | **32** | 🔔 工具確認框 (`tool-confirmation`) |
+     | **9** | 📅 每週額度 (`quota-weekly`) | **21** | 💰 權杖數量 (`token-count`) | **33** | 📥 待處理輸入 (`pending-input`) |
+     | **10** | 📅 每週長條圖 (`quota-weekly-bar`) | **22** | 💰 權杖長條圖 (`token-count-bar`) | **34** | 🔄 背景任務數 (`background-tasks`) |
+     | **11** | ⏲️ 每週倒數 (`quota-weekly-countdown`) | **23** | 📁 專案短路徑 (`project-path`) | **35** | 👥 活躍子代理 (`subagents`) |
+     | **12** | 🗓️ 每週時間 (`quota-weekly-reset-time`) | **24** | 📍 專案完整路徑 (`project-full-path`) | **36** | 📄 產出檔案數 (`artifacts`) |
+     ```
+   - **各語系單行標題與表頭範例**：
+     - **zh-tw**：`📋 **目前已選取的狀態列指標（共 N 項）** — *於下方 Write-in 輸入序號或代碼（如 \`2, e1, n, e:quota\`；純數字/\`t\` 為文字、\`e\` 為 Emoji、\`n\` 為換行）：*` ／ 表頭 `| # | 指標名稱（識別碼） | # | 指標名稱（識別碼） | # | 指標名稱（識別碼） |`
+     - **zh-cn**：`📋 **目前已选取的状态栏指标（共 N 项）** — *于下方 Write-in 输入序号或代码（如 \`2, e1, n, e:quota\`；纯数字/\`t\` 为文字、\`e\` 为 Emoji、\`n\` 为换行）：*` ／ 表頭 `| # | 指标名称（标识码） | # | 指标名称（标识码） | # | 指标名称（标识码） |`
+     - **us**：`📋 **Currently Selected Metrics (Total N)** — *Enter comma-separated numbers/IDs in Write-in below (e.g. \`2, e1, n, e:quota\`; number/\`t\`=text, \`e\`=Emoji, \`n\`=line break):*` ／ 表頭 `| # | Metric (ID) | # | Metric (ID) | # | Metric (ID) |`
+     - **jp**：`📋 **現在選択中の指標（全 N 項目）** — *下の Write-in に番号またはIDをカンマ区切りで入力（例: \`2, e1, n, e:quota\`；数字/\`t\`=テキスト、\`e\`=絵文字、\`n\`=改行）：*` ／ 表頭 `| # | 指標名（ID） | # | 指標名（ID） | # | 指標名（ID） |`
+2. **緊接著在同一回合呼叫「單行極簡版」`ask_question`**（`question` 欄位**嚴格限制為單純 1 行文字，禁止包含 `\n` 換行**，以免重複渲染兩次推擠上方表格）：
+   - **前綴規則**（已濃縮於上方表格標題中）：
      - 純數字（如 `1`）或 `t1` 或純英文 ID（如 `quota`）或 `t:quota` 均為文字樣式。
      - `e1` 或 `e:quota` 為繪圖符號（Emoji）樣式。
-     - 大小寫不分。
-     - 略過排序預設全部為文字樣式。
-     - 可以使用 `n` 來強制換行。未填寫的指標將不予顯示。
+     - 大小寫不分；略過排序預設全部為文字樣式；可使用 `n` 強制換行；未填寫的指標不予顯示。
 
    **zh-tw 範例**：
    ```json
    {
      "questions": [
        {
-         "question": "請設定狀態列顯示順序與個別樣式。\n\n目前已選取：\n1. 🤖 目前使用的人工智慧模型名稱（model-name）\n2. 🔋 帳號五小時可用額度百分比（quota）\n3. 🧠 目前對話已消耗的脈絡用量比例（context-used）\n\n請在下方輸入框「Write-in...」中輸入以逗號分隔的序號或英文識別碼（如：2, e1, e:context-used）。\n- 樣式前綴：純數字（如 1）或 t1、t:quota 為文字樣式；e1、e:quota 為 Emoji 樣式（大小寫不分）。\n- 可使用 `n` 強制換行。未填寫的指標將不予顯示。",
+         "question": "請設定狀態列顯示順序與個別樣式：",
          "options": [
            "略過，使用原勾選順序啟用全部指標（預設文字樣式）",
            "手動排序與設定樣式（請在下方「Write-in...」欄位中填寫）"
@@ -288,7 +319,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    {
      "questions": [
        {
-         "question": "请设置状态栏显示顺序与个别样式。\n\n目前已选取：\n1. 🤖 当前使用的人工智能模型名称（model-name）\n2. 🔋 账号五小时可用额度百分比（quota）\n3. 🧠 当前对话已消耗的上下文用量比例（context-used）\n\n请在下方输入框“Write-in...”中输入以逗号分隔的序号或英文标识码（如：2, e1, e:context-used）。\n- 样式前缀：纯数字（如 1）或 t1、t:quota 为文字样式；e1、e:quota 为 Emoji 样式（大小写不分）。\n- 可使用 `n` 强制换行。未填写的指标将不予显示。",
+         "question": "请设置状态栏显示顺序与个别样式：",
          "options": [
            "跳过，使用原勾选顺序启用全部指标（默认文字样式）",
            "手动排序与设定样式（请在下方“Write-in...”栏位中填写）"
@@ -306,7 +337,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    {
      "questions": [
        {
-         "question": "Please set the statusline display order and individual styles.\n\nCurrently selected:\n1. 🤖 Current AI model name (model-name)\n2. 🔋 Hourly available quota remaining (quota)\n3. 🧠 Context used percentage (context-used)\n\nPlease enter comma-separated numbers or metric IDs in the 'Write-in...' box below (e.g.: 2, e1, e:context-used).\n- Style prefixes: Plain numbers (e.g., 1) or t1, t:quota for text labels; e1, e:quota for Emoji icons (case-insensitive).\n- Use `n` to force a line break. Unlisted items will not be displayed.",
+         "question": "Please set the statusline display order and individual styles:",
          "options": [
            "Skip, keep current selection order (default text labels)",
            "Manual order & styles (fill in the 'Write-in...' box below)"
@@ -324,7 +355,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    {
      "questions": [
        {
-         "question": "ステータスラインの表示順序と個別のスタイルを設定してください。\n\n現在選択中：\n1. 🤖 現在のAIモデル名（model-name）\n2. 🔋 時間別利用可能残量（quota）\n3. 🧠 コンテキスト使用割合（context-used）\n\n下の「Write-in...」入力欄に、カンマ区切りで番号またはメトリックIDを入力してください（例：2, e1, e:context-used）。\n- スタイル接頭辞：数字のみ（例：1）または t1、t:quota はテキスト形式；e1、e:quota は絵文字アイコン形式（大文字・小文字を区別しません）。\n- `n` を使用して強制的に改行できます。入力されなかった項目は非表示になります。",
+         "question": "ステータスラインの表示順序と個別のスタイルを設定してください：",
          "options": [
            "スキップして選択順のまま全指標を有効化（デフォルトテキスト形式）",
            "手動で並べ替えとスタイル設定（下の「Write-in...」欄に入力）"
@@ -379,7 +410,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 ## ! 常見陷阱速查
 
-完整對照表（11 條陷阱與修正做法）詳見 [references/pitfalls.md](references/pitfalls.md)。最關鍵的三條速記：
+完整對照表（12 條陷阱與修正做法）詳見 [references/pitfalls.md](references/pitfalls.md)。最關鍵的三條速記：
 
 1. **必須同步寫入三層設定檔**（特別是 命令列介面（CLI）專屬的 `~/.gemini/antigravity-cli/settings.json`，是最致命的盲點）
 2. **Windows 寫設定檔絕對禁止帶 位元組順序記號（BOM）**，寫入後必須驗證前 3 個位元組

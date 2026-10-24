@@ -106,7 +106,7 @@ Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更�
 - `ui.language` 可為 `zh-tw` / `zh-cn` / `us` / `jp`
 - `ui.footer.labelStyle` 可為 `"text"`（預設，顯示文字標籤與冒號，如 `模型: Gemini 3.1 Pro`）或 `"emoji"`（以專屬 Emoji 取代文字標籤並省略冒號，如 `🤖 Gemini 3.1 Pro`）
 - `ui.footer.items` 為英文識別碼陣列，順序決定狀態列顯示順序
-- 支援的識別碼：`model-name` / `agent-profile` / `agent-state` / `sandbox-status` / `context-used` / `context-used-bar` / `token-count` / `token-count-bar` / `artifacts` / `account-email` / `plan-tier` / `quota` / `quota-bar` / `quota-reset-countdown` / `quota-reset-time` / `quota-weekly` / `quota-weekly-bar` / `quota-weekly-countdown` / `quota-weekly-reset-time` / `tool-confirmation` / `pending-input` / `background-tasks` / `subagents` / `project-path` / `project-full-path` / `vcs-type` / `git-branch` / `vcs-dirty` / `memory-usage` / `cli-version` / `conversation-id` / `mode`
+- 支援的識別碼：`model-name` / `agent-profile` / `agent-state` / `sandbox-status` / `context-used` / `context-used-bar` / `token-count` / `token-count-bar` / `artifacts` / `account-email` / `plan-tier` / `quota` / `quota-bar` / `quota-reset-countdown` / `quota-reset-time` / `quota-weekly` / `quota-weekly-bar` / `quota-weekly-countdown` / `quota-weekly-reset-time` / `quota-argon` / `quota-argon-bar` / `quota-argon-countdown` / `quota-argon-reset-time` / `tool-confirmation` / `pending-input` / `background-tasks` / `subagents` / `project-path` / `project-full-path` / `vcs-type` / `git-branch` / `vcs-dirty` / `memory-usage` / `cli-version` / `conversation-id` / `mode`
 - 特殊識別碼：`n` 或 `newline` 用於強制換行（可重複出現）
 - 自訂設定：
   - `ui.footer.labelStyle`：標籤顯示樣式（`"text"` 或 `"emoji"`，預設 `"text"`）

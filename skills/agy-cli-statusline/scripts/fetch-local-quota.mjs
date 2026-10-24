@@ -231,10 +231,13 @@ export function parseWeeklyBuckets(summaryResponse) {
   for (const group of resObj.groups) {
     if (!group.buckets) continue;
     for (const bucket of group.buckets) {
-      const windowVal = bucket.window || bucket.windowVal || '';
-      if (windowVal !== 'weekly') continue;
+      const windowVal = (bucket.window || bucket.windowVal || '').toLowerCase();
       const bucketId = bucket.bucketId || '';
       if (!bucketId) continue;
+      const lowerId = bucketId.toLowerCase();
+      const isShortTermSuffix = /-(5h|3h|hourly|shortterm)$/i.test(bucketId);
+      const isWeekly = windowVal === 'weekly' || (!windowVal && (lowerId.endsWith('-weekly') || ((lowerId.includes('argon') || lowerId.endsWith('-wtu')) && !isShortTermSuffix)));
+      if (!isWeekly) continue;
       const pool = bucketId.replace(/-weekly$/, '');
 
       let fraction = 1;
@@ -279,10 +282,13 @@ export function parseShortTermBuckets(summaryResponse) {
   for (const group of resObj.groups) {
     if (!group.buckets) continue;
     for (const bucket of group.buckets) {
-      const windowVal = bucket.window || bucket.windowVal || '';
-      if (windowVal === 'weekly') continue;
+      const windowVal = (bucket.window || bucket.windowVal || '').toLowerCase();
       const bucketId = bucket.bucketId || '';
       if (!bucketId) continue;
+      const lowerId = bucketId.toLowerCase();
+      const isShortTermSuffix = /-(5h|3h|hourly|shortterm)$/i.test(bucketId);
+      const isWeekly = windowVal === 'weekly' || (!windowVal && (lowerId.endsWith('-weekly') || ((lowerId.includes('argon') || lowerId.endsWith('-wtu')) && !isShortTermSuffix)));
+      if (isWeekly) continue;
       const pool = bucketId.replace(/-(5h|3h|hourly|shortterm)$/, '');
 
       let fraction = 1;
@@ -378,6 +384,7 @@ export async function fetchLiveQuotaCache() {
   // 1. 優先使用 Antigravity CLI 注入的環境變數 (極速直連，零進程開銷)
   let envLsAddr = process.env.ANTIGRAVITY_LS_ADDRESS;
   let envCsrfToken = process.env.ANTIGRAVITY_CSRF_TOKEN || '';
+  let envPreferHttps = false;
   let envLoadedFromDisk = false;
 
   // 若 statusLine.command 等子進程環境未繼承環境變數，從最新會話快取中載入
@@ -389,6 +396,7 @@ export async function fetchLiveQuotaCache() {
         envLoadedFromDisk = true;
       }
       if (!envCsrfToken && savedEnv.csrf_token) envCsrfToken = savedEnv.csrf_token;
+      if (savedEnv.prefer_https !== undefined) envPreferHttps = Boolean(savedEnv.prefer_https);
     } catch (_) {}
   } else {
     // 將有效的直連位址與 Token 持久化，供後續未獲取環境變數的 Hook 子進程共用
@@ -397,6 +405,7 @@ export async function fetchLiveQuotaCache() {
       writeFileSyncAndVerifyNoBOM(ENV_CACHE_FILE, JSON.stringify({
         ls_address: envLsAddr,
         csrf_token: envCsrfToken,
+        prefer_https: false,
         updatedAt: Date.now()
       }, null, 2));
     } catch (_) {}
@@ -407,12 +416,11 @@ export async function fetchLiveQuotaCache() {
       const [host, portStr] = envLsAddr.split(':');
       const port = parseInt(portStr, 10);
       if (!isNaN(port)) {
-        // ANTIGRAVITY_LS_ADDRESS 為 HTTP 協定，直接以 HTTP 快路徑連線
-        const response = await requestUserStatus(port, envCsrfToken, host, false);
-        let summaryResponse = null;
-        try {
-          summaryResponse = await requestQuotaSummary(port, envCsrfToken, host, false);
-        } catch (_) {}
+        // 併行請求 GetUserStatus 與 RetrieveUserQuotaSummary 以縮短延遲
+        const [response, summaryResponse] = await Promise.all([
+          requestUserStatus(port, envCsrfToken, host, envPreferHttps),
+          requestQuotaSummary(port, envCsrfToken, host, envPreferHttps).catch(() => null)
+        ]);
         processStatusAndSummary(response, summaryResponse);
       }
     } catch (_) {
@@ -425,33 +433,48 @@ export async function fetchLiveQuotaCache() {
   }
 
   // 2. 若環境變數通道未獲取到資料，降級回進程掃描（向下相容舊版或獨立 IDE）
-  if (Object.keys(allModels).length === 0 && Object.keys(weekly).length === 0) {
+  if (Object.keys(allModels).length === 0 && Object.keys(weekly).length === 0 && Object.keys(shortTerm).length === 0) {
     const candidates = findServerCandidates();
+    let discoveredEnv = null;
     for (const info of candidates) {
       const ports = getListeningPorts(info.pid);
       for (const port of ports) {
         try {
           const token = info.csrf_token || envCsrfToken;
           // 未知掃描端口優先使用 HTTPS，避免對 Go TLS Listener 發送明文 HTTP 觸發終端報錯
-          const response = await requestUserStatus(port, token, '127.0.0.1', true);
-          let summaryResponse = null;
-          try {
-            summaryResponse = await requestQuotaSummary(port, token, '127.0.0.1', true);
-          } catch (_) {}
+          const [response, summaryResponse] = await Promise.all([
+            requestUserStatus(port, token, '127.0.0.1', true),
+            requestQuotaSummary(port, token, '127.0.0.1', true).catch(() => null)
+          ]);
           processStatusAndSummary(response, summaryResponse);
+          if (!discoveredEnv && token && (Object.keys(allModels).length > 0 || Object.keys(weekly).length > 0 || Object.keys(shortTerm).length > 0)) {
+            discoveredEnv = { ls_address: `127.0.0.1:${port}`, csrf_token: token, prefer_https: true };
+          }
         } catch (_) {
           continue;
         }
       }
     }
+    // 將進程掃描成功的端點與 Token 快取至磁碟，使後續更新直接走步驟 1 極速通道（免重複執行 ps/lsof/PowerShell）
+    if (discoveredEnv && !envLoadedFromDisk) {
+      try {
+        mkdirSync(dirname(ENV_CACHE_FILE), { recursive: true });
+        writeFileSyncAndVerifyNoBOM(ENV_CACHE_FILE, JSON.stringify({
+          ...discoveredEnv,
+          updatedAt: Date.now()
+        }, null, 2));
+      } catch (_) {}
+    }
   }
 
   if (Object.keys(allModels).length > 0 || Object.keys(weekly).length > 0 || Object.keys(shortTerm).length > 0) {
+    const now = Date.now();
     return { 
       models: allModels, 
       weekly,
       shortTerm,
-      updatedAt: Date.now(),
+      updatedAt: now,
+      lsUpdatedAt: now,
       email: accountEmail,
       planTier: planTierName,
       planStatus: planStatusData
@@ -473,6 +496,14 @@ async function main() {
   try {
     const cache = await fetchLiveQuotaCache();
     if (cache) {
+      try {
+        const prev = JSON.parse(readFileSync(CACHE_FILE, 'utf8').replace(/^\uFEFF/, ''));
+        if (prev && typeof prev === 'object') {
+          if (prev.lastAgentState !== undefined) cache.lastAgentState = prev.lastAgentState;
+          if (prev.lastOutputTokens !== undefined) cache.lastOutputTokens = prev.lastOutputTokens;
+          if (prev.lastTotalTokens !== undefined) cache.lastTotalTokens = prev.lastTotalTokens;
+        }
+      } catch (_) {}
       mkdirSync(dirname(CACHE_FILE), { recursive: true });
       writeFileSyncAndVerifyNoBOM(CACHE_FILE, JSON.stringify(cache, null, 2));
     }

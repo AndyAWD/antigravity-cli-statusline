@@ -694,14 +694,18 @@ async function testCase8QuestionsJsonMetricIds() {
     'quota-bar',
     'quota-weekly-bar',
     'context-used-bar',
-    'token-count-bar'
+    'token-count-bar',
+    'quota-argon',
+    'quota-argon-bar',
+    'quota-argon-countdown',
+    'quota-argon-reset-time'
   ];
 
   for (const lang of languages) {
     const langData = questionsData[lang];
     assert.ok(langData, `${lang} 語系資料必須存在`);
     assert.ok(Array.isArray(langData.options), `${lang}.options 必須為陣列`);
-    assert.strictEqual(langData.options.length, 32, `${lang}.options 必須包含全部 32 個指標選項`);
+    assert.strictEqual(langData.options.length, 36, `${lang}.options 必須包含全部 36 個指標選項`);
 
     const extractedIds = langData.options.map(item => {
       const match = item.match(/[\(（]([^）\)]+)[\)）]$/);
@@ -709,7 +713,7 @@ async function testCase8QuestionsJsonMetricIds() {
     });
 
     const uniqueIds = new Set(extractedIds);
-    assert.strictEqual(uniqueIds.size, 32, `${lang} 的所有指標識別碼必須不重複`);
+    assert.strictEqual(uniqueIds.size, 36, `${lang} 的所有指標識別碼必須不重複`);
 
     for (const newId of expectedNewIds) {
       assert.ok(uniqueIds.has(newId), `${lang} 必須包含新指標 ID: "${newId}"`);
@@ -851,7 +855,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
 
   const expectedCategories = [
     { id: 'model-and-agent', count: 4 },
-    { id: 'quota-and-billing', count: 10 },
+    { id: 'quota-and-billing', count: 14 },
     { id: 'context-and-tokens', count: 4 },
     { id: 'workspace-and-vcs', count: 5 },
     { id: 'system-and-tasks', count: 9 }
@@ -874,7 +878,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
       totalOptions += cat.options.length;
       catOptionsFlat.push(...cat.options);
     }
-    assert.strictEqual(totalOptions, 32, `${lang} 分類中的指標總和必須剛好為 32 項`);
+    assert.strictEqual(totalOptions, 36, `${lang} 分類中的指標總和必須剛好為 36 項`);
     assert.deepStrictEqual(catOptionsFlat, langData.options, `${lang} 平坦 options 必須與 5 大分類彙整選項完全一致`);
 
     // 驗證雙括號清理需求：各選項中僅允許末尾唯一的英文識別碼括號，不得含有額外說明括號
@@ -961,9 +965,9 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
     'context-used': 'emoji'
   });
 
-  // 7. 全域 1-32 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 21 代表 git-branch）
-  const subsetIds = ['model-name', 'git-branch']; // length = 2, git-branch 在 32 項中為第 21 項
-  const resGlobalFallback = parseOrderAndStyles('1, e21', subsetIds);
+  // 7. 全域 1-36 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 25 代表 git-branch）
+  const subsetIds = ['model-name', 'git-branch']; // length = 2, git-branch 在 36 項中為第 25 項
+  const resGlobalFallback = parseOrderAndStyles('1, e25', subsetIds);
   assert.deepStrictEqual(resGlobalFallback.items, ['model-name', 'git-branch']);
   assert.deepStrictEqual(resGlobalFallback.itemStyles, {
     'git-branch': 'emoji'

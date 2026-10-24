@@ -24,6 +24,7 @@
 | 9 | agy CLI 內部指令（疑似 `/model` 切換模型時）覆寫 `~/.gemini/antigravity-cli/settings.json` 並把 `statusLine.command` 清空或刪除 | 三層合併後 `command` 為空字串，agy CLI 完全停止呼叫 hook → 狀態列**整條空白消失**（非退讓 UI，是真的不見）；無錯誤訊息、難以察覺 | 短期 workaround：重新執行本技能，會同步覆寫三層 `statusLine`。下次發生時請先**不要重跑技能**，立即執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 抓現場證據（重點看 CLI 專屬層的 `statusLine.command`），確認假設後再決定是否新增 watchdog 機制或向 agy CLI 上游回報 |
 | 10 | macOS / Linux 下 `statusLine.command` 寫死裸命令 `node`，或 Windows 下在 `statusLine.command` 中加入雙引號 `"` | macOS / Linux 因 non-interactive `sh` 缺乏 NVM `PATH` 報 `exit status 127 (sh: 1: node: not found)`；Windows 因 `agy.exe` 底層以 Go `exec.CommandContext(ctx, "cmd", "/c", command)` 呼叫，Go `syscall.EscapeArg` 會將內部雙引號轉義為 `\"`，而 `cmd.exe /c` 不會解開 `\"`，導致 `node.exe` 將其視為字面引號字元並與 CWD 拼接報錯 `Cannot find module 'D:\cwd\"C:\...\statusline-quota.mjs"'` | macOS / Linux 使用 `process.execPath` 絕對路徑；Windows **絕對禁止包含雙引號**，無空格路徑使用 `node <path>`，含空格路徑使用 `node --import file:///... -e 0`，並於 `trusted_hooks.json` 同步登記所有變體 |
 | 11 | 初次安裝或初次啟用狀態列後未重新啟動 agy CLI | agy CLI 在執行期間不會動態掛載新增的 statusLine 掛鉤行程，導致狀態列完全未顯現，誤以為設定失敗 | 向使用者明確說明：初次啟用時必須重新啟動 agy CLI（退出後重新開啟）才能載入掛鉤行程；僅在先前已啟用狀態列時，調整順序或語系才能免重啟熱更新立即生效 |
+| 12 | 在步驟 4 將已選指標輸出為單欄 36 行長清單，或在 `ask_question.question` 中放入多行說明文字 | agy CLI 底層 TUI 會將 `question` 重複渲染兩次（對話歷史區＋底部面板），若超過單行或輸出單欄長清單，會把上方表格頂出視窗並觸發緩衝區裁切吃字（Issue #1262） | **嚴禁單欄長清單與多行 `question`**：必須在同一回合呼叫 `ask_question` 前，先於一般對話輸出「**單行填寫規則標題 ＋ 三欄 Markdown 表格**」（最多 12 列），且 `ask_question.question` **嚴格限制為單純 1 行短句**（不含換行 `\n`） |
 
 ---
 
