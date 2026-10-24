@@ -243,12 +243,12 @@ antigravity-cli-statusline/
 
 - **数字序号版本**：
   ```text
-  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,7,8,n,5,6,e9,e10,11,12,n,13,14,15,16,n,n,26,27,e23,n,e24,25,n,e4,e30,28,29
+  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
   ```
 
 - **英文标识码版本**：
   ```text
-  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,quota-reset-countdown,quota-reset-time,n,quota,quota-bar,e:quota-weekly,e:quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,memory-usage,cli-version
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version
   ```
 
 - **数字序号**：代表步骤 3 勾选列表中的序号（从 1 起算；若全选 36 项指标，即对应上方 `1`～`36` 编号）。
@@ -268,13 +268,14 @@ antigravity-cli-statusline/
 🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ 关闭
 🪪 Default │ 代理状态: 执行中 │ 子代理: 2 │ 产出文件: 0 │ 待处理输入: 0 │ 后台任务: 0 │ 工具待确认: 无
 
-上下文用量: 18.5% [█░░░░░░░░░] │ 令牌数: 185.0k / 1.0M [█░░░░░░░░░] │ 五小时倒数: 4h 50m │ 五小时重置: 15:50
-五小时可用: 88% [████████░░] │ 📅 78% [███████░░░] │ 七日内倒数: 4d 5h │ 七日内重置: 2026/10/18 16:00
+上下文用量: 18.5% [█░░░░░░░░░] │ 令牌数: 185.0k / 1.0M [█░░░░░░░░░]
+五小时可用: 88% [████████░░] │ 五小时倒数: 4h 50m │ 五小时重置: 15:50
+七日内可用: 78% [███████░░░] │ 七日内倒数: 4d 5h │ 七日内重置: 2026/10/18 16:00
 Argon 可用: 59% [█████░░░░░] │ Argon 倒数: 6d 1h │ Argon 重置: 2026/10/30 23:57
 
 版控状态: 无变更 │ 版控类型: git │ 🔀 main
 📁 antigravity-cli-statusline │ 完整路径: /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 内存: 279MB │ 版本: v1.3.2
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ 版本: v1.3.2
 ```
 
 ### 换行
