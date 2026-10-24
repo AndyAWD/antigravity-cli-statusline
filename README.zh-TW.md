@@ -2,7 +2,7 @@
 
 [English](README.md) | 繁體中文 | [简体中文](README.zh-CN.md)
 
-[![版本](https://img.shields.io/badge/版本-1.9.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![版本](https://img.shields.io/badge/版本-1.10.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
