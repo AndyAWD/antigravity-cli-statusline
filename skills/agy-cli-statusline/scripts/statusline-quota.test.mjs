@@ -17,7 +17,9 @@ import {
   getGitBranch,
   getGitDirty,
   resolveTerminalWidth,
-  resolveArgonQuota
+  resolveArgonQuota,
+  parseMetaQuota,
+  mergeQuotaBuckets
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
@@ -1526,6 +1528,112 @@ async function main() {
     }
 
     console.log("✅ Test R28 passed! Gemini 4 Argon quota, countdown, and rendering work across all 4 locales!");
+
+    // =========================================================================
+    // Test R29: Real-time quota sync (Argon meta.quota classification, incomplete meta.quota fallback, state-transition & micro-wait)
+    // =========================================================================
+    console.log("\n[Test R29] Verifying Argon meta.quota classification, incomplete meta.quota fallback, and state-transition micro-wait...");
+
+    // 1. Unit test: parseMetaQuota classifies gemini-argon-wtu into weekly['gemini-argon-wtu']
+    const parsedArgonMeta = parseMetaQuota({
+      quota: {
+        "gemini-weekly": { remaining_fraction: 0.91, reset_in_seconds: 300000 },
+        "gemini-argon-wtu": { remaining_fraction: 0.54, reset_in_seconds: 400000 }
+      }
+    });
+    assert.ok(parsedArgonMeta, "parseMetaQuota must return non-null for weekly + argon");
+    assert.ok(parsedArgonMeta.weekly["gemini-argon-wtu"], "gemini-argon-wtu must be classified under weekly");
+    assert.strictEqual(Math.round(parsedArgonMeta.weekly["gemini-argon-wtu"].remaining_percentage), 54);
+    assert.strictEqual(parsedArgonMeta.shortTerm["gemini-argon-wtu"], undefined, "gemini-argon-wtu must NOT pollute shortTerm");
+
+    // 2. Unit test: mergeQuotaBuckets behavior
+    const mergedSameWindow = mergeQuotaBuckets(
+      { gemini: { remaining_percentage: 68, reset_time: "2026-10-25T10:00:00Z" } },
+      { gemini: { remaining_percentage: 75, reset_time: "2026-10-25T10:00:00Z" } },
+      true
+    );
+    assert.strictEqual(mergedSameWindow.gemini.remaining_percentage, 68, "When freshlyFetchedFromLs=true in same window, lower percentage wins");
+
+    const mergedResetCrossed = mergeQuotaBuckets(
+      { gemini: { remaining_percentage: 12, reset_time: "2026-10-25T05:00:00Z" } },
+      { gemini: { remaining_percentage: 100, reset_time: "2026-10-25T10:00:00Z" } },
+      true
+    );
+    assert.strictEqual(mergedResetCrossed.gemini.remaining_percentage, 100, "When reset_time advances by >5m, new window (100%) wins");
+
+    // 3. E2E test: Incomplete meta.quota (only gemini-weekly, missing gemini-5h) + state transition (working -> idle) within 2s cooldown
+    const settingsR29 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: ["quota", "quota-weekly", "quota-argon"]
+        }
+      }
+    };
+    const staleCacheR29 = {
+      updatedAt: Date.now() - 3000, // 3 seconds ago (would have been blocked by old 30s cooldown!)
+      lsUpdatedAt: Date.now() - 3000,
+      lastAgentState: "working",
+      lastOutputTokens: 100,
+      lastTotalTokens: 1100,
+      shortTerm: {
+        gemini: { remaining_percentage: 88, refreshes_in: "4h" }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 95, refreshes_in: "6d" },
+        "gemini-argon-wtu": { remaining_percentage: 70, refreshes_in: "5d" }
+      }
+    };
+    const homeR29 = makeTempHome(staleCacheR29, settingsR29);
+    try {
+      // Deploy a mock fetch-local-quota.mjs in tempHome that writes freshly deducted quota (88% -> 62%, Argon 70% -> 51%) in 20ms
+      const hooksDirR29 = join(homeR29, '.gemini', 'antigravity-cli', 'hooks');
+      mkdirSync(hooksDirR29, { recursive: true });
+      const mockUpdaterPath = join(hooksDirR29, 'fetch-local-quota.mjs');
+      const targetCacheFile = join(homeR29, '.gemini', 'tmp', 'real_quota_cache.json').replace(/\\/g, '/');
+      writeFileSync(mockUpdaterPath, `
+import { writeFileSync, readFileSync } from 'fs';
+const p = "${targetCacheFile}";
+let prev = {};
+try { prev = JSON.parse(readFileSync(p, 'utf8')); } catch (_) {}
+const now = Date.now();
+const next = {
+  ...prev,
+  updatedAt: now,
+  lsUpdatedAt: now,
+  shortTerm: {
+    gemini: { remaining_percentage: 62, refreshes_in: '3h 50m' }
+  },
+  weekly: {
+    gemini: { remaining_percentage: 91, refreshes_in: '6d' },
+    'gemini-argon-wtu': { remaining_percentage: 51, refreshes_in: '5d' }
+  }
+};
+writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
+`, 'utf8');
+
+      // Simulate CLI transitioning to 'idle' with only gemini-weekly in meta.quota (missing gemini-5h)
+      const metaR29 = {
+        model: { display_name: "Gemini 4 Argon (Medium)" },
+        agent_state: "idle",
+        context_window: { total_input_tokens: 1500, total_output_tokens: 350, context_window_size: 1048576, used_percentage: 0.18 },
+        quota: {
+          "gemini-weekly": { remaining_fraction: 0.91, reset_in_seconds: 518400 }
+        },
+        terminal_width: 160
+      };
+
+      const resR29 = await runStatusline(metaR29, homeR29);
+      const plainR29 = stripAnsi(resR29.stdout).trim();
+      console.log("R29 Output:", plainR29);
+      assert.strictEqual(resR29.code, 0);
+      assert.ok(plainR29.includes("五小時可用: 62%"), `Must render freshly fetched 5h quota (62%) on the spot instead of stale 88%, got: "${plainR29}"`);
+      assert.ok(plainR29.includes("七日內可用: 91%"), `Must render updated weekly quota (91%), got: "${plainR29}"`);
+      assert.ok(plainR29.includes("Argon 可用: 51%"), `Must render freshly fetched Argon quota (51%), got: "${plainR29}"`);
+      console.log("✅ Test R29 passed! (Real-time quota micro-wait and incomplete meta.quota fallback verified)");
+    } finally {
+      try { rmSync(homeR29, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
 
   } catch (err) {
     console.error("Test execution failed:", err);

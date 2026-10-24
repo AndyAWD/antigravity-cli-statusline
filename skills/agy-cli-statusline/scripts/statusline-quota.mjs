@@ -555,7 +555,15 @@ export function parseMetaQuota(meta) {
     if (resetTime) entry.reset_time = resetTime;
     if (refreshesIn) entry.refreshes_in = refreshesIn;
 
-    if (key.endsWith('-weekly')) {
+    const lowerKey = key.toLowerCase();
+    const isWeeklyWindow = bucket.window === 'weekly' || bucket.windowVal === 'weekly';
+    const isShortTermSuffix = /-(5h|3h|hourly|shortterm)$/i.test(key);
+    const isWeeklyBucket =
+      key.endsWith('-weekly') ||
+      isWeeklyWindow ||
+      ((lowerKey.includes('argon') || lowerKey.endsWith('-wtu')) && !isShortTermSuffix);
+
+    if (isWeeklyBucket) {
       const pool = key.replace(/-weekly$/, '');
       weekly[pool] = entry;
     } else {
@@ -568,24 +576,114 @@ export function parseMetaQuota(meta) {
   return { shortTerm, weekly };
 }
 
-async function triggerQuotaUpdateIfNeededAsync(cacheInfo) {
-  let needUpdate = true;
-  if (cacheInfo && Date.now() - (cacheInfo.updatedAt || 0) < 30000) needUpdate = false;
+export function mergeQuotaBuckets(baseBuckets = {}, incomingBuckets = {}, preferLowerWhenSameReset = false) {
+  const safeBase = (baseBuckets && typeof baseBuckets === 'object' && !Array.isArray(baseBuckets)) ? baseBuckets : {};
+  const safeIncoming = (incomingBuckets && typeof incomingBuckets === 'object' && !Array.isArray(incomingBuckets)) ? incomingBuckets : {};
+  const merged = { ...safeBase };
 
-  if (needUpdate) {
-    try {
-      const updaterScript = join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs');
-      await fs.access(updaterScript);
-      const proc = spawn('node', [updaterScript], {
-        env: { ...process.env, DISABLE_QUOTA_HOOK: '1' },
-        stdio: 'ignore',
-        detached: true,
-        windowsHide: true
-      });
-      proc.on('error', () => {});
-      proc.unref();
-    } catch (e) {}
+  for (const [pool, inc] of Object.entries(safeIncoming)) {
+    if (!inc || typeof inc !== 'object') continue;
+    const existing = merged[pool];
+    if (!existing || typeof existing !== 'object' || !preferLowerWhenSameReset) {
+      merged[pool] = inc;
+      continue;
+    }
+    const existResetMs = existing.reset_time ? new Date(existing.reset_time).getTime() : 0;
+    const incResetMs = inc.reset_time ? new Date(inc.reset_time).getTime() : 0;
+    if (existResetMs > 0 && incResetMs > 0 && !isNaN(existResetMs) && !isNaN(incResetMs) && Math.abs(incResetMs - existResetMs) > 300000) {
+      merged[pool] = incResetMs > existResetMs ? inc : existing;
+      continue;
+    }
+    if (typeof existing.remaining_percentage === 'number' && typeof inc.remaining_percentage === 'number') {
+      merged[pool] = existing.remaining_percentage <= inc.remaining_percentage ? existing : inc;
+    } else {
+      merged[pool] = inc;
+    }
   }
+  return merged;
+}
+
+export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, options = {}) {
+  const now = Date.now();
+  const lastUpdatedAt = cacheInfo?.lsUpdatedAt || cacheInfo?.updatedAt || 0;
+  const ageMs = now - lastUpdatedAt;
+
+  const currentState = typeof meta?.agent_state === 'string' ? meta.agent_state.trim().toLowerCase() : '';
+  const prevState = typeof cacheInfo?.lastAgentState === 'string' ? cacheInfo.lastAgentState.trim().toLowerCase() : '';
+  const currentOutputTokens = Number(meta?.context_window?.total_output_tokens || 0);
+  const currentInputTokens = Number(meta?.context_window?.total_input_tokens || 0);
+  const currentTotalTokens = currentInputTokens + currentOutputTokens;
+  const prevOutputTokens = Number(cacheInfo?.lastOutputTokens || 0);
+  const prevTotalTokens = Number(cacheInfo?.lastTotalTokens || 0);
+
+  const stateJustBecameIdle = currentState === 'idle' && prevState !== '' && prevState !== 'idle';
+  const tokensJustChanged =
+    (currentOutputTokens > 0 && currentOutputTokens !== prevOutputTokens) ||
+    (currentTotalTokens > 0 && currentTotalTokens !== prevTotalTokens);
+  const missingBuckets = Boolean(options?.missingRequiredBuckets);
+
+  let needUpdate = false;
+  if (!cacheInfo || !lastUpdatedAt || ageMs >= 15000) {
+    needUpdate = true;
+  } else if ((stateJustBecameIdle || tokensJustChanged || missingBuckets) && ageMs >= 1500) {
+    needUpdate = true;
+  }
+
+  if (!needUpdate) {
+    return { cache: cacheInfo, freshlyFetchedFromLs: false, timedOut: false };
+  }
+
+  let timedOut = false;
+  let freshlyFetchedFromLs = false;
+  const cachePath = options?.cachePath || join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
+  const waitMs = typeof options?.waitMs === 'number' ? options.waitMs : 400;
+
+  try {
+    const updaterScript = options?.updaterScript || join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs');
+    await fs.access(updaterScript);
+
+    await new Promise((resolve) => {
+      let settled = false;
+      const finish = (didTimeOut = false) => {
+        if (!settled) {
+          settled = true;
+          timedOut = didTimeOut;
+          clearTimeout(timer);
+          resolve();
+        }
+      };
+      const timer = setTimeout(() => finish(true), waitMs);
+      try {
+        const proc = spawn(process.execPath, [updaterScript], {
+          env: { ...process.env, DISABLE_QUOTA_HOOK: '1' },
+          stdio: 'ignore',
+          detached: true,
+          windowsHide: true
+        });
+        proc.on('error', () => finish(false));
+        proc.on('close', () => finish(false));
+        proc.unref();
+      } catch (_) {
+        finish(false);
+      }
+    });
+
+    if (!timedOut && cachePath) {
+      try {
+        const freshContent = await fs.readFile(cachePath, 'utf8');
+        const freshCache = JSON.parse(freshContent.replace(/^\uFEFF/, ''));
+        if (freshCache && typeof freshCache === 'object' && !Array.isArray(freshCache)) {
+          const freshTs = freshCache.lsUpdatedAt || freshCache.updatedAt || 0;
+          if (freshTs >= lastUpdatedAt) {
+            freshlyFetchedFromLs = true;
+            return { cache: freshCache, freshlyFetchedFromLs, timedOut };
+          }
+        }
+      } catch (_) {}
+    }
+  } catch (e) {}
+
+  return { cache: cacheInfo, freshlyFetchedFromLs, timedOut };
 }
 
 export function resolveModelQuota(fallbackModel, cache) {
@@ -1497,25 +1595,101 @@ async function main() {
     let cache = null;
     try {
       const cacheContent = await fs.readFile(cachePath, 'utf8');
-      cache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
+      const parsedCache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
+      if (parsedCache && typeof parsedCache === 'object' && !Array.isArray(parsedCache)) {
+        cache = parsedCache;
+      }
     } catch (e) {}
 
+    const normFallbackModel = normalizeModelName(fallbackModel);
+    const activePool = normFallbackModel.includes('gemini') ? 'gemini' : ((normFallbackModel.includes('claude') || normFallbackModel.includes('gpt')) ? '3p' : '');
+    const needsArgon = Array.isArray(footerItems) && footerItems.some(item => typeof item === 'string' && item.startsWith('quota-argon'));
+
     const metaQuota = parseMetaQuota(meta);
+    const hasMetaShortTerm = activePool
+      ? Boolean(metaQuota?.shortTerm?.[activePool])
+      : Boolean(metaQuota?.shortTerm && Object.keys(metaQuota.shortTerm).length > 0);
+    const hasMetaWeekly = activePool
+      ? Boolean(metaQuota?.weekly?.[activePool])
+      : Boolean(metaQuota?.weekly && Object.keys(metaQuota.weekly).some(k => !k.toLowerCase().includes('argon')));
+    const hasMetaArgon = !needsArgon || Boolean(
+      metaQuota && (
+        Object.keys(metaQuota.weekly || {}).some(k => k.toLowerCase().includes('argon')) ||
+        Object.keys(metaQuota.shortTerm || {}).some(k => k.toLowerCase().includes('argon'))
+      )
+    );
+    const isMetaQuotaComplete = Boolean(metaQuota && hasMetaShortTerm && hasMetaWeekly && hasMetaArgon);
+
+    const hasCacheShortTerm = Boolean(
+      (activePool && cache?.shortTerm?.[activePool]) ||
+      (cache?.shortTerm && Object.keys(cache.shortTerm).length > 0) ||
+      (cache?.models && typeof cache.models === 'object' && Object.keys(cache.models).length > 0)
+    );
+    const hasCacheArgon = !needsArgon || Boolean(
+      (cache?.weekly && typeof cache.weekly === 'object' && Object.keys(cache.weekly).some(k => k.toLowerCase().includes('argon'))) ||
+      (cache?.shortTerm && typeof cache.shortTerm === 'object' && Object.keys(cache.shortTerm).some(k => k.toLowerCase().includes('argon'))) ||
+      (cache?.models && typeof cache.models === 'object' && Object.keys(cache.models).some(k => k.toLowerCase().includes('argon')))
+    );
+    const missingRequiredBuckets = (!hasMetaShortTerm && !hasCacheShortTerm) || (!hasMetaArgon && !hasCacheArgon);
+
+    const currentState = typeof meta?.agent_state === 'string' ? meta.agent_state.trim().toLowerCase() : '';
+    const prevState = typeof cache?.lastAgentState === 'string' ? cache.lastAgentState.trim().toLowerCase() : '';
+    const currentOutputTokens = Number(meta?.context_window?.total_output_tokens || 0);
+    const currentInputTokens = Number(meta?.context_window?.total_input_tokens || 0);
+    const currentTotalTokens = currentInputTokens + currentOutputTokens;
+    const prevOutputTokens = Number(cache?.lastOutputTokens || 0);
+    const prevTotalTokens = Number(cache?.lastTotalTokens || 0);
+    const stateOrTokensChanged =
+      (currentState === 'idle' && prevState !== '' && prevState !== 'idle') ||
+      (currentOutputTokens > 0 && currentOutputTokens !== prevOutputTokens) ||
+      (currentTotalTokens > 0 && currentTotalTokens !== prevTotalTokens);
+
+    let freshlyFetchedFromLs = false;
+    let timedOut = false;
+    if (!isMetaQuotaComplete || stateOrTokensChanged) {
+      const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
+        cachePath,
+        missingRequiredBuckets
+      });
+      cache = updateRes.cache;
+      freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
+      timedOut = updateRes.timedOut;
+    }
+
+    let shouldPersistCache = false;
     if (metaQuota) {
-      if (!cache) cache = {};
-      cache.shortTerm = { ...(cache.shortTerm || {}), ...metaQuota.shortTerm };
-      cache.weekly = { ...(cache.weekly || {}), ...metaQuota.weekly };
+      if (!cache || typeof cache !== 'object') cache = {};
+      cache.shortTerm = mergeQuotaBuckets(cache.shortTerm, metaQuota.shortTerm, freshlyFetchedFromLs);
+      cache.weekly = mergeQuotaBuckets(cache.weekly, metaQuota.weekly, freshlyFetchedFromLs);
       const planTier = meta?.plan_tier || meta?.account?.plan_tier;
       const email = meta?.email || meta?.account?.email;
       if (planTier) cache.planTier = planTier;
       if (email) cache.email = email;
-      cache.updatedAt = Date.now();
-      try {
-        await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-        await writeFileAndVerifyNoBOM(cachePath, JSON.stringify(cache, null, 2));
-      } catch (_) {}
-    } else {
-      await triggerQuotaUpdateIfNeededAsync(cache);
+      if (isMetaQuotaComplete || !cache.updatedAt) {
+        cache.updatedAt = Date.now();
+      }
+      shouldPersistCache = true;
+    }
+
+    if (cache && typeof cache === 'object') {
+      if (currentState && cache.lastAgentState !== currentState) {
+        cache.lastAgentState = currentState;
+        shouldPersistCache = true;
+      }
+      if (currentOutputTokens > 0 && cache.lastOutputTokens !== currentOutputTokens) {
+        cache.lastOutputTokens = currentOutputTokens;
+        shouldPersistCache = true;
+      }
+      if (currentTotalTokens > 0 && cache.lastTotalTokens !== currentTotalTokens) {
+        cache.lastTotalTokens = currentTotalTokens;
+        shouldPersistCache = true;
+      }
+      if (shouldPersistCache && !timedOut) {
+        try {
+          await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
+          await writeFileAndVerifyNoBOM(cachePath, JSON.stringify(cache, null, 2));
+        } catch (_) {}
+      }
     }
 
     // 解析核心資料
