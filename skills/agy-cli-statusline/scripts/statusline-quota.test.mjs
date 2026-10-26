@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync } from 'fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
@@ -19,7 +19,8 @@ import {
   resolveTerminalWidth,
   resolveArgonQuota,
   parseMetaQuota,
-  mergeQuotaBuckets
+  mergeQuotaBuckets,
+  formatResetTime
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
@@ -38,7 +39,7 @@ const RESET = "\x1b[0m";
  */
 function runStatusline(stdinData, homeDir, scriptPath = SCRIPT_PATH) {
   return new Promise((resolve) => {
-    const env = { ...process.env, HOME: homeDir, USERPROFILE: homeDir };
+    const env = { ...process.env, HOME: homeDir, USERPROFILE: homeDir, STATUSLINE_QUOTA_WAIT_MS: '800' };
     delete env.DISABLE_QUOTA_HOOK;            // explicit unset — Finding #1
     const child = spawn('node', [scriptPath], {
       env,
@@ -1635,6 +1636,330 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       try { rmSync(homeR29, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
+    // =========================================================================
+    // Test R30: Fix 100% <-> 99% jumping bug (anti-jitter for 5h, weekly, and argon quota during active conversation)
+    // =========================================================================
+    console.log("\n[Test R30] Verifying anti-jitter protection across 5h, weekly, and Argon quota during active conversation...");
+
+    // 1. Unit test: mergeQuotaBuckets default preferLowerWhenSameReset=true prevents stale 100% from overwriting 99%
+    const unjitteredSameWindow = mergeQuotaBuckets(
+      { gemini: { remaining_percentage: 99, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } },
+      { gemini: { remaining_percentage: 100, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } }
+    );
+    assert.strictEqual(unjitteredSameWindow.gemini.remaining_percentage, 99, "Lower percentage (99%) MUST win over stale 100% even without 3rd parameter");
+    assert.strictEqual(unjitteredSameWindow.gemini.reset_time, "2026-10-25T15:00:00Z");
+
+    // 2. Unit test: mergeQuotaBuckets preserves reset_time when incoming has lower percentage without reset_time
+    const incomingLowerNoReset = mergeQuotaBuckets(
+      { gemini: { remaining_percentage: 99, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } },
+      { gemini: { remaining_percentage: 97 } }
+    );
+    assert.strictEqual(incomingLowerNoReset.gemini.remaining_percentage, 97, "Incoming 97% must win over existing 99%");
+    assert.strictEqual(incomingLowerNoReset.gemini.reset_time, "2026-10-25T15:00:00Z", "reset_time must not be lost");
+
+    // 3. Unit test: weekly and argon anti-jitter behavior
+    const weeklyJitterTest = mergeQuotaBuckets(
+      {
+        gemini: { remaining_percentage: 93.1, reset_time: "2026-10-31T07:00:00Z" },
+        "gemini-argon-wtu": { remaining_percentage: 8.9, reset_time: "2026-10-30T14:00:00Z" }
+      },
+      {
+        gemini: { remaining_percentage: 100, reset_time: "2026-10-31T07:00:00Z" },
+        "gemini-argon-wtu": { remaining_percentage: 50, reset_time: "2026-10-30T14:00:00Z" }
+      }
+    );
+    assert.strictEqual(weeklyJitterTest.gemini.remaining_percentage, 93.1, "Weekly lower percentage (93.1%) must win over stale 100%");
+    assert.strictEqual(weeklyJitterTest["gemini-argon-wtu"].remaining_percentage, 8.9, "Argon lower percentage (8.9%) must win over stale 50%");
+
+    // 4. E2E test: Active conversation scenario (Conversation ID: e9caef1c reproduction)
+    // Stale stdin meta.quota has 100% for 5h and weekly, but local cache has real consumed quota (99%, 93%, 8.9%)
+    // Redraw during active working state within rate-limit cooldown (freshlyFetchedFromLs = false)
+    const settingsR30 = {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          items: ["quota", "quota-weekly", "quota-argon"]
+        }
+      }
+    };
+    const future5h = new Date(Date.now() + 17100 * 1000).toISOString();
+    const futureWeekly = new Date(Date.now() + 475200 * 1000).toISOString();
+    const futureArgon = new Date(Date.now() + 417600 * 1000).toISOString();
+    const cacheR30 = {
+      updatedAt: Date.now() - 500, // 500ms ago (within 1500ms cooldown)
+      lsUpdatedAt: Date.now() - 500,
+      lastAgentState: "working",
+      lastOutputTokens: 200,
+      lastTotalTokens: 1500,
+      shortTerm: {
+        gemini: { remaining_percentage: 99, reset_time: future5h, refreshes_in: "4h 45m" }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 93, reset_time: futureWeekly, refreshes_in: "5d 12h" },
+        "gemini-argon-wtu": { remaining_percentage: 8.9, reset_time: futureArgon, refreshes_in: "4d 20h" }
+      }
+    };
+    const homeR30 = makeTempHome(cacheR30, settingsR30);
+    try {
+      // Step A: Active conversation frame - CLI passes stale 100% in stdin meta.quota while model is working
+      const metaR30Active = {
+        conversation_id: "e9caef1c-3cb2-491c-aaee-3f48807ba76a",
+        model: { display_name: "Gemini 4 Argon (Medium)" },
+        agent_state: "working",
+        context_window: { total_input_tokens: 1300, total_output_tokens: 200, context_window_size: 1048576, used_percentage: 0.14 },
+        quota: {
+          "gemini-5h": { remaining_fraction: 1.0, reset_in_seconds: 17100 },
+          "gemini-weekly": { remaining_fraction: 1.0, reset_in_seconds: 475200 }
+        },
+        terminal_width: 160
+      };
+
+      const resR30Active = await runStatusline(metaR30Active, homeR30);
+      const plainR30Active = stripAnsi(resR30Active.stdout).trim();
+      console.log("R30 Active Output:", plainR30Active);
+      assert.strictEqual(resR30Active.code, 0);
+      assert.ok(plainR30Active.includes("五小時可用: 99%"), `Must stay at 99% during conversation turn, NOT jump to 100%! Got: "${plainR30Active}"`);
+      assert.ok(plainR30Active.includes("七日內可用: 93%"), `Weekly must stay at 93%, NOT jump to 100%! Got: "${plainR30Active}"`);
+      assert.ok(plainR30Active.includes("Argon 可用: 9%"), `Argon must stay at 9% (rounded from 8.9%), NOT jump to 100%! Got: "${plainR30Active}"`);
+
+      // Verify the cache on disk was not poisoned with 100%
+      const targetCacheFileR30 = join(homeR30, '.gemini', 'tmp', 'real_quota_cache.json');
+      const diskCacheContent = JSON.parse(readFileSync(targetCacheFileR30, 'utf8'));
+      assert.strictEqual(diskCacheContent.shortTerm.gemini.remaining_percentage, 99, "Disk cache shortTerm must remain 99%");
+      assert.strictEqual(diskCacheContent.weekly.gemini.remaining_percentage, 93, "Disk cache weekly must remain 93%");
+      assert.strictEqual(diskCacheContent.weekly["gemini-argon-wtu"].remaining_percentage, 8.9, "Disk cache Argon must remain 8.9%");
+
+      // Step B: Conversation finishes - CLI updates to 97% and agent becomes idle
+      const metaR30Finished = {
+        conversation_id: "e9caef1c-3cb2-491c-aaee-3f48807ba76a",
+        model: { display_name: "Gemini 4 Argon (Medium)" },
+        agent_state: "idle",
+        context_window: { total_input_tokens: 1300, total_output_tokens: 450, context_window_size: 1048576, used_percentage: 0.17 },
+        quota: {
+          "gemini-5h": { remaining_fraction: 0.97, reset_in_seconds: 17000 },
+          "gemini-weekly": { remaining_fraction: 0.93, reset_in_seconds: 475100 }
+        },
+        terminal_width: 160
+      };
+
+      const resR30Finished = await runStatusline(metaR30Finished, homeR30);
+      const plainR30Finished = stripAnsi(resR30Finished.stdout).trim();
+      console.log("R30 Finished Output:", plainR30Finished);
+      assert.strictEqual(resR30Finished.code, 0);
+      assert.ok(plainR30Finished.includes("五小時可用: 97%"), `Must update to 97% when conversation finishes! Got: "${plainR30Finished}"`);
+      assert.ok(plainR30Finished.includes("七日內可用: 93%"), `Weekly remains 93%! Got: "${plainR30Finished}"`);
+      assert.ok(plainR30Finished.includes("Argon 可用: 9%"), `Argon remains 9%! Got: "${plainR30Finished}"`);
+
+      // Step C: Subsequent frame with stale meta - must STAY at 97% and never jump back
+      const metaR30Followup = {
+        conversation_id: "e9caef1c-3cb2-491c-aaee-3f48807ba76a",
+        model: { display_name: "Gemini 4 Argon (Medium)" },
+        agent_state: "idle",
+        context_window: { total_input_tokens: 1300, total_output_tokens: 450, context_window_size: 1048576, used_percentage: 0.17 },
+        quota: {
+          "gemini-5h": { remaining_fraction: 0.99, reset_in_seconds: 16900 } // stale higher value
+        },
+        terminal_width: 160
+      };
+      const resR30Followup = await runStatusline(metaR30Followup, homeR30);
+      const plainR30Followup = stripAnsi(resR30Followup.stdout).trim();
+      assert.strictEqual(resR30Followup.code, 0);
+      assert.ok(plainR30Followup.includes("五小時可用: 97%"), `Must stay at 97% and NEVER jump back to 99%! Got: "${plainR30Followup}"`);
+
+      console.log("✅ Test R30 passed! Anti-jitter protection across 5h, weekly, and Argon quota verified.");
+    } finally {
+      try { rmSync(homeR30, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    // ----------------------------------------------------
+    // Test Case R31: Drift beyond 5 minutes in long conversation & expired reset window recovery
+    // ----------------------------------------------------
+    console.log("\n[Test R31] Verifying 6-minute dialogue drift anti-jitter and expired window recovery...");
+    const nowR31 = Date.now();
+
+    // 1. Long active dialogue: 6 minutes (360 seconds) elapsed. Stdin passes stale 100% with shifted reset_time
+    const existingActiveShort = {
+      gemini: { remaining_percentage: 99, reset_time: new Date(nowR31 + 17100 * 1000).toISOString() }
+    };
+    const incomingDrifted6Min = {
+      gemini: { remaining_percentage: 100, reset_time: new Date(nowR31 + (17100 + 360) * 1000).toISOString() }
+    };
+    const driftedMergeRes = mergeQuotaBuckets(existingActiveShort, incomingDrifted6Min, true);
+    assert.strictEqual(driftedMergeRes.gemini.remaining_percentage, 99, "Must stay at 99% after 6-minute dialogue drift (should NOT jump back to 100%!)");
+
+    // 2. Weekly & Argon drift during long conversation (15 minutes drift)
+    const existingWeekly = {
+      gemini: { remaining_percentage: 93, reset_time: new Date(nowR31 + 475200 * 1000).toISOString() },
+      "gemini-argon-wtu": { remaining_percentage: 8.9, reset_time: new Date(nowR31 + 417600 * 1000).toISOString() }
+    };
+    const incomingWeeklyDrifted = {
+      gemini: { remaining_percentage: 100, reset_time: new Date(nowR31 + (475200 + 900) * 1000).toISOString() },
+      "gemini-argon-wtu": { remaining_percentage: 100, reset_time: new Date(nowR31 + (417600 + 900) * 1000).toISOString() }
+    };
+    const weeklyDriftRes = mergeQuotaBuckets(existingWeekly, incomingWeeklyDrifted, true);
+    assert.strictEqual(weeklyDriftRes.gemini.remaining_percentage, 93, "Weekly quota must remain at 93% despite 15m dialogue drift");
+    assert.strictEqual(weeklyDriftRes["gemini-argon-wtu"].remaining_percentage, 8.9, "Argon quota must remain at 8.9% despite 15m dialogue drift");
+
+    // 3. Expired quota window (reset_time was 2 minutes ago)
+    const expiredOldWindow = {
+      gemini: { remaining_percentage: 12, reset_time: new Date(nowR31 - 120000).toISOString() }
+    };
+    const freshNewWindow100 = {
+      gemini: { remaining_percentage: 100, reset_time: new Date(nowR31 + 18000 * 1000).toISOString() }
+    };
+    const expiredRecoveryRes = mergeQuotaBuckets(expiredOldWindow, freshNewWindow100, true);
+    assert.strictEqual(expiredRecoveryRes.gemini.remaining_percentage, 100, "100% fresh quota must supersede expired 12% window");
+
+    // 4. Expired quota window when incoming lacks reset_time
+    const freshNewWindowNoTimestamp = {
+      gemini: { remaining_percentage: 100 }
+    };
+    const expiredNoTsRecoveryRes = mergeQuotaBuckets(expiredOldWindow, freshNewWindowNoTimestamp, true);
+    assert.strictEqual(expiredNoTsRecoveryRes.gemini.remaining_percentage, 100, "100% fresh quota without timestamp must supersede expired 12% window");
+
+    console.log("✅ Test R31 passed! 6-minute dialogue drift anti-jitter and expired window recovery verified.");
+
+    // ----------------------------------------------------
+    // Test Case R32: 40-minute ultra-long dialogue drift, dynamic countdown recalculation, and cache aging auto-update in main()
+    // ----------------------------------------------------
+    console.log("\n[Test R32] Verifying 40-minute dialogue drift, dynamic countdown recalculation, and cache aging auto-update in main()...");
+    const nowR32 = Date.now();
+
+    // 1. 40-minute dialogue drift (2400 seconds) in 5-hour quota: must stay at 99%, NOT jump back to 100%
+    const existingActive40Min = {
+      gemini: {
+        remaining_percentage: 99,
+        reset_time: new Date(nowR32 + 17100 * 1000).toISOString(),
+        refreshes_in: "4h 45m"
+      }
+    };
+    const incomingDrifted40Min = {
+      gemini: {
+        remaining_percentage: 100,
+        reset_time: new Date(nowR32 + (17100 + 2400) * 1000).toISOString(),
+        refreshes_in: "5h 25m"
+      }
+    };
+    const drift40MinRes = mergeQuotaBuckets(existingActive40Min, incomingDrifted40Min, true);
+    assert.strictEqual(drift40MinRes.gemini.remaining_percentage, 99, "Must stay at 99% after 40-minute dialogue drift (windowThresholdMs=2h protects against jumping back to 100%)");
+
+    // 2. Genuinely new window (>2 hours advance, e.g. 2.5 hours = 9000 seconds) supersedes existing window
+    const incomingNewWindow = {
+      gemini: {
+        remaining_percentage: 100,
+        reset_time: new Date(nowR32 + (17100 + 9000) * 1000).toISOString(),
+        refreshes_in: "7h 15m"
+      }
+    };
+    const newWindowRes = mergeQuotaBuckets(existingActive40Min, incomingNewWindow, true);
+    assert.strictEqual(newWindowRes.gemini.remaining_percentage, 100, "Genuine new cycle (>2h advance) must supersede old window with 100%");
+
+    // 3. Dynamic countdown recalculation: refreshes_in must be dynamically computed from reset_time rather than frozen at stale string
+    const targetResetTime1h = new Date(nowR32 + 3600 * 1000).toISOString();
+    const staleEntryWithOldCountdown = {
+      gemini: {
+        remaining_percentage: 97,
+        reset_time: targetResetTime1h,
+        refreshes_in: "4h 59m" // stale countdown from 4 hours ago
+      }
+    };
+    const incomingSameWindow = {
+      gemini: {
+        remaining_percentage: 100,
+        reset_time: targetResetTime1h
+      }
+    };
+    const dynamicCountdownRes = mergeQuotaBuckets(staleEntryWithOldCountdown, incomingSameWindow, true);
+    assert.strictEqual(dynamicCountdownRes.gemini.remaining_percentage, 97);
+    assert.strictEqual(dynamicCountdownRes.gemini.refreshes_in, "1h", "refreshes_in must be dynamically recalculated to '1h', NOT frozen at '4h 59m'");
+
+    // 4. Invalid reset_time format defensively returns empty string in formatResetTime
+    assert.strictEqual(formatResetTime(''), '');
+    assert.strictEqual(formatResetTime(null), '');
+    assert.strictEqual(formatResetTime(undefined), '');
+    assert.strictEqual(formatResetTime(true), '');
+    assert.strictEqual(formatResetTime(false), '');
+    assert.strictEqual(formatResetTime([]), '');
+    assert.strictEqual(formatResetTime('not-a-valid-date'), '');
+
+    // 4b. Gemini weekly quota (pool = 'gemini', window = 'weekly'): 3-hour drift must NOT jump to 100%
+    const baseWeeklyR32 = {
+      gemini: { remaining_percentage: 93, reset_time: new Date(nowR32 + 500000 * 1000).toISOString(), window: 'weekly' }
+    };
+    const driftedWeeklyR32_3h = {
+      gemini: { remaining_percentage: 100, reset_time: new Date(nowR32 + (500000 + 10800) * 1000).toISOString(), window: 'weekly' }
+    };
+    const weeklyDrift3hRes = mergeQuotaBuckets(baseWeeklyR32, driftedWeeklyR32_3h, true);
+    assert.strictEqual(weeklyDrift3hRes.gemini.remaining_percentage, 93, "Gemini weekly quota with stripped pool must use 24h threshold and stay at 93% after 3h drift");
+
+    // 5. E2E: Stale cache (>15s age) auto-triggers background update even when meta.quota is complete and state/tokens have not changed
+    const settingsR32 = {
+      ui: {
+        language: "zh-tw",
+        footer: { items: ["quota", "quota-weekly"] }
+      }
+    };
+    const staleCacheR32 = {
+      updatedAt: Date.now() - 25000, // 25 seconds ago (isCacheStale: true)
+      lsUpdatedAt: Date.now() - 25000,
+      lastAgentState: "idle",
+      lastOutputTokens: 200,
+      lastTotalTokens: 1200,
+      shortTerm: {
+        gemini: { remaining_percentage: 100, refreshes_in: "5h" }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 95, refreshes_in: "6d" }
+      }
+    };
+    const homeR32 = makeTempHome(staleCacheR32, settingsR32);
+    try {
+      const hooksDirR32 = join(homeR32, '.gemini', 'antigravity-cli', 'hooks');
+      mkdirSync(hooksDirR32, { recursive: true });
+      const mockUpdaterPathR32 = join(hooksDirR32, 'fetch-local-quota.mjs');
+      const targetCacheFileR32 = join(homeR32, '.gemini', 'tmp', 'real_quota_cache.json').replace(/\\/g, '/');
+      writeFileSync(mockUpdaterPathR32, `
+import { writeFileSync, readFileSync } from 'fs';
+const p = "${targetCacheFileR32}";
+let prev = {};
+try { prev = JSON.parse(readFileSync(p, 'utf8')); } catch (_) {}
+const now = Date.now();
+const next = {
+  ...prev,
+  updatedAt: now,
+  lsUpdatedAt: now,
+  shortTerm: {
+    gemini: { remaining_percentage: 77, refreshes_in: '4h 10m' }
+  },
+  weekly: {
+    gemini: { remaining_percentage: 92, refreshes_in: '5d 20h' }
+  }
+};
+writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
+`, 'utf8');
+
+      // Complete meta.quota with identical state (idle) and unchanged tokens
+      const metaR32 = {
+        model: { display_name: "Gemini 3.5 Flash" },
+        agent_state: "idle",
+        context_window: { total_input_tokens: 1000, total_output_tokens: 200, context_window_size: 1048576, used_percentage: 0.12 },
+        quota: {
+          "gemini-5h": { remaining_fraction: 1.0, reset_in_seconds: 18000 },
+          "gemini-weekly": { remaining_fraction: 0.95, reset_in_seconds: 518400 }
+        },
+        terminal_width: 160
+      };
+
+      const resR32 = await runStatusline(metaR32, homeR32);
+      const plainR32 = stripAnsi(resR32.stdout).trim();
+      console.log("R32 Output:", plainR32);
+      assert.strictEqual(resR32.code, 0);
+      assert.ok(plainR32.includes("五小時可用: 77%"), `Must trigger background update on cache aging and render fresh 77%! Got: "${plainR32}"`);
+      assert.ok(plainR32.includes("七日內可用: 92%"), `Weekly must update to fresh 92%! Got: "${plainR32}"`);
+      console.log("✅ Test R32 passed! (40-minute drift, countdown dynamic recalculation, and cache aging auto-update verified)");
+    } finally {
+      try { rmSync(homeR32, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;
