@@ -418,8 +418,11 @@ async function getSettingsAsync(meta) {
 // ==========================================
 export function formatResetTime(resetTimeStr) {
   try {
+    if (!resetTimeStr || typeof resetTimeStr === 'boolean' || Array.isArray(resetTimeStr)) return '';
     const reset = new Date(resetTimeStr);
-    const diffSeconds = Math.floor((reset.getTime() - Date.now()) / 1000);
+    const resetMs = reset.getTime();
+    if (isNaN(resetMs)) return '';
+    const diffSeconds = Math.floor((resetMs - Date.now()) / 1000);
     if (diffSeconds <= 0) return 'now';
     const minutes = Math.floor((diffSeconds + 59) / 60);
     if (minutes < 60) return `${minutes}m`;
@@ -565,7 +568,7 @@ export function parseMetaQuota(meta) {
 
     if (isWeeklyBucket) {
       const pool = key.replace(/-weekly$/, '');
-      weekly[pool] = entry;
+      weekly[pool] = { ...entry, window: 'weekly' };
     } else {
       const pool = key.replace(/-(5h|3h|hourly|shortterm)$/, '');
       shortTerm[pool] = entry;
@@ -576,28 +579,92 @@ export function parseMetaQuota(meta) {
   return { shortTerm, weekly };
 }
 
-export function mergeQuotaBuckets(baseBuckets = {}, incomingBuckets = {}, preferLowerWhenSameReset = false) {
+export function mergeQuotaBuckets(baseBuckets = {}, incomingBuckets = {}, preferLowerWhenSameReset = true) {
   const safeBase = (baseBuckets && typeof baseBuckets === 'object' && !Array.isArray(baseBuckets)) ? baseBuckets : {};
   const safeIncoming = (incomingBuckets && typeof incomingBuckets === 'object' && !Array.isArray(incomingBuckets)) ? incomingBuckets : {};
   const merged = { ...safeBase };
+  const now = Date.now();
 
   for (const [pool, inc] of Object.entries(safeIncoming)) {
     if (!inc || typeof inc !== 'object') continue;
     const existing = merged[pool];
-    if (!existing || typeof existing !== 'object' || !preferLowerWhenSameReset) {
-      merged[pool] = inc;
-      continue;
-    }
-    const existResetMs = existing.reset_time ? new Date(existing.reset_time).getTime() : 0;
+    const existResetMs = existing?.reset_time ? new Date(existing.reset_time).getTime() : 0;
     const incResetMs = inc.reset_time ? new Date(inc.reset_time).getTime() : 0;
-    if (existResetMs > 0 && incResetMs > 0 && !isNaN(existResetMs) && !isNaN(incResetMs) && Math.abs(incResetMs - existResetMs) > 300000) {
-      merged[pool] = incResetMs > existResetMs ? inc : existing;
+    const lowerPool = pool.toLowerCase();
+    const isWeekly = lowerPool.includes('weekly') || lowerPool.includes('argon') || lowerPool.endsWith('-wtu') ||
+      existing?.window === 'weekly' || inc?.window === 'weekly' ||
+      Math.max(existResetMs - now, incResetMs - now) > 12 * 60 * 60 * 1000;
+
+    if (!existing || typeof existing !== 'object') {
+      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
+      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
+      if (isWeekly) merged[pool].window = 'weekly';
       continue;
     }
-    if (typeof existing.remaining_percentage === 'number' && typeof inc.remaining_percentage === 'number') {
-      merged[pool] = existing.remaining_percentage <= inc.remaining_percentage ? existing : inc;
+
+    const hasValidExistReset = existResetMs > 0 && !isNaN(existResetMs);
+    const hasValidIncReset = incResetMs > 0 && !isNaN(incResetMs);
+
+    // 1. 過期判定：若既有配額之重置時間已過期，且傳入配額具備較新重置時間或無時間戳記之100%重置額度，舊窗口讓位給新進入配額
+    if (hasValidExistReset && existResetMs <= now && (incResetMs > existResetMs || (!hasValidIncReset && inc.remaining_percentage >= 100))) {
+      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
+      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
+      if (isWeekly) merged[pool].window = 'weekly';
+      continue;
+    }
+    // 若傳入配額本身已過期，但既有配額仍處於未來有效窗口中，保留既有配額
+    if (hasValidIncReset && incResetMs <= now && hasValidExistReset && existResetMs > now) {
+      const dynamicExist = existing.reset_time ? formatResetTime(existing.reset_time) : '';
+      merged[pool] = dynamicExist ? { ...existing, refreshes_in: dynamicExist } : existing;
+      if (isWeekly) merged[pool].window = 'weekly';
+      continue;
+    }
+
+    // 2. 跨重置窗口判定：依配額池類別動態設定時間門檻
+    // 週額度與 Argon 週期為 7 日，門檻設為 24 小時；五小時/短週期額度門檻設為 2 小時，消除長對話時序漂移
+    const windowThresholdMs = isWeekly ? 24 * 60 * 60 * 1000 : 2 * 60 * 60 * 1000;
+
+    if (hasValidExistReset && hasValidIncReset && Math.abs(incResetMs - existResetMs) > windowThresholdMs) {
+      const chosen = incResetMs > existResetMs ? inc : existing;
+      const dynamicChosen = chosen.reset_time ? formatResetTime(chosen.reset_time) : '';
+      merged[pool] = dynamicChosen ? { ...chosen, refreshes_in: dynamicChosen } : chosen;
+      if (isWeekly) merged[pool].window = 'weekly';
+      continue;
+    }
+
+    if (!preferLowerWhenSameReset) {
+      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
+      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
+      if (isWeekly) merged[pool].window = 'weekly';
+      continue;
+    }
+
+    const hasExistPct = typeof existing.remaining_percentage === 'number' && !isNaN(existing.remaining_percentage);
+    const hasIncPct = typeof inc.remaining_percentage === 'number' && !isNaN(inc.remaining_percentage);
+    if (hasExistPct && hasIncPct) {
+      const lowerEntry = existing.remaining_percentage <= inc.remaining_percentage ? existing : inc;
+      const higherEntry = existing.remaining_percentage <= inc.remaining_percentage ? inc : existing;
+      const targetResetTime = lowerEntry.reset_time || higherEntry.reset_time;
+      let dynamicRefreshesIn = '';
+      if (targetResetTime) {
+        dynamicRefreshesIn = formatResetTime(targetResetTime);
+      }
+      merged[pool] = {
+        ...higherEntry,
+        ...lowerEntry,
+        remaining_percentage: Math.min(existing.remaining_percentage, inc.remaining_percentage),
+        reset_time: targetResetTime,
+        refreshes_in: dynamicRefreshesIn || inc.refreshes_in || lowerEntry.refreshes_in || higherEntry.refreshes_in
+      };
+      if (isWeekly) merged[pool].window = 'weekly';
+    } else if (hasIncPct) {
+      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
+      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
+      if (isWeekly) merged[pool].window = 'weekly';
     } else {
-      merged[pool] = inc;
+      const dynamicExist = existing.reset_time ? formatResetTime(existing.reset_time) : '';
+      merged[pool] = dynamicExist ? { ...existing, refreshes_in: dynamicExist } : existing;
+      if (isWeekly) merged[pool].window = 'weekly';
     }
   }
   return merged;
@@ -607,6 +674,7 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
   const now = Date.now();
   const lastUpdatedAt = cacheInfo?.lsUpdatedAt || cacheInfo?.updatedAt || 0;
   const ageMs = now - lastUpdatedAt;
+  const attemptAgeMs = now - (cacheInfo?.lastPollAttemptAt || 0);
 
   const currentState = typeof meta?.agent_state === 'string' ? meta.agent_state.trim().toLowerCase() : '';
   const prevState = typeof cacheInfo?.lastAgentState === 'string' ? cacheInfo.lastAgentState.trim().toLowerCase() : '';
@@ -624,7 +692,9 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
 
   let needUpdate = false;
   if (!cacheInfo || !lastUpdatedAt || ageMs >= 15000) {
-    needUpdate = true;
+    if (!cacheInfo?.lastPollAttemptAt || attemptAgeMs >= 15000) {
+      needUpdate = true;
+    }
   } else if ((stateJustBecameIdle || tokensJustChanged || missingBuckets) && ageMs >= 1500) {
     needUpdate = true;
   }
@@ -633,10 +703,15 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
     return { cache: cacheInfo, freshlyFetchedFromLs: false, timedOut: false };
   }
 
+  if (cacheInfo && typeof cacheInfo === 'object') {
+    cacheInfo.lastPollAttemptAt = now;
+  }
+
   let timedOut = false;
   let freshlyFetchedFromLs = false;
   const cachePath = options?.cachePath || join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
-  const waitMs = typeof options?.waitMs === 'number' ? options.waitMs : 400;
+  const envWait = parseInt(process.env.STATUSLINE_QUOTA_WAIT_MS || '', 10);
+  const waitMs = typeof options?.waitMs === 'number' ? options.waitMs : (!isNaN(envWait) && envWait > 0 ? envWait : 500);
 
   try {
     const updaterScript = options?.updaterScript || join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs');
@@ -674,8 +749,14 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
         const freshCache = JSON.parse(freshContent.replace(/^\uFEFF/, ''));
         if (freshCache && typeof freshCache === 'object' && !Array.isArray(freshCache)) {
           const freshTs = freshCache.lsUpdatedAt || freshCache.updatedAt || 0;
-          if (freshTs >= lastUpdatedAt) {
+          if (freshTs > lastUpdatedAt || (lastUpdatedAt === 0 && freshTs > 0)) {
             freshlyFetchedFromLs = true;
+            if (cacheInfo && typeof cacheInfo === 'object') {
+              freshCache.shortTerm = mergeQuotaBuckets(cacheInfo.shortTerm, freshCache.shortTerm, true);
+              freshCache.weekly = mergeQuotaBuckets(cacheInfo.weekly, freshCache.weekly, true);
+              freshCache.models = { ...(cacheInfo.models || {}), ...(freshCache.models || {}) };
+              if (cacheInfo.lastPollAttemptAt !== undefined) freshCache.lastPollAttemptAt = cacheInfo.lastPollAttemptAt;
+            }
             return { cache: freshCache, freshlyFetchedFromLs, timedOut };
           }
         }
@@ -1644,9 +1725,17 @@ async function main() {
       (currentOutputTokens > 0 && currentOutputTokens !== prevOutputTokens) ||
       (currentTotalTokens > 0 && currentTotalTokens !== prevTotalTokens);
 
+    const now = Date.now();
+    const lastUpdatedAt = cache?.lsUpdatedAt || cache?.updatedAt || 0;
+    const cacheAgeMs = now - lastUpdatedAt;
+    const lastAttemptAgeMs = now - (cache?.lastPollAttemptAt || 0);
+    const isCacheStale = (!cache || !lastUpdatedAt || cacheAgeMs >= 15000) && (!lastUpdatedAt || lastAttemptAgeMs >= 15000);
+
     let freshlyFetchedFromLs = false;
     let timedOut = false;
-    if (!isMetaQuotaComplete || stateOrTokensChanged) {
+    let shouldPersistCache = false;
+
+    if (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale) {
       const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
         cachePath,
         missingRequiredBuckets
@@ -1655,17 +1744,15 @@ async function main() {
       freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
       timedOut = updateRes.timedOut;
     }
-
-    let shouldPersistCache = false;
     if (metaQuota) {
       if (!cache || typeof cache !== 'object') cache = {};
-      cache.shortTerm = mergeQuotaBuckets(cache.shortTerm, metaQuota.shortTerm, freshlyFetchedFromLs);
-      cache.weekly = mergeQuotaBuckets(cache.weekly, metaQuota.weekly, freshlyFetchedFromLs);
+      cache.shortTerm = mergeQuotaBuckets(cache.shortTerm, metaQuota.shortTerm, true);
+      cache.weekly = mergeQuotaBuckets(cache.weekly, metaQuota.weekly, true);
       const planTier = meta?.plan_tier || meta?.account?.plan_tier;
       const email = meta?.email || meta?.account?.email;
       if (planTier) cache.planTier = planTier;
       if (email) cache.email = email;
-      if (isMetaQuotaComplete || !cache.updatedAt) {
+      if (freshlyFetchedFromLs || !cache.updatedAt) {
         cache.updatedAt = Date.now();
       }
       shouldPersistCache = true;
