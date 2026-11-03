@@ -10,15 +10,32 @@
 
 全面支持 Google Antigravity 的三大核心平台：Antigravity 命令行界面（`agy`）、Antigravity 集成开发环境（Integrated Development Environment）以及 Antigravity 2.0 桌面应用程序。
 
-## 实际效果截图
+## 状态栏实际运作展示
 
-### Windows
+<p align="center">
+  <img src="docs/images/statusline-demo-zh-cn.svg" alt="Antigravity 命令行界面（Command-Line Interface，CLI）状态栏交互设置与动态遥测展示：从执行 /antigravity-cli-statusline:agy-cli-statusline 指令、语言选择、五大分类分页勾选、自定义排序 Write-in 到 11 列完整状态栏即时运作。" width="100%">
+</p>
+<p align="center">
+  <em>切换展示语言：<a href="docs/images/statusline-demo-zh-cn.svg">简体中文</a> | <a href="docs/images/statusline-demo-zh-tw.svg">繁體中文</a> | <a href="docs/images/statusline-demo-en.svg">English</a> | <a href="docs/images/statusline-demo-jp.svg">日本語</a></em>
+</p>
+
+这是 Antigravity 命令行界面（Command-Line Interface，CLI）状态栏从交互设置到实际运作的实时动态展示。画面完整展示执行设置指令 `/antigravity-cli-statusline:agy-cli-statusline`、各阶段 `ask_question` 问卷交互、自定义排版输入，以及最终呈现的 11 列高信息密度状态栏：
+
+1. **执行设置指令与语言选择**：输入 `/antigravity-cli-statusline:agy-cli-statusline` 启动交互设置向导，第一步实时选择并锁定显示语言（简体中文、繁体中文、英文、日语）。
+2. **五大分类指标分页勾选**：通过 `ask_question` 分类分页向导（1/5 ~ 5/5）完整容纳 36 项指标，解决终端行数限制与滚动截断问题。
+3. **手动排序与个别样式 Write-in**：支持在单行输入框填写自定义排序与前缀（如 `e:model-name` 指定 Emoji、`quota` 指定文本模式、`n` 强制换行、`n,n` 建立空白分隔行）。
+4. **设置同步与即时热重载**：自动同步命令行界面专属、全局与项目三层 `settings.json` 及 `trusted_hooks.json` 信任机制，免重启 CLI 立即热重载生效，展开 11 列自订状态栏。
+5. **完整 11 列状态栏即时遥测运作**：依自订顺序实时追踪人工智能模型、可用额度与 10 格进度条、上下文与令牌计数、活跃子代理、Git 版控与系统内存。
+
+### 实际效果截图
+
+#### Windows
 
 | 繁体中文 (zh-tw) | 简体中文 (zh-cn) | English (us) | 日本语 (jp) |
 | :---: | :---: | :---: | :---: |
 | ![繁体中文](docs/images/agy-cli-statusline-windows-zhtw.png) | *(支持 zh-cn 模式)* | ![English](docs/images/agy-cli-statusline-windows-us.png) | ![日本语](docs/images/agy-cli-statusline-windows-jp.png) |
 
-### macOS
+#### macOS
 
 | 繁体中文 (zh-tw) | 简体中文 (zh-cn) | English (us) | 日本语 (jp) |
 | :---: | :---: | :---: | :---: |

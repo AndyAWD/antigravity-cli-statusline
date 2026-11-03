@@ -10,15 +10,32 @@
 
 全面支援 Google Antigravity 的三大核心平台：Antigravity 命令列介面（`agy`）、Antigravity 整合開發環境（Integrated Development Environment）以及 Antigravity 2.0 桌面應用程式。
 
-## 實際畫面
+## 狀態列實際運作展示
 
-### Windows
+<p align="center">
+  <img src="docs/images/statusline-demo-zh-tw.svg" alt="Antigravity 命令列介面（Command-Line Interface，CLI）狀態列互動設定與動態遙測展示：從執行 /antigravity-cli-statusline:agy-cli-statusline 指令、語系選擇、五大分類分頁勾選、自訂排序 Write-in 到 11 列完整狀態列即時運作。" width="100%">
+</p>
+<p align="center">
+  <em>切換展示語系：<a href="docs/images/statusline-demo-zh-tw.svg">繁體中文</a> | <a href="docs/images/statusline-demo-en.svg">English</a> | <a href="docs/images/statusline-demo-zh-cn.svg">简体中文</a> | <a href="docs/images/statusline-demo-jp.svg">日本語</a></em>
+</p>
+
+這是 Antigravity 命令列介面（Command-Line Interface，CLI）狀態列從互動設定到實際運作的即時動態展示。畫面完整展示執行設定指令 `/antigravity-cli-statusline:agy-cli-statusline`、各階段 `ask_question` 問卷互動、自訂排版輸入，以及最終呈現的 11 列高資訊密度狀態列：
+
+1. **執行設定指令與語系選擇**：輸入 `/antigravity-cli-statusline:agy-cli-statusline` 啟動互動設定精靈，第一步即時選擇並鎖定顯示語系（繁體中文、簡體中文、英文、日本語）。
+2. **五大分類指標分頁勾選**：透過 `ask_question` 分類分頁精靈（1/5 ~ 5/5）完整容納 36 項指標，解決終端機行數限制與滾動截斷問題。
+3. **手動排序與個別樣式 Write-in**：支援在單行輸入框填寫自訂排序與前綴（如 `e:model-name` 指定 Emoji、`quota` 指定文字模式、`n` 強制換行、`n,n` 建立空白分隔行）。
+4. **設定同步與即時熱重載**：自動同步命令列介面專屬、全域與專案三層 `settings.json` 及 `trusted_hooks.json` 信任機制，免重啟 CLI 立即熱重載生效，展開 11 列自訂狀態列。
+5. **完整 11 列狀態列即時遙測運作**：依自訂順序即時追蹤人工智慧模型、可用額度與 10 格長條圖、脈絡與權杖計數、活躍子代理、Git 版控與系統記憶體。
+
+### 實際畫面
+
+#### Windows
 
 | 繁體中文 (zh-tw) | 簡體中文 (zh-cn) | English (us) | 日本語 (jp) |
 | :---: | :---: | :---: | :---: |
 | ![繁體中文](docs/images/agy-cli-statusline-windows-zhtw.png) | *(支援 zh-cn 模式)* | ![English](docs/images/agy-cli-statusline-windows-us.png) | ![日本語](docs/images/agy-cli-statusline-windows-jp.png) |
 
-### macOS
+#### macOS
 
 | 繁體中文 (zh-tw) | 簡體中文 (zh-cn) | English (us) | 日本語 (jp) |
 | :---: | :---: | :---: | :---: |

@@ -1,0 +1,451 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640" role="img" aria-label="Antigravity CLI ステータスライン対話型設定と動的テレメトリデモ：/antigravity-cli-statusline:agy-cli-statusline の実行、言語選択、5大分類ウィザード（Question 1/5〜5/5の全5階層）、カスタム並び順 Write-in、11列ステータスラインのリアルタイム稼働まで。" xml:space="preserve">
+<style>
+  text { font: 12.5px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace; white-space: pre; }
+  .cap { font: 15.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-weight: 600; }
+  .cur { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .f { opacity: 0; }
+  @keyframes f0 {
+    0%, 11.10% { opacity: 1; }
+    11.11%, 99.99% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  .f0 { opacity: 1; animation: f0 36.0s infinite; }
+
+  @keyframes f1 {
+    0%, 11.10% { opacity: 0; }
+    11.11%, 22.21% { opacity: 1; }
+    22.22%, 100% { opacity: 0; }
+  }
+  .f1 { animation: f1 36.0s infinite; }
+
+  @keyframes f2 {
+    0%, 22.21% { opacity: 0; }
+    22.22%, 33.32% { opacity: 1; }
+    33.33%, 100% { opacity: 0; }
+  }
+  .f2 { animation: f2 36.0s infinite; }
+
+  @keyframes f3 {
+    0%, 33.32% { opacity: 0; }
+    33.33%, 44.43% { opacity: 1; }
+    44.44%, 100% { opacity: 0; }
+  }
+  .f3 { animation: f3 36.0s infinite; }
+
+  @keyframes f4 {
+    0%, 44.43% { opacity: 0; }
+    44.44%, 55.54% { opacity: 1; }
+    55.55%, 100% { opacity: 0; }
+  }
+  .f4 { animation: f4 36.0s infinite; }
+
+  @keyframes f5 {
+    0%, 55.54% { opacity: 0; }
+    55.55%, 66.65% { opacity: 1; }
+    66.66%, 100% { opacity: 0; }
+  }
+  .f5 { animation: f5 36.0s infinite; }
+
+  @keyframes f6 {
+    0%, 66.65% { opacity: 0; }
+    66.66%, 77.76% { opacity: 1; }
+    77.77%, 100% { opacity: 0; }
+  }
+  .f6 { animation: f6 36.0s infinite; }
+
+  @keyframes f7 {
+    0%, 77.76% { opacity: 0; }
+    77.77%, 88.87% { opacity: 1; }
+    88.88%, 100% { opacity: 0; }
+  }
+  .f7 { animation: f7 36.0s infinite; }
+
+  @keyframes f8 {
+    0%, 88.87% { opacity: 0; }
+    88.88%, 99.99% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .f8 { animation: f8 36.0s infinite; }
+</style>
+
+<defs>
+  <!-- Exact Antigravity CLI Logo (12x10 pixel grid, 50 colored blocks) -->
+  <g id="agy-logo">
+    <rect x="79" y="48" width="6" height="6" rx="1" fill="#f2922e"/>
+    <rect x="86" y="48" width="6" height="6" rx="1" fill="#f07236"/>
+    <rect x="72" y="55" width="6" height="6" rx="1" fill="#dbb131"/>
+    <rect x="79" y="55" width="6" height="6" rx="1" fill="#f6912e"/>
+    <rect x="86" y="55" width="6" height="6" rx="1" fill="#f37337"/>
+    <rect x="93" y="55" width="6" height="6" rx="1" fill="#f0583b"/>
+    <rect x="65" y="62" width="6" height="6" rx="1" fill="#9ec345"/>
+    <rect x="72" y="62" width="6" height="6" rx="1" fill="#b5b43e"/>
+    <rect x="79" y="62" width="6" height="6" rx="1" fill="#e2993d"/>
+    <rect x="86" y="62" width="6" height="6" rx="1" fill="#f67a34"/>
+    <rect x="93" y="62" width="6" height="6" rx="1" fill="#f86a35"/>
+    <rect x="100" y="62" width="6" height="6" rx="1" fill="#ef5442"/>
+    <rect x="65" y="69" width="6" height="6" rx="1" fill="#86c64e"/>
+    <rect x="72" y="69" width="6" height="6" rx="1" fill="#75b45e"/>
+    <rect x="79" y="69" width="6" height="6" rx="1" fill="#cc954d"/>
+    <rect x="86" y="69" width="6" height="6" rx="1" fill="#ef7947"/>
+    <rect x="93" y="69" width="6" height="6" rx="1" fill="#e16652"/>
+    <rect x="100" y="69" width="6" height="6" rx="1" fill="#e14f59"/>
+    <rect x="58" y="76" width="6" height="6" rx="1" fill="#7cc251"/>
+    <rect x="65" y="76" width="6" height="6" rx="1" fill="#71c25c"/>
+    <rect x="72" y="76" width="6" height="6" rx="1" fill="#5ca98f"/>
+    <rect x="79" y="76" width="6" height="6" rx="1" fill="#5c91b3"/>
+    <rect x="86" y="76" width="6" height="6" rx="1" fill="#8373b0"/>
+    <rect x="93" y="76" width="6" height="6" rx="1" fill="#746fc3"/>
+    <rect x="100" y="76" width="6" height="6" rx="1" fill="#995da8"/>
+    <rect x="107" y="76" width="6" height="6" rx="1" fill="#9c5b97"/>
+    <rect x="58" y="83" width="6" height="6" rx="1" fill="#80c654"/>
+    <rect x="65" y="83" width="6" height="6" rx="1" fill="#54b881"/>
+    <rect x="72" y="83" width="6" height="6" rx="1" fill="#4097de"/>
+    <rect x="93" y="83" width="6" height="6" rx="1" fill="#4a7ee4"/>
+    <rect x="100" y="83" width="6" height="6" rx="1" fill="#706ece"/>
+    <rect x="107" y="83" width="6" height="6" rx="1" fill="#8f64b4"/>
+    <rect x="58" y="90" width="6" height="6" rx="1" fill="#61c37d"/>
+    <rect x="65" y="90" width="6" height="6" rx="1" fill="#43aeab"/>
+    <rect x="100" y="90" width="6" height="6" rx="1" fill="#4a80ea"/>
+    <rect x="107" y="90" width="6" height="6" rx="1" fill="#6c73d8"/>
+    <rect x="51" y="97" width="6" height="6" rx="1" fill="#6dc694"/>
+    <rect x="58" y="97" width="6" height="6" rx="1" fill="#62bad5"/>
+    <rect x="65" y="97" width="6" height="6" rx="1" fill="#47a8dc"/>
+    <rect x="100" y="97" width="6" height="6" rx="1" fill="#3d89fb"/>
+    <rect x="107" y="97" width="6" height="6" rx="1" fill="#4a81f0"/>
+    <rect x="114" y="97" width="6" height="6" rx="1" fill="#6579e1"/>
+    <rect x="51" y="104" width="6" height="6" rx="1" fill="#6bc7a3"/>
+    <rect x="58" y="104" width="6" height="6" rx="1" fill="#64b6f6"/>
+    <rect x="107" y="104" width="6" height="6" rx="1" fill="#3886fb"/>
+    <rect x="114" y="104" width="6" height="6" rx="1" fill="#4881f4"/>
+    <rect x="44" y="111" width="6" height="6" rx="1" fill="#67b9f4"/>
+    <rect x="51" y="111" width="6" height="6" rx="1" fill="#64b6f6"/>
+    <rect x="114" y="111" width="6" height="6" rx="1" fill="#3883f9"/>
+    <rect x="121" y="111" width="6" height="6" rx="1" fill="#3d85fc"/>
+  </g>
+</defs>
+
+<!-- Terminal Window Container -->
+<rect width="960" height="640" rx="10" fill="#282c34"/>
+<!-- Window Header Border -->
+<rect x=".5" y=".5" width="959" height="639" rx="10" fill="none" stroke="#383e5a"/>
+
+<!-- Window Traffic Light Buttons -->
+<circle cx="18" cy="18" r="5.5" fill="#ff5f56"/>
+<circle cx="38" cy="18" r="5.5" fill="#ffbd2e"/>
+<circle cx="58" cy="18" r="5.5" fill="#27c93f"/>
+<text x="480" y="22" fill="#8b949e" text-anchor="middle" style="font-size:12px; font-weight:500;">📁 agy</text>
+
+<!-- Antigravity Banner Area -->
+<use href="#agy-logo"/>
+<text x="148" y="62" fill="#57caff" font-weight="700">Antigravity CLI 1.4.12</text>
+<text x="148" y="80" fill="#c9d1d9">anandydy529@gmail.com (Google AI Pro)</text>
+<text x="148" y="98" fill="#8b949e">Gemini 3.1 Pro (High)</text>
+<text x="148" y="116" fill="#6e7681">~/Project/antigravity-cli-statusline</text>
+
+<!-- Divider above prompt -->
+<line x1="24" y1="134" x2="936" y2="134" stroke="#383e5a" stroke-width="1"/>
+
+<!-- Bottom Caption Bar Container -->
+<path d="M0 575H960V630Q960 640 950 640H10Q0 640 0 630Z" fill="#21252b"/>
+<line x1="0" y1="575" x2="960" y2="575" stroke="#383e5a" stroke-width="1"/>
+
+<!-- ============================================================== -->
+<!-- FRAME 0: Command & Language Selection Wizard -->
+<!-- ============================================================== -->
+<g class="f f0">
+  <!-- Command Trigger & Question 1: Language selection -->
+  <text x="24" y="154" fill="#57caff">&gt;</text>
+  <text x="40" y="154" fill="#e6edf3">/antigravity-cli-statusline:agy-cli-statusline</text>
+  <rect class="cur" x="382" y="141" width="8" height="15" fill="#e6edf3"/>
+  <line x1="24" y1="168" x2="936" y2="168" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="196" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="196" fill="#e6edf3" font-weight="700">表示言語の選択 / Select Display Language</text>
+  <text x="44" y="220" fill="#8b949e">○ 繁體中文 (zh-tw)</text>
+  <text x="44" y="242" fill="#8b949e">○ 简体中文 (zh-cn)</text>
+  <text x="44" y="264" fill="#8b949e">○ English (us)</text>
+  <text x="44" y="286" fill="#39c5cf" font-weight="700">● 日本語 (jp)</text>
+  <text x="24" y="318" fill="#6e7681">↑/↓ 選択 · Enter 決定 · 以降のすべての対話で選択言語を維持します</text>
+  <text x="24" y="344" fill="#8b949e">ℹ️  第1段階アンケート：言語選択後、以降のすべての設定手順とステータスラインに適用されます</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">① 設定コマンド実行と言語選択 · /antigravity-cli-statusline:agy-cli-statusline でウィザード起動</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 1: Category Wizard 1/5 (Model & Agent) -->
+<!-- ============================================================== -->
+<g class="f f1">
+  <!-- Category Wizard 1/5 (モデルとエージェント) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">表示言語を固定：日本語 (jp)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">表示する指標を選択（5 大分類ウィザード 1/5 ~ 5/5）：</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 1/5: 表示するモデルとエージェントの指標を選択してください</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 🤖 現在のAIモデル名（model-name）</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🪪 使用中のエージェント（agent-profile）</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] ⚡ エージェント状態（agent-state）</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ 現在の実行モード（mode）</text>
+  <text x="44" y="318" fill="#8b949e">⎿ ページ進捗：[ 第 1 / 5 ページ ] · 4 項目を選択中</text>
+  <text x="24" y="340" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">② 指標ウィザード (1/5 モデルとエージェント) · model-name, agent-profile, agent-state, mode を選択</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 2: Category Wizard 2/5 (Quota, Billing & Account) -->
+<!-- ============================================================== -->
+<g class="f f2">
+  <!-- Category Wizard 2/5 (クォータ・請求・アカウント) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">表示言語を固定：日本語 (jp)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">表示する指標を選択（5 大分類ウィザード 1/5 ~ 5/5）：</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 2/5: 表示するクォータ・請求・アカウントの指標を選択してください</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 🔋 時間別利用可能残量（quota）</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🔋 時間別利用可能残量バーグラフ（quota-bar）</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] ⏳ 時間別残量リセットカウントダウン（quota-reset-countdown）</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 🕒 時間別リセット時刻（quota-reset-time）</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 📅 週間利用可能残量（quota-weekly）</text>
+  <text x="44" y="316" fill="#39c5cf">[✓] 📅 週間利用可能残量バーグラフ（quota-weekly-bar）</text>
+  <text x="44" y="334" fill="#39c5cf">[✓] ⏲️ 週間残量リセットカウントダウン（quota-weekly-countdown）</text>
+  <text x="44" y="352" fill="#39c5cf">[✓] 🗓️ 週間リセット時刻（quota-weekly-reset-time）</text>
+  <text x="44" y="370" fill="#39c5cf">[✓] ✨ Gemini 4 Argon 利用可能残量（quota-argon）</text>
+  <text x="44" y="388" fill="#39c5cf">[✓] ✨ Gemini 4 Argon 利用可能残量バーグラフ（quota-argon-bar）</text>
+  <text x="44" y="406" fill="#39c5cf">[✓] ⏱️ Gemini 4 Argon 残量リセットカウントダウン（quota-argon-countdown）</text>
+  <text x="44" y="424" fill="#39c5cf">[✓] ⏰ Gemini 4 Argon リセット時刻（quota-argon-reset-time）</text>
+  <text x="44" y="442" fill="#39c5cf">[✓] 💎 現在のサブスクリプションプラン（plan-tier）</text>
+  <text x="44" y="460" fill="#39c5cf">[✓] 📧 アカウントのメールアドレス（account-email）</text>
+  <text x="44" y="498" fill="#8b949e">⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 18 項目を選択中</text>
+  <text x="24" y="520" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (3/5 コンテキスト) · スクロール不要</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">③ 指標ウィザード (2/5 クォータ・請求) · 5時間/週間/Argon クォータ、バー、時刻など14項目</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 3: Category Wizard 3/5 (Context & Tokens) -->
+<!-- ============================================================== -->
+<g class="f f3">
+  <!-- Category Wizard 3/5 (コンテキストとトークン) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">表示言語を固定：日本語 (jp)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">表示する指標を選択（5 大分類ウィザード 1/5 ~ 5/5）：</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 3/5: 表示するコンテキストとトークンの指標を選択してください</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 🧠 コンテキスト使用割合（context-used）</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🧠 コンテキスト使用バーグラフ（context-used-bar）</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] 💰 現在のセッションの正確なトークン数（token-count）</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 💰 トークン数バーグラフ（token-count-bar）</text>
+  <text x="44" y="318" fill="#8b949e">⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 22 項目を選択中</text>
+  <text x="24" y="340" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (4/5 ワークスペース) · スクロール不要</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">④ 指標ウィザード (3/5 コンテキスト・トークン) · コンテキスト使用率・バー、トークン数・バーを選択</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 4: Category Wizard 4/5 (Workspace & VCS) -->
+<!-- ============================================================== -->
+<g class="f f4">
+  <!-- Category Wizard 4/5 (ワークスペースとバージョン管理) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">表示言語を固定：日本語 (jp)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">表示する指標を選択（5 大分類ウィザード 1/5 ~ 5/5）：</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 4/5: 表示するワークスペースとバージョン管理の指標を選択してください</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 📁 現在のワークスペースの短いパス（project-path）</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 📍 現在のワークスペースの完全なパス（project-full-path）</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] 🔀 現在のGitブランチ（git-branch）</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 🔍 ワークスペースの未コミット変更（vcs-dirty）</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🗃️ バージョン管理タイプ（vcs-type）</text>
+  <text x="44" y="336" fill="#8b949e">⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 27 項目を選択中</text>
+  <text x="24" y="358" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (5/5 システム) · スクロール不要</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑤ 指標ウィザード (4/5 ワークスペース・VCS) · プロジェクトパス、Gitブランチ、未コミット変更、VCS種別</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 5: Category Wizard 5/5 (System & Background Tasks) -->
+<!-- ============================================================== -->
+<g class="f f5">
+  <!-- Category Wizard 5/5 (システム状態とバックグラウンドタスク) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">表示言語を固定：日本語 (jp)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">表示する指標を選択（5 大分類ウィザード 1/5 ~ 5/5）：</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 5/5: 表示するシステム状態とバックグラウンドタスクの指標を選択してください</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 💾 CLIプロセスのRAM使用量（memory-usage）</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🚀 Antigravity CLIバージョン（cli-version）</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] 💬 現在の会話ID（conversation-id）</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 🛡️ サンドボックス状態（sandbox-status）</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🔔 返答待ちのツール確認ダイアログ（tool-confirmation）</text>
+  <text x="44" y="316" fill="#39c5cf">[✓] 📥 キュー内の待機中ユーザー入力数（pending-input）</text>
+  <text x="44" y="334" fill="#39c5cf">[✓] 🔄 実行中のバックグラウンドタスク数（background-tasks）</text>
+  <text x="44" y="352" fill="#39c5cf">[✓] 👥 アクティブなサブエージェント数（subagents）</text>
+  <text x="44" y="370" fill="#39c5cf">[✓] 📄 今回のセッションで生成されたアーティファクト数（artifacts）</text>
+  <text x="44" y="408" fill="#5cdb6d">★ 全 5 カテゴリ 36 指標の一括選択が完了しました！</text>
+  <text x="24" y="430" fill="#6e7681">Space 選択/解除 · Enter 決定してカスタム並べ替えへ (Write-in)</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑥ 指標ウィザード (5/5 システム・タスク) · メモリ、CLIバージョン、会話ID、サブエージェント等9項目</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 6: Custom Order & Style Input Write-in -->
+<!-- ============================================================== -->
+<g class="f f6">
+  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
+  <text x="24" y="156" fill="#8b949e">📋</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 36 項目）</text>
+  <text x="280" y="156" fill="#8b949e">— 下の Write-in に並び順を入力（e: で絵文字、n で改行、n,n で空行）：</text>
+  
+  <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon 残量 (argon)  │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 🔀 Git 分岐 (branch)   │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🔍 未コミット (dirty)  │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版管理種別 (vcs)    │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 メモリ (memory)     │</text>
+  <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
+
+  <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="290" fill="#e6edf3" font-weight="700">ステータスラインの表示順序と個別スタイルを設定してください：</text>
+  <text x="44" y="312" fill="#8b949e">○ スキップ、選択順で全指標を有効化（デフォルトテキスト形式）</text>
+  <text x="44" y="334" fill="#39c5cf" font-weight="700">● 手動で並び順とスタイルを設定（下の「Write-in...」欄に入力）</text>
+  <text x="44" y="356" fill="#ffd427" font-weight="700">Write-in &gt; </text>
+  <text x="135" y="356" fill="#57caff">[e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,</text>
+  <text x="44" y="376" fill="#57caff">  e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,</text>
+  <text x="44" y="396" fill="#57caff">  context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,...]</text>
+  <rect class="cur" x="830" y="384" width="8" height="15" fill="#57caff"/>
+  <text x="24" y="422" fill="#6e7681">指定された順序とスタイルに基づき、11 列の高密度ステータスラインを自動構築</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑦ 並び順・スタイル直接入力 · e: 接頭辞で絵文字指定、n/n,n で自在に改行</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 7: Config Deployed & Statusline Hot Reloaded -->
+<!-- ============================================================== -->
+<g class="f f7">
+  <!-- Step 4: Configuration Deployed & Hot Reloaded -->
+  <text x="24" y="156" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="156" fill="#c9d1d9">3 層の設定ファイルを更新：~/.gemini/antigravity-cli/settings.json</text>
+  <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="180" fill="#c9d1d9">フックを配置し ~/.gemini/trusted_hooks.json への登録を完了</text>
+  <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
+  <text x="44" y="204" fill="#57caff" font-weight="700">ステータスラインが即時反映！11 列のカスタム並び順と混合スタイルを適用</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 46 の指標・改行要素を解決 · 隣接バーの自動統合 · 24-bit フルカラー表示</text>
+  <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="314" fill="#57caff">&gt;</text>
+  <text x="40" y="314" fill="#e6edf3">Antigravity CLI ステータスライン稼働中。ワークスペースを監視しています。</text>
+  <rect class="cur" x="582" y="301" width="8" height="15" fill="#e6edf3"/>
+
+  <!-- Statusline Divider Line -->
+  <line x1="24" y1="330" x2="936" y2="330" stroke="#383e5a" stroke-width="1"/>
+
+  <!-- Statusline Footer (Exact User-Specified Sorting) -->
+  <text x="24" y="351"><tspan fill="#ffffff">🤖</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#4796e3" font-weight="700">Gemini 3.1 Pro (High)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">📧 </tspan><tspan fill="#ffffff" font-weight="700">anandydy529@gmail.com</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💎 </tspan><tspan fill="#ffffff" font-weight="700">Google AI Pro</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🛡️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">オフ</tspan></text>
+  <text x="24" y="370"><tspan fill="#ffffff">🪪</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">状態:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">待機</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">サブ代理:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">成果物: </tspan><tspan fill="#ffffff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">入力キュー:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">BGタスク:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">ご承認待ち:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">なし</tspan></text>
+  <!-- Empty row 2 from n,n -->
+  <text x="24" y="389"> </text>
+  <text x="24" y="408"><tspan fill="#ffffff">コンテキスト使用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0.0%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#c9d1d9">░░░░░░░░░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">トークン:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff">0</tspan><tspan fill="#c9d1d9"> / 1.0M [</tspan><tspan fill="#c9d1d9">░░░░░░░░░░]</tspan></text>
+  <text x="24" y="427"><tspan fill="#ffffff">五時間残量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五時間リセット:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">5h 00m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五時間リセット時刻:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">03:22</tspan></text>
+  <text x="24" y="446"><tspan fill="#ffffff">七日間残量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日間リセット:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">7d 00h</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日間リセット時刻:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/09 03:22</tspan></text>
+  <text x="24" y="465"><tspan fill="#ffffff">Argon 残量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon リセット:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">24h 00m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon リセット時刻:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/03 03:22</tspan></text>
+  <!-- Empty row 7 from n,n -->
+  <text x="24" y="484"> </text>
+  <text x="24" y="503"><tspan fill="#ffffff">版管理状態:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">✓ 変更なし</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版管理種別: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
+  <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">パス: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">バージョン: </tspan><tspan fill="#ffffff" font-weight="700">v1.4.12</tspan></text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑧ 設定の反映と即時ホットリロード · 3 層 settings.json 同期、11 列レイアウト即時適用</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 8: Live Runtime & Telemetry Update -->
+<!-- ============================================================== -->
+<g class="f f8">
+  <!-- Step 5: Live Task Execution & Dynamic Telemetry Update -->
+  <text x="24" y="156" fill="#57caff">&gt;</text>
+  <text x="40" y="156" fill="#e6edf3">自動テストスイートを実行：npm test</text>
+  <text x="24" y="180" fill="#57caff">●</text>
+  <text x="44" y="180" fill="#e6edf3">2 つのサブ代理を並行起動しユニットテストを実行中...</text>
+  <text x="44" y="202" fill="#8b949e">⎿ statusline-quota.test.mjs  (14 passing, 10 分割バー &amp; 多言語検証済)</text>
+  <text x="44" y="222" fill="#8b949e">⎿ configure-statusline.test.mjs  (12 passing, 括弧 &amp; itemStyles 検証済)</text>
+  <text x="24" y="248" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="248" fill="#c9d1d9">テスト全合格！ステータスライン即時更新：コンテキスト 18.5%、トークン 185k、残量 86%。</text>
+  <text x="44" y="270" fill="#ffd427">⎿ 画面下部でサブ代理数、成果物、Git 未コミット変更のテレメトリが連動</text>
+  <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="314" fill="#57caff">&gt;</text>
+  <rect class="cur" x="40" y="301" width="8" height="15" fill="#e6edf3"/>
+
+  <!-- Statusline Divider Line -->
+  <line x1="24" y1="330" x2="936" y2="330" stroke="#383e5a" stroke-width="1"/>
+
+  <!-- Statusline Footer (Exact User-Specified Sorting, Dynamic Telemetry) -->
+  <text x="24" y="351"><tspan fill="#ffffff">🤖</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#4796e3" font-weight="700">Gemini 3.1 Pro (High)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">📧 </tspan><tspan fill="#ffffff" font-weight="700">anandydy529@gmail.com</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💎 </tspan><tspan fill="#ffffff" font-weight="700">Google AI Pro</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🛡️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">オフ</tspan></text>
+  <text x="24" y="370"><tspan fill="#ffffff">🪪</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">状態:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">実行中</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">サブ代理:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">2</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">成果物: </tspan><tspan fill="#ffffff" font-weight="700">3</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">入力キュー:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">BGタスク:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">1</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">ご承認待ち:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">なし</tspan></text>
+  <!-- Empty row 2 from n,n -->
+  <text x="24" y="389"> </text>
+  <text x="24" y="408"><tspan fill="#ffffff">コンテキスト使用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">18.5%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">█</tspan><tspan fill="#c9d1d9">░░░░░░░░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">トークン:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff">185k</tspan><tspan fill="#c9d1d9"> / 1.0M [</tspan><tspan fill="#57caff">█</tspan><tspan fill="#c9d1d9">░░░░░░░░░]</tspan></text>
+  <text x="24" y="427"><tspan fill="#ffffff">五時間残量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">86%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">████████</tspan><tspan fill="#c9d1d9">░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五時間リセット:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">4h 32m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五時間リセット時刻:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">03:49</tspan></text>
+  <text x="24" y="446"><tspan fill="#ffffff">七日間残量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">96%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">█████████</tspan><tspan fill="#c9d1d9">░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日間リセット:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">6d 18h</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日間リセット時刻:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/08 05:06</tspan></text>
+  <text x="24" y="465"><tspan fill="#ffffff">Argon 残量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon リセット:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">23h 59m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon リセット時刻:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/02 08:30</tspan></text>
+  <!-- Empty row 7 from n,n -->
+  <text x="24" y="484"> </text>
+  <text x="24" y="503"><tspan fill="#ffffff">版管理状態:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">✘ 未コミット (+3)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版管理種別: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
+  <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">パス: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">バージョン: </tspan><tspan fill="#ffffff" font-weight="700">v1.4.12</tspan></text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑨ リアルタイムテレメトリ稼働 · 指定順序でプログレスバー、トークン、サブ代理を追跡</text>
+</g>
+</svg>
