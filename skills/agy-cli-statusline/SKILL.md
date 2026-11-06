@@ -65,7 +65,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 「對話輸出」涵蓋（不限於）：
 - 步驟 2 Node.js 缺失時的 `ask_question` 警告對話
-- 步驟 3（五大分類分頁勾選指標）與步驟 4 的 `ask_question` 問卷（`question` 文字、`options` 字串、`toolSummary`、`toolAction`）
+- 步驟 3（五大分類分頁勾選指標）與步驟 4 的 `ask_question` 問卷（`question` 文字、`options` 字串）
 - 步驟 5 / 6 進行中的 any 進度說明、確認語句、警告訊息
 - 步驟 5（位元組順序記號（BOM）污染修復）與步驟 6（Windows 缺 `sh.exe`）的偵測與修復提示
 - 步驟 7 的最終回報訊息與舊版腳本溫馨提醒
@@ -100,9 +100,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
       ],
       "is_multi_select": false
     }
-  ],
-  "toolSummary": "語系選擇",
-  "toolAction": "詢問顯示語系"
+  ]
 }
 ```
 
@@ -122,7 +120,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
   1. **向使用者發出明確警告（以所選語系撰寫）**，說明缺少 Node.js 將導致：
      - CLI 底部狀態列**完全空白**，不會顯示 any 指標
      - `agy` 命令列介面（CLI）會反覆記錄 `statusline: command failed: exit status 127 (stderr: sh: node: command not found)`，連續失敗 30 次後自動停用 statusline
-  2. **呼叫 `ask_question` 詢問使用者是否繼續**（問卷 `question`、`options`、`toolSummary`、`toolAction` 全部以所選語系撰寫）：
+  2. **呼叫 `ask_question` 詢問使用者是否繼續**（問卷 `question`、`options` 全部以所選語系撰寫）：
 
 **zh-tw 範例**：
 ```json
@@ -136,9 +134,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
       ],
       "is_multi_select": false
     }
-  ],
-  "toolSummary": "Node 環境檢查",
-  "toolAction": "確認 Node 安裝"
+  ]
 }
 ```
 
@@ -154,9 +150,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
       ],
       "is_multi_select": false
     }
-  ],
-  "toolSummary": "Node 环境检查",
-  "toolAction": "确认 Node 安装"
+  ]
 }
 ```
 
@@ -172,9 +166,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
       ],
       "is_multi_select": false
     }
-  ],
-  "toolSummary": "Node environment check",
-  "toolAction": "Confirm Node installation"
+  ]
 }
 ```
 
@@ -190,9 +182,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
       ],
       "is_multi_select": false
     }
-  ],
-  "toolSummary": "Node 環境確認",
-  "toolAction": "Node インストール確認"
+  ]
 }
 ```
 
@@ -246,9 +236,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
       "options": [ /* 分類 5 的 options */ ],
       "is_multi_select": true
     }
-  ],
-  "toolSummary": "指標選擇",
-  "toolAction": "分類勾選指標"
+  ]
 }
 ```
 
@@ -308,9 +296,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
          ],
          "is_multi_select": false
        }
-     ],
-     "toolSummary": "排序設定",
-     "toolAction": "詢問顯示順序與樣式"
+     ]
    }
    ```
 
@@ -326,9 +312,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
          ],
          "is_multi_select": false
        }
-     ],
-     "toolSummary": "排序设置",
-     "toolAction": "询问显示顺序与样式"
+     ]
    }
    ```
 
@@ -344,9 +328,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
          ],
          "is_multi_select": false
        }
-     ],
-     "toolSummary": "Sorting settings",
-     "toolAction": "Ask display order and styles"
+     ]
    }
    ```
 
@@ -362,9 +344,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
          ],
          "is_multi_select": false
        }
-     ],
-     "toolSummary": "並べ替え設定",
-     "toolAction": "表示順序とスタイルの確認"
+     ]
    }
    ```
 3. 取得使用者的排序輸入（`order`）。
