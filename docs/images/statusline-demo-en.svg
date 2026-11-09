@@ -1,0 +1,451 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640" role="img" aria-label="Antigravity CLI statusline interactive setup and live telemetry demo: from running /antigravity-cli-statusline:agy-cli-statusline command, language selection, 5-category wizard (all 5 layers Question 1/5 to 5/5), custom order Write-in, to full 11-row live statusline telemetry." xml:space="preserve">
+<style>
+  text { font: 12.5px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace; white-space: pre; }
+  .cap { font: 15.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-weight: 600; }
+  .cur { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .f { opacity: 0; }
+  @keyframes f0 {
+    0%, 11.10% { opacity: 1; }
+    11.11%, 99.99% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  .f0 { opacity: 1; animation: f0 36.0s infinite; }
+
+  @keyframes f1 {
+    0%, 11.10% { opacity: 0; }
+    11.11%, 22.21% { opacity: 1; }
+    22.22%, 100% { opacity: 0; }
+  }
+  .f1 { animation: f1 36.0s infinite; }
+
+  @keyframes f2 {
+    0%, 22.21% { opacity: 0; }
+    22.22%, 33.32% { opacity: 1; }
+    33.33%, 100% { opacity: 0; }
+  }
+  .f2 { animation: f2 36.0s infinite; }
+
+  @keyframes f3 {
+    0%, 33.32% { opacity: 0; }
+    33.33%, 44.43% { opacity: 1; }
+    44.44%, 100% { opacity: 0; }
+  }
+  .f3 { animation: f3 36.0s infinite; }
+
+  @keyframes f4 {
+    0%, 44.43% { opacity: 0; }
+    44.44%, 55.54% { opacity: 1; }
+    55.55%, 100% { opacity: 0; }
+  }
+  .f4 { animation: f4 36.0s infinite; }
+
+  @keyframes f5 {
+    0%, 55.54% { opacity: 0; }
+    55.55%, 66.65% { opacity: 1; }
+    66.66%, 100% { opacity: 0; }
+  }
+  .f5 { animation: f5 36.0s infinite; }
+
+  @keyframes f6 {
+    0%, 66.65% { opacity: 0; }
+    66.66%, 77.76% { opacity: 1; }
+    77.77%, 100% { opacity: 0; }
+  }
+  .f6 { animation: f6 36.0s infinite; }
+
+  @keyframes f7 {
+    0%, 77.76% { opacity: 0; }
+    77.77%, 88.87% { opacity: 1; }
+    88.88%, 100% { opacity: 0; }
+  }
+  .f7 { animation: f7 36.0s infinite; }
+
+  @keyframes f8 {
+    0%, 88.87% { opacity: 0; }
+    88.88%, 99.99% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .f8 { animation: f8 36.0s infinite; }
+</style>
+
+<defs>
+  <!-- Exact Antigravity CLI Logo (12x10 pixel grid, 50 colored blocks) -->
+  <g id="agy-logo">
+    <rect x="79" y="48" width="6" height="6" rx="1" fill="#f2922e"/>
+    <rect x="86" y="48" width="6" height="6" rx="1" fill="#f07236"/>
+    <rect x="72" y="55" width="6" height="6" rx="1" fill="#dbb131"/>
+    <rect x="79" y="55" width="6" height="6" rx="1" fill="#f6912e"/>
+    <rect x="86" y="55" width="6" height="6" rx="1" fill="#f37337"/>
+    <rect x="93" y="55" width="6" height="6" rx="1" fill="#f0583b"/>
+    <rect x="65" y="62" width="6" height="6" rx="1" fill="#9ec345"/>
+    <rect x="72" y="62" width="6" height="6" rx="1" fill="#b5b43e"/>
+    <rect x="79" y="62" width="6" height="6" rx="1" fill="#e2993d"/>
+    <rect x="86" y="62" width="6" height="6" rx="1" fill="#f67a34"/>
+    <rect x="93" y="62" width="6" height="6" rx="1" fill="#f86a35"/>
+    <rect x="100" y="62" width="6" height="6" rx="1" fill="#ef5442"/>
+    <rect x="65" y="69" width="6" height="6" rx="1" fill="#86c64e"/>
+    <rect x="72" y="69" width="6" height="6" rx="1" fill="#75b45e"/>
+    <rect x="79" y="69" width="6" height="6" rx="1" fill="#cc954d"/>
+    <rect x="86" y="69" width="6" height="6" rx="1" fill="#ef7947"/>
+    <rect x="93" y="69" width="6" height="6" rx="1" fill="#e16652"/>
+    <rect x="100" y="69" width="6" height="6" rx="1" fill="#e14f59"/>
+    <rect x="58" y="76" width="6" height="6" rx="1" fill="#7cc251"/>
+    <rect x="65" y="76" width="6" height="6" rx="1" fill="#71c25c"/>
+    <rect x="72" y="76" width="6" height="6" rx="1" fill="#5ca98f"/>
+    <rect x="79" y="76" width="6" height="6" rx="1" fill="#5c91b3"/>
+    <rect x="86" y="76" width="6" height="6" rx="1" fill="#8373b0"/>
+    <rect x="93" y="76" width="6" height="6" rx="1" fill="#746fc3"/>
+    <rect x="100" y="76" width="6" height="6" rx="1" fill="#995da8"/>
+    <rect x="107" y="76" width="6" height="6" rx="1" fill="#9c5b97"/>
+    <rect x="58" y="83" width="6" height="6" rx="1" fill="#80c654"/>
+    <rect x="65" y="83" width="6" height="6" rx="1" fill="#54b881"/>
+    <rect x="72" y="83" width="6" height="6" rx="1" fill="#4097de"/>
+    <rect x="93" y="83" width="6" height="6" rx="1" fill="#4a7ee4"/>
+    <rect x="100" y="83" width="6" height="6" rx="1" fill="#706ece"/>
+    <rect x="107" y="83" width="6" height="6" rx="1" fill="#8f64b4"/>
+    <rect x="58" y="90" width="6" height="6" rx="1" fill="#61c37d"/>
+    <rect x="65" y="90" width="6" height="6" rx="1" fill="#43aeab"/>
+    <rect x="100" y="90" width="6" height="6" rx="1" fill="#4a80ea"/>
+    <rect x="107" y="90" width="6" height="6" rx="1" fill="#6c73d8"/>
+    <rect x="51" y="97" width="6" height="6" rx="1" fill="#6dc694"/>
+    <rect x="58" y="97" width="6" height="6" rx="1" fill="#62bad5"/>
+    <rect x="65" y="97" width="6" height="6" rx="1" fill="#47a8dc"/>
+    <rect x="100" y="97" width="6" height="6" rx="1" fill="#3d89fb"/>
+    <rect x="107" y="97" width="6" height="6" rx="1" fill="#4a81f0"/>
+    <rect x="114" y="97" width="6" height="6" rx="1" fill="#6579e1"/>
+    <rect x="51" y="104" width="6" height="6" rx="1" fill="#6bc7a3"/>
+    <rect x="58" y="104" width="6" height="6" rx="1" fill="#64b6f6"/>
+    <rect x="107" y="104" width="6" height="6" rx="1" fill="#3886fb"/>
+    <rect x="114" y="104" width="6" height="6" rx="1" fill="#4881f4"/>
+    <rect x="44" y="111" width="6" height="6" rx="1" fill="#67b9f4"/>
+    <rect x="51" y="111" width="6" height="6" rx="1" fill="#64b6f6"/>
+    <rect x="114" y="111" width="6" height="6" rx="1" fill="#3883f9"/>
+    <rect x="121" y="111" width="6" height="6" rx="1" fill="#3d85fc"/>
+  </g>
+</defs>
+
+<!-- Terminal Window Container -->
+<rect width="960" height="640" rx="10" fill="#282c34"/>
+<!-- Window Header Border -->
+<rect x=".5" y=".5" width="959" height="639" rx="10" fill="none" stroke="#383e5a"/>
+
+<!-- Window Traffic Light Buttons -->
+<circle cx="18" cy="18" r="5.5" fill="#ff5f56"/>
+<circle cx="38" cy="18" r="5.5" fill="#ffbd2e"/>
+<circle cx="58" cy="18" r="5.5" fill="#27c93f"/>
+<text x="480" y="22" fill="#8b949e" text-anchor="middle" style="font-size:12px; font-weight:500;">📁 agy</text>
+
+<!-- Antigravity Banner Area -->
+<use href="#agy-logo"/>
+<text x="148" y="62" fill="#57caff" font-weight="700">Antigravity CLI 1.4.12</text>
+<text x="148" y="80" fill="#c9d1d9">anandydy529@gmail.com (Google AI Pro)</text>
+<text x="148" y="98" fill="#8b949e">Gemini 3.1 Pro (High)</text>
+<text x="148" y="116" fill="#6e7681">~/Project/antigravity-cli-statusline</text>
+
+<!-- Divider above prompt -->
+<line x1="24" y1="134" x2="936" y2="134" stroke="#383e5a" stroke-width="1"/>
+
+<!-- Bottom Caption Bar Container -->
+<path d="M0 575H960V630Q960 640 950 640H10Q0 640 0 630Z" fill="#21252b"/>
+<line x1="0" y1="575" x2="960" y2="575" stroke="#383e5a" stroke-width="1"/>
+
+<!-- ============================================================== -->
+<!-- FRAME 0: Command & Language Selection Wizard -->
+<!-- ============================================================== -->
+<g class="f f0">
+  <!-- Command Trigger & Question 1: Language selection -->
+  <text x="24" y="154" fill="#57caff">&gt;</text>
+  <text x="40" y="154" fill="#e6edf3">/antigravity-cli-statusline:agy-cli-statusline</text>
+  <rect class="cur" x="382" y="141" width="8" height="15" fill="#e6edf3"/>
+  <line x1="24" y1="168" x2="936" y2="168" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="196" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="196" fill="#e6edf3" font-weight="700">Select Display Language / 選擇顯示語系</text>
+  <text x="44" y="220" fill="#8b949e">○ 繁體中文 (zh-tw)</text>
+  <text x="44" y="242" fill="#8b949e">○ 简体中文 (zh-cn)</text>
+  <text x="44" y="264" fill="#39c5cf" font-weight="700">● English (us)</text>
+  <text x="44" y="286" fill="#8b949e">○ 日本語 (jp)</text>
+  <text x="24" y="318" fill="#6e7681">↑/↓ Navigate · Enter Confirm · Locks display language for all steps</text>
+  <text x="24" y="344" fill="#8b949e">ℹ️  Step 1 Question: All subsequent wizard prompts and statusline items will use this locale</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">① Run Command &amp; Select Language · Launch wizard with /antigravity-cli-statusline:agy-cli-statusline</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 1: Category Wizard 1/5 (Model & Agent) -->
+<!-- ============================================================== -->
+<g class="f f1">
+  <!-- Category Wizard 1/5 (Model &amp; Agent) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">Locked display locale: English (us)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">Select statusline indicators (Category Wizard 1/5 ~ 5/5):</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 1/5: Select Model &amp; Agent metrics to display</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 🤖 Current AI model name (model-name)</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🪪 Active agent profile (agent-profile)</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] ⚡ Agent state (agent-state)</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ Current running mode (mode)</text>
+  <text x="44" y="318" fill="#8b949e">⎿ Wizard pager: [ Page 1 / 5 ] · 4 metrics selected</text>
+  <text x="24" y="340" fill="#6e7681">Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">② Indicator Selection (1/5 Model &amp; Agent) · Select model-name, agent-profile, agent-state, mode</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 2: Category Wizard 2/5 (Quota, Billing & Account) -->
+<!-- ============================================================== -->
+<g class="f f2">
+  <!-- Category Wizard 2/5 (Quota, Billing &amp; Account) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">Locked display locale: English (us)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">Select statusline indicators (Category Wizard 1/5 ~ 5/5):</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 2/5: Select Quota, Billing &amp; Account metrics to display</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 🔋 Hourly available quota remaining (quota)</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🔋 Hourly available quota bar graph (quota-bar)</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] ⏳ Hourly quota reset countdown (quota-reset-countdown)</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 🕒 Hourly reset time (quota-reset-time)</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 📅 Weekly available quota remaining (quota-weekly)</text>
+  <text x="44" y="316" fill="#39c5cf">[✓] 📅 Weekly available quota bar graph (quota-weekly-bar)</text>
+  <text x="44" y="334" fill="#39c5cf">[✓] ⏲️ Weekly quota reset countdown (quota-weekly-countdown)</text>
+  <text x="44" y="352" fill="#39c5cf">[✓] 🗓️ Weekly reset time (quota-weekly-reset-time)</text>
+  <text x="44" y="370" fill="#39c5cf">[✓] ✨ Gemini 4 Argon available quota remaining (quota-argon)</text>
+  <text x="44" y="388" fill="#39c5cf">[✓] ✨ Gemini 4 Argon available quota bar graph (quota-argon-bar)</text>
+  <text x="44" y="406" fill="#39c5cf">[✓] ⏱️ Gemini 4 Argon quota reset countdown (quota-argon-countdown)</text>
+  <text x="44" y="424" fill="#39c5cf">[✓] ⏰ Gemini 4 Argon reset time (quota-argon-reset-time)</text>
+  <text x="44" y="442" fill="#39c5cf">[✓] 💎 Current subscription plan tier (plan-tier)</text>
+  <text x="44" y="460" fill="#39c5cf">[✓] 📧 Account email (account-email)</text>
+  <text x="44" y="498" fill="#8b949e">⎿ Wizard pager: [ Page 2 / 5 ] · 18 metrics selected cumulatively</text>
+  <text x="24" y="520" fill="#6e7681">Space Toggle · Enter Next category (3/5 Context) · Eliminates scroll truncation</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">③ Indicator Selection (2/5 Quota &amp; Billing) · Select 5-hr/weekly/Argon quotas, bars &amp; reset times (14 items)</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 3: Category Wizard 3/5 (Context & Tokens) -->
+<!-- ============================================================== -->
+<g class="f f3">
+  <!-- Category Wizard 3/5 (Context &amp; Tokens) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">Locked display locale: English (us)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">Select statusline indicators (Category Wizard 1/5 ~ 5/5):</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 3/5: Select Context &amp; Token metrics to display</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 🧠 Context used percentage (context-used)</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🧠 Context used bar graph (context-used-bar)</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] 💰 Exact token count for current session (token-count)</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 💰 Token count bar graph (token-count-bar)</text>
+  <text x="44" y="318" fill="#8b949e">⎿ Wizard pager: [ Page 3 / 5 ] · 22 metrics selected cumulatively</text>
+  <text x="24" y="340" fill="#6e7681">Space Toggle · Enter Next category (4/5 Workspace) · Eliminates scroll truncation</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">④ Indicator Selection (3/5 Context &amp; Tokens) · Select context used %, context bar, token count &amp; bar</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 4: Category Wizard 4/5 (Workspace & VCS) -->
+<!-- ============================================================== -->
+<g class="f f4">
+  <!-- Category Wizard 4/5 (Workspace &amp; VCS) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">Locked display locale: English (us)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">Select statusline indicators (Category Wizard 1/5 ~ 5/5):</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 4/5: Select Workspace &amp; VCS metrics to display</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 📁 Current workspace short path (project-path)</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 📍 Current workspace full path (project-full-path)</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] 🔀 Current Git branch (git-branch)</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 🔍 Workspace dirty status (vcs-dirty)</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🗃️ VCS type (vcs-type)</text>
+  <text x="44" y="336" fill="#8b949e">⎿ Wizard pager: [ Page 4 / 5 ] · 27 metrics selected cumulatively</text>
+  <text x="24" y="358" fill="#6e7681">Space Toggle · Enter Next category (5/5 System) · Eliminates scroll truncation</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑤ Indicator Selection (4/5 Workspace &amp; VCS) · Select project path, full path, Git branch, dirty status &amp; VCS type</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 5: Category Wizard 5/5 (System & Background Tasks) -->
+<!-- ============================================================== -->
+<g class="f f5">
+  <!-- Category Wizard 5/5 (System Status &amp; Background Tasks) -->
+  <text x="24" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="158" fill="#c9d1d9">Locked display locale: English (us)</text>
+  <text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>
+  <text x="24" y="184" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="184" fill="#e6edf3" font-weight="700">Select statusline indicators (Category Wizard 1/5 ~ 5/5):</text>
+  <text x="44" y="206" fill="#ffd427" font-weight="700">Question 5/5: Select System Status &amp; Background Task metrics to display</text>
+  <text x="44" y="226" fill="#39c5cf">[✓] 💾 RAM usage of CLI process (memory-usage)</text>
+  <text x="44" y="244" fill="#39c5cf">[✓] 🚀 Antigravity CLI version (cli-version)</text>
+  <text x="44" y="262" fill="#39c5cf">[✓] 💬 Current conversation ID (conversation-id)</text>
+  <text x="44" y="280" fill="#39c5cf">[✓] 🛡️ Sandbox status (sandbox-status)</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🔔 Pending tool confirmation dialog (tool-confirmation)</text>
+  <text x="44" y="316" fill="#39c5cf">[✓] 📥 Pending user inputs in queue (pending-input)</text>
+  <text x="44" y="334" fill="#39c5cf">[✓] 🔄 Running background tasks (background-tasks)</text>
+  <text x="44" y="352" fill="#39c5cf">[✓] 👥 Active subagents (subagents)</text>
+  <text x="44" y="370" fill="#39c5cf">[✓] 📄 Total artifacts generated in this session (artifacts)</text>
+  <text x="44" y="408" fill="#5cdb6d">★ All 36 indicators across 5 categories successfully selected!</text>
+  <text x="24" y="430" fill="#6e7681">Space Toggle · Enter Confirm &amp; proceed to custom order (Write-in)</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑥ Indicator Selection (5/5 System &amp; Tasks) · Select RAM usage, CLI version, sandbox, subagents &amp; artifacts (9 items)</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 6: Custom Order & Style Input Write-in -->
+<!-- ============================================================== -->
+<g class="f f6">
+  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
+  <text x="24" y="156" fill="#8b949e">📋</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 36)</text>
+  <text x="330" y="156" fill="#8b949e">— Enter custom order below (e: for Emoji, n for newline):</text>
+  
+  <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon Quota (argon) │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 🔀 Git Branch (branch) │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🔍 Dirty State (dirty) │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ VCS Type (vcs-type) │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 Memory (memory)     │</text>
+  <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
+
+  <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
+  <text x="44" y="290" fill="#e6edf3" font-weight="700">Please set the statusline display order and individual styles:</text>
+  <text x="44" y="312" fill="#8b949e">○ Skip, keep current selection order (default text labels)</text>
+  <text x="44" y="334" fill="#39c5cf" font-weight="700">● Manual order &amp; styles (fill in the &apos;Write-in...&apos; box below)</text>
+  <text x="44" y="356" fill="#ffd427" font-weight="700">Write-in &gt; </text>
+  <text x="135" y="356" fill="#57caff">[e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,</text>
+  <text x="44" y="376" fill="#57caff">  e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,</text>
+  <text x="44" y="396" fill="#57caff">  context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,...]</text>
+  <rect class="cur" x="830" y="384" width="8" height="15" fill="#57caff"/>
+  <text x="24" y="422" fill="#6e7681">Compiles custom array into an 11-row high-density statusline with auto-merged bars</text>
+
+  <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
+  <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="554" fill="#6e7681">? for shortcuts</text>
+  <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑦ Custom Order &amp; Styles Write-in · Supports e: for Emoji, text styles, and n/n,n line breaks</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 7: Config Deployed & Statusline Hot Reloaded -->
+<!-- ============================================================== -->
+<g class="f f7">
+  <!-- Step 4: Configuration Deployed & Hot Reloaded -->
+  <text x="24" y="156" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="156" fill="#c9d1d9">Synchronized 3-tier config: ~/.gemini/antigravity-cli/settings.json</text>
+  <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="180" fill="#c9d1d9">Cross-platform hook deployed &amp; registered in ~/.gemini/trusted_hooks.json</text>
+  <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
+  <text x="44" y="204" fill="#57caff" font-weight="700">Statusline hot reloaded! Applied custom 11-row layout with mixed Emoji/Text</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 46 metrics &amp; layout tokens resolved · Auto-merged adjacent bars · 24-bit truecolor</text>
+  <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="314" fill="#57caff">&gt;</text>
+  <text x="40" y="314" fill="#e6edf3">Antigravity CLI statusline active. Ready to monitor workspace and telemetry.</text>
+  <rect class="cur" x="614" y="301" width="8" height="15" fill="#e6edf3"/>
+
+  <!-- Statusline Divider Line -->
+  <line x1="24" y1="330" x2="936" y2="330" stroke="#383e5a" stroke-width="1"/>
+
+  <!-- Statusline Footer (Exact User-Specified Sorting) -->
+  <text x="24" y="351"><tspan fill="#ffffff">🤖</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#4796e3" font-weight="700">Gemini 3.1 Pro (High)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">📧 </tspan><tspan fill="#ffffff" font-weight="700">anandydy529@gmail.com</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💎 </tspan><tspan fill="#ffffff" font-weight="700">Google AI Pro</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🛡️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">off</tspan></text>
+  <text x="24" y="370"><tspan fill="#ffffff">🪪</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agent:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">idle</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Subagents:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Outputs: </tspan><tspan fill="#ffffff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Queue:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">BG:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Awaiting You:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">none</tspan></text>
+  <!-- Empty row 2 from n,n -->
+  <text x="24" y="389"> </text>
+  <text x="24" y="408"><tspan fill="#ffffff">Context Used:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0.0%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#c9d1d9">░░░░░░░░░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Tokens:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff">0</tspan><tspan fill="#c9d1d9"> / 1.0M [</tspan><tspan fill="#c9d1d9">░░░░░░░░░░]</tspan></text>
+  <text x="24" y="427"><tspan fill="#ffffff">5-hr Available:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">5-hr Reset:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">5h 00m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">5-hr Reset Time:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">03:22</tspan></text>
+  <text x="24" y="446"><tspan fill="#ffffff">7-day Available:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">7-day Reset:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">7d 00h</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">7-day Reset Time:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/09 03:22</tspan></text>
+  <text x="24" y="465"><tspan fill="#ffffff">Argon Available:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon Reset:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">24h 00m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon Reset Time:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/03 03:22</tspan></text>
+  <!-- Empty row 7 from n,n -->
+  <text x="24" y="484"> </text>
+  <text x="24" y="503"><tspan fill="#ffffff">VCS Status:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">✓ no changes</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">VCS: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
+  <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Project Path: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.4.12</tspan></text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑧ Config Deployment &amp; Hot Reload · Sync 3-tier settings.json &amp; activate 11-row statusline</text>
+</g>
+
+<!-- ============================================================== -->
+<!-- FRAME 8: Live Runtime & Telemetry Update -->
+<!-- ============================================================== -->
+<g class="f f8">
+  <!-- Step 5: Live Task Execution & Dynamic Telemetry Update -->
+  <text x="24" y="156" fill="#57caff">&gt;</text>
+  <text x="40" y="156" fill="#e6edf3">Run comprehensive test suite: npm test</text>
+  <text x="24" y="180" fill="#57caff">●</text>
+  <text x="44" y="180" fill="#e6edf3">Dispatching 2 subagents in parallel to execute unit test runners...</text>
+  <text x="44" y="202" fill="#8b949e">⎿ statusline-quota.test.mjs  (14 passing, 10-block bar &amp; i18n verified)</text>
+  <text x="44" y="222" fill="#8b949e">⎿ configure-statusline.test.mjs  (12 passing, bracket &amp; itemStyles verified)</text>
+  <text x="24" y="248" fill="#5cdb6d" font-weight="700">✓</text>
+  <text x="44" y="248" fill="#c9d1d9">All test suites passed! Live telemetry: context 18.5%, tokens 185k, 5-hr quota 86%.</text>
+  <text x="44" y="270" fill="#ffd427">⎿ Footer statusline instantly reflects active subagents, outputs, and dirty git state</text>
+  <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
+  <text x="24" y="314" fill="#57caff">&gt;</text>
+  <rect class="cur" x="40" y="301" width="8" height="15" fill="#e6edf3"/>
+
+  <!-- Statusline Divider Line -->
+  <line x1="24" y1="330" x2="936" y2="330" stroke="#383e5a" stroke-width="1"/>
+
+  <!-- Statusline Footer (Exact User-Specified Sorting, Dynamic Telemetry) -->
+  <text x="24" y="351"><tspan fill="#ffffff">🤖</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#4796e3" font-weight="700">Gemini 3.1 Pro (High)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">📧 </tspan><tspan fill="#ffffff" font-weight="700">anandydy529@gmail.com</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💎 </tspan><tspan fill="#ffffff" font-weight="700">Google AI Pro</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🛡️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">off</tspan></text>
+  <text x="24" y="370"><tspan fill="#ffffff">🪪</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agent:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">working</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Subagents:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">2</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Outputs: </tspan><tspan fill="#ffffff" font-weight="700">3</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Queue:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">BG:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">1</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Awaiting You:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">none</tspan></text>
+  <!-- Empty row 2 from n,n -->
+  <text x="24" y="389"> </text>
+  <text x="24" y="408"><tspan fill="#ffffff">Context Used:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">18.5%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">█</tspan><tspan fill="#c9d1d9">░░░░░░░░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Tokens:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff">185k</tspan><tspan fill="#c9d1d9"> / 1.0M [</tspan><tspan fill="#57caff">█</tspan><tspan fill="#c9d1d9">░░░░░░░░░]</tspan></text>
+  <text x="24" y="427"><tspan fill="#ffffff">5-hr Available:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">86%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">████████</tspan><tspan fill="#c9d1d9">░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">5-hr Reset:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">4h 32m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">5-hr Reset Time:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">03:49</tspan></text>
+  <text x="24" y="446"><tspan fill="#ffffff">7-day Available:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">96%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">█████████</tspan><tspan fill="#c9d1d9">░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">7-day Reset:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">6d 18h</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">7-day Reset Time:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/08 05:06</tspan></text>
+  <text x="24" y="465"><tspan fill="#ffffff">Argon Available:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon Reset:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">23h 59m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon Reset Time:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/02 08:30</tspan></text>
+  <!-- Empty row 7 from n,n -->
+  <text x="24" y="484"> </text>
+  <text x="24" y="503"><tspan fill="#ffffff">VCS Status:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">✘ uncommitted (+3)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">VCS: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
+  <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Project Path: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.4.12</tspan></text>
+
+  <!-- Caption -->
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑨ Live Telemetry Statusline in Action · Real-time tracking of bars, tokens, and subagents</text>
+</g>
+</svg>

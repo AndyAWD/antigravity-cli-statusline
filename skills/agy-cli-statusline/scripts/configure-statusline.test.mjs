@@ -1025,6 +1025,12 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
   assert.deepStrictEqual(resSparse.items, ['model-name', 'git-branch']);
   assert.deepStrictEqual(resSparse.itemStyles, { 'model-name': 'emoji' });
 
+  // 12. 外層被方括號包覆之陣列格式輸入（例如使用者直接貼上完整陣列）
+  const bracketInput = '[e:model-name,e:quota,n,git-branch]';
+  const resBracket = parseOrderAndStyles(bracketInput, testIds);
+  assert.deepStrictEqual(resBracket.items, ['model-name', 'quota', 'n', 'git-branch']);
+  assert.deepStrictEqual(resBracket.itemStyles, { 'model-name': 'emoji', 'quota': 'emoji' });
+
   console.log('✅ 測試情境 10 通過！');
 }
 

@@ -10,15 +10,32 @@ An Antigravity plugin that customizes the Antigravity Command-Line Interface (CL
 
 Comprehensive support across the three core platforms of Google Antigravity (AGY): Antigravity Command-Line Interface (CLI) (`agy`), Antigravity Integrated Development Environment (IDE), and Antigravity 2.0 Desktop Application.
 
-## Screenshots
+## Statusline Setup & Interactive Telemetry in Action
 
-### Windows
+<p align="center">
+  <img src="docs/images/statusline-demo.svg" alt="Antigravity CLI statusline interactive setup and live telemetry demo: from running /antigravity-cli-statusline:agy-cli-statusline command, language selection, 5-category wizard, custom order Write-in, to full 11-row live statusline telemetry." width="100%">
+</p>
+<p align="center">
+  <em>View language versions: <a href="docs/images/statusline-demo-en.svg">English</a> | <a href="docs/images/statusline-demo-zh-tw.svg">繁體中文</a> | <a href="docs/images/statusline-demo-zh-cn.svg">简体中文</a> | <a href="docs/images/statusline-demo-jp.svg">日本語</a></em>
+</p>
+
+This is the Antigravity Command-Line Interface (CLI) statusline demonstration showing the complete journey from interactive setup to live execution. The animation captures running `/antigravity-cli-statusline:agy-cli-statusline`, each interactive `ask_question` wizard step, custom order & styling input, and the resulting 11-row high-density statusline:
+
+1. **Command Trigger & Locale Selection**: Execute `/antigravity-cli-statusline:agy-cli-statusline` to launch the wizard, selecting and locking the display language (English, Traditional Chinese, Japanese, Simplified Chinese).
+2. **5-Category Metric Selection**: Navigate the `ask_question` paginated wizard (1/5 to 5/5) across all 36 metrics without terminal scroll truncation.
+3. **Manual Order & Styles Write-in**: Input custom order and prefixes in Write-in (e.g. `e:model-name` for Emoji, `quota` for Text, `n` for newline, and `n,n` for blank separator lines).
+4. **Config Sync & Instant Hot Reload**: Synchronizes 3-tier `settings.json` and `trusted_hooks.json`, activating the 11-row statusline immediately without restarting the CLI.
+5. **Full 11-Row Live Telemetry**: Tracks AI models, API quota with 10-block progress bars, context and tokens, active subagents, Git VCS, and system memory in real time.
+
+### Screenshots
+
+#### Windows
 
 | English (us) | Traditional Chinese (zh-tw) | Simplified Chinese (zh-cn) | Japanese (jp) |
 | :---: | :---: | :---: | :---: |
 | ![English](docs/images/agy-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-windows-zhtw.png) | *(supports zh-cn mode)* | ![Japanese](docs/images/agy-cli-statusline-windows-jp.png) |
 
-### macOS
+#### macOS
 
 | English (us) | Traditional Chinese (zh-tw) | Simplified Chinese (zh-cn) | Japanese (jp) |
 | :---: | :---: | :---: | :---: |

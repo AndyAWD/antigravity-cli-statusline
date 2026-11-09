@@ -315,8 +315,11 @@ export function parseOrderAndStyles(orderStr, selectedIds) {
     return { items, itemStyles };
   }
 
-  // 1. 正規化全形字元、全形標點符號與空格
+  // 1. 正規化全形字元、全形標點符號與空格，並剝除可能包覆陣列的外層方括號
   let s = orderStr
+    .trim()
+    .replace(/^\[\s*/, '')
+    .replace(/\s*\]$/, '')
     .replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
     .replace(/\u3000/g, ' ')
     .replace(/[\u3001，；;]/g, ',');
@@ -357,8 +360,8 @@ export function parseOrderAndStyles(orderStr, selectedIds) {
     const tokens = sub.split(/\s+/).map(x => x.trim()).filter(Boolean);
 
     for (let part of tokens) {
-      // 剝除頭尾標點符號（如點號、逗號、冒號等，但保留中間的冒號/連字號）
-      part = part.replace(/^[.,:;]+|[.,:;]+$/g, '');
+      // 剝除頭尾標點符號與方括號（如點號、逗號、冒號、方括號等，但保留中間的冒號/連字號）
+      part = part.replace(/^[[.,:;]+|[\].,:;]+$/g, '');
       if (!part) continue;
 
       if (part.toLowerCase() === 'n' || part.toLowerCase() === 'newline') {
