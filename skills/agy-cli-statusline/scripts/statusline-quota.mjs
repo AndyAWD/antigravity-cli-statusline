@@ -1,7 +1,7 @@
 import { promises as fs, realpathSync } from 'fs';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
-import path, { join, basename } from 'path';
+import path, { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
 
@@ -922,16 +922,23 @@ export function resolveArgonQuota(cache) {
 }
 
 async function writeFileAndVerifyNoBOM(filePath, content) {
-  await fs.writeFile(filePath, content, { encoding: 'utf8' });
-  let buffer = await fs.readFile(filePath);
+  const dir = dirname(filePath);
+  const tmpPath = join(dir, `.tmp_${basename(filePath)}_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  await fs.writeFile(tmpPath, content, { encoding: 'utf8' });
+  let buffer = await fs.readFile(tmpPath);
   if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
     buffer = buffer.slice(3);
-    await fs.writeFile(filePath, buffer);
+    await fs.writeFile(tmpPath, buffer);
   }
+  await fs.rename(tmpPath, filePath);
 }
 
-async function calculateContextUsageAsync(meta, conversationId) {
-  const contextWindow = meta.context_window || {};
+let stateWriteQueue = Promise.resolve();
+
+export const DEFAULT_COMPACTION_THRESHOLD = 256000;
+
+export async function calculateContextUsageAsync(meta, conversationId, settings = {}) {
+  const contextWindow = meta?.context_window || {};
   const ctxCachePath = join(os.homedir(), '.gemini', 'tmp', `ctx_${conversationId}.json`);
   
   let totalInput = contextWindow.total_input_tokens || 0;
@@ -939,6 +946,11 @@ async function calculateContextUsageAsync(meta, conversationId) {
   let usedPctNum = contextWindow.used_percentage || 0;
   let contextSize = contextWindow.context_window_size || 0;
   
+  const nativeLimitSniffed = contextWindow.compaction_threshold ??
+    contextWindow.compaction_token_limit ??
+    contextWindow.compact_threshold ??
+    contextWindow.effective_context_window_size;
+
   if (totalInput === 0 && totalOutput === 0) {
     try {
       const content = await fs.readFile(ctxCachePath, 'utf8');
@@ -947,6 +959,9 @@ async function calculateContextUsageAsync(meta, conversationId) {
       totalOutput = cachedCtx.total_output_tokens || 0;
       if (cachedCtx.used_percentage) usedPctNum = cachedCtx.used_percentage;
       if (cachedCtx.context_window_size) contextSize = cachedCtx.context_window_size;
+      if (cachedCtx.compaction_threshold !== undefined && contextWindow.compaction_threshold === undefined) {
+        contextWindow.compaction_threshold = cachedCtx.compaction_threshold;
+      }
     } catch (e) {}
   } else {
     try {
@@ -955,7 +970,8 @@ async function calculateContextUsageAsync(meta, conversationId) {
         total_input_tokens: totalInput,
         total_output_tokens: totalOutput,
         used_percentage: usedPctNum,
-        context_window_size: contextSize
+        context_window_size: contextSize,
+        compaction_threshold: nativeLimitSniffed !== undefined ? nativeLimitSniffed : contextWindow.compaction_threshold
       }));
     } catch (e) {}
   }
@@ -964,8 +980,119 @@ async function calculateContextUsageAsync(meta, conversationId) {
   if (contextSize > 0 && totalInput > 0 && !usedPctNum) {
     usedPctNum = (totalInput / contextSize) * 100;
   }
+
+  let effectiveTokenCeiling = null;
+
+  // (1) contextWindow 原生擴充欄位嗅探（compaction_threshold, compaction_token_limit, compact_threshold, effective_context_window_size）
+  const nativeLimit = contextWindow.compaction_threshold ??
+    contextWindow.compaction_token_limit ??
+    contextWindow.compact_threshold ??
+    contextWindow.effective_context_window_size;
+
+  if (nativeLimit !== undefined && nativeLimit !== null && nativeLimit !== '') {
+    if (typeof nativeLimit === 'string') {
+      const s = nativeLimit.trim().toLowerCase();
+      if (s.endsWith('k') && !isNaN(Number(s.slice(0, -1)))) {
+        effectiveTokenCeiling = Number(s.slice(0, -1)) * 1000;
+      } else if (s.endsWith('m') && !isNaN(Number(s.slice(0, -1)))) {
+        effectiveTokenCeiling = Number(s.slice(0, -1)) * 1000000;
+      } else if (!isNaN(Number(s)) && Number(s) > 0) {
+        effectiveTokenCeiling = Number(s);
+      }
+    } else {
+      const parsedNative = Number(nativeLimit);
+      if (!isNaN(parsedNative) && parsedNative > 0) {
+        effectiveTokenCeiling = parsedNative;
+      }
+    }
+  }
+
+  // (2) 外部設定檔 (ui.footer.tokenCeiling / ui.tokenCeiling) 或環境變數 (AGY_TOKEN_CEILING)，支援數值與 "model"/"physical"/"full"/"1m"/"0"
+  if (effectiveTokenCeiling === null) {
+    const rawCeiling = settings?.ui?.footer?.tokenCeiling ??
+      settings?.ui?.tokenCeiling ??
+      process.env.AGY_TOKEN_CEILING;
+
+    if (rawCeiling !== undefined && rawCeiling !== null && rawCeiling !== '') {
+      if (typeof rawCeiling === 'string') {
+        const s = rawCeiling.trim().toLowerCase();
+        if (s === 'model' || s === 'physical' || s === 'full' || s === '1m' || s === '0') {
+          effectiveTokenCeiling = contextSize;
+        } else if (s.endsWith('k') && !isNaN(Number(s.slice(0, -1)))) {
+          const val = Number(s.slice(0, -1)) * 1000;
+          if (val > 0) effectiveTokenCeiling = val;
+        } else if (s.endsWith('m') && !isNaN(Number(s.slice(0, -1)))) {
+          const val = Number(s.slice(0, -1)) * 1000000;
+          if (val > 0) effectiveTokenCeiling = val;
+        } else if (!isNaN(Number(s))) {
+          const num = Number(s);
+          if (num >= 0) {
+            effectiveTokenCeiling = num === 0 ? contextSize : num;
+          }
+        }
+      } else if (typeof rawCeiling === 'number' && !isNaN(rawCeiling) && rawCeiling >= 0) {
+        effectiveTokenCeiling = rawCeiling === 0 ? contextSize : rawCeiling;
+      }
+    }
+  }
+
+  // (3) 破頂自動跳檔解鎖 + CLI 版本記憶快取 (Step-Up Auto-Unlock)：若 totalInput > DEFAULT_COMPACTION_THRESHOLD (256000)，effectiveTokenCeiling 立即跳檔解鎖回模型物理視窗 contextSize（絕不可顯示 300k / 300k 卡死 100%），並將 meta.version 寫入 ~/.gemini/tmp/compaction_ceiling_state.json 的 unlockedVersions 物件中；若該版本已記錄過，後續新對話直接沿用 contextSize
+  if (effectiveTokenCeiling === null) {
+    const statePath = join(os.homedir(), '.gemini', 'tmp', 'compaction_ceiling_state.json');
+    let unlockedVersions = {};
+    let fullState = {};
+    try {
+      const stateContent = await fs.readFile(statePath, 'utf8');
+      const parsedState = JSON.parse(stateContent.replace(/^\uFEFF/, ''));
+      if (parsedState && typeof parsedState === 'object' && !Array.isArray(parsedState)) {
+        fullState = parsedState;
+        if (typeof parsedState.unlockedVersions === 'object' && parsedState.unlockedVersions !== null) {
+          unlockedVersions = parsedState.unlockedVersions;
+        }
+      }
+    } catch (_) {}
+
+    const rawVersion = meta?.version
+      ? String(meta.version).trim()
+      : (meta?.cli_version ? String(meta.cli_version).trim() : '');
+    const cleanVersion = rawVersion.replace(/^v/, '');
+
+    if (rawVersion && (unlockedVersions[rawVersion] || (cleanVersion && unlockedVersions[cleanVersion]))) {
+      effectiveTokenCeiling = contextSize;
+    } else if (totalInput > DEFAULT_COMPACTION_THRESHOLD) {
+      effectiveTokenCeiling = contextSize;
+      if (rawVersion) {
+        stateWriteQueue = stateWriteQueue.then(async () => {
+          try {
+            await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
+            let latestState = {};
+            let latestUnlocked = {};
+            try {
+              const diskContent = await fs.readFile(statePath, 'utf8');
+              const diskParsed = JSON.parse(diskContent.replace(/^\uFEFF/, ''));
+              if (diskParsed && typeof diskParsed === 'object' && !Array.isArray(diskParsed)) {
+                latestState = diskParsed;
+                if (typeof diskParsed.unlockedVersions === 'object' && diskParsed.unlockedVersions !== null) {
+                  latestUnlocked = diskParsed.unlockedVersions;
+                }
+              }
+            } catch (_) {}
+            latestUnlocked[rawVersion] = true;
+            if (cleanVersion) latestUnlocked[cleanVersion] = true;
+            await writeFileAndVerifyNoBOM(statePath, JSON.stringify({ ...latestState, unlockedVersions: latestUnlocked }, null, 2));
+          } catch (_) {}
+        }).catch(() => {});
+        await stateWriteQueue;
+      }
+    }
+  }
+
+  // (4) 預設為 Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD)（小於 256k 的模型如 Claude 200k 保持 200k）
+  if (effectiveTokenCeiling === null) {
+    effectiveTokenCeiling = Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD);
+  }
   
-  return { totalInput, contextSize, usedPctNum };
+  return { totalInput, contextSize, effectiveTokenCeiling, usedPctNum };
 }
 
 export function resolveTerminalWidth(meta, cachedAccount = {}) {
@@ -1086,10 +1213,19 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const remainCtx = Math.max(0, 100 - contextInfo.usedPctNum);
   const contextColor = getColorByPercentage(remainCtx);
   const usedPct = `${contextInfo.usedPctNum.toFixed(1)}%`;
-  const tokenCount = `${contextColor}${formatTokens(contextInfo.totalInput)}${RESET} / ${formatTokens(contextInfo.contextSize)}`;
   const contextBarVal = renderBarGraph(contextInfo.usedPctNum, barLength, contextColor);
-  const tokenPct = contextInfo.contextSize > 0 ? (contextInfo.totalInput / contextInfo.contextSize) * 100 : contextInfo.usedPctNum;
-  const tokenBarVal = renderBarGraph(tokenPct, barLength, contextColor);
+
+  const effectiveTokenMax = (contextInfo.effectiveTokenCeiling && contextInfo.effectiveTokenCeiling > 0)
+    ? contextInfo.effectiveTokenCeiling
+    : (contextInfo.contextSize && contextInfo.contextSize > 0
+        ? Math.min(contextInfo.contextSize, DEFAULT_COMPACTION_THRESHOLD)
+        : DEFAULT_COMPACTION_THRESHOLD);
+  const rawTokenPct = effectiveTokenMax > 0 ? (contextInfo.totalInput / effectiveTokenMax) * 100 : contextInfo.usedPctNum;
+  const tokenPct = Math.min(100, Math.max(0, rawTokenPct));
+  const remainTokenPct = Math.max(0, 100 - tokenPct);
+  const tokenColor = getColorByPercentage(remainTokenPct); // 獨立顏色計算！
+  const tokenCount = `${tokenColor}${formatTokens(contextInfo.totalInput)}${RESET} / ${formatTokens(effectiveTokenMax)}`;
+  const tokenBarVal = renderBarGraph(tokenPct, barLength, tokenColor);
 
   const projectPath = (typeof meta?.project?.path === 'string' && meta.project.path) ? meta.project.path : process.cwd();
   const projectName = basename(projectPath);
@@ -1289,7 +1425,8 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName,
     weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode,
     quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal,
-    argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal
+    argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal,
+    tokenColor
   };
 }
 
@@ -1783,7 +1920,7 @@ async function main() {
     const quotaInfo = resolveModelQuota(fallbackModel, cache);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
     const argonInfo = resolveArgonQuota(cache);
-    const contextInfo = await calculateContextUsageAsync(meta, conversationId);
+    const contextInfo = await calculateContextUsageAsync(meta, conversationId, settings);
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
     const barLength = settings?.ui?.footer?.barLength || settings?.ui?.barLength || 10;

@@ -20,7 +20,10 @@ import {
   resolveArgonQuota,
   parseMetaQuota,
   mergeQuotaBuckets,
-  formatResetTime
+  formatResetTime,
+  DEFAULT_COMPACTION_THRESHOLD,
+  calculateContextUsageAsync,
+  extractMetricsAsync
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
@@ -1960,6 +1963,299 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
     } finally {
       try { rmSync(homeR32, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
+
+    // =========================================================================
+    // Test Case R33: 256.0k Compaction Threshold & Step-Up Auto-Unlock Architecture
+    // =========================================================================
+    console.log("\n[Test R33] Verifying 256.0k compaction threshold, independent alert color, Claude 200k preservation, step-up auto-unlock, and tokenCeiling overrides...");
+
+    // (1) 預設 256.0k 門檻與四國語系渲染 (zh-tw, zh-cn, us, jp)
+    const langExpectationsR33 = [
+      { lang: 'zh-tw', expectedLabel: '權杖數: 47.4k / 256.0k' },
+      { lang: 'zh-cn', expectedLabel: '令牌数: 47.4k / 256.0k' },
+      { lang: 'us',    expectedLabel: 'Tokens: 47.4k / 256.0k' },
+      { lang: 'jp',    expectedLabel: 'トークン: 47.4k / 256.0k' }
+    ];
+
+    for (const { lang, expectedLabel } of langExpectationsR33) {
+      const homeR33Lang = makeTempHome({}, {
+        ui: {
+          language: lang,
+          footer: { items: ['token-count'] }
+        }
+      });
+      try {
+        const metaR33Lang = {
+          model: { display_name: "Gemini 3.5 Flash" },
+          context_window: {
+            total_input_tokens: 47400,
+            context_window_size: 1048576
+          },
+          terminal_width: 120
+        };
+        const res = await runStatusline(metaR33Lang, homeR33Lang);
+        assert.strictEqual(res.code, 0);
+        const plain = stripAnsi(res.stdout);
+        assert.ok(plain.includes(expectedLabel), `Language '${lang}' must render '${expectedLabel}', got: "${plain.trim()}"`);
+      } finally {
+        try { rmSync(homeR33Lang, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+      }
+    }
+    console.log("  -> Subtest 1 passed: Default 256.0k threshold renders across all 4 languages.");
+
+    // (2) 獨立預警顏色（200K 時為紅色警示而非 1.0M 的富藍色）
+    const metaR33_200k = {
+      model: { display_name: "Gemini 3.5 Flash" },
+      context_window: {
+        total_input_tokens: 200000, // 200k out of 256k = 78.1% used -> 21.9% remain (<25% -> RED)
+        context_window_size: 1048576 // 200k out of 1.0M = 19.1% used -> 80.9% remain (>=75% -> BLUE)
+      }
+    };
+    const ctxInfoR33_200k = await calculateContextUsageAsync(metaR33_200k, 'r33_200k_test');
+    assert.strictEqual(ctxInfoR33_200k.effectiveTokenCeiling, 256000);
+    const metricsR33_200k = await extractMetricsAsync(
+      metaR33_200k, 'zh-tw', 'Gemini 3.5 Flash', null, {}, {}, ctxInfoR33_200k, { remaining_percentage: 100, refreshes_in: '' }, { barLength: 10 }
+    );
+    // Context is based on 1.0M physical window -> remain > 75% -> BLUE
+    assert.strictEqual(metricsR33_200k.contextColor, "\x1b[38;2;87;202;255m", "Context color must remain BLUE (80.9% remaining of 1.0M)");
+    // Token is based on 256k compaction threshold -> remain < 25% -> RED
+    assert.strictEqual(metricsR33_200k.tokenColor, "\x1b[38;2;255;125;175m", "Token color must be RED (<25% remaining of 256.0k)");
+    assert.ok(metricsR33_200k.tokenCount.includes("\x1b[38;2;255;125;175m200.0k"), "tokenCount must render with RED warning prefix");
+    assert.ok(metricsR33_200k.tokenCount.includes("/ 256.0k"), "tokenCount must show / 256.0k");
+    console.log("  -> Subtest 2 passed: Independent alert color (200k triggers RED for tokens, while context remains BLUE).");
+
+    // (3) 小視窗模型（Claude 200.0k）不放大
+    const metaR33_Claude = {
+      model: { display_name: "Claude 3.5 Sonnet" },
+      context_window: {
+        total_input_tokens: 50000,
+        context_window_size: 200000
+      }
+    };
+    const ctxInfoR33_Claude = await calculateContextUsageAsync(metaR33_Claude, 'r33_claude_test');
+    assert.strictEqual(ctxInfoR33_Claude.effectiveTokenCeiling, 200000, "Claude 200k context size must NOT be enlarged to 256k");
+    const homeR33_Claude = makeTempHome({}, {
+      ui: {
+        language: 'zh-tw',
+        footer: { items: ['token-count'] }
+      }
+    });
+    try {
+      const resClaude = await runStatusline(metaR33_Claude, homeR33_Claude);
+      assert.strictEqual(resClaude.code, 0);
+      const plainClaude = stripAnsi(resClaude.stdout);
+      assert.ok(plainClaude.includes("50.0k / 200.0k"), `Must render / 200.0k without enlarging to 256k! Got: "${plainClaude.trim()}"`);
+      assert.ok(!plainClaude.includes("256.0k"), "Must not mention 256.0k for Claude 200k");
+    } finally {
+      try { rmSync(homeR33_Claude, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+    console.log("  -> Subtest 3 passed: Small window model (Claude 200.0k) is preserved and not enlarged.");
+
+    // (4) 破頂自動跳檔解鎖（>256000 時分母變 1.0M，進度條不卡死 100%）與同 CLI 版本跨對話記憶
+    const homeR33_StepUp = makeTempHome({}, {
+      ui: {
+        language: 'zh-tw',
+        footer: { items: ['token-count+bar'] }
+      }
+    });
+    try {
+      // 4A: 第一個對話突破 256k 門檻 (totalInput = 300,000)
+      const metaR33_OverCeiling = {
+        version: "1.11.0",
+        conversation_id: "conv-r33-session-1",
+        model: { display_name: "Gemini 3.5 Flash" },
+        context_window: {
+          total_input_tokens: 300000,
+          context_window_size: 1048576
+        },
+        terminal_width: 120
+      };
+      const resOver = await runStatusline(metaR33_OverCeiling, homeR33_StepUp);
+      assert.strictEqual(resOver.code, 0);
+      const plainOver = stripAnsi(resOver.stdout);
+      assert.ok(plainOver.includes("300.0k / 1.0M"), `Must unlock to / 1.0M on exceeding 256k! Got: "${plainOver.trim()}"`);
+      assert.ok(!plainOver.includes("[██████████]"), `Progress bar must NOT be stuck at 100%! Got: "${plainOver.trim()}"`);
+
+      // 驗證 ~/.gemini/tmp/compaction_ceiling_state.json 記錄了 unlockedVersions
+      const stateFilePath = join(homeR33_StepUp, '.gemini', 'tmp', 'compaction_ceiling_state.json');
+      const stateFileContent = readFileSync(stateFilePath, 'utf8');
+      const parsedState = JSON.parse(stateFileContent);
+      assert.ok(parsedState.unlockedVersions && parsedState.unlockedVersions["1.11.0"], "Version 1.11.0 must be recorded in unlockedVersions");
+
+      // 4B: 第二個新對話 (token 數僅 1,000，但同一 CLI 版本 1.11.0)
+      const metaR33_NextConv = {
+        version: "1.11.0",
+        conversation_id: "conv-r33-session-2-fresh",
+        model: { display_name: "Gemini 3.5 Flash" },
+        context_window: {
+          total_input_tokens: 1000,
+          context_window_size: 1048576
+        },
+        terminal_width: 120
+      };
+      const resNext = await runStatusline(metaR33_NextConv, homeR33_StepUp);
+      assert.strictEqual(resNext.code, 0);
+      const plainNext = stripAnsi(resNext.stdout);
+      assert.ok(plainNext.includes("1.0k / 1.0M"), `Next conversation must inherit unlocked 1.0M window for remembered version! Got: "${plainNext.trim()}"`);
+    } finally {
+      try { rmSync(homeR33_StepUp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+    console.log("  -> Subtest 4 passed: Step-Up Auto-Unlock (>256k unlocks to 1.0M, bar not stuck at 100%) and cross-session version cache memory.");
+
+    // (5) 外部設定檔 tokenCeiling 覆寫與原生欄位嗅探
+    // 5A: ui.footer.tokenCeiling = "model"
+    const homeR33_ConfigModel = makeTempHome({}, {
+      ui: {
+        footer: {
+          items: ['token-count'],
+          tokenCeiling: "model"
+        }
+      }
+    });
+    try {
+      const metaR33_Cfg = {
+        model: { display_name: "Gemini 3.5 Flash" },
+        context_window: { total_input_tokens: 1000, context_window_size: 1048576 },
+        terminal_width: 120
+      };
+      const res = await runStatusline(metaR33_Cfg, homeR33_ConfigModel);
+      assert.strictEqual(res.code, 0);
+      const plain = stripAnsi(res.stdout);
+      assert.ok(plain.includes("1.0k / 1.0M"), `tokenCeiling='model' must force 1.0M ceiling! Got: "${plain.trim()}"`);
+    } finally {
+      try { rmSync(homeR33_ConfigModel, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // 5B: ui.footer.tokenCeiling = 512000
+    const homeR33_ConfigNum = makeTempHome({}, {
+      ui: {
+        footer: {
+          items: ['token-count'],
+          tokenCeiling: 512000
+        }
+      }
+    });
+    try {
+      const metaR33_CfgNum = {
+        model: { display_name: "Gemini 3.5 Flash" },
+        context_window: { total_input_tokens: 1000, context_window_size: 1048576 },
+        terminal_width: 120
+      };
+      const res = await runStatusline(metaR33_CfgNum, homeR33_ConfigNum);
+      assert.strictEqual(res.code, 0);
+      const plain = stripAnsi(res.stdout);
+      assert.ok(plain.includes("1.0k / 512.0k"), `tokenCeiling=512000 must render 512.0k ceiling! Got: "${plain.trim()}"`);
+    } finally {
+      try { rmSync(homeR33_ConfigNum, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // 5C: 原生擴充欄位嗅探 (compaction_threshold, compaction_token_limit, compact_threshold, effective_context_window_size)
+    const nativeFieldsToTest = [
+      { field: 'compaction_threshold', val: 300000, expected: '300.0k' },
+      { field: 'compaction_token_limit', val: 400000, expected: '400.0k' },
+      { field: 'compact_threshold', val: 350000, expected: '350.0k' },
+      { field: 'effective_context_window_size', val: 600000, expected: '600.0k' }
+    ];
+
+    for (const { field, val, expected } of nativeFieldsToTest) {
+      const homeR33_Native = makeTempHome({}, {
+        ui: {
+          footer: { items: ['token-count'] }
+        }
+      });
+      try {
+        const metaNative = {
+          model: { display_name: "Gemini 3.5 Flash" },
+          context_window: {
+            total_input_tokens: 1000,
+            context_window_size: 1048576,
+            [field]: val
+          },
+          terminal_width: 120
+        };
+        const res = await runStatusline(metaNative, homeR33_Native);
+        assert.strictEqual(res.code, 0);
+        const plain = stripAnsi(res.stdout);
+        assert.ok(plain.includes(`1.0k / ${expected}`), `Native field '${field}' must be sniffed and render / ${expected}, got: "${plain.trim()}"`);
+      } finally {
+        try { rmSync(homeR33_Native, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+      }
+    }
+    console.log("  -> Subtest 5 passed: External tokenCeiling settings override and native field sniffing verified.");
+
+    // (6) 跨輪次快取維持原生嗅探上限、字串單位解析與負數設定值防禦退讓
+    // 6A: 跨輪次快取保存 native limit（如 compaction_token_limit: 400000）
+    const metaR33_Turn1 = {
+      conversation_id: 'conv-r33-turn-cache',
+      context_window: { total_input_tokens: 50000, context_window_size: 1048576, compaction_token_limit: 400000 }
+    };
+    const ctxTurn1 = await calculateContextUsageAsync(metaR33_Turn1, 'conv-r33-turn-cache');
+    assert.strictEqual(ctxTurn1.effectiveTokenCeiling, 400000, "Turn 1 must sniff compaction_token_limit = 400k");
+
+    const metaR33_Turn2 = {
+      conversation_id: 'conv-r33-turn-cache',
+      context_window: { total_input_tokens: 0, total_output_tokens: 0 }
+    };
+    const ctxTurn2 = await calculateContextUsageAsync(metaR33_Turn2, 'conv-r33-turn-cache');
+    assert.strictEqual(ctxTurn2.effectiveTokenCeiling, 400000, "Turn 2 (idle) must restore sniffed 400k from ctx cache");
+
+    // 6B: 原生欄位字串後綴 (如 "400k", "1m")
+    const metaR33_StrLimit = {
+      conversation_id: 'conv-r33-str-limit',
+      context_window: { total_input_tokens: 1000, context_window_size: 1048576, compact_threshold: '400k' }
+    };
+    const ctxStrLimit = await calculateContextUsageAsync(metaR33_StrLimit, 'conv-r33-str-limit');
+    assert.strictEqual(ctxStrLimit.effectiveTokenCeiling, 400000, "compact_threshold='400k' string must parse to 400000");
+
+    // 6C: 負數與無效設定值防禦退讓
+    const metaR33_Neg = {
+      conversation_id: 'conv-r33-neg',
+      context_window: { total_input_tokens: 1000, context_window_size: 1048576 }
+    };
+    const ctxNeg = await calculateContextUsageAsync(metaR33_Neg, 'conv-r33-neg', { ui: { footer: { tokenCeiling: -100 } } });
+    assert.strictEqual(ctxNeg.effectiveTokenCeiling, 256000, "Negative tokenCeiling must safely fall back to 256k");
+
+    const metricsNeg = await extractMetricsAsync(
+      metaR33_Neg, 'zh-tw', 'Gemini 3.5 Flash', null, {}, {}, ctxNeg, { remaining_percentage: 100, refreshes_in: '' }, { barLength: 10 }
+    );
+    assert.ok(metricsNeg.tokenCount.includes("/ 256.0k"), "tokenCount must safely fall back to / 256.0k on negative config");
+    console.log("  -> Subtest 6 passed: Cross-turn cache persistence, string unit sniffing, and negative setting guards verified.");
+
+    // (7) 高並發 20 個版本同時寫入狀態檔原子性與既有屬性保留
+    const homeR33_Conc = makeTempHome({}, {});
+    try {
+      const statePathConc = join(homeR33_Conc, '.gemini', 'tmp', 'compaction_ceiling_state.json');
+      mkdirSync(join(homeR33_Conc, '.gemini', 'tmp'), { recursive: true });
+      writeFileSync(statePathConc, JSON.stringify({ existingProp: "preserved", unlockedVersions: {} }), 'utf8');
+
+      const originalHome = process.env.HOME;
+      process.env.HOME = homeR33_Conc;
+      try {
+        const concPromises = [];
+        for (let i = 0; i < 20; i++) {
+          const metaConc = {
+            version: `2.0.${i}`,
+            conversation_id: `conv-conc-${i}`,
+            context_window: { total_input_tokens: 300000, context_window_size: 1048576 }
+          };
+          concPromises.push(calculateContextUsageAsync(metaConc, `conv-conc-${i}`));
+        }
+        await Promise.all(concPromises);
+
+        const savedContent = readFileSync(statePathConc, 'utf8');
+        const parsedSaved = JSON.parse(savedContent);
+        assert.strictEqual(parsedSaved.existingProp, "preserved", "Existing properties must be preserved during concurrent writes");
+        const unlockedCount = Object.keys(parsedSaved.unlockedVersions || {}).length;
+        assert.strictEqual(unlockedCount, 20, `All 20 concurrent versions must be recorded! Got: ${unlockedCount}`);
+      } finally {
+        process.env.HOME = originalHome;
+      }
+    } finally {
+      try { rmSync(homeR33_Conc, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+    console.log("  -> Subtest 7 passed: High concurrency (20 parallel versions) atomic writes and metadata preservation verified.");
+
+    console.log("✅ Test R33 passed! (256.0k compaction threshold, 4-language i18n, independent alert colors, small window preservation, auto-unlock, and tokenCeiling overrides all verified)");
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;
