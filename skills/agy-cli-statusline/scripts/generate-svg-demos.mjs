@@ -190,7 +190,7 @@ function getScenarios(lang) {
     contextColor: '\x1b[38;2;87;202;255m',
     usedPct: '0.0%',
     contextBarVal: renderBarGraph(0, 10, '\x1b[38;2;87;202;255m'),
-    tokenCount: '\x1b[38;2;87;202;255m0\x1b[0m / 1.0M',
+    tokenCount: '\x1b[38;2;87;202;255m0\x1b[0m / 256.0k',
     tokenBarVal: renderBarGraph(0, 10, '\x1b[38;2;87;202;255m'),
     quotaColor: '\x1b[38;2;87;202;255m',
     quotaVal: '100%',
@@ -223,7 +223,7 @@ function getScenarios(lang) {
     contextColor: '\x1b[38;2;87;202;255m',
     usedPct: '18.5%',
     contextBarVal: renderBarGraph(18.5, 10, '\x1b[38;2;87;202;255m'),
-    tokenCount: '\x1b[38;2;87;202;255m185k\x1b[0m / 1.0M',
+    tokenCount: '\x1b[38;2;87;202;255m47.4k\x1b[0m / 256.0k',
     tokenBarVal: renderBarGraph(18.5, 10, '\x1b[38;2;87;202;255m'),
     quotaColor: '\x1b[38;2;87;202;255m',
     quotaVal: '86%',
@@ -677,7 +677,7 @@ ${optionLines}
   <text x="44" y="202" fill="#8b949e">⎿ statusline-quota.test.mjs  (14 passing, 10-block bar &amp; i18n verified)</text>
   <text x="44" y="222" fill="#8b949e">⎿ configure-statusline.test.mjs  (12 passing, bracket &amp; itemStyles verified)</text>
   <text x="24" y="248" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="248" fill="#c9d1d9">所有測試套件全數通過！狀態列即時串流：脈絡消耗 18.5%、權杖 185k、額度 86%。</text>
+  <text x="44" y="248" fill="#c9d1d9">所有測試套件全數通過！狀態列即時串流：脈絡消耗 18.5%、權杖 47.4k、額度 86%。</text>
   <text x="44" y="270" fill="#ffd427">⎿ 底部狀態列即時反映子代理、產出檔案與 Git 未提交變更狀態</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
@@ -691,7 +691,7 @@ ${optionLines}
   <text x="44" y="202" fill="#8b949e">⎿ statusline-quota.test.mjs  (14 passing, 10-block bar &amp; i18n verified)</text>
   <text x="44" y="222" fill="#8b949e">⎿ configure-statusline.test.mjs  (12 passing, bracket &amp; itemStyles verified)</text>
   <text x="24" y="248" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="248" fill="#c9d1d9">所有测试套件全数通过！状态栏即时串流：上下文消耗 18.5%、令牌 185k、额度 86%。</text>
+  <text x="44" y="248" fill="#c9d1d9">所有测试套件全数通过！状态栏即时串流：上下文消耗 18.5%、令牌 47.4k、额度 86%。</text>
   <text x="44" y="270" fill="#ffd427">⎿ 底部状态栏即时反映子代理、产出文件与 Git 未提交变更状态</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
@@ -705,7 +705,7 @@ ${optionLines}
   <text x="44" y="202" fill="#8b949e">⎿ statusline-quota.test.mjs  (14 passing, 10 分割バー &amp; 多言語検証済)</text>
   <text x="44" y="222" fill="#8b949e">⎿ configure-statusline.test.mjs  (12 passing, 括弧 &amp; itemStyles 検証済)</text>
   <text x="24" y="248" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="248" fill="#c9d1d9">テスト全合格！ステータスライン即時更新：コンテキスト 18.5%、トークン 185k、残量 86%。</text>
+  <text x="44" y="248" fill="#c9d1d9">テスト全合格！ステータスライン即時更新：コンテキスト 18.5%、トークン 47.4k、残量 86%。</text>
   <text x="44" y="270" fill="#ffd427">⎿ 画面下部でサブ代理数、成果物、Git 未コミット変更のテレメトリが連動</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
@@ -718,7 +718,7 @@ ${optionLines}
   <text x="44" y="202" fill="#8b949e">⎿ statusline-quota.test.mjs  (14 passing, 10-block bar &amp; i18n verified)</text>
   <text x="44" y="222" fill="#8b949e">⎿ configure-statusline.test.mjs  (12 passing, bracket &amp; itemStyles verified)</text>
   <text x="24" y="248" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="248" fill="#c9d1d9">All test suites passed! Live telemetry: context 18.5%, tokens 185k, 5-hr quota 86%.</text>
+  <text x="44" y="248" fill="#c9d1d9">All test suites passed! Live telemetry: context 18.5%, tokens 47.4k, 5-hr quota 86%.</text>
   <text x="44" y="270" fill="#ffd427">⎿ Footer statusline instantly reflects active subagents, outputs, and dirty git state</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>

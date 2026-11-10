@@ -226,13 +226,13 @@ When a numeric indicator and its corresponding bar graph are placed **adjacent**
   ```
 - **Merged Output Preview (Text Mode `text`)**:
   ```text
-  Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 185.0k / 1.0M [█░░░░░░░░░]
+  Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 47.4k / 256.0k [█░░░░░░░░░]
   5-hr Available: 88% [████████░░] │ 7-day Available: 78% [███████░░░]
   Argon Available: 59% [█████░░░░░]
   ```
 - **Merged Output Preview (Emoji Mode `emoji`)**:
   ```text
-  🧠 18.5% [█░░░░░░░░░] │ 💰 185.0k / 1.0M [█░░░░░░░░░]
+  🧠 18.5% [█░░░░░░░░░] │ 💰 47.4k / 256.0k [█░░░░░░░░░]
   🔋 88% [████████░░] │ 📅 78% [███████░░░]
   ✨ 59% [█████░░░░░]
   ```
@@ -247,7 +247,7 @@ When a numeric indicator and its corresponding bar graph are **separated** by an
   ```
 - **Separate Output Preview**:
   ```text
-  Context Used: 18.5% │ Tokens: 185.0k / 1.0M
+  Context Used: 18.5% │ Tokens: 47.4k / 256.0k
   Context Used: [█░░░░░░░░░] │ Tokens: [█░░░░░░░░░]
   5-hr Available: 88% │ 5-hr Reset: 4h 50m │ 5-hr Available: [████████░░]
   7-day Available: 78% │ 7-day Reset: 4d 5h │ 7-day Available: [███████░░░]
@@ -285,7 +285,7 @@ Preview of the sorted statusline in **Mixed / Individual Style Mode** (4 logical
 🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ off
 🪪 Default │ Agent: working │ Subagents: 2 │ Outputs: 0 │ Queue: 0 │ BG: 0 │ Awaiting You: none
 
-Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 185.0k / 1.0M [█░░░░░░░░░]
+Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 47.4k / 256.0k [█░░░░░░░░░]
 5-hr Available: 88% [████████░░] │ 5-hr Reset: 4h 50m │ 5-hr Reset Time: 15:50
 7-day Available: 78% [███████░░░] │ 7-day Reset: 4d 5h │ 7-day Reset Time: 2026/10/18 16:00
 Argon Available: 59% [█████░░░░░] │ Argon Reset: 6d 1h │ Argon Reset Time: 2026/10/30 23:57
