@@ -1,6 +1,6 @@
 # Contributing to Antigravity CLI Statusline
 
-[English](#english-us) | [繁體中文](#繁體中文-zh-tw) | [简体中文](#简体中文-zh-cn)
+[English](#english-us) | [繁體中文](#繁體中文-zh-tw) | [简体中文](#简体中文-zh-cn) | [日本語](#日本語-jp)
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### 💡 Add Your Language Translation via AI
 
-You can generate a new language translation for this plugin using an AI agent (such as Gemini). To ensure even fast models (like Gemini Flash) can process this accurately, copy and paste the prompt below.
+You can generate a new language translation for this plugin using an AI agent (such as Gemini Flash). To ensure fast models process this accurately, copy and paste the prompt below.
 
 Replace `[LANG_CODE]` with your target language code (e.g., `kr` — note that `zh-tw`, `zh-cn`, `us`, and `jp` are already built-in), and `[Target Language]` with the language name (e.g., `"Korean"`):
 
@@ -20,14 +20,16 @@ Since this project dynamically handles multiple languages within existing files,
 ### 1. Modify `skills/agy-cli-statusline/SKILL.md`
 - **Find Step 1 (步驟 1)**: Update the `question` title and add `"[Target Language] ([LANG_CODE])"` to the `options` JSON array.
 - **Find Locale Locking (🌐 語言鎖定規則) and Step 3 (步驟 3)**: Add `[LANG_CODE]` to the list of supported language codes.
+- **Find Step 4 Question & Table Headers (步驟 4 互動問卷題目與預覽表頭規格)**: Add `[LANG_CODE]` translations for question text and table headers.
 
 ### 2. Modify `skills/agy-cli-statusline/resources/questions.json`
-- Add a new `"[LANG_CODE]"` object at the root level with `"style_question"`, `"style_options"` (2 items ending with `(text)` and `(emoji)`), `"question"`, and `"options"`.
-- Translate all **32 statusline indicators** in `"options"` into [Target Language] using the exact format `"<Emoji> <Localized Description> (<indicator-id>)"`.
+- Add a new `"[LANG_CODE]"` object at the root level containing `"style_question"`, `"style_options"` (2 items ending with `(text)` and `(emoji)`), `"question"`, and `"categories"` array (5 categories: `model-and-agent`, `quota-and-billing`, `context-and-tokens`, `workspace-and-vcs`, `system-and-tasks`).
+- Translate all **36 statusline indicators** across the categories into [Target Language] using the exact format `"<Emoji> <Localized Description> (<indicator-id>)"`.
 
 ### 3. Modify `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **Find `normalizeLanguage(lang)`**: Add matching rules to normalize `[LANG_CODE]` and related locale aliases to `'[LANG_CODE]'`.
-- **Find `buildI18nDict(lang, m, labelStyle = 'text')`**: Add a new `[LANG_CODE]` object inside the `dicts` map. Translate all **36 keys** (**32 status indicators** + **4 merged bar graph keys**: `quota+bar`, `context-used+bar`, `quota-weekly+bar`, `token-count+bar`) into [Target Language]. Refer to the `zh-tw`, `zh-cn`, `us`, or `jp` entries and preserve all ANSI color variables (`${BOLD}`, `${WHITE}`, `${RESET}`, etc.) and `${m.*}` template expressions.
+- **Find `buildI18nDict(lang, m, labelStyle = 'text')`**: Add a new `[LANG_CODE]` object inside the `dicts` map. Translate all **41 keys** (**36 status indicators** + **5 merged bar graph keys**: `quota+bar`, `context-used+bar`, `quota-weekly+bar`, `quota-argon+bar`, `token-count+bar`) into [Target Language]. Refer to the `zh-tw`, `zh-cn`, `us`, or `jp` entries and preserve all ANSI color variables (`${BOLD}`, `${WHITE}`, `${RESET}`, etc.) and `${m.*}` template expressions.
+- **Find `AGENT_STATE_MAP`**: Add translations for `'[LANG_CODE]'` across all states (`idle`, `thinking`, `working`, `tool_use`, `initializing`).
 - **Find `getGitBranch(projectPath, lang)`**: Update both ternary expressions (inside the `return` statement and inside the `catch` block) to include the translation for `"No VC"` in [Target Language].
 - **Find `unknownStr`, `noneStr`, `vcsDirtyLabel`, `sandboxStatusVal`, and `agentProfileName` in `main()`**: Update their ternary expressions to include [Target Language] translations for `"Unknown"`, `"None"`, `"Dirty"` / `"Clean"`, `"Sandbox"` / `"Local"`, and `"Default"`.
 
@@ -40,13 +42,13 @@ Since this project dynamically handles multiple languages within existing files,
 
 To add a new statusline indicator (`<indicator-id>`):
 
-1. **`skills/agy-cli-statusline/resources/questions.json`**: Append `"<Emoji> <Description> (<indicator-id>)"` to the `options` array across all supported locales (`zh-tw`, `zh-cn`, `us`, `jp`).
+1. **`skills/agy-cli-statusline/resources/questions.json`**: Append `"<Emoji> <Description> (<indicator-id>)"` to the appropriate category `options` array across all supported locales (`zh-tw`, `zh-cn`, `us`, `jp`).
 2. **`skills/agy-cli-statusline/scripts/statusline-quota.mjs`**:
    - Compute the indicator value in `main()` and pass it into the `metrics` object (`m`) supplied to `buildI18nDict(lang, m, labelStyle)`.
    - Register the indicator's Emoji in `EMOJI_MAP` (plus `<indicator-id>+bar` if it pairs with a bar graph).
    - Add `<indicator-id>` to every locale dictionary inside `buildI18nDict(lang, m, labelStyle)`.
-   - If the indicator pairs with a bar graph (`<indicator-id>-bar`), register the pair in `MERGEABLE_BAR_PAIRS` and add the combined `<indicator-id>+bar` key to `buildI18nDict(lang, m, labelStyle)`.
-3. **Documentation**: Add the indicator ID, Emoji, and description to `README.md`, `README.zh-TW.md`, and `README.zh-CN.md`.
+   - If the indicator pairs with a bar graph (`<indicator-id>-bar`), register the pair in `ADJACENT_PAIRS` and add the combined `<indicator-id>+bar` key to `buildI18nDict(lang, m, labelStyle)`.
+3. **Documentation**: Add the indicator ID, Emoji, and description to `README.md`, `README.zh-TW.md`, `README.zh-CN.md`, and `README.ja.md`.
 
 ### 🧪 Testing & Verification
 
@@ -82,7 +84,7 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 
 ### 💡 使用 AI 一鍵新增其他語言
 
-你可以使用人工智慧（Artificial Intelligence）代理（例如 Gemini）產生其他語言的翻譯版本。為了讓輕量模型（如 Gemini Flash）也能精確執行，請直接複製下方的提示詞（Prompt）。
+你可以使用人工智慧（Artificial Intelligence）代理（例如 Gemini Flash）產生其他語言的翻譯版本。為了讓輕量快速模型也能精確執行，請直接複製下方的提示詞（Prompt）。
 
 請將 `[LANG_CODE]` 替換為目標語系代碼（例如 `kr`；目前專案已內建 `zh-tw`、`zh-cn`、`us`、`jp` 四種語系），並將 `【目標語言】` 替換為語言名稱（例如「韓文」）：
 
@@ -94,14 +96,16 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 ### 1. 修改 `skills/agy-cli-statusline/SKILL.md`
 - **尋找「步驟 1」**：在第一階段問卷 JSON 的 `question` 標題與 `options` 陣列中，新增 `"【目標語言】 ([LANG_CODE])"` 選項。
 - **尋找「🌐 語言鎖定規則」與「步驟 3」**：在支援的語言代碼列表中補上 `[LANG_CODE]`。
+- **尋找「步驟 4 互動問卷題目與預覽表頭規格」**：補上 `[LANG_CODE]` 的問卷題目與預覽表格表頭文字。
 
 ### 2. 修改 `skills/agy-cli-statusline/resources/questions.json`
-- 在根物件下新增 `"[LANG_CODE]"` 子物件，包含 `"style_question"`、`"style_options"`（2 個選項，結尾維持 `（text）` 與 `（emoji）`）、`"question"` 與 `"options"` 陣列。
-- 將 `"options"` 中的全部 **32 個狀態列指標**翻譯成【目標語言】，格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`。
+- 在根物件下新增 `"[LANG_CODE]"` 子物件，包含 `"style_question"`、`"style_options"`（2 個選項，結尾維持 `（text）` 與 `（emoji）`）、`"question"` 與包含五大分類的 `"categories"` 陣列（`model-and-agent`、`quota-and-billing`、`context-and-tokens`、`workspace-and-vcs`、`system-and-tasks`）。
+- 將各分類下的全部 **36 個狀態列指標**翻譯成【目標語言】，格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **尋找 `normalizeLanguage(lang)` 函式**：新增對應判斷條件，將 `[LANG_CODE]` 及相關語系別名標準化為 `'[LANG_CODE]'`。
-- **尋找 `buildI18nDict(lang, m, labelStyle = 'text')` 函式**：在 `dicts` 物件內新增 `[LANG_CODE]` 子物件，將全部 **36 個鍵值**（包含 **32 個狀態列指標**與 **4 個長條圖合併鍵值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`token-count+bar`）翻譯成【目標語言】。請參考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的範本，保留原有的美國國家標準協會（ANSI）色彩變數（如 `${BOLD}`、`${WHITE}`、`${RESET}`）與 `${m.*}` 變數插值。
+- **尋找 `buildI18nDict(lang, m, labelStyle = 'text')` 函式**：在 `dicts` 物件內新增 `[LANG_CODE]` 子物件，將全部 **41 個鍵值**（包含 **36 個狀態列指標**與 **5 個長條圖合併鍵值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻譯成【目標語言】。請參考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的範本，保留原有的美國國家標準協會（ANSI）色彩變數（如 `${BOLD}`、`${WHITE}`、`${RESET}`）與 `${m.*}` 變數插值。
+- **尋找 `AGENT_STATE_MAP` 物件**：在所有代理狀態（`idle`、`thinking`、`working`、`tool_use`、`initializing`）中新增 `'[LANG_CODE]'` 的在地化文字。
 - **尋找 `getGitBranch(projectPath, lang)` 函式**：修改 `return` 敘述與 `catch` 區塊中的三元運算子，加上【目標語言】對於「無版本控制（No VC）」的翻譯。
 - **尋找 `main()` 內的 `unknownStr`、`noneStr`、`vcsDirtyLabel`、`sandboxStatusVal` 與 `agentProfileName` 變數**：修改三元運算子，補上【目標語言】對於「未知」、「無」、「有變更 / 乾淨」、「沙盒 / 本地」與「預設」的翻譯。
 
@@ -114,13 +118,13 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 
 若要新增一個狀態列指標（假設識別碼為 `<indicator-id>`）：
 
-1. **`skills/agy-cli-statusline/resources/questions.json`**：在所有支援語系（`zh-tw`、`zh-cn`、`us`、`jp`）的 `options` 陣列尾端，依 `"<繪圖符號> <指標說明> (<indicator-id>)"` 格式加入新指標。
+1. **`skills/agy-cli-statusline/resources/questions.json`**：在所有支援語系（`zh-tw`、`zh-cn`、`us`、`jp`）對應分類的 `options` 陣列尾端，依 `"<繪圖符號> <指標說明> (<indicator-id>)"` 格式加入新指標。
 2. **`skills/agy-cli-statusline/scripts/statusline-quota.mjs`**：
    - 在 `main()` 中計算該指標的數值或文字，並放入傳遞給 `buildI18nDict(lang, m, labelStyle)` 的 `metrics`（`m`）物件中。
    - 在 `EMOJI_MAP` 註冊該指標對應的繪圖符號（Emoji）（若支援長條圖合併，一併註冊 `<indicator-id>+bar`）。
    - 在 `buildI18nDict(lang, m, labelStyle)` 內所有語系的字典中新增 `<indicator-id>` 鍵值。
-   - 若該指標支援相鄰長條圖自動合併（`<indicator-id>-bar`），請同步在 `MERGEABLE_BAR_PAIRS` 註冊配對，並於 `buildI18nDict(lang, m, labelStyle)` 新增 `<indicator-id>+bar` 合併鍵值。
-3. **說明文件更新**：將新指標、繪圖符號與說明補充至 `README.md`、`README.zh-TW.md` 與 `README.zh-CN.md` 的指標總覽清單中。
+   - 若該指標支援相鄰長條圖自動合併（`<indicator-id>-bar`），請同步在 `ADJACENT_PAIRS` 註冊配對，並於 `buildI18nDict(lang, m, labelStyle)` 新增 `<indicator-id>+bar` 合併鍵值。
+3. **說明文件更新**：將新指標、繪圖符號與說明補充至 `README.md`、`README.zh-TW.md`、`README.zh-CN.md` 與 `README.ja.md` 的指標總覽清單中。
 
 ### 🧪 測試與驗證
 
@@ -156,7 +160,7 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 
 ### 💡 使用 AI 一键新增其他语言
 
-你可以使用人工智能（Artificial Intelligence）代理（例如 Gemini）快速生成其他语言的翻译版本。为了让轻量模型（如 Gemini Flash）也能精确执行，请直接复制下方的提示词（Prompt）。
+你可以使用人工智能（Artificial Intelligence）代理（例如 Gemini Flash）快速生成其他语言的翻译版本。为了让轻量快速模型也能精确执行，请直接复制下方的提示词（Prompt）。
 
 请把 `[LANG_CODE]` 换成你的目标语系代码（例如 `kr`；目前项目已内置 `zh-tw`、`zh-cn`、`us`、`jp` 四种语系），把 `【目标语言】` 换成语言名称（例如“韩文”）：
 
@@ -168,14 +172,16 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 ### 1. 修改 `skills/agy-cli-statusline/SKILL.md`
 - **寻找“步骤 1”**：在第一阶段问卷 JSON 的 `question` 标题与 `options` 数组中，新增 `"【目标语言】 ([LANG_CODE])"` 选项。
 - **寻找“🌐 语言锁定规则”与“步骤 3”**：在支持的语言代码列表中补上 `[LANG_CODE]`。
+- **寻找“步骤 4 交互问卷题目与预览表头规格”**：补上 `[LANG_CODE]` 的问卷题目与预览表格表头文本。
 
 ### 2. 修改 `skills/agy-cli-statusline/resources/questions.json`
-- 在根对象下新增 `"[LANG_CODE]"` 子对象，包含 `"style_question"`、`"style_options"`（2 个选项，结尾维持 `（text）` 与 `（emoji）`）、`"question"` 与 `"options"` 数组。
-- 将 `"options"` 中的全部 **32 个状态栏指标**翻译成【目标语言】，格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`。
+- 在根对象下新增 `"[LANG_CODE]"` 子对象，包含 `"style_question"`、`"style_options"`（2 个选项，结尾维持 `（text）` 与 `（emoji）`）、`"question"` 与包含五大分类的 `"categories"` 数组（`model-and-agent`、`quota-and-billing`、`context-and-tokens`、`workspace-and-vcs`、`system-and-tasks`）。
+- 将各分类下的全部 **36 个状态栏指标**翻译成【目标语言】，格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **寻找 `normalizeLanguage(lang)` 函数**：新增对应判断条件，将 `[LANG_CODE]` 及相关语系别名标准化为 `'[LANG_CODE]'`。
-- **寻找 `buildI18nDict(lang, m, labelStyle = 'text')` 函数**：在 `dicts` 对象内新增 `[LANG_CODE]` 子对象，将全部 **36 个键值**（包含 **32 个状态栏指标**与 **4 个长条图合并键值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`token-count+bar`）翻译成【目标语言】。请参考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的范本，保留原有的 ANSI 色彩变量（如 `${BOLD}`、`${WHITE}`、`${RESET}`）与 `${m.*}` 变量插值。
+- **寻找 `buildI18nDict(lang, m, labelStyle = 'text')` 函数**：在 `dicts` 对象内新增 `[LANG_CODE]` 子对象，将全部 **41 个键值**（包含 **36 个状态栏指标**与 **5 个长条图合并键值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻译成【目标语言】。请参考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的范本，保留原有的 ANSI 色彩变量（如 `${BOLD}`、`${WHITE}`、`${RESET}`）与 `${m.*}` 变量插值。
+- **寻找 `AGENT_STATE_MAP` 对象**：在所有代理状态（`idle`、`thinking`、`working`、`tool_use`、`initializing`）中新增 `'[LANG_CODE]'` 的本地化文本。
 - **寻找 `getGitBranch(projectPath, lang)` 函数**：修改 `return` 语句与 `catch` 区块中的三元运算符，加上【目标语言】对于“无版本控制（No VC）”的翻译。
 - **寻找 `main()` 内的 `unknownStr`、`noneStr`、`vcsDirtyLabel`、`sandboxStatusVal` 与 `agentProfileName` 变量**：修改三元运算符，补上【目标语言】对于“未知”、“无”、“有更改 / 干净”、“沙盒 / 本地”与“默认”的翻译。
 
@@ -188,13 +194,13 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 
 若要新增一个状态栏指标（假设标识码为 `<indicator-id>`）：
 
-1. **`skills/agy-cli-statusline/resources/questions.json`**：在所有支持语系（`zh-tw`、`zh-cn`、`us`、`jp`）的 `options` 数组末尾，按 `"<表情符号> <指标说明> (<indicator-id>)"` 格式加入新指标。
+1. **`skills/agy-cli-statusline/resources/questions.json`**：在所有支持语系（`zh-tw`、`zh-cn`、`us`、`jp`）对应分类的 `options` 数组末尾，按 `"<表情符号> <指标说明> (<indicator-id>)"` 格式加入新指标。
 2. **`skills/agy-cli-statusline/scripts/statusline-quota.mjs`**：
    - 在 `main()` 中计算该指标的数值或文本，并放入传递给 `buildI18nDict(lang, m, labelStyle)` 的 `metrics`（`m`）对象中。
    - 在 `EMOJI_MAP` 注册该指标对应的表情符号（Emoji）（若支持长条图合并，一并注册 `<indicator-id>+bar`）。
    - 在 `buildI18nDict(lang, m, labelStyle)` 内所有语系的字典中新增 `<indicator-id>` 键值。
-   - 若该指标支持相邻长条图自动合并（`<indicator-id>-bar`），请同步在 `MERGEABLE_BAR_PAIRS` 注册配对，并在 `buildI18nDict(lang, m, labelStyle)` 新增 `<indicator-id>+bar` 合并键值。
-3. **说明文档更新**：将新指标、表情符号与说明补充至 `README.md`、`README.zh-TW.md` 与 `README.zh-CN.md` 的指标总览列表中。
+   - 若该指标支持相邻长条图自动合并（`<indicator-id>-bar`），请同步在 `ADJACENT_PAIRS` 注册配对，并在 `buildI18nDict(lang, m, labelStyle)` 新增 `<indicator-id>+bar` 合并键值。
+3. **说明文档更新**：将新指标、表情符号与说明补充至 `README.md`、`README.zh-TW.md`、`README.zh-CN.md` 与 `README.ja.md` 的指标总览列表中。
 
 ### 🧪 测试与验证
 
