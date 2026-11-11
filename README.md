@@ -2,7 +2,7 @@
 
 English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 
-[![Version](https://img.shields.io/badge/version-1.10.2-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.11.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -19,27 +19,7 @@ Comprehensive support across the three core platforms of Google Antigravity (AGY
   <em>View language versions: <a href="docs/images/statusline-demo-en.svg">English</a> | <a href="docs/images/statusline-demo-zh-tw.svg">繁體中文</a> | <a href="docs/images/statusline-demo-zh-cn.svg">简体中文</a> | <a href="docs/images/statusline-demo-jp.svg">日本語</a></em>
 </p>
 
-This is the Antigravity Command-Line Interface (CLI) statusline demonstration showing the complete journey from interactive setup to live execution. The animation captures running `/antigravity-cli-statusline:agy-cli-statusline`, each interactive `ask_question` wizard step, custom order & styling input, and the resulting 11-row high-density statusline:
-
-1. **Command Trigger & Locale Selection**: Execute `/antigravity-cli-statusline:agy-cli-statusline` to launch the wizard, selecting and locking the display language (English, Traditional Chinese, Japanese, Simplified Chinese).
-2. **5-Category Metric Selection**: Navigate the `ask_question` paginated wizard (1/5 to 5/5) across all 36 metrics without terminal scroll truncation.
-3. **Manual Order & Styles Write-in**: Input custom order and prefixes in Write-in (e.g. `e:model-name` for Emoji, `quota` for Text, `n` for newline, and `n,n` for blank separator lines).
-4. **Config Sync & Instant Hot Reload**: Synchronizes 3-tier `settings.json` and `trusted_hooks.json`, activating the 11-row statusline immediately without restarting the CLI.
-5. **Full 11-Row Live Telemetry**: Tracks AI models, API quota with 10-block progress bars, context and tokens, active subagents, Git VCS, and system memory in real time.
-
-### Screenshots
-
-#### Windows
-
-| English (us) | Traditional Chinese (zh-tw) | Simplified Chinese (zh-cn) | Japanese (jp) |
-| :---: | :---: | :---: | :---: |
-| ![English](docs/images/agy-cli-statusline-windows-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-windows-zhtw.png) | *(supports zh-cn mode)* | ![Japanese](docs/images/agy-cli-statusline-windows-jp.png) |
-
-#### macOS
-
-| English (us) | Traditional Chinese (zh-tw) | Simplified Chinese (zh-cn) | Japanese (jp) |
-| :---: | :---: | :---: | :---: |
-| ![English](docs/images/agy-cli-statusline-macos-us.png) | ![Traditional Chinese](docs/images/agy-cli-statusline-macos-zhtw.png) | *(supports zh-cn mode)* | ![Japanese](docs/images/agy-cli-statusline-macos-jp.png) |
+Live animation demonstrating the complete flow from executing `/antigravity-cli-statusline:agy-cli-statusline`, interactive indicator selection, custom layout input, to the full 11-row telemetry statusline.
 
 ## Installation
 
@@ -63,73 +43,32 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 1. **Multi-Platform Compatibility**: Supports Antigravity CLI terminal, Antigravity IDE sidebar chat, and Antigravity 2.0 Desktop Application across Windows, macOS, and Linux.
 2. **36 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 36 metrics across model status, API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
-3. **Flexible Bar Graphs (Merged or Separate)**: Renders 10-block visual progress bars (`[████████░░]`) for hourly quota, weekly quota, Gemini 4 Argon quota, context usage, and session tokens. Automatically merges labels when placed adjacent to numeric counterparts, or displays them with independent labels when separated.
+3. **Flexible Bar Graphs (Merged or Separate)**: Renders 10-block visual progress bars (`[████████░░]`) for 5-hour quota, weekly quota, Gemini 4 Argon quota, context usage, and session tokens. Automatically merges labels when placed adjacent to numeric counterparts, or displays them with independent labels when separated.
 4. **Custom Sorting & Dual Line-Wrapping**: Supports 1-based index sorting, `n` manual line breaks, `n,n` blank-line section separators, and terminal-width-aware automatic wrapping.
-5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`100–75%` Blue, `74–50%` Green, `49–25%` Yellow, `24–0%` Pink) alongside model-family brand colors.
+5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`#57caff` Blue `100–75%`, `#5cdb6d` Green `74–50%`, `#ffd427` Yellow `49–25%`, `#ff7daf` Pink `24–0%`) alongside model-family brand colors.
 6. **Three-Layer Config Sync & OS Safeguards**: Synchronizes CLI-specific, global, and workspace `settings.json` plus `trusted_hooks.json`, while handling macOS/Linux NVM path resolution and Windows UTF-8 Byte Order Mark (BOM) prevention.
 
 ## Plugin Management
 
-• List installed plugins:
+```bash
+# List installed plugins
+agy plugin list
 
-  ```bash
-  agy plugin list
-  ```
+# Enable this plugin
+agy plugin enable antigravity-cli-statusline
 
-• Enable this plugin:
+# Disable this plugin
+agy plugin disable antigravity-cli-statusline
 
-  ```bash
-  agy plugin enable antigravity-cli-statusline
-  ```
-
-• Disable this plugin:
-
-  ```bash
-  agy plugin disable antigravity-cli-statusline
-  ```
-
-• Uninstall this plugin:
-
-  ```bash
-  agy plugin uninstall antigravity-cli-statusline
-  ```
-
-## Directory Structure
-
-```text
-antigravity-cli-statusline/
-├── plugin.json
-├── package.json
-├── LICENSE
-├── CONTRIBUTING.md
-├── README.md
-├── README.zh-TW.md
-├── README.zh-CN.md
-├── docs/
-│   └── images/
-└── skills/
-    └── agy-cli-statusline/
-        ├── SKILL.md
-        ├── references/
-        │   ├── config-files.md
-        │   ├── pitfalls.md
-        │   └── windows.md
-        ├── resources/
-        │   └── questions.json
-        └── scripts/
-            ├── configure-statusline.mjs
-            ├── diagnose-statusline.mjs
-            ├── fetch-local-quota.mjs
-            ├── sh_hidden.cs
-            ├── statusline-quota.mjs
-            └── test-counters.mjs
+# Uninstall this plugin
+agy plugin uninstall antigravity-cli-statusline
 ```
 
 ## Commands and Skills
 
 Once installed, trigger the configuration workflow using the slash command:
 
-### 1. Configure Statusline
+### Configure Statusline
 
 ```text
 /antigravity-cli-statusline:agy-cli-statusline
@@ -139,7 +78,7 @@ Once installed, trigger the configuration workflow using the slash command:
 - **How It Works**:
   1. Prompts for display language selection and locks the session output to that locale.
   2. Verifies Node.js environment availability and inspects the three-layer `settings.json` files.
-  3. Sequentially prompts for indicator selection across 5 categorized tabs from `questions.json`, avoiding terminal screen height truncation (Issue #1262).
+  3. Sequentially prompts for indicator selection across 5 categorized tabs from `questions.json`, avoiding terminal screen height truncation.
   4. Displays selected indicators and accepts a custom sort order with individual style prefixes (supporting plain numbers, `t` text prefix, `e` emoji prefix, and `n` newline tokens), writing `ui.footer.items` and `ui.footer.itemStyles` across all three `settings.json` layers, and deploys hook scripts to `~/.gemini/antigravity-cli/hooks/`.
   5. Upon completion, automatically prints code blocks containing the previous and current layout order strings for easy copy-paste reuse.
 
@@ -168,7 +107,7 @@ The numbers below correspond to the 1-based option indices across the 5 categori
 - `12.` 🗓️ **Weekly reset time (`quota-weekly-reset-time`)** — weekly local reset timestamp (e.g., `2026/10/18 16:00`)
 - `13.` ✨ **Gemini 4 Argon available quota (`quota-argon`)** — Gemini 4 Argon dedicated quota percentage, four-tier color-coded
 - `14.` ✨ **Gemini 4 Argon quota bar graph (`quota-argon-bar`)** — 10-block Argon quota bar (`[█████░░░░░]`)
-- `15.` ⏱️ **Gemini 4 Argon reset countdown (`quota-argon-countdown`)** — time remaining until Argon quota refresh
+- `15.` ⏱️ **Gemini 4 Argon quota reset countdown (`quota-argon-countdown`)** — time remaining until Argon quota refresh
 - `16.` ⏰ **Gemini 4 Argon reset time (`quota-argon-reset-time`)** — Argon local reset timestamp (e.g., `2026/10/30 23:57`)
 - `17.` 💎 **Subscription plan tier (`plan-tier`)** — current subscription plan level
 - `18.` 📧 **Account email (`account-email`)** — logged-in account email address
@@ -197,95 +136,41 @@ The numbers below correspond to the 1-based option indices across the 5 categori
 - `35.` 👥 **Active subagents (`subagents`)** — running subagent count
 - `36.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
 
-### Label Display Styles: Text (`text`) vs. Emoji (`emoji`)
+### Sorting Rules & Style Configuration
 
-Individual indicator styles can be customized during Step 4 sorting via style prefixes (saved in the `ui.footer.itemStyles` map across `settings.json`; unconfigured items strictly default to text):
+In Step 4 of the skill workflow, enter a comma-separated list of indicator indices in the Write-in box to customize the layout and individual styles (unlisted indicators are excluded; leaving blank or choosing Skip keeps the original selection with default text style):
 
-- **Text label style (`text`, default)**: Displays localized text prefixes with a colon (e.g., `Model: Gemini 3.1 Pro │ 5-hr Available: 88% │ Branch: main`). Plain numeric indices (e.g. `1`), `t` prefix (e.g. `t1`), or plain English IDs (`quota`, `t:quota`) all resolve to text style.
-- **Emoji label style (`emoji`)**: Replaces text label prefixes and colons with the indicator's Emoji followed by a single space (e.g., `🤖 Gemini 3.1 Pro │ 🔋 88% │ 🔀 main`), while keeping status values (`none`, `no changes`, `off`) localized in your chosen language. Use an `e` prefix (e.g. `e1`, `e:quota`) to assign emoji style. Items can be mixed freely (e.g. `1, e2, t3, e:git-branch`).
-- **Bar Graph Style Conflict Handling**: If adjacent bar graph indicators have conflicting styles (one text, one emoji), they will not merge; they render as two separate blocks.
-
-### Percentage Bar Graphs: Merged vs. Separate Display
-
-Default bar length is 10 blocks (`[████████░░]`), configurable via `ui.footer.barLength` in `settings.json`. Solid block `█` represents capacity or usage, while shaded block `░` represents empty space. Reset time format is configurable via `ui.footer.timeFormat` (`"smart"`, `"yyyy/MM/dd HH:mm"`, `"12h"`, or `"24h"`).
-
-Five indicator pairs support percentage bar graphs:
-- `quota` (`5`) + `quota-bar` (`6`)
-- `quota-weekly` (`9`) + `quota-weekly-bar` (`10`)
-- `quota-argon` (`13`) + `quota-argon-bar` (`14`)
-- `context-used` (`19`) + `context-used-bar` (`20`)
-- `token-count` (`21`) + `token-count-bar` (`22`)
-
-#### 1. Merged Display Example (Adjacent Auto-Merge)
-
-When a numeric indicator and its corresponding bar graph are placed **adjacent** to each other (in either order, e.g., `5,6` or `6,5`), the renderer automatically merges them under a single label and separator:
-
-- **Sort Input**:
-  ```text
-  19,20,21,22,n,5,6,9,10,n,13,14
-  ```
-- **Merged Output Preview (Text Mode `text`)**:
-  ```text
-  Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 185.0k / 1.0M [█░░░░░░░░░]
-  5-hr Available: 88% [████████░░] │ 7-day Available: 78% [███████░░░]
-  Argon Available: 59% [█████░░░░░]
-  ```
-- **Merged Output Preview (Emoji Mode `emoji`)**:
-  ```text
-  🧠 18.5% [█░░░░░░░░░] │ 💰 185.0k / 1.0M [█░░░░░░░░░]
-  🔋 88% [████████░░] │ 📅 78% [███████░░░]
-  ✨ 59% [█████░░░░░]
-  ```
-
-#### 2. Separate Display Example (Non-Adjacent / Independent Labels)
-
-When a numeric indicator and its corresponding bar graph are **separated** by another indicator or a newline `n` (or when only the bar indicator is selected), each indicator renders individually with its own label:
-
-- **Sort Input**:
-  ```text
-  19,21,n,20,22,n,5,7,6,n,9,11,10,n,13,15,14
-  ```
-- **Separate Output Preview**:
-  ```text
-  Context Used: 18.5% │ Tokens: 185.0k / 1.0M
-  Context Used: [█░░░░░░░░░] │ Tokens: [█░░░░░░░░░]
-  5-hr Available: 88% │ 5-hr Reset: 4h 50m │ 5-hr Available: [████████░░]
-  7-day Available: 78% │ 7-day Reset: 4d 5h │ 7-day Available: [███████░░░]
-  Argon Available: 59% │ Argon Reset: 6d 1h │ Argon Available: [█████░░░░░]
-  ```
-
-### Sorting & Individual Style Prefixes
-
-In Step 4 of the skill workflow, enter a comma-separated list of numbers in the Write-in box to customize the layout and individual styles:
-
-- **Numeric Version**:
-  ```text
-  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
-  ```
-
-- **Identifier Version**:
-  ```text
-  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version
-  ```
-
-- **Numbers** refer to the 1-based position in your Step 3 selection (when all 36 indicators are selected, numbers `1`–`36` match the list above).
 - **Style Prefixes**:
-  - Plain numbers (e.g., `1`) or `t1`, or plain English IDs (`quota`, `t:quota`) format as **Text labels**.
-  - `e1` or `e:quota` formats as **Emoji icons** (case-insensitive).
-  - Can be mixed freely (e.g., `e1, 18, e17, 31`), unformatted items default to text labels.
-- **Identifiers** like `quota` or `model-name` can also be used or mixed with numbers.
-- **`n` token** forces a line break; consecutive `n,n` inserts a blank line to separate logical groups.
-- **Omitted indicators are excluded** — the sort string defines the exact final display set.
-- Leave blank or choose `Skip` to keep the original selection order with all selected indicators enabled (default text style).
-- **Configuration History**: The skill automatically displays both the previous and newly configured order strings upon completion, allowing instant copy-pasting for future adjustments.
+  - **Text label style (`text`, default)**: Plain numbers (e.g., `1`), `t` prefix (e.g., `t1`), or plain English IDs (`quota`, `t:quota`) format as localized text labels with colons (e.g., `5-hr Available: 88%`).
+  - **Emoji icon style (`emoji`)**: Use an `e` prefix (e.g., `e1`, `e:quota`, case-insensitive) to replace text labels with the indicator's Emoji icon and a single space (e.g., `🔋 88%`), while keeping status values localized.
+  - **Mix & Match**: Items can be styled independently (e.g., `e1, 18, e17, 31`), unformatted items default to text style.
+- **Percentage Bar Graph Merging & Separation**:
+  - For the five indicator pairs (`quota` `5`+`6`, `quota-weekly` `9`+`10`, `quota-argon` `13`+`14`, `context-used` `19`+`20`, `token-count` `21`+`22`), placing a numeric indicator **adjacent** to its corresponding bar graph (e.g., `5,6`) with matching styles automatically merges them under a single label and progress bar.
+  - When **separated** (by other indicators or newlines) or when styles conflict (one `text`, one `emoji`), each renders individually with its own label.
+  - Default bar length is 10 blocks (`[████████░░]`, configurable via `ui.footer.barLength`), and reset time format is configurable via `ui.footer.timeFormat`.
+- **Line Wrapping & Spacing**:
+  - **Manual line breaks (`n`)**: Insert `n` to force a newline at that position; consecutive `n,n` inserts a blank line separator.
+  - **Smart automatic wrapping**: Automatically wraps to the next line when total width exceeds the terminal window.
+- **Dynamic Color Shifts**:
+  - 24-bit truecolor four-tier palette (`#57caff` Blue → `#5cdb6d` Green → `#ffd427` Yellow → `#ff7daf` Pink) shifts based on remaining quota or context pressure; each AI model family also applies its brand color.
 
-Preview of the sorted statusline in **Mixed / Individual Style Mode** (4 logical groups across 8 content lines separated by blank lines):
+#### Sort Input Example
+
+```text
+e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
+```
+
+*(Note: English identifiers such as `model-name` or `e:quota` are also supported, but numeric indices are recommended for conciseness.)*
+
+#### Output Preview (Mixed Mode)
+
+4 logical groups across 9 content lines separated by blank lines:
 
 ```text
 🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ off
 🪪 Default │ Agent: working │ Subagents: 2 │ Outputs: 0 │ Queue: 0 │ BG: 0 │ Awaiting You: none
 
-Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 185.0k / 1.0M [█░░░░░░░░░]
+Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 47.4k / 256.0k [█░░░░░░░░░]
 5-hr Available: 88% [████████░░] │ 5-hr Reset: 4h 50m │ 5-hr Reset Time: 15:50
 7-day Available: 78% [███████░░░] │ 7-day Reset: 4d 5h │ 7-day Reset Time: 2026/10/18 16:00
 Argon Available: 59% [█████░░░░░] │ Argon Reset: 6d 1h │ Argon Reset Time: 2026/10/30 23:57
@@ -295,24 +180,9 @@ VCS Status: no changes │ VCS: git │ 🔀 main
 ⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Version: v1.3.2
 ```
 
-### Line Wrapping
-
-Two mechanisms operate together:
-
-1. **Smart automatic wrapping**: The renderer reads the terminal width and wraps the next indicator to a new line whenever it would overflow the current row.
-2. **Manual newline (`n`)**: Insert `n` in the sort string to force a line break at that exact position:
-
-```text
-1,2,n,3,4
-```
-
-### Dynamic Colors
-
-A 24-bit truecolor four-tier palette (`#57caff` Blue → `#5cdb6d` Green → `#ffd427` Yellow → `#ff7daf` Pink) updates dynamically based on remaining API quota and context window pressure; each AI model family (Gemini, Claude, GPT) also renders with its dedicated brand accent color.
-
 ## Contributing
 
-Contributions are welcome — including new indicators, cross-platform fixes, and language translations. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
+Contributions are welcome — including new indicators, cross-platform fixes, and language translations. See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed project structure and workflow.
 
 ## Acknowledgements
 
