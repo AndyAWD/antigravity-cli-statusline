@@ -1,8 +1,8 @@
 # antigravity-cli-statusline
 
-[English](README.md) | 繁體中文 | [简体中文](README.zh-CN.md)
+[English](README.md) | 繁體中文 | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-[![版本](https://img.shields.io/badge/版本-1.11.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![版本](https://img.shields.io/badge/版本-1.11.1-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -14,9 +14,6 @@
 
 <p align="center">
   <img src="docs/images/statusline-demo-zh-tw.svg" alt="Antigravity 命令列介面狀態列互動設定與動態遙測展示：從執行 /antigravity-cli-statusline:agy-cli-statusline 指令、語系選擇、五大分類分頁勾選、自訂排序 Write-in 到 11 列完整狀態列即時運作。" width="100%">
-</p>
-<p align="center">
-  <em>切換展示語系：<a href="docs/images/statusline-demo-zh-tw.svg">繁體中文</a> | <a href="docs/images/statusline-demo-en.svg">English</a> | <a href="docs/images/statusline-demo-zh-cn.svg">简体中文</a> | <a href="docs/images/statusline-demo-jp.svg">日本語</a></em>
 </p>
 
 動態展示從執行設定指令 `/antigravity-cli-statusline:agy-cli-statusline`、問卷互動選取指標、自訂排序輸入，到最終呈現 11 列高資訊密度狀態列的完整即時遙測流程。
@@ -156,9 +153,15 @@ agy plugin uninstall antigravity-cli-statusline
 
 #### 排序輸入範例
 
-```text
-e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
-```
+- **數字序號版本**：
+  ```text
+  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
+  ```
+
+- **英文識別碼版本**：
+  ```text
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version
+  ```
 
 *(註：亦支援 `model-name`、`e:quota` 等英文識別碼，但使用數字序號最為簡潔實用。)*
 

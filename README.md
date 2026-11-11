@@ -1,8 +1,8 @@
 # antigravity-cli-statusline
 
-English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
+English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-[![Version](https://img.shields.io/badge/version-1.11.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.11.1-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -14,9 +14,6 @@ Comprehensive support across the three core platforms of Google Antigravity (AGY
 
 <p align="center">
   <img src="docs/images/statusline-demo.svg" alt="Antigravity CLI statusline interactive setup and live telemetry demo: from running /antigravity-cli-statusline:agy-cli-statusline command, language selection, 5-category wizard, custom order Write-in, to full 11-row live statusline telemetry." width="100%">
-</p>
-<p align="center">
-  <em>View language versions: <a href="docs/images/statusline-demo-en.svg">English</a> | <a href="docs/images/statusline-demo-zh-tw.svg">繁體中文</a> | <a href="docs/images/statusline-demo-zh-cn.svg">简体中文</a> | <a href="docs/images/statusline-demo-jp.svg">日本語</a></em>
 </p>
 
 Live animation demonstrating the complete flow from executing `/antigravity-cli-statusline:agy-cli-statusline`, interactive indicator selection, custom layout input, to the full 11-row telemetry statusline.
@@ -156,9 +153,15 @@ In Step 4 of the skill workflow, enter a comma-separated list of indicator indic
 
 #### Sort Input Example
 
-```text
-e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
-```
+- **Numeric Version**:
+  ```text
+  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
+  ```
+
+- **Identifier Version**:
+  ```text
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version
+  ```
 
 *(Note: English identifiers such as `model-name` or `e:quota` are also supported, but numeric indices are recommended for conciseness.)*
 
