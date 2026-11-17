@@ -118,7 +118,6 @@ antigravity-cli-statusline/
             ├── configure-statusline.mjs
             ├── diagnose-statusline.mjs
             ├── fetch-local-quota.mjs
-            ├── sh_hidden.cs
             ├── statusline-quota.mjs
             └── test-counters.mjs
 ```

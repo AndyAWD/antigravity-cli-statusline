@@ -14,7 +14,7 @@
 - [3. Windows BOM 自動清理（由配置腳本自動執行）](#3-windows-bom-自動清理由配置腳本自動執行)
 - [4. 記憶體查詢：Get-CimInstance 取代已棄用的 wmic](#4-記憶體查詢get-ciminstance-取代已棄用的-wmic)
 - [5. settings.json 中 Windows 路徑跳脫範本](#5-settingsjson-中-windows-路徑跳脫範本)
-- [6. sh.exe 相容橋接器：編譯靜默無窗體轉發器](#6-shexe-相容橋接器編譯靜默無窗體轉發器)
+- [6. 舊版 sh.exe 相容橋接器廢棄說明（Issue #8）](#6-舊版-shexe-相容橋接器廢棄說明issue-8)
 - [7. 子行程（Child Process）執行：強制 windowsHide: true](#7-子行程child-process執行強制-windowshide-true)
 
 ---
@@ -109,7 +109,7 @@ Microsoft 已於 Windows 11 預設棄用並移除 `wmic`。在查詢 CLI 行程�
 
 因此，Windows 平台上的 `statusLine.command` **絕對禁止包含任何雙引號 `"`**，並依據腳本路徑是否含空格採雙軌無引號策略：
 - **路徑不含空格時（多數情況）**：直接使用無雙引號的裸命令 `node <腳本絕對路徑>`。
-- **路徑包含空格時（例如 `C:\Users\John Doe\...`）**：將腳本絕對路徑轉換為無空格、無引號的 `file:///` URL（空格編碼為 `%20`、反斜線轉為 `/`），並使用 `node --import file:///C:/Users/John%20Doe/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0` 載入執行。此格式完全不含雙引號、不含單引號、亦不含未編碼空白，在 `cmd.exe /c` 與 `sh.exe -c` 下皆可 100% 零錯誤執行。
+- **路徑包含空格時（例如 `C:\Users\John Doe\...`）**：將腳本絕對路徑轉換為無空格、無引號的 `file:///` URL（空格編碼為 `%20`、反斜線轉為 `/`），並使用 `node --import file:///C:/Users/John%20Doe/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0` 載入執行。此格式完全不含雙引號、不含單引號、亦不含未編碼空白，在 `cmd.exe /c` 下可 100% 零錯誤執行。
 
 `statusLine` 物件的 `command` 欄位在 Windows 平台範本（無空格路徑）：
 
@@ -135,46 +135,19 @@ Microsoft 已於 Windows 11 預設棄用並移除 `wmic`。在查詢 CLI 行程�
 
 ---
 
-## 6. sh.exe 相容橋接器：編譯靜默無窗體轉發器
+## 6. 舊版 sh.exe 相容橋接器廢棄說明（Issue #8）
 
-### 背景
+### 歷史背景與廢棄原因
 
-舊版 agy CLI 的狀態列執行器在部分環境下依賴 `sh -c` 執行指令。Windows 預設沒有 `sh.exe`，若直接複製 `powershell.exe` 當作替身，每次狀態列背景更新時都會閃爍一個黑色終端機視窗。
+早期版（`< v1.3.5`）的 agy CLI 狀態列執行器在部分 Windows 環境下曾依賴 `sh -c` 執行指令。為避免以 `powershell.exe` 替代 `sh.exe` 導致每次更新閃爍黑色終端機視窗，過去 `configure-statusline.mjs` 會透過 `csc.exe /target:winexe` 在本地編譯一個無簽章、靜默轉發 `cmd.exe /c` 的 `sh.exe`（`4,608` 位元組）至 `%LOCALAPPDATA%\agy\bin\sh.exe`。
 
-### 靜默無窗體橋接器方案（無彈窗 + 引號防禦）
+然而，此類本機動態編譯且無數位簽章的隱藏執行檔易觸發企業防毒軟體（如 Symantec 自動防護掃描 `Heur.AdvML.B`）誤判為惡意軟體並隔離，進而中斷後續執行。自 `agy.exe (v1.3.5+)` 起，Windows 底層已全面改由 Go `exec.CommandContext(ctx, "cmd", "/c", command)` 原生執行狀態列指令，不再需要 `sh.exe` 橋接器。
 
-`configure-statusline.mjs` 在 Windows 環境下若偵測到 CLI 目錄缺少 `sh.exe`，會自動利用 Windows 內建的 `.NET Compiler (csc.exe)` 編譯一個無窗體（`/target:winexe`）的 `sh.exe` 轉發橋接器，徹底消除彈窗。原始碼中特別增加針對雙引號開頭指令的外層引號防禦包裹，防止 `cmd.exe /c` 誤剝除內部雙引號。
+### 現行處置機制
 
-### 執行步驟
-
-1. **取得 CLI 執行目錄**：
-   ```bash
-   cmd.exe /c where agy
-   ```
-   提取所在資料夾（例如 `C:\Users\...\AppData\Local\agy\bin`）。
-
-2. **檢查並清理舊版錯置的 sh.exe**：
-   ```bash
-   node -e "console.log(require('path').dirname(process.execPath))"
-   ```
-   若該目錄下存在之前錯誤放置的 `sh.exe`，**務必**提示使用者手動將其刪除（提供精確的絕對路徑，例如 `C:\Program Files\nodejs\sh.exe`），以免嚴重污染系統環境。
-
-3. **讀取 sh_hidden.cs 原始碼**：
-   - 優先讀取當前工作區根目錄下 `skills/agy-cli-statusline/scripts/sh_hidden.cs`
-   - 若不存在或在其他工作區，退回從本外掛根目錄 `skills/agy-cli-statusline/scripts/sh_hidden.cs` 讀取
-   - 將其複製或寫入到暫存資料夾
-
-4. **動態尋找 csc.exe 並編譯**：
-   嚴禁寫死路徑與版本號。透過 PowerShell 取得最新版編譯器：
-   ```powershell
-   (Get-ChildItem -Path 'C:\Windows\Microsoft.NET\Framework64\v*\csc.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
-   ```
-   編譯至真正的 CLI 目錄：
-   ```bash
-   "<動態取得的 csc.exe 絕對路徑>" /target:winexe /out:"<CLI 執行目錄>\sh.exe" "暫存目錄\sh_hidden.cs"
-   ```
-
-完成後，當 CLI 發出 `sh -c "node ..."` 時，會被這個靜默程式完美攔截，在完全沒有黑框閃爍的情況下執行背景更新。
+1. **停止編譯 `sh.exe`**：`configure-statusline.mjs` 已移除 `csc.exe` 與 `sh_hidden.cs` 本地編譯流程，設定階段不再衍生外部編譯器或 PowerShell 子行程。
+2. **自動清理舊版微型 `sh.exe` 殘留**：於 Windows 執行設定時，`cleanupLegacyWindowsShBridge()` 會檢查 `%LOCALAPPDATA%\agy\bin\sh.exe`；僅當該檔存在、非符號連結（Symbolic Link）且檔案大小 `<= 16,384` 位元組（對應舊版編譯的 `4,608` 位元組橋接器，排除大於 `1.5 MB` 的真實 Git / MSYS2 `sh.exe`）時予以安全移除。
+3. **舊版 CLI 升級建議**：若極早期環境仍使用 `< v1.3.5` 的 `agy` 並出現 `sh` 缺失錯誤，應升級 `agy` CLI 至 `v1.3.5+`（目前為 `1.5.10+`），切勿手動複製 `powershell.exe` 或編譯未簽署 `sh.exe`。
 
 ---
 

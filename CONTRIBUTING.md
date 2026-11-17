@@ -35,7 +35,6 @@ Since this project dynamically handles multiple languages within existing files,
 
 ### 4. Modify `skills/agy-cli-statusline/scripts/configure-statusline.mjs`
 - **Find `normalizeLanguage(l)`**: Add the same locale alias normalization rules for `'[LANG_CODE]'` as in `statusline-quota.mjs`.
-- **Find the Windows `sh.exe` compilation warning**: Add an `else if (lang === '[LANG_CODE]')` branch with the translated warning message.
 ````
 
 ### 🛠️ Adding a New Statusline Indicator
@@ -111,7 +110,6 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/configure-statusline.mjs`
 - **尋找 `normalizeLanguage(l)` 函式**：同步加入與 `statusline-quota.mjs` 相同的 `'[LANG_CODE]'` 語系標準化規則。
-- **尋找 Windows `sh.exe` 編譯失敗警告**：新增 `else if (lang === '[LANG_CODE]')` 分支並填入【目標語言】的警告訊息。
 ````
 
 ### 🛠️ 新增狀態列指標指南
@@ -187,7 +185,6 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/configure-statusline.mjs`
 - **寻找 `normalizeLanguage(l)` 函数**：同步加入与 `statusline-quota.mjs` 相同的 `'[LANG_CODE]'` 语系标准化规则。
-- **寻找 Windows `sh.exe` 编译失败警告**：新增 `else if (lang === '[LANG_CODE]')` 分支并填入【目标语言】的警告信息。
 ````
 
 ### 🛠️ 新增状态栏指标指南
