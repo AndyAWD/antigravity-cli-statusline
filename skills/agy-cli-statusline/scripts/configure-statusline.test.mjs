@@ -4,7 +4,7 @@ import assert from 'assert';
 import os from 'os';
 import { spawn, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { getStatusLineCommand, parseOrderAndStyles } from './configure-statusline.mjs';
+import { getStatusLineCommand, parseOrderAndStyles, cleanupLegacyWindowsShBridge } from './configure-statusline.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -591,7 +591,7 @@ async function testCase7DirectGetStatusLineCommandMatrix() {
     'Windows 無空格路徑必須為無雙引號的 node 裸命令'
   );
 
-  // 1b. 含空格路徑：必須使用 node --import file:///... -e 0（同時無雙引號且無未編碼空格，完美相容 cmd /c 與 sh.exe -c）
+  // 1b. 含空格路徑：必須使用 node --import file:///... -e 0（同時無雙引號且無未編碼空格，完美相容 cmd /c）
   const winCmd2 = getStatusLineCommand('C:\\Users\\John Doe\\.gemini\\hooks\\statusline-quota.mjs', 'win32');
   assert.strictEqual(
     winCmd2,
@@ -1250,6 +1250,63 @@ async function testCase13NonDestructiveConfigAndLegacyCleanup() {
 }
 
 // ==========================================
+// 測試情境 14：Windows 不再編譯 sh.exe 且安全清理舊版微型 sh.exe 橋接器（Issue #8）
+// ==========================================
+async function testCase14LegacyWindowsShBridgeRemoval() {
+  console.log('\n--- 執行測試情境 14：Windows 不再編譯 sh.exe 且安全清理舊版微型 sh.exe 橋接器 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case14-'));
+
+  try {
+    const localAppData = path.join(sandbox, 'LocalAppData');
+    const agyBinDir = path.join(localAppData, 'agy', 'bin');
+    const legacyShPath = path.join(agyBinDir, 'sh.exe');
+    fs.mkdirSync(agyBinDir, { recursive: true });
+
+    // 1. 模擬舊版 sh_hidden.cs 編譯之 4,608 位元組 sh.exe：非 Windows 不觸動，Windows 會安全清理
+    fs.writeFileSync(legacyShPath, Buffer.alloc(4608, 0));
+    assert.strictEqual(cleanupLegacyWindowsShBridge(localAppData, 'darwin'), false, '非 Windows 平台不可清理');
+    assert.strictEqual(fs.existsSync(legacyShPath), true, '非 Windows 平台必須保留檔案');
+    assert.strictEqual(cleanupLegacyWindowsShBridge(localAppData, 'win32'), true, 'Windows 平台必須移除舊版 4,608 bytes sh.exe');
+    assert.strictEqual(fs.existsSync(legacyShPath), false, '舊版微型 sh.exe 應已被移除');
+
+    // 2. 防誤刪保護：大於 16,384 位元組的真實 sh.exe（如 Git / MSYS2）與符號連結必須保留
+    fs.writeFileSync(legacyShPath, Buffer.alloc(20000, 1));
+    assert.strictEqual(cleanupLegacyWindowsShBridge(localAppData, 'win32'), false, '大於 16,384 bytes 的真實 sh.exe 不可刪除');
+    assert.strictEqual(fs.existsSync(legacyShPath), true, '真實 sh.exe 必須完好保留');
+    fs.unlinkSync(legacyShPath);
+
+    const realTargetPath = path.join(sandbox, 'real-sh.exe');
+    fs.writeFileSync(realTargetPath, Buffer.alloc(1024, 2));
+    try {
+      fs.symlinkSync(realTargetPath, legacyShPath, 'file');
+      assert.strictEqual(cleanupLegacyWindowsShBridge(localAppData, 'win32'), false, '符號連結類型的 sh.exe 不可刪除');
+      assert.strictEqual(fs.lstatSync(legacyShPath).isSymbolicLink(), true, '符號連結必須完好保留');
+      fs.unlinkSync(legacyShPath);
+    } catch (_) {
+      // Windows 無建立符號連結權限時略過符號連結分支
+    }
+
+    // 3. 端對端執行 configure-statusline.mjs：不應輸出任何 sh.exe 編譯失敗警告或重新建立 sh.exe
+    const mockHome = path.join(sandbox, 'home');
+    fs.mkdirSync(mockHome, { recursive: true });
+    const fakeBin = path.join(sandbox, 'fake-bin');
+    fs.mkdirSync(fakeBin, { recursive: true });
+    const res = await runScript(
+      configureScriptSrc,
+      ['--lang', 'zh-tw', '--selected', '["model-name"]', '--order', '1', '--workspace', sandbox],
+      { HOME: mockHome, USERPROFILE: mockHome, LOCALAPPDATA: localAppData, PATH: `${fakeBin}${path.delimiter}${process.env.PATH || ''}` }
+    );
+    assert.strictEqual(res.code, 0, `configure-statusline.mjs 應成功退出，stderr: ${res.stderr}`);
+    assert.ok(!res.stdout.includes('sh.exe 編譯') && !res.stderr.includes('sh.exe'), '設定過程不應嘗試編譯 sh.exe');
+    assert.strictEqual(fs.existsSync(legacyShPath), false, '設定過程不得再建立 sh.exe');
+
+    console.log('✅ 測試情境 14 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -1267,6 +1324,7 @@ async function runAllTests() {
     await testCase11ItemStylesPrefixAndConfig();
     await testCase12PureNumbersOverwritesResidualEmojiStyle();
     await testCase13NonDestructiveConfigAndLegacyCleanup();
+    await testCase14LegacyWindowsShBridgeRemoval();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {
