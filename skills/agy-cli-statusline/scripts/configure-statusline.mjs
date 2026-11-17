@@ -2,7 +2,6 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { execSync, execFileSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -271,6 +270,34 @@ function readJsonWithBOMDefense(filePath) {
 
 function writeJsonAndVerifyNoBOM(filePath, data) {
   writeContentAndVerifyNoBOM(filePath, JSON.stringify(data, null, 2));
+}
+
+const LEGACY_SH_BRIDGE_MAX_BYTES = 16384;
+
+/**
+ * 安全移除早期版本於 Windows %LOCALAPPDATA%\agy\bin\ 編譯遺留的微型 sh.exe 橋接器（約 4,608 bytes）。
+ * 自 agy v1.3.5+ 起改用 cmd /c 原生執行狀態列，保留未簽署 sh.exe 反易觸發防毒軟體啟發式誤報。
+ * 嚴格限定非符號連結、普通檔案且大小 <= 16,384 bytes，避免誤傷真實的 Git / MSYS2 sh.exe。
+ */
+export function cleanupLegacyWindowsShBridge(localAppDataDir = process.env.LOCALAPPDATA, platform = process.platform) {
+  if (platform !== 'win32' || !localAppDataDir || typeof localAppDataDir !== 'string') {
+    return false;
+  }
+  const legacyShPath = path.join(localAppDataDir, 'agy', 'bin', 'sh.exe');
+  try {
+    const stats = fs.lstatSync(legacyShPath);
+    if (stats.isSymbolicLink() || !stats.isFile() || stats.size > LEGACY_SH_BRIDGE_MAX_BYTES) {
+      return false;
+    }
+    if (isInGitProject(legacyShPath)) {
+      return false;
+    }
+    fs.unlinkSync(legacyShPath);
+    console.log(`[Clean Up] 已移除舊版 Windows sh.exe 橋接器（agy v1.3.5+ 已不再需要且可避免防毒誤報）: ${legacyShPath}`);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -721,62 +748,8 @@ if (workspacePath) {
 
 console.log(`狀態列執行指令：/statusline ${statusLineCommand}`);
 
-// 6. Windows sh.exe 編譯
-if (process.platform === 'win32') {
-  let cliBinDir = '';
-  try {
-    const whereOut = execSync('where agy', { windowsHide: true }).toString().trim();
-    const agyPath = whereOut.split('\r\n')[0].split('\n')[0].trim();
-    cliBinDir = path.dirname(agyPath);
-  } catch (err) {
-    console.warn('無法使用 where 指令尋找 agy.exe 路徑：', err.message);
-  }
-
-  if (cliBinDir) {
-    const destShPath = path.join(cliBinDir, 'sh.exe');
-    if (!fs.existsSync(destShPath)) {
-      console.log(`在 ${cliBinDir} 找不到 sh.exe，嘗試編譯...`);
-      const sourceCsPath = path.join(sourceDir, 'sh_hidden.cs');
-      if (fs.existsSync(sourceCsPath)) {
-        let cscPath = '';
-        try {
-          const cscFindCmd = `powershell.exe -NoProfile -Command "(Get-ChildItem -Path 'C:\\Windows\\Microsoft.NET\\Framework64\\v*\\csc.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName"`;
-          cscPath = execSync(cscFindCmd, { windowsHide: true }).toString().trim();
-        } catch (err) {
-          console.error('使用 PowerShell 尋找 csc.exe 失敗：', err.message);
-        }
-
-        if (cscPath) {
-          try {
-            console.log(`正在使用 ${cscPath} 編譯隱藏的 sh.exe...`);
-            execFileSync(cscPath, ['/target:winexe', `/out:${destShPath}`, sourceCsPath], { windowsHide: true });
-            console.log('sh.exe 編譯成功。');
-          } catch (err) {
-            console.error('編譯 sh.exe 失敗：', err.message);
-          }
-        } else {
-          console.warn('找不到 csc.exe。跳過 sh.exe 編譯。');
-        }
-      } else {
-        console.warn('找不到 sh_hidden.cs 原始碼檔案。跳過 sh.exe 編譯。');
-      }
-
-      if (!fs.existsSync(destShPath)) {
-        if (lang === 'zh-tw') {
-          console.warn('警告：sh.exe 編譯失敗，請檢查權限是否足夠，或嘗試以系統管理員權限重新設定。');
-        } else if (lang === 'zh-cn') {
-          console.warn('警告：sh.exe 编译失败，请检查权限是否足够，或尝试以管理员权限重新设置。');
-        } else if (lang === 'jp') {
-          console.warn('警告：sh.exe のコンパイルに失敗しました。アクセス権限が十分であるか確認するか、管理者権限で再設定を試みてください。');
-        } else {
-          console.warn('Warning: Compilation of sh.exe failed. Please check if you have sufficient privileges, or try configuring again with administrator privileges.');
-        }
-      }
-    } else {
-      console.log('sh.exe 已存在，跳過編譯。');
-    }
-  }
-}
+// 6. 移除舊版 Windows sh.exe 相容橋接器（agy v1.3.5+ 已改用 cmd /c 原生執行，停止編譯未簽署 sh.exe 以避免 Symantec 誤報）
+cleanupLegacyWindowsShBridge(process.env.LOCALAPPDATA);
 
   console.log('設定成功完成！');
 }
