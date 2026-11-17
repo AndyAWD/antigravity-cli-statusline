@@ -1,27 +1,29 @@
 ---
 name: antigravity-cli-statusline:agy-cli-statusline
-description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、標籤顯示樣式（文字標籤 text / Emoji 圖示 emoji）、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並自動部署跨平台 Node.js 掛鉤（Hook）腳本（statusline-quota.mjs、fetch-local-quota.mjs）至 ~/.gemini/antigravity-cli/hooks/，同步註冊三層 settings.json（全域、命令列介面（CLI）專屬、專案）與 trusted_hooks.json 信任機制。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、切換文字或 Emoji 圖示標籤模式、顯示應用程式介面（API）額度（含長條圖與絕對重置時間） / 權杖（Token）用量與長條圖 / 上下文（Context）消耗與長條圖 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境，並自動處理 Node.js 跨平台執行相容性（macOS/Linux 絕對路徑防 NVM 127、Windows 裸命令防空白與引號剝除）、sh.exe 缺失、UTF-8 位元組順序記號（BOM）污染、wmic 棄用等系統陷阱。
+description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）的狀態列（Statusline / Footer）顯示指標、標籤顯示樣式（文字標籤 text / Emoji 圖示 emoji）、顯示順序與多語系介面（繁體中文 zh-tw / 简体中文 zh-cn / English us / 日本語 jp），並透過隨附的跨平台 Node.js 配置腳本（configure-statusline.mjs）完成狀態列腳本部署與設定同步。適用情境：使用者要求設定 / 客製化 / 啟用命令列介面（CLI）狀態列、調整命令列介面（CLI）頁尾顯示項目、切換文字或 Emoji 圖示標籤模式、顯示應用程式介面（API）額度（含長條圖與絕對重置時間） / 權杖（Token）用量與長條圖 / 上下文（Context）消耗與長條圖 / Git 分支 / 工作區是否乾淨（dirty）/ VCS 類型 / 人工智慧（AI）模型名稱 / 代理狀態（agent state）/ 等你回應的工具確認對話方塊（Dialog Box） / 輸入佇列 / 背景任務 / 子代理數 / 檔案數量（Artifacts） / 沙盒模式 / 命令列介面（CLI）版本 / 對話識別碼（ID） / 使用中代理（agent profile）/ 隨機存取記憶體（RAM）記憶體用量 / 訂閱方案等指標於命令列介面（CLI）底部、切換狀態列語言、在新電腦上啟用此狀態列，或使用者主動以 /antigravity-cli-statusline:agy-cli-statusline 觸發本技能時。支援 macOS、Linux、Windows（含 Windows 10 / 11）跨平台環境。
 ---
 
 # Antigravity 狀態列設定技能
 
-本技能提供 Antigravity 命令列介面（CLI）狀態列（Statusline / Footer）的客製化、標籤樣式（文字 / Emoji）、語系設定與跨平台掛鉤（Hook）部署能力。
+本技能提供 Antigravity 命令列介面（CLI）狀態列（Statusline / Footer）的客製化、標籤樣式（文字 / Emoji）、語系設定與跨平台腳本部署能力。
 
-## ⚠️ References 載入規範（必讀）
+## ⚠️ 執行與路徑規範（必讀）
 
-本技能的細節分散於下列三份 references/：
-- [`references/windows.md`](references/windows.md) — Windows 特定規範（位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.exe` 編譯等）
-- [`references/config-files.md`](references/config-files.md) — 三層設定檔結構、`statusLine` 物件、`trusted_hooks.json` 信任機制
-- [`references/pitfalls.md`](references/pitfalls.md) — 常見陷阱對照表
-
-**載入規則（強制）**：
-1. **禁止透過子代理（subagent / Explore Agent）摘要 references/ 內容**，主代理必須親自以 Read 工具讀取原文
-2. **禁止改寫程式碼區塊與 JSON 結構**
-3. 若內容與你熟悉的其他 CLI 規範不同，**一律以本技能檔案為準**
+1. **禁止以 `read_file` 或 `edit_file` 工具直接存取 `~/.gemini/` 下的設定檔**：
+   - 在 Antigravity CLI 中，`~/.gemini/antigravity-cli/settings.json` 等路徑受系統保護邊界（System Protection Boundary）保護。
+   - **主代理在步驟 1 至步驟 7 期間，絕對禁止呼叫 `read_file`、`write_file` 或 `edit_file` 讀取或編輯 `~/.gemini/` 下的 `settings.json`**，亦無須讀取 `scripts/*.mjs` 原始碼。
+   - 所有設定檔的讀取、位元組順序記號（BOM）清理與寫入，一律在步驟 5 透過 `run_command` 執行本技能的 `configure-statusline.mjs` 腳本自動完成。
+2. **動態解析本技能目錄路徑（`<SKILL_DIR>`）**：
+   - 本 `SKILL.md` 所在的目錄即為 `<SKILL_DIR>`（例如外掛安裝路徑 `~/.gemini/config/plugins/antigravity-cli-statusline/skills/agy-cli-statusline`，或本機開發工作區下的 `skills/agy-cli-statusline`）。
+   - 讀取 `resources/questions.json` 或執行 `scripts/configure-statusline.mjs`、`scripts/test-counters.mjs` 時，請直接使用相對於 `<SKILL_DIR>` 的完整路徑，勿假設當前工作區（CWD）即為本外掛儲存庫。
+3. **參考文件（僅在需要查閱細節時讀取）**：
+   - [`references/windows.md`](references/windows.md) — Windows 平台相容規範（無 BOM 編碼、路徑無引號格式等）
+   - [`references/config-files.md`](references/config-files.md) — 設定檔結構與跨平台 `statusLine` 格式
+   - [`references/pitfalls.md`](references/pitfalls.md) — 常見問題對照表
 
 ---
 
-## 🎯 設定檔路徑（三層必同步）
+## 🎯 設定檔架構說明（由步驟 5 配置腳本自動處理）
 
 | 層級 | 路徑語法 | 優先級 |
 |---|---|---|
@@ -29,30 +31,23 @@ description: 本技能用於設定 Antigravity 命令列介面（CLI）（agy）
 | 全域 | `~/.gemini/settings.json` | 中 |
 | 專案（條件性）| `<workspace>/.gemini/settings.json` | 若存在則覆寫 |
 
-> [!CAUTION]
-> 命令列介面（CLI）專屬設定檔由 agy 命令列介面（CLI）自身維護，優先級**高於**全域設定檔。若忽略此檔案，全域設定將被無聲覆蓋！這是本技能中**最致命且最隱蔽的 Bug**。完整路徑解析規則、JSON 結構、跨電腦移植雙保險設計詳見 [references/config-files.md](references/config-files.md)。
-
 自訂語系偏好記錄於 `ui.language` 屬性中；標籤顯示樣式記錄於 `ui.footer.labelStyle`（`"text"` 或 `"emoji"`）中；指標順序記錄於 `ui.footer.items` 陣列中；個別指標樣式覆寫記錄於 `ui.footer.itemStyles`（如 `{ "quota": "emoji" }`）中，未設定者一律強制以文字為預設。
 
 ---
 
 ## 🛠️ 技術標準
 
-1. **純 Node.js 跨平台實作**：
-   - macOS / Linux：`ps auxww` + `lsof`
-   - Windows：`Get-CimInstance Win32_Process` + `netstat -ano`（不再使用已棄用的 `wmic`）
-2. **所有 `fs.writeFileSync` 強制加 `{ encoding: 'utf8' }`**（防 Windows UTF-16 崩潰）
-3. **智慧型多行換行（Smart Line Wrapping by Feature）**：讀取 `meta.terminal_width` 或 `process.stdout.columns` 得知終端機寬度。組合狀態列字串時，若下一個加入的指標會讓整行長度（不含 ANSI 碼，並精確計算中日韓全形字元與 Unicode 代理對 Emoji 為 2 格寬度）超過終端機寬度，必須將該指標折疊到新的一行（插入 `\n`）。
+1. **跨平台 Node.js 實作**：相容 macOS、Linux 與 Windows（Windows 10 / 11）。
+2. **所有 `fs.writeFileSync` 強制加 `{ encoding: 'utf8' }`**（防 Windows UTF-16 編碼問題與位元組順序記號（BOM）污染）。
+3. **智慧型多行換行（Smart Line Wrapping by Feature）**：讀取 `meta.terminal_width` 或 `process.stdout.columns` 得知終端機寬度。組合狀態列字串時，若下一個加入的指標會讓整行長度（不含 ANSI 碼，並精確計算中日韓全形字元與 Unicode 代理對 Emoji 為 2 格寬度）超過終端機寬度，自動將該指標折疊到新的一行（插入 `\n`）。
 4. **四階段精確色彩辨識（24-bit truecolor 柔和配色）**：
    - `100~75%`：藍色 `#57caff`（`\x1b[38;2;87;202;255m`）
    - `74~50%`：綠色 `#5cdb6d`（`\x1b[38;2;92;219;109m`）
    - `49~25%`：黃色 `#ffd427`（`\x1b[38;2;255;212;39m`）
    - `24~0%`：紅色 `#ff7daf`（`\x1b[38;2;255;125;175m`）
-5. **容量長條圖與相鄰自動合併（Bar Graph & Adjacent Auto-Merge）**：支援五小時可用額度（`quota-bar`）、每週可用額度（`quota-weekly-bar`）、脈絡用量（`context-used-bar`）與權杖數（`token-count-bar`）之長條圖（預設 10 格 `[████████░░]`）。當長條圖與對應數值指標相鄰且顯示樣式一致時，自動合併為單一標籤（文字模式如 `五小時可用: 88% [████████░░]`，Emoji 模式如 `🔋 88% [████████░░]`）。若樣式衝突（一為 text、一為 emoji）則不合併，拆開為兩個獨立區塊顯示。
-6. **絕對重置時間（Reset Absolute Time）**：支援五小時重置時間（`quota-reset-time`）與每週重置時間（`quota-weekly-reset-time`），原生轉換為本機時區絕對時間，預設同日顯示 `HH:mm`、跨日顯示 `yyyy/MM/dd HH:mm`，亦支援於設定檔以 `ui.footer.timeFormat` 自訂（`smart` / `yyyy/MM/dd HH:mm` / `12h` / `24h`）。
+5. **容量長條圖與相鄰自動合併（Bar Graph & Adjacent Auto-Merge）**：支援五小時可用額度（`quota-bar`）、每週可用額度（`quota-weekly-bar`）、Argon 可用額度（`quota-argon-bar`）、脈絡用量（`context-used-bar`）與權杖數（`token-count-bar`）之長條圖（預設 10 格 `[████████░░]`）。當長條圖與對應數值指標相鄰且顯示樣式一致時，自動合併為單一標籤（文字模式如 `五小時可用: 88% [████████░░]`，Emoji 模式如 `🔋 88% [████████░░]`）。若樣式衝突（一為 text、一為 emoji）則不合併，拆開為兩個獨立區塊顯示。
+6. **絕對重置時間（Reset Absolute Time）**：支援五小時重置時間（`quota-reset-time`）、每週重置時間（`quota-weekly-reset-time`）與 Argon 重置時間（`quota-argon-reset-time`），原生轉換為本機時區絕對時間，預設同日顯示 `HH:mm`、跨日顯示 `yyyy/MM/dd HH:mm`，亦支援於設定檔以 `ui.footer.timeFormat` 自訂（`smart` / `yyyy/MM/dd HH:mm` / `12h` / `24h`）。
 7. **多樣化標籤顯示樣式（Label Style: 全域與個別指標支援）**：支援於設定檔 `ui.footer.itemStyles` 針對個別指標設定樣式覆寫（`"emoji"` 或 `"text"`，未設定者一律以文字為預設），亦支援於 `ui.footer.labelStyle` 設定全域標籤樣式。在 Emoji 樣式下，以專屬 Emoji 取代文字標籤並省略冒號、僅保留單一空白（如 `🤖 Gemini 3.1 Pro`、`🔋 100%`、`🔀 main`），狀態值仍依 `ui.language` 顯示本地化文字。
-
-Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.exe` 編譯、`windowsHide: true` 規範詳見 [references/windows.md](references/windows.md)。
 
 ---
 
@@ -106,19 +101,20 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 選擇完成後，**將所選語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）記錄為本次執行的鎖定語系**，並依「🌐 語言鎖定規則」於後續所有步驟使用該語系撰寫對話輸出。
 
-### 步驟 2：Node.js 預檢 + 三層設定檔讀取
+### 步驟 2：Node.js 環境預檢
 
 > 本步驟所有與使用者互動的文字必須用步驟 1 所選語系呈現。
+> ⚠️ **嚴格禁止在步驟 2 呼叫 `read_file` 去讀取 `~/.gemini/` 下的任何 `settings.json`**（會觸發 CLI 系統保護邊界錯誤）。設定檔的讀取與更新一律交由步驟 5 的 `configure-statusline.mjs` 腳本處理。
 
-**【Node.js 環境預檢 — 最優先】**：依作業系統執行對應的偵測指令：
-- macOS / Linux：`command -v node` 或 `which node`
-- Windows：`where node`（cmd）或 `Get-Command node`（PowerShell）
+**【Node.js 環境預檢】**：依作業系統執行對應的偵測指令：
+- macOS / Linux：`command -v node && node --version`
+- Windows：`where node && node --version`（cmd）或 `node --version`
 - 跨平台通用：`node --version`
 
-- ✅ **若 Node.js 已安裝**：記錄版本號並繼續後續流程。
+- ✅ **若 Node.js 已安裝**：記錄版本號並直接進入步驟 3。
 - ❌ **若 Node.js 未安裝**（指令回傳 `command not found` 或非零退出碼）：
   1. **向使用者發出明確警告（以所選語系撰寫）**，說明缺少 Node.js 將導致：
-     - CLI 底部狀態列**完全空白**，不會顯示 any 指標
+     - CLI 底部狀態列**完全空白**，不會顯示任何指標
      - `agy` 命令列介面（CLI）會反覆記錄 `statusline: command failed: exit status 127 (stderr: sh: node: command not found)`，連續失敗 30 次後自動停用 statusline
   2. **呼叫 `ask_question` 詢問使用者是否繼續**（問卷 `question`、`options` 全部以所選語系撰寫）：
 
@@ -127,7 +123,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 {
   "questions": [
     {
-      "question": "⚠️ 偵測到系統未安裝 Node.js。\n\n狀態列掛鉤（Hook）需要 Node.js 才能運作，缺少 Node.js 將導致命令列介面（CLI）底部狀態列完全空白且自動停用。\n\n建議先安裝 Node.js（例如：brew install node），再重新執行本技能。\n\n是否仍要繼續設定？（設定檔會正確寫入，但狀態列在安裝 Node.js 前不會顯示）",
+      "question": "⚠️ 偵測到系統未安裝 Node.js。\n\n狀態列腳本需要 Node.js 才能運作，缺少 Node.js 將導致命令列介面（CLI）底部狀態列完全空白且自動停用。\n\n建議先安裝 Node.js（例如：brew install node），再重新執行本技能。\n\n是否仍要繼續設定？（設定檔會正確寫入，但狀態列在安裝 Node.js 前不會顯示）",
       "options": [
         "中斷，我先去安裝 Node.js",
         "繼續設定（安裝 Node.js 後狀態列會自動生效）"
@@ -143,7 +139,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 {
   "questions": [
     {
-      "question": "⚠️ 检测到系统未安装 Node.js。\n\n状态栏挂钩（Hook）需要 Node.js 才能运作，缺少 Node.js 将导致命令行界面（CLI）底部状态栏完全空白且自动停用。\n\n建议先安装 Node.js（例如：brew install node），再重新运行本技能。\n\n是否仍要继续设置？（配置文件会正确写入，但状态栏在安装 Node.js 前不会显示）",
+      "question": "⚠️ 检测到系统未安装 Node.js。\n\n状态栏脚本需要 Node.js 才能运作，缺少 Node.js 将导致命令行界面（CLI）底部状态栏完全空白且自动停用。\n\n建议先安装 Node.js（例如：brew install node），再重新运行本技能。\n\n是否仍要继续设置？（配置文件会正确写入，但状态栏在安装 Node.js 前不会显示）",
       "options": [
         "中断，我先去安装 Node.js",
         "继续设置（安装 Node.js 后状态栏会自动生效）"
@@ -159,7 +155,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 {
   "questions": [
     {
-      "question": "⚠️ Node.js is not installed on this system.\n\nThe statusline hook requires Node.js to function. Without Node.js, the CLI footer will be completely blank and automatically disabled.\n\nIt is recommended to install Node.js first (e.g.: brew install node), then re-run this skill.\n\nDo you still want to proceed? (Configuration files will be written, but the statusline will not appear until Node.js is installed)",
+      "question": "⚠️ Node.js is not installed on this system.\n\nThe statusline script requires Node.js to function. Without Node.js, the CLI footer will be completely blank and automatically disabled.\n\nIt is recommended to install Node.js first (e.g.: brew install node), then re-run this skill.\n\nDo you still want to proceed? (Configuration files will be written, but the statusline will not appear until Node.js is installed)",
       "options": [
         "Abort, I will install Node.js first",
         "Continue setup (Statusline will automatically work once Node.js is installed)"
@@ -175,7 +171,7 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 {
   "questions": [
     {
-      "question": "⚠️ システムに Node.js がインストールされていません。\n\nステータスラインのフック（Hook）には Node.js が必要です。Node.js がないと、CLI 画面下部のステータスラインは完全に空白となり、自動的に無効化されます。\n\n先に Node.js をインストールしてから（例：brew install node）、本スキルを再実行することをお勧めします。\n\nそれでも設定を続行しますか？（設定ファイルは正常に書き込まれますが、Node.js がインストールされるまでステータスラインは表示されません）",
+      "question": "⚠️ システムに Node.js がインストールされていません。\n\nステータスラインのスクリプトには Node.js が必要です。Node.js がないと、CLI 画面下部のステータスラインは完全に空白となり、自動的に無効化されます。\n\n先に Node.js をインストールしてから（例：brew install node）、本スキルを再実行することをお勧めします。\n\nそれでも設定を続行しますか？（設定ファイルは正常に書き込まれますが、Node.js がインストールされるまでステータスラインは表示されません）",
       "options": [
         "中断して、先に Node.js をインストールする",
         "設定を続行する（Node.js インストール後にステータスラインが自動的に有効になります）"
@@ -186,16 +182,12 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 }
 ```
 
-  3. **若使用者選擇「中斷」**：以所選語系輸出安裝指引後結束本技能流程，不進行 any 設定檔寫入。
+  3. **若使用者選擇「中斷」**：以所選語系輸出安裝指引後結束本技能流程，不進行任何設定檔寫入。
   4. **若使用者選擇「繼續」**：繼續執行後續步驟。設定檔會正確寫入，待使用者安裝 Node.js 並重新啟動 `agy` 命令列介面（CLI）後狀態列即會自動生效。
-
-**【動態解析三層設定檔】**：在 Node.js 預檢通過（或使用者選擇繼續）後，動態展開 `$HOME` / `USERPROFILE`，讀取三層 `settings.json`。檢查目前 `ui.footer.items` 啟用了哪些項目、`ui.footer.labelStyle` 標籤樣式、`ui.language` 設定，以及各設定檔中是否存在空的或殘缺的 `statusLine` 物件（如 `{ "type": "", "command": "", "enabled": true }`）。
-
-**【Windows 平台額外步驟：位元組順序記號（BOM）預檢】**：讀取每份 `settings.json` 與 `trusted_hooks.json` 時，必須檢查檔案前 3 個位元組是否為 `EF BB BF`（UTF-8 位元組順序記號（BOM））。若是，記錄該檔案路徑為「需於步驟 5 自動修復」的目標。詳見 [references/windows.md §1](references/windows.md) 與 §3。
 
 ### 步驟 3：第二階段問卷（讀取 questions.json、五大分類分頁勾選指標）
 
-1. **讀取靜態問卷**：人工智慧（AI）代理必須優先讀取本外掛目錄底下的 `skills/agy-cli-statusline/resources/questions.json` 檔案。
+1. **讀取靜態問卷**：人工智慧（AI）代理必須使用本 `SKILL.md` 所在目錄（`<SKILL_DIR>`）下的 `<SKILL_DIR>/resources/questions.json` 路徑讀取靜態問卷檔案（例如 `~/.gemini/config/plugins/antigravity-cli-statusline/skills/agy-cli-statusline/resources/questions.json` 或工作區內的 `skills/agy-cli-statusline/resources/questions.json`）。
 2. **根據步驟 1 的語言代碼（`zh-tw` / `zh-cn` / `us` / `jp`）**，從 `questions.json` 中讀取對應語系的 `categories`（五大分類清單）。
 
 > [!NOTE]
@@ -351,26 +343,23 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
 
 ### 步驟 5：執行配置腳本
 
-1. 取得使用者工作區（workspace）的絕對路徑（`workspace`）。
-2. 呼叫 `run_command` 執行本外掛目錄下的 `configure-statusline.mjs` 腳本，傳入相關參數。腳本會全自動處理：
+1. 取得使用者工作區（workspace）的絕對路徑（`workspace`）與本 `SKILL.md` 所在的目錄路徑（`<SKILL_DIR>`）。
+2. 呼叫 `run_command` 執行 `<SKILL_DIR>/scripts/configure-statusline.mjs` 腳本，傳入相關參數。腳本會全自動處理：
    - 排序輸入與個別標籤顯示樣式（前綴 `t`/`e` 解析並寫入 `ui.footer.itemStyles`，未設定者強制以文字為預設）。
-   - 依平台智慧產生 Node.js 執行指令（macOS / Linux 使用絕對路徑以避免 NVM 等非互動式 Shell 遺失 `PATH` 引發 exit status 127；Windows 絕對禁止包含雙引號以避開 Go `exec.Command("cmd", "/c", command)` 的 `\"` 字面引號污染陷阱，無空格路徑使用 `node <path>`，含空格路徑自動轉為 `node --import file:///... -e 0`）。
-   - 同步寫入三層 `settings.json`（已執行防禦性 位元組順序記號（BOM）剝除與寫入後無 位元組順序記號（BOM）驗證，包含 `items` 與 `itemStyles`）。
-   - 寫入 `trusted_hooks.json` 註冊安全信任（含當前工作區、家目錄與 `"*"` 萬用字元（Wildcard）鍵，精確註冊設定檔命令並全面補齊引號、反斜線、正斜線與環境變數變體）。
-   - 將 Hook 腳本安全拷貝部署至 `~/.gemini/antigravity-cli/hooks/` 目錄中，寫入時強制 `{ encoding: 'utf8' }`。
-   - 若為 Windows 平台且 CLI 目錄缺少 `sh.exe`，自動編譯靜默無窗體橋接器。
+   - 依平台產生最穩定的 Node.js 執行指令（macOS / Linux 使用絕對路徑以避免 NVM 等非互動式 Shell 遺失 `PATH` 引發 exit status 127；Windows 不含雙引號以相容 Go `exec.Command("cmd", "/c", command)`，無空格路徑使用 `node <path>`，含空格路徑自動轉為 `node --import file:///... -e 0`）。
+   - 將狀態列腳本部署至 `~/.gemini/antigravity-cli/hooks/` 目錄中，並同步更新設定檔（已執行防禦性位元組順序記號（BOM）清理與保留既有設定屬性）。
 
-   **指令範例**：
+   **指令範例**（請將 `<SKILL_DIR>` 替換為本 `SKILL.md` 所在目錄的真實路徑）：
    ```bash
-   node skills/agy-cli-statusline/scripts/configure-statusline.mjs --lang "<步驟1選定的語言>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/樣式輸入>" --workspace "<當前工作區絕對路徑>"
+   node "<SKILL_DIR>/scripts/configure-statusline.mjs" --lang "<步驟1選定的語言>" --selected '<JSON字串格式的步驟3勾選結果>' --order "<步驟4的排序/樣式輸入>" --workspace "<當前工作區絕對路徑>"
    ```
    *注意：`--selected` 必須是合法的 JSON 字串陣列，例如 `'["🤖 目前使用的人工智慧模型名稱（model-name）","🔋 帳號五小時可用額度百分比（quota）"]'`。請注意外層與內層引號的正確跳脫。*
 
 ### 步驟 6：自動驗證
 
-1. 配置腳本執行完成後，呼叫 `run_command` 執行原有的測試驗證腳本：
+1. 配置腳本執行完成後，呼叫 `run_command` 執行測試驗證腳本：
    ```bash
-   node skills/agy-cli-statusline/scripts/test-counters.mjs
+   node "<SKILL_DIR>/scripts/test-counters.mjs"
    ```
 2. 確認測試無誤通過。若有任何錯誤，依照錯誤訊息進行對應修正。
 
@@ -380,18 +369,17 @@ Windows 平台的 位元組順序記號（BOM）鐵則、`sh.exe` 越獄、`csc.
    - 在最終回報中，以程式碼區塊清楚列出**本次設定**與**先前設定**（若有先前含換行 `n` 或自訂排序紀錄）的排版順序字串，並同時提供以下兩種版本，方便使用者留存紀錄、日後重新設定或直接複製貼上至步驟 4 的 Write-in 欄位：
      - **數字序號版本**：以步驟 3 勾選項目序號與樣式前綴組成的逗號分隔字串（如 `1,e2,n,3`；若為略過則輸出對應序號字串如 `1,2,3...`）。
      - **英文識別碼版本**：以指標英文識別碼與樣式前綴組成的逗號分隔字串（文字樣式為純識別碼如 `model-name`，Emoji 樣式加上 `e:` 前綴如 `e:quota`，並保留換行 `n`，例如 `model-name,e:quota,n,context-used`），即使日後勾選項目增減也不會跑位。
-2. **根據所選語系撰寫重新載入說明**：
-   - **初次安裝或初次啟用狀態列**：向使用者說明，由於 agy 命令列介面（CLI）在執行期間不會動態監聽並註冊新增的掛鉤行程，**必須重新啟動 agy 命令列介面（CLI）（退出後重新開啟）** 才能載入掛鉤行程並顯示狀態列。
-   - **已啟用狀態列之調整**：若使用者先前已啟用狀態列，本次僅為調整指標順序或切換語系，設定已自動在命令列介面（CLI）底部**即時熱更新（Hot Reload）生效**，無需重新啟動。
-3. **舊版腳本檢查**：讀取或檢查 `~/.gemini/hooks/statusline-quota.mjs` 與 `~/.gemini/hooks/fetch-local-quota.mjs` 是否存在。若存在，則以所選語系提醒使用者可以安全地手動刪除它們。
-4. **故障診斷指引**：在回覆末尾以所選語系加入提示：「若日後狀態列突然消失，請前往本外掛目錄執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs`，並把完整輸出貼給 人工智慧（AI）代理進行診斷。」
+2. **根據所選語系撰寫重新載入與啟用說明**：
+   - **已啟用狀態列之調整**：若使用者先前已啟用本狀態列，本次調整指標順序或切換語系已自動在命令列介面（CLI）底部**即時熱更新（Hot Reload）生效**，無需重新啟動。
+   - **初次啟用或切換狀態列命令**：向使用者說明，若底部狀態列尚未顯示（或先前使用其他自訂腳本如 `statusline.sh`），可直接於 `agy` 對話框輸入配置腳本輸出的 `/statusline <command>` 指令立即啟用，或重新啟動 `agy` 命令列介面（CLI）。
+3. **故障診斷指引**：在回覆末尾以所選語系加入提示：「若日後狀態列突然消失，請執行 `node "<SKILL_DIR>/scripts/diagnose-statusline.mjs"`，並把完整輸出貼給人工智慧（AI）代理進行診斷。」
 
 ---
 
 ## ! 常見陷阱速查
 
-完整對照表（12 條陷阱與修正做法）詳見 [references/pitfalls.md](references/pitfalls.md)。最關鍵的三條速記：
+完整對照表詳見 [references/pitfalls.md](references/pitfalls.md)。最關鍵的三條速記：
 
-1. **必須同步寫入三層設定檔**（特別是 命令列介面（CLI）專屬的 `~/.gemini/antigravity-cli/settings.json`，是最致命的盲點）
-2. **Windows 寫設定檔絕對禁止帶 位元組順序記號（BOM）**，寫入後必須驗證前 3 個位元組
-3. **絕對禁止憑空生成 掛鉤（Hook） 腳本**，必須從本外掛的 `skills/agy-cli-statusline/scripts/` 讀取原文部署
+1. **禁止以 `read_file` / `edit_file` 直接讀寫 `~/.gemini/antigravity-cli/settings.json`**，一律由步驟 5 執行 `configure-statusline.mjs` 自動同步三層設定檔。
+2. **Windows 寫設定檔絕對禁止帶位元組順序記號（BOM）**，寫入後必須驗證前 3 個位元組。
+3. **絕對禁止憑空生成狀態列腳本**，必須透過本外掛的 `scripts/configure-statusline.mjs` 部署原始腳本。

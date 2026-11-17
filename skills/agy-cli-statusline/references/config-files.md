@@ -1,12 +1,9 @@
 # 設定檔規範（Reference）
 
 > [!IMPORTANT]
-> 本檔案內含必須**逐字（verbatim）使用**的 JSON 結構、路徑範本與信任機制字串。
-> AI 代理載入本檔案時必須遵守：
-> 1. **禁止透過 Explore / 子代理（subagent）摘要本檔案** — 主代理必須親自以 Read 工具讀取
-> 2. **禁止改寫、簡化、重新格式化任何 JSON 區塊或路徑範本**
-> 3. **禁止省略多層設定檔中任何一層**（特別是 CLI 專屬設定檔，是最致命的盲點）
-> 4. 若內容與你熟悉的其他 CLI / 工具格式不同，**一律以本檔案為準**（此為 agy CLI 專用規範）
+> 本檔案記錄狀態列設定檔的 JSON 結構與跨平台執行命令規範。
+> 1. **禁止以 `read_file` 或 `edit_file` 工具直接存取 `~/.gemini/` 下的 `settings.json`** — 所有設定檔更新均由 `scripts/configure-statusline.mjs` 自動處理。
+> 2. **禁止改寫、簡化、重新格式化任何 JSON 區塊或路徑範本**。
 
 ---
 
@@ -16,14 +13,14 @@
 - [2. statusLine 物件結構（macOS / Linux）](#2-statusline-物件結構macos--linux)
 - [3. statusLine 物件結構（Windows）](#3-statusline-物件結構windows)
 - [4. ui.language 與 ui.footer.items 結構](#4-uilanguage-與-uifooteritems-結構)
-- [5. trusted_hooks.json 信任機制](#5-trusted_hooksjson-信任機制)
-- [6. 跨電腦移植的雙保險設計](#6-跨電腦移植的雙保險設計)
+- [5. 原生 /statusline 斜線指令支援](#5-原生-statusline-斜線指令支援)
+- [6. 跨電腦移植與相容性設計](#6-跨電腦移植與相容性設計)
 
 ---
 
 ## 1. 三層設定檔架構與優先級
 
-Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更新全部三層**，否則狀態列將無聲無息失效。
+`configure-statusline.mjs` 腳本會自動同步更新三層設定檔，確保 CLI 本體與狀態列渲染腳本讀取一致的設定：
 
 | 層級 | 路徑語法 | 動態解析方式 | 優先級 |
 |---|---|---|---|
@@ -31,8 +28,8 @@ Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更�
 | **全域設定檔** | `~/.gemini/settings.json` | 展開 `$HOME` / `USERPROFILE` | 中 |
 | **專案設定檔** | `<workspace>/.gemini/settings.json` | 當前工作區根目錄 | 條件性（若存在）|
 
-> [!CAUTION]
-> **最致命的隱蔽 Bug**：CLI 專屬設定檔 `~/.gemini/antigravity-cli/settings.json` 由 agy CLI 自身維護，優先級**高於**全域設定檔。若該檔案存在一個 `statusLine` 物件且 `command` 為空字串（如 `{ "type": "", "command": "", "enabled": true }`），全域設定檔中正確的 Hook 設定會被完全覆蓋。AI 代理**必須**在 Pre-check 階段讀取此檔案、在寫入階段同步覆寫此檔案。
+> [!NOTE]
+> CLI 專屬設定檔 `~/.gemini/antigravity-cli/settings.json` 由 `agy` CLI 讀取以決定 `statusLine.command`。`configure-statusline.mjs` 會在保留使用者既有屬性（如 `permissions`、`trustedWorkspaces`、`model`、`colorScheme` 等）的前提下，局部更新 `ui.language`、`ui.footer` 與 `statusLine`。
 
 ---
 
@@ -115,53 +112,26 @@ Antigravity CLI（agy）讀取**三層**設定檔。AI 代理**必須同時更�
 
 ---
 
-## 5. trusted_hooks.json 信任機制
+## 5. 原生 `/statusline` 斜線指令支援
 
-路徑：`~/.gemini/trusted_hooks.json`（全域）
+Antigravity CLI 內建 `/statusline` 斜線指令，可於 TUI 互動介面中直接管理狀態列：
 
-為防止 CLI 將 Hook 靜默阻擋，必須在下列三個鍵的陣列中註冊信任字串：
+- `/statusline`：切換啟用或停用狀態列。
+- `/statusline <command>`：直接設定自訂狀態列命令並立即啟用（無需重啟 CLI）。
+- `/statusline on` / `/statusline off`：明確開啟或關閉自訂狀態列。
+- `/statusline delete` / `/statusline reset`：清除自訂命令並還原為內建預設狀態列。
 
-1. 當前工作區目錄（鍵為當前 workspace 絕對路徑）
-2. 使用者家目錄（鍵為 `$HOME` / `USERPROFILE` 展開後的絕對路徑）
-3. `"*"` 萬用字元（Wildcard）鍵
-
-### 信任字串格式
-
-**macOS / Linux**（精確指令 + 絕對路徑變體 + `$HOME` 變體 + 裸命令相容）：
-```text
-statusLine:<真實的 Node.js 執行檔絕對路徑> <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs
-statusLine:"<真實的 Node.js 執行檔絕對路徑>" "<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
-statusLine:<真實的 Node.js 執行檔絕對路徑> $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs
-statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs
-statusLine:node $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs
-```
-
-**Windows**（精確指令 + `--import file:///` + 雙反斜線 + forward slash + `%USERPROFILE%` + 引號變體）：
-```text
-statusLine:node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs
-statusLine:node --import file:///<真實的使用者家目錄正斜線且空格轉%20路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0
-statusLine:node "<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
-statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs
-statusLine:node "<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
-statusLine:node %USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs
-statusLine:node "%USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
-```
-
-> ⚠️ 必須**同時追加**寫入 `settings.json` 的精確指令字串、各類引號變體與環境變數變體（`$HOME` 或 `%USERPROFILE%`），以完美通過 CLI 的安全性檢驗。
+此外，`configure-statusline.mjs` 亦向下相容維護舊版 CLI 所需的設定項目，無須由 AI 代理手動編輯設定檔。
 
 ---
 
-## 6. 跨電腦移植的雙保險設計
+## 6. 跨電腦移植與相容性設計
 
 ### 寫入 `settings.json` 時
 
 - **macOS / Linux**：使用目前環境 Node.js 執行檔絕對路徑（`process.execPath`）搭配腳本絕對路徑，若路徑含空格以引號包裹。免去 non-interactive `sh` 遺失 `PATH` 的問題（exit status 127）。
 - **Windows**：使用無雙引號的 `node` 裸命令搭配腳本絕對路徑（含空格時轉為 `node --import file:///... -e 0`）。免去 Go `exec.Command("cmd", "/c", command)` 的 `\"` 字面引號污染與 `C:\Program Files\nodejs\node.exe` 空白引號剝除問題。
 
-### 寫入 `trusted_hooks.json` 時：全方位註冊
+### 跨電腦移植時的自動更新機制
 
-同時寫入精確命令、引號變體、環境變數變體與歷史裸命令變體，確保設定檔無論如何遷移都能保持信任狀態。
-
-### 跨電腦移植時的自癒機制
-
-由於開源分享或複製設定檔到新電腦時絕對路徑會改變，新電腦的 AI 代理在首次執行本技能時，會全自動動態重新解析新電腦的絕對路徑並覆寫更新設定。因此**直接由腳本動態解析並寫入適當的跨平台指令是最健壯且無副作用的方案**。
+由於複製設定檔到新電腦時絕對路徑可能改變，在新電腦執行本技能的 `configure-statusline.mjs` 時，腳本會自動動態解析新電腦的絕對路徑並更新設定。

@@ -1,12 +1,9 @@
 # Windows 平台特定規範（Reference）
 
 > [!IMPORTANT]
-> 本檔案內含必須**逐字（verbatim）使用**的指令片段、JSON 結構與路徑範本。
-> AI 代理載入本檔案時必須遵守：
-> 1. **禁止透過 Explore / 子代理（subagent）摘要本檔案** — 主代理必須親自以 Read 工具讀取
-> 2. **禁止改寫、簡化、重新格式化任何程式碼區塊內容**
-> 3. **禁止將指令翻譯成「等效」做法**（例如不可將 PowerShell `utf8NoBOM` 改寫為 `Out-File -Encoding UTF8`）
-> 4. 若內容與你熟悉的其他 CLI / API 格式不同，**一律以本檔案為準**（此為 agy CLI 專用規範）
+> 本檔案記錄 Windows 平台的編碼與路徑相容規範。
+> 1. **禁止以 `read_file` 或 `edit_file` 工具直接存取 `~/.gemini/` 下的 `settings.json`** — 所有設定檔更新均由 `scripts/configure-statusline.mjs` 自動處理。
+> 2. **禁止改寫、簡化、重新格式化任何程式碼區塊內容**。
 
 ---
 
@@ -14,10 +11,10 @@
 
 - [1. UTF-8 BOM 編碼鐵則（寫設定檔絕對禁止帶 BOM）](#1-utf-8-bom-編碼鐵則寫設定檔絕對禁止帶-bom)
 - [2. Windows 寫檔強制 `{ encoding: 'utf8' }`](#2-windows-寫檔強制-encoding-utf8)
-- [3. Windows BOM 預檢（讀檔時必執行）](#3-windows-bom-預檢讀檔時必執行)
-- [4. 行程查詢：Get-CimInstance 取代 wmic](#4-行程查詢get-ciminstance-取代-wmic)
+- [3. Windows BOM 自動清理（由配置腳本自動執行）](#3-windows-bom-自動清理由配置腳本自動執行)
+- [4. 記憶體查詢：Get-CimInstance 取代已棄用的 wmic](#4-記憶體查詢get-ciminstance-取代已棄用的-wmic)
 - [5. settings.json 中 Windows 路徑跳脫範本](#5-settingsjson-中-windows-路徑跳脫範本)
-- [6. sh.exe 缺失修復：編譯靜默無窗體橋接器](#6-shexe-缺失修復編譯靜默無窗體橋接器)
+- [6. sh.exe 相容橋接器：編譯靜默無窗體轉發器](#6-shexe-相容橋接器編譯靜默無窗體轉發器)
 - [7. 子行程（Child Process）執行：強制 windowsHide: true](#7-子行程child-process執行強制-windowshide-true)
 
 ---
@@ -28,7 +25,7 @@ Windows 上有多個「預設帶 UTF-8 BOM（`EF BB BF`）」的寫檔路徑，�
 
 ### ❌ 絕對禁止的寫檔路徑
 
-AI 代理寫入任何 `.gemini` 之下的 JSON 設定檔（`settings.json`、`trusted_hooks.json` 等）時，**絕對禁止**走下列任一路徑：
+寫入任何 `.gemini` 之下的 JSON 設定檔（`settings.json` 等）時，**絕對禁止**走下列任一路徑：
 
 - ❌ **PowerShell 5.1**：`Set-Content -Encoding UTF8`、`Out-File -Encoding UTF8`、`Add-Content -Encoding UTF8`、`>` / `>>` 重新導向（**全部帶 BOM 且不可關閉**）
 - ❌ **PowerShell 7+**：`Set-Content -Encoding UTF8`、`Out-File -Encoding UTF8`（**仍預設帶 BOM**；必須改用 `-Encoding utf8NoBOM`）
@@ -86,30 +83,15 @@ fs.writeFileSync(targetPath, content);
 
 ---
 
-## 3. Windows BOM 預檢（讀檔時必執行）
+## 3. Windows BOM 自動清理（由配置腳本自動執行）
 
-讀取每一份 `settings.json` 與 `trusted_hooks.json` 時，必須同時檢查檔案的前 3 個位元組是否為 `EF BB BF`（UTF-8 BOM）。若是，請將該檔案路徑記錄為「需於後續寫入步驟自動修復」的目標。
-
-PowerShell 檢測片段：
-
-```powershell
-$b = [System.IO.File]::ReadAllBytes($path)
-$hasBOM = ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)
-```
+`configure-statusline.mjs` 在讀寫設定檔時，會自動偵測並剝除檔案開頭的 `EF BB BF`（UTF-8 BOM），無須由 AI 代理手動呼叫 `read_file` 讀取設定檔。
 
 ---
 
-## 4. 行程查詢：Get-CimInstance 取代 wmic
+## 4. 記憶體查詢：Get-CimInstance 取代已棄用的 wmic
 
-Microsoft 已於 Windows 11 預設棄用並移除 `wmic`。若依賴 `wmic` 將導致行程查詢直接失敗，狀態列無聲無息地回傳「未知」與「無」。
-
-**正確做法**：使用 PowerShell `Get-CimInstance Win32_Process`，同時相容 Windows 10 與 11。
-
-```powershell
-Get-CimInstance Win32_Process -Filter "Name like '%agy%'"
-```
-
-此命令能穩定獲取 `ProcessID` 與 `CommandLine`（用以解析 `--csrf_token` 參數），是高相容性、零 dependency 的跨 Windows 世代黃金方案。
+Microsoft 已於 Windows 11 預設棄用並移除 `wmic`。在查詢 CLI 行程記憶體用量（WorkingSetSize）時，使用 PowerShell `Get-CimInstance Win32_Process`，同時相容 Windows 10 與 11。
 
 ---
 
@@ -117,9 +99,9 @@ Get-CimInstance Win32_Process -Filter "Name like '%agy%'"
 
 ### 為什麼 Windows 平台使用 `node` 裸命令且「絕對禁止包含雙引號 `"`」（架構評估）
 
-在跨平台評估與 `agy.exe`（v1.3.5+）反組譯驗證中，Windows 的 `statusLine.command` 存在幾個極其關鍵的系統底層限制：
-1. **Go `exec.CommandContext(ctx, "cmd", "/c", command)` 與 `\"` 字面引號污染陷阱（最致命）**：
-   在 Windows 版 `agy.exe` 的 `statusline_runner.go` 中，底層是透過 Go 標準庫 `exec.CommandContext(ctx, "cmd", "/c", command)` 執行狀態列指令。Go 的 `syscall.EscapeArg` 在組裝 Windows `CreateProcessW` 命令列時，只要參數包含空白或雙引號，就會在外層包裹雙引號 `"..."`，並將**內部所有的雙引號 `"` 強制加上反斜線轉義為 `\"`**（即 `cmd /c "node \"C:\Users\...\statusline-quota.mjs\""`）。
+在跨平台評估中，Windows 的 `statusLine.command` 存在幾個關鍵的系統底層限制：
+1. **Go `exec.CommandContext(ctx, "cmd", "/c", command)` 與 `\"` 字面引號污染陷阱（最關鍵）**：
+   在 Windows 版 `agy.exe` 中，底層是透過 Go 標準庫 `exec.CommandContext(ctx, "cmd", "/c", command)` 執行狀態列指令。Go 的 `syscall.EscapeArg` 在組裝 Windows `CreateProcessW` 命令列時，只要參數包含空白或雙引號，就會在外層包裹雙引號 `"..."`，並將**內部所有的雙引號 `"` 強制加上反斜線轉義為 `\"`**（即 `cmd /c "node \"C:\Users\...\statusline-quota.mjs\""`）。
    然而 `cmd.exe /c` 僅會剝除最外層的雙引號，**不會解開 `\"` 跳脫**，而是原封不動將 `\"C:\Users\...\statusline-quota.mjs\"` 傳給 `node.exe`。接著 `node.exe`（MSVC CRT 命令列解析器）會將 `\"`（奇數個反斜線加雙引號）解析為**字面上的雙引號字元 `"`**（而非字串邊界！），導致 `process.argv[1]` 變成開頭帶有雙引號字元的相對路徑 `"\"C:\\Users\\..."`，進而與當前工作目錄（CWD）拼接並直接崩潰報錯：
    `Error: Cannot find module 'D:\Project\...\"C:\Users\...\statusline-quota.mjs"'`（累積 30 次後狀態列即被 CLI 自動停用 `enabled: false`）。
 2. **路徑空格與 `cmd.exe` 雙引號剝除陷阱**：Windows 官方預設安裝於 `C:\Program Files\nodejs\node.exe`，內含空白字元，絕對不可寫入 `process.execPath` 絕對路徑。
@@ -149,31 +131,19 @@ Get-CimInstance Win32_Process -Filter "Name like '%agy%'"
 }
 ```
 
-`trusted_hooks.json` 中對應的 Windows 信任字串（必須包含精確命令，並同時追加 `--import file:///`、單/雙反斜線、forward slash、引號與 `%USERPROFILE%` 變體以確保相容性）：
-
-```text
-"statusLine:node <真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
-"statusLine:node --import file:///<真實的使用者家目錄正斜線且空格轉%20路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs -e 0"
-"statusLine:node \"<真實的使用者家目錄絕對路徑>\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
-"statusLine:node <真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs"
-"statusLine:node \"<真實的使用者家目錄絕對路徑>/.gemini/antigravity-cli/hooks/statusline-quota.mjs\""
-"statusLine:node %USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"
-"statusLine:node \"%USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs\""
-```
-
-> ⚠️ **絕對禁止照抄** `<真實的使用者家目錄絕對路徑>` 此佔位符。AI 代理必須動態解析當前系統環境中的真實絕對路徑（例如 `C:\Users\andy`）替換之。
+> ⚠️ **絕對禁止照抄** `<真實的使用者家目錄絕對路徑>` 此佔位符。`configure-statusline.mjs` 會動態解析當前系統環境中的真實絕對路徑（例如 `C:\Users\andy`）替換之。
 
 ---
 
-## 6. sh.exe 缺失修復：編譯靜默無窗體橋接器
+## 6. sh.exe 相容橋接器：編譯靜默無窗體轉發器
 
 ### 背景
 
-agy CLI 的 `statusline_runner.go` 底層強制依賴 `sh -c` 執行指令。Windows 預設沒有 `sh.exe`，若直接複製 `powershell.exe` 當作替身，每次狀態列背景更新時都會閃爍一個黑色終端機視窗。
+舊版 agy CLI 的狀態列執行器在部分環境下依賴 `sh -c` 執行指令。Windows 預設沒有 `sh.exe`，若直接複製 `powershell.exe` 當作替身，每次狀態列背景更新時都會閃爍一個黑色終端機視窗。
 
-### 完美越獄方案（無彈窗 + 引號防禦）
+### 靜默無窗體橋接器方案（無彈窗 + 引號防禦）
 
-利用 Windows 內建的 `.NET Compiler (csc.exe)` 編譯一個無窗體（`/target:winexe`）的 `sh.exe` 橋接器，徹底消除彈窗。原始碼中特別增加針對雙引號開頭指令的外層引號防禦包裹，防止 `cmd.exe /c` 誤剝除內部雙引號。
+`configure-statusline.mjs` 在 Windows 環境下若偵測到 CLI 目錄缺少 `sh.exe`，會自動利用 Windows 內建的 `.NET Compiler (csc.exe)` 編譯一個無窗體（`/target:winexe`）的 `sh.exe` 轉發橋接器，徹底消除彈窗。原始碼中特別增加針對雙引號開頭指令的外層引號防禦包裹，防止 `cmd.exe /c` 誤剝除內部雙引號。
 
 ### 執行步驟
 
