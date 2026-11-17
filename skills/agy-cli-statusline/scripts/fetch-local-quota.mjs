@@ -1,10 +1,9 @@
-import { spawnSync, execSync } from 'child_process';
 import { writeFileSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
 import path, { dirname, join } from 'path';
 import http from 'http';
 import https from 'https';
 import os from 'os';
-import { pathToFileURL, fileURLToPath } from 'url';
+import { fileURLToPath } from 'url';
 
 const CACHE_FILE = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
 const ENV_CACHE_FILE = join(os.homedir(), '.gemini', 'tmp', 'antigravity_ls_env.json');
@@ -30,125 +29,6 @@ export function formatResetTime(resetTimeStr) {
   } catch (e) {
     return '';
   }
-}
-
-function findServerCandidates() {
-  try {
-    let output = '';
-    const candidates = [];
-    if (process.platform === 'win32') {
-      try {
-        const psCmd = "powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter 'Name like ''%antigravity%'' or Name like ''%agy%'' or Name like ''%language_server%''' | Select-Object ProcessID, Name, CommandLine | ConvertTo-Json -Compress\"";
-        output = execSync(psCmd, { encoding: 'utf8', windowsHide: true }).trim();
-        if (output) {
-          const jsonStart = output.search(/\[|\{/);
-          if (jsonStart !== -1) {
-            output = output.slice(jsonStart);
-          }
-          let processes = JSON.parse(output);
-          if (!Array.isArray(processes)) processes = [processes];
-          for (const proc of processes) {
-            const cmdLine = proc.CommandLine || '';
-            const pid = proc.ProcessId || proc.ProcessID;
-            if (!pid) continue;
-            
-            const lower = (cmdLine + ' ' + (proc.Name || '')).toLowerCase();
-            const isCli = (lower.includes('antigravity') || lower.includes('agy')) && !lower.includes('statusline-quota');
-            const isLang = lower.includes('language_server');
-            if (!isCli && !isLang) continue;
-            
-            const fallbackToken = process.env.ANTIGRAVITY_CSRF_TOKEN || '';
-            const matchToken = cmdLine.match(/--csrf_token\s+([^\s"']+)/) || cmdLine.match(/--csrf_token=([^\s"']+)/);
-            const token = matchToken ? matchToken[1] : fallbackToken;
-            candidates.push({
-              pid: pid,
-              csrf_token: token,
-              score: (isCli ? 40 : 0) + (isLang ? 20 : 0) + (token ? 10 : 0),
-              kind: isCli ? 'cli' : 'language_server'
-            });
-          }
-        }
-      } catch (e) {}
-
-      if (candidates.length === 0) {
-        try {
-          const wmicOut = execSync('wmic process get processid,caption,commandline /format:csv', { encoding: 'utf8', windowsHide: true });
-          const lines = wmicOut.split('\n');
-          for (const line of lines) {
-            const lower = line.toLowerCase();
-            if (!lower.includes('language_server') && !lower.includes('agy') && !lower.includes('antigravity')) continue;
-            if (lower.includes('statusline-quota')) continue;
-            const parts = line.split(',');
-            if (parts.length >= 3) {
-              const pidStr = parts[parts.length - 1].trim();
-              const pid = parseInt(pidStr, 10);
-              if (!isNaN(pid)) {
-                const fallbackToken = process.env.ANTIGRAVITY_CSRF_TOKEN || '';
-                const matchToken = line.match(/--csrf_token\s+([^\s"']+)/) || line.match(/--csrf_token=([^\s"']+)/);
-                const token = matchToken ? matchToken[1] : fallbackToken;
-                candidates.push({
-                  pid: pid,
-                  csrf_token: token,
-                  score: 20 + (token ? 10 : 0),
-                  kind: 'language_server'
-                });
-              }
-            }
-          }
-        } catch (e) {}
-      }
-    } else {
-      try {
-        output = execSync('ps auxww', { encoding: 'utf8', windowsHide: true });
-        const lines = output.split('\n');
-        for (const line of lines) {
-          const lower = line.toLowerCase();
-          const isCli = (/\bagy(\s|$)/.test(lower) || lower.includes('antigravity-cli')) && !lower.includes('statusline-quota');
-          const isLang = lower.includes('language_server');
-          if (!isCli && !isLang) continue;
-          const parts = line.trim().split(/\s+/);
-          if (parts.length < 11) continue;
-          const pid = parseInt(parts[1], 10);
-          if (isNaN(pid)) continue;
-          
-          const fallbackToken = process.env.ANTIGRAVITY_CSRF_TOKEN || '';
-          const matchToken = line.match(/--csrf_token(?:=|\s+)([^\s"']+)/);
-          const token = matchToken ? matchToken[1] : fallbackToken;
-          candidates.push({
-            pid,
-            csrf_token: token,
-            score: (isCli ? 40 : 0) + (isLang ? 20 : 0) + (token ? 10 : 0) - (lower.includes('/applications/antigravity.app') ? 10 : 0),
-            kind: isCli ? 'cli' : 'language_server'
-          });
-        }
-      } catch (e) {}
-    }
-    return candidates.sort((a, b) => b.score - a.score);
-  } catch (e) {
-    return [];
-  }
-}
-
-function getListeningPorts(pid) {
-  const ports = [];
-  try {
-    if (process.platform === 'win32') {
-      const output = execSync(`netstat -ano | findstr ${pid}`, { encoding: 'utf8', windowsHide: true });
-      const matches = [...output.matchAll(/TCP\s+(?:127\.0\.0\.1|0\.0\.0\.0):(\d+).*?LISTENING/g)];
-      for (const m of matches) {
-        const port = parseInt(m[1], 10);
-        if (!ports.includes(port)) ports.push(port);
-      }
-    } else {
-      const output = execSync(`lsof -nP -a -p ${pid} -iTCP -sTCP:LISTEN`, { encoding: 'utf8', windowsHide: true });
-      const matches = [...output.matchAll(/:(\d+)\s+\(LISTEN\)/g)];
-      for (const m of matches) {
-        const port = parseInt(m[1], 10);
-        if (!ports.includes(port)) ports.push(port);
-      }
-    }
-  } catch (e) {}
-  return ports.sort((a, b) => a - b);
 }
 
 function requestRpc(host, port, csrfToken, rpcPath, useHttps = false) {
@@ -433,41 +313,6 @@ export async function fetchLiveQuotaCache() {
         envCsrfToken = process.env.ANTIGRAVITY_CSRF_TOKEN || '';
         try { unlinkSync(ENV_CACHE_FILE); } catch (_) {}
       }
-    }
-  }
-
-  // 2. 若環境變數通道未獲取到資料，降級回進程掃描（向下相容舊版或獨立 IDE）
-  if (Object.keys(allModels).length === 0 && Object.keys(weekly).length === 0 && Object.keys(shortTerm).length === 0) {
-    const candidates = findServerCandidates();
-    let discoveredEnv = null;
-    for (const info of candidates) {
-      const ports = getListeningPorts(info.pid);
-      for (const port of ports) {
-        try {
-          const token = info.csrf_token || envCsrfToken;
-          // 未知掃描端口優先使用 HTTPS，避免對 Go TLS Listener 發送明文 HTTP 觸發終端報錯
-          const [response, summaryResponse] = await Promise.all([
-            requestUserStatus(port, token, '127.0.0.1', true),
-            requestQuotaSummary(port, token, '127.0.0.1', true).catch(() => null)
-          ]);
-          processStatusAndSummary(response, summaryResponse);
-          if (!discoveredEnv && token && (Object.keys(allModels).length > 0 || Object.keys(weekly).length > 0 || Object.keys(shortTerm).length > 0)) {
-            discoveredEnv = { ls_address: `127.0.0.1:${port}`, csrf_token: token, prefer_https: true };
-          }
-        } catch (_) {
-          continue;
-        }
-      }
-    }
-    // 將進程掃描成功的端點與 Token 快取至磁碟，使後續更新直接走步驟 1 極速通道（免重複執行 ps/lsof/PowerShell）
-    if (discoveredEnv && !envLoadedFromDisk) {
-      try {
-        mkdirSync(dirname(ENV_CACHE_FILE), { recursive: true });
-        writeFileSyncAndVerifyNoBOM(ENV_CACHE_FILE, JSON.stringify({
-          ...discoveredEnv,
-          updatedAt: Date.now()
-        }, null, 2));
-      } catch (_) {}
     }
   }
 

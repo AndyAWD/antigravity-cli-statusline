@@ -13,17 +13,17 @@
 
 | # | 陷阱 | 後果 | 修正做法 |
 |---|---|---|---|
-| 1 | 僅寫 `ui.footer` 而漏掉根節點的 `statusLine` 物件 | 全新電腦上 CLI 不會載入 Hook，自訂狀態列完全不顯現 | 寫入 `settings.json` 時同步寫入完整 `statusLine` 物件（`enabled: true`、`type: "command"`、`command` 指向 Hook 絕對路徑）|
-| 2 | 漏掉 CLI 專屬設定檔 `~/.gemini/antigravity-cli/settings.json` | 全域設定被高優先級的 CLI 專屬設定無聲覆蓋，無任何錯誤訊息，極難排查 | **同步寫入三層設定檔**（全域、CLI 專屬、專案）— 詳見 [config-files.md §1](config-files.md#1-三層設定檔架構與優先級) |
-| 3 | `command` 中使用環境變數 `$HOME` / `%USERPROFILE%` | CLI 背景以直接呼叫方式執行時無法 Shell 展開，Node.js 找不到路徑而失敗 | `settings.json` 一律寫入**絕對路徑**；`trusted_hooks.json` 同時追加絕對路徑與環境變數變體 |
-| 4 | Windows 上 `fs.writeFileSync` 未指定 `{ encoding: 'utf8' }` | Windows 預設 UTF-16 編碼，agy CLI 啟動時解析錯誤直接崩潰 | 所有 `fs.writeFileSync` 強制加 `{ encoding: 'utf8' }` — 詳見 [windows.md §2](windows.md#2-windows-寫檔強制-encoding-utf8) |
-| 5 | Windows 上以帶 BOM 的工具寫 `settings.json` | agy CLI（Go）的 JSON 解析器遇 BOM 崩潰報 `invalid character 'ï' looking for beginning of value` | 改用「保證不寫 BOM」的工具，並於寫入後驗證前 3 個位元組 — 詳見 [windows.md §1](windows.md#1-utf-8-bom-編碼鐵則寫設定檔絕對禁止帶-bom) |
-| 6 | Windows 上依賴 `wmic` 查詢行程 | Windows 11 已棄用 wmic，行程查詢失敗，記憶體用量回傳「未知」 | 改用 `Get-CimInstance Win32_Process` — 詳見 [windows.md §4](windows.md#4-行程查詢get-ciminstance-取代-wmic) |
-| 7 | Windows 上直接以 `powershell.exe` 替身 `sh.exe` | 每次背景更新閃爍黑色終端機視窗，UX 崩壞 | 利用 `csc.exe` 編譯靜默 `/target:winexe` 橋接器 — 詳見 [windows.md §6](windows.md#6-shexe-缺失修復編譯靜默無窗體橋接器) |
-| 8 | AI 代理憑空生成或竄改 `statusline-quota.mjs` / `fetch-local-quota.mjs` 程式碼 | 狀態列功能殘缺、指標抓取失敗（如抓不到 Token 變成 `--`），甚至導致 CLI 崩潰 | **絕對禁令**：必須 100% 準確讀取本技能 `skills/agy-cli-statusline/scripts/` 目錄下的對應檔案原文部署，禁止自行發明或修改邏輯。要更新狀態列邏輯，必須先更新 `skills/agy-cli-statusline/scripts/*.mjs` 內容再部署 |
-| 9 | agy CLI 內部指令（疑似 `/model` 切換模型時）覆寫 `~/.gemini/antigravity-cli/settings.json` 並把 `statusLine.command` 清空或刪除 | 三層合併後 `command` 為空字串，agy CLI 完全停止呼叫 hook → 狀態列**整條空白消失**（非退讓 UI，是真的不見）；無錯誤訊息、難以察覺 | 短期 workaround：重新執行本技能，會同步覆寫三層 `statusLine`。下次發生時請先**不要重跑技能**，立即執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 抓現場證據（重點看 CLI 專屬層的 `statusLine.command`），確認假設後再決定是否新增 watchdog 機制或向 agy CLI 上游回報 |
-| 10 | macOS / Linux 下 `statusLine.command` 寫死裸命令 `node`，或 Windows 下在 `statusLine.command` 中加入雙引號 `"` | macOS / Linux 因 non-interactive `sh` 缺乏 NVM `PATH` 報 `exit status 127 (sh: 1: node: not found)`；Windows 因 `agy.exe` 底層以 Go `exec.CommandContext(ctx, "cmd", "/c", command)` 呼叫，Go `syscall.EscapeArg` 會將內部雙引號轉義為 `\"`，而 `cmd.exe /c` 不會解開 `\"`，導致 `node.exe` 將其視為字面引號字元並與 CWD 拼接報錯 `Cannot find module 'D:\cwd\"C:\...\statusline-quota.mjs"'` | macOS / Linux 使用 `process.execPath` 絕對路徑；Windows **絕對禁止包含雙引號**，無空格路徑使用 `node <path>`，含空格路徑使用 `node --import file:///... -e 0`，並於 `trusted_hooks.json` 同步登記所有變體 |
-| 11 | 初次安裝或初次啟用狀態列後未重新啟動 agy CLI | agy CLI 在執行期間不會動態掛載新增的 statusLine 掛鉤行程，導致狀態列完全未顯現，誤以為設定失敗 | 向使用者明確說明：初次啟用時必須重新啟動 agy CLI（退出後重新開啟）才能載入掛鉤行程；僅在先前已啟用狀態列時，調整順序或語系才能免重啟熱更新立即生效 |
+| 1 | 僅寫 `ui.footer` 而漏掉根節點的 `statusLine` 物件 | 全新電腦上 CLI 不會載入狀態列腳本，自訂狀態列不顯現 | 透過 `configure-statusline.mjs` 同步寫入完整 `statusLine` 物件（`enabled: true`、`type: "command"`、`command` 指向腳本絕對路徑）|
+| 2 | 人工智慧（AI）代理以 `read_file` 或 `edit_file` 直接讀寫 `~/.gemini/antigravity-cli/settings.json` | 觸發 CLI 硬編碼的系統保護邊界（System Protection Boundary）錯誤而中止執行 | **禁止以 `read_file` / `edit_file` 直接存取 `~/.gemini/` 下的 `settings.json`**；一律於步驟 5 透過 `run_command` 執行 `configure-statusline.mjs` 自動同步三層設定檔 |
+| 3 | `command` 中使用環境變數 `$HOME` / `%USERPROFILE%` | CLI 背景以直接呼叫方式執行時無法展開環境變數，Node.js 找不到路徑而失敗 | `settings.json` 一律寫入**絕對路徑** |
+| 4 | Windows 上 `fs.writeFileSync` 未指定 `{ encoding: 'utf8' }` | Windows 預設 UTF-16 編碼，導致 JSON 解析失敗 | 所有 `fs.writeFileSync` 強制加 `{ encoding: 'utf8' }` — 詳見 [windows.md §2](windows.md#2-windows-寫檔強制-encoding-utf8) |
+| 5 | Windows 上以帶 BOM 的工具寫 `settings.json` | 舊版 JSON 解析器遇 BOM 報 `invalid character 'ï' looking for beginning of value` | 改用保證不寫 BOM 的工具，並於寫入後驗證前 3 個位元組 — 詳見 [windows.md §1](windows.md#1-utf-8-bom-編碼鐵則寫設定檔絕對禁止帶-bom) |
+| 6 | Windows 上依賴 `wmic` 查詢記憶體 | Windows 11 已棄用 wmic，查詢失敗 | 改用 `Get-CimInstance Win32_Process` — 詳見 [windows.md §4](windows.md#4-記憶體查詢get-ciminstance-取代已棄用的-wmic) |
+| 7 | Windows 上直接以 `powershell.exe` 替身 `sh.exe` | 每次背景更新閃爍黑色終端機視窗，UX 崩壞 | 利用 `csc.exe` 編譯靜默 `/target:winexe` 轉發橋接器 — 詳見 [windows.md §6](windows.md#6-shexe-相容橋接器編譯靜默無窗體轉發器) |
+| 8 | AI 代理憑空生成或竄改 `statusline-quota.mjs` / `fetch-local-quota.mjs` 程式碼 | 狀態列功能殘缺、指標抓取失敗（如抓不到 Token 變成 `--`） | **絕對禁令**：必須透過本技能 `scripts/configure-statusline.mjs` 部署原始腳本，禁止自行生成或修改邏輯 |
+| 9 | CLI 專屬層 `~/.gemini/antigravity-cli/settings.json` 的 `statusLine.command` 為空或指向舊腳本 | 三層合併後 `command` 未指向 `statusline-quota.mjs`，自訂狀態列不顯示 | 重新執行 `configure-statusline.mjs` 同步更新三層 `statusLine`，或於 CLI 輸入 `/statusline <command>` 直接設定 |
+| 10 | macOS / Linux 下 `statusLine.command` 寫死裸命令 `node`，或 Windows 下在 `statusLine.command` 中加入雙引號 `"` | macOS / Linux 因 non-interactive `sh` 缺乏 NVM `PATH` 報 `exit status 127 (sh: 1: node: not found)`；Windows 因 `agy.exe` 底層以 Go `exec.CommandContext(ctx, "cmd", "/c", command)` 呼叫，Go `syscall.EscapeArg` 會將內部雙引號轉義為 `\"`，而 `cmd.exe /c` 不會解開 `\"`，導致 `node.exe` 將其視為字面引號字元並與 CWD 拼接報錯 `Cannot find module` | macOS / Linux 使用 `process.execPath` 絕對路徑；Windows **絕對禁止包含雙引號**，無空格路徑使用 `node <path>`，含空格路徑使用 `node --import file:///... -e 0` |
+| 11 | 初次啟用狀態列後未套用命令或未重新載入 | 狀態列尚未切換至新命令 | 可直接於 `agy` 輸入 `/statusline <command>` 立即啟用，或重新啟動 `agy` CLI；若先前已啟用本狀態列，調整順序或語系會即時熱更新生效 |
 | 12 | 在步驟 4 將已選指標輸出為單欄 36 行長清單，或在 `ask_question.question` 中放入多行說明文字 | agy CLI 底層 TUI 會將 `question` 重複渲染兩次（對話歷史區＋底部面板），若超過單行或輸出單欄長清單，會把上方表格頂出視窗並觸發緩衝區裁切吃字（Issue #1262） | **嚴禁單欄長清單與多行 `question`**：必須在同一回合呼叫 `ask_question` 前，先於一般對話輸出「**單行填寫規則標題 ＋ 三欄 Markdown 表格**」（最多 12 列），且 `ask_question.question` **嚴格限制為單純 1 行短句**（不含換行 `\n`） |
 
 ---

@@ -254,11 +254,18 @@ function readJsonWithBOMDefense(filePath) {
   }
   let content = fs.readFileSync(filePath, 'utf8');
   content = content.replace(/^\uFEFF/, '');
-  try {
-    return JSON.parse(content);
-  } catch (err) {
-    console.error(`解析 ${filePath} 失敗，傳回空物件：`, err);
+  if (!content.trim()) {
     return {};
+  }
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return null;
+  } catch (err) {
+    console.error(`解析 ${filePath} 失敗，為保護既有設定將跳過寫入此檔案：`, err.message);
+    return null;
   }
 }
 
@@ -635,42 +642,65 @@ console.log('掛鉤腳本部署成功。');
 
 // 4. 三層 settings.json 寫入與防禦位元組順序記號（BOM）鐵則
 const statuslineQuotaMjsPath = path.join(hooksDir, 'statusline-quota.mjs');
+const statusLineCommand = getStatusLineCommand(statuslineQuotaMjsPath);
+
+// 清理舊版遺留於 ~/.gemini/hooks/ 的同名腳本（僅清理特定檔案，保留其他使用者檔案）
+const legacyHooksDir = path.join(homeDir, '.gemini', 'hooks');
+for (const legacyFile of ['statusline-quota.mjs', 'fetch-local-quota.mjs']) {
+  const legacyPath = path.join(legacyHooksDir, legacyFile);
+  try {
+    if (fs.existsSync(legacyPath) && !isInGitProject(legacyPath)) {
+      fs.unlinkSync(legacyPath);
+      console.log(`[Clean Up] 已自動清理舊版遺留腳本: ${legacyPath}`);
+    }
+  } catch (_) {}
+}
 
 function updateSettings(settingsPath) {
   console.log(`正在更新設定檔：${settingsPath}`);
-  const settings = readJsonWithBOMDefense(settingsPath);
-  
-  if (!settings.ui) settings.ui = {};
-  settings.ui.language = lang;
-  
-  if (!settings.ui.footer) settings.ui.footer = {};
-  if (settings.ui.footer.theme) {
-    delete settings.ui.footer.theme;
+  try {
+    const settings = readJsonWithBOMDefense(settingsPath);
+    if (settings === null) {
+      return;
+    }
+    
+    if (!settings.ui) settings.ui = {};
+    settings.ui.language = lang;
+    
+    if (!settings.ui.footer) settings.ui.footer = {};
+    if (settings.ui.footer.theme) {
+      delete settings.ui.footer.theme;
+    }
+    if (settings.ui.footer.style) {
+      delete settings.ui.footer.style;
+    }
+    if (settings.ui.labelStyle) {
+      delete settings.ui.labelStyle;
+    }
+    settings.ui.footer.items = items;
+    settings.ui.footer.itemStyles = itemStyles;
+    if (labelStyle) {
+      settings.ui.footer.labelStyle = labelStyle;
+    } else {
+      settings.ui.footer.labelStyle = 'text';
+    }
+    if (timeFormat) settings.ui.footer.timeFormat = timeFormat;
+    if (barLength && !isNaN(barLength) && barLength > 0) settings.ui.footer.barLength = barLength;
+    
+    const existingStatusLine = (settings.statusLine && typeof settings.statusLine === 'object' && !Array.isArray(settings.statusLine))
+      ? settings.statusLine
+      : {};
+    settings.statusLine = {
+      ...existingStatusLine,
+      enabled: true,
+      type: 'command',
+      command: statusLineCommand
+    };
+    
+    writeJsonAndVerifyNoBOM(settingsPath, settings);
+  } catch (err) {
+    console.warn(`更新設定檔 ${settingsPath} 時略過（${err.message}）。可於 CLI 輸入 /statusline ${statusLineCommand} 手動套用。`);
   }
-  if (settings.ui.footer.style) {
-    delete settings.ui.footer.style;
-  }
-  if (settings.ui.labelStyle) {
-    delete settings.ui.labelStyle;
-  }
-  settings.ui.footer.items = items;
-  settings.ui.footer.itemStyles = itemStyles;
-  if (labelStyle) {
-    settings.ui.footer.labelStyle = labelStyle;
-  } else {
-    settings.ui.footer.labelStyle = 'text';
-  }
-  if (timeFormat) settings.ui.footer.timeFormat = timeFormat;
-  if (barLength && !isNaN(barLength) && barLength > 0) settings.ui.footer.barLength = barLength;
-  
-  const statusLineCmd = getStatusLineCommand(statuslineQuotaMjsPath);
-  settings.statusLine = {
-    enabled: true,
-    type: 'command',
-    command: statusLineCmd
-  };
-  
-  writeJsonAndVerifyNoBOM(settingsPath, settings);
 }
 
 // 寫入全域與 CLI 專屬 settings.json
@@ -689,90 +719,7 @@ if (workspacePath) {
   }
 }
 
-// 5. trusted_hooks.json 寫入與防禦位元組順序記號（BOM）
-const trustedHooksPath = path.join(homeDir, '.gemini', 'trusted_hooks.json');
-console.log(`正在更新信任掛鉤設定：${trustedHooksPath}`);
-const trustedHooks = readJsonWithBOMDefense(trustedHooksPath);
-
-const statusLineCommand = getStatusLineCommand(statuslineQuotaMjsPath);
-const trustStrings = [];
-
-// 無論任何平台，最優先加入當前寫入 settings.json 的精確命令字串
-trustStrings.push(`statusLine:${statusLineCommand}`);
-
-if (process.platform === 'win32') {
-  // Windows 平台相容變體
-  const winFileUrl = 'file:///' + statuslineQuotaMjsPath.replace(/^"(.*)"$/, '$1').replace(/\\/g, '/').replace(/^\//, '').replace(/ /g, '%20');
-  trustStrings.push(`statusLine:node --import ${winFileUrl} -e 0`);
-  // 1. node 裸命令變體（單反斜線，未引號與引號）
-  trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath}`);
-  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath}"`);
-  // 2. 雙反斜線變體
-  trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}`);
-  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}"`);
-  // 3. forward slash 變體
-  trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath.replace(/\\/g, '/')}`);
-  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath.replace(/\\/g, '/')}"`);
-  // 4. 環境變數 %USERPROFILE% 變體
-  trustStrings.push(`statusLine:node %USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs`);
-  trustStrings.push(`statusLine:node "%USERPROFILE%\\.gemini\\antigravity-cli\\hooks\\statusline-quota.mjs"`);
-  trustStrings.push(`statusLine:node %USERPROFILE%\\\\.gemini\\\\antigravity-cli\\\\hooks\\\\statusline-quota.mjs`);
-  trustStrings.push(`statusLine:node "%USERPROFILE%\\\\.gemini\\\\antigravity-cli\\\\hooks\\\\statusline-quota.mjs"`);
-  trustStrings.push(`statusLine:node %USERPROFILE%/.gemini/antigravity-cli/hooks/statusline-quota.mjs`);
-  trustStrings.push(`statusLine:node "%USERPROFILE%/.gemini/antigravity-cli/hooks/statusline-quota.mjs"`);
-  // 5. process.execPath 完整路徑變體（防禦使用者手動覆寫成絕對路徑）
-  trustStrings.push(`statusLine:${process.execPath} ${statuslineQuotaMjsPath}`);
-  trustStrings.push(`statusLine:"${process.execPath}" "${statuslineQuotaMjsPath}"`);
-  trustStrings.push(`statusLine:${process.execPath.replace(/\\/g, '/')} ${statuslineQuotaMjsPath.replace(/\\/g, '/')}`);
-  trustStrings.push(`statusLine:"${process.execPath.replace(/\\/g, '/')}" "${statuslineQuotaMjsPath.replace(/\\/g, '/')}"`);
-  trustStrings.push(`statusLine:${process.execPath.replace(/\\/g, '\\\\')} ${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}`);
-  trustStrings.push(`statusLine:"${process.execPath.replace(/\\/g, '\\\\')}" "${statuslineQuotaMjsPath.replace(/\\/g, '\\\\')}"`);
-} else {
-  // macOS / Linux 平台相容變體
-  // 1. process.execPath 絕對路徑變體
-  trustStrings.push(`statusLine:${process.execPath} ${statuslineQuotaMjsPath}`);
-  trustStrings.push(`statusLine:"${process.execPath}" "${statuslineQuotaMjsPath}"`);
-  trustStrings.push(`statusLine:${process.execPath} "${statuslineQuotaMjsPath}"`);
-  trustStrings.push(`statusLine:"${process.execPath}" ${statuslineQuotaMjsPath}`);
-  // 2. $HOME 環境變數變體
-  if (statuslineQuotaMjsPath.startsWith(homeDir)) {
-    const homeRelPath = statuslineQuotaMjsPath.slice(homeDir.length);
-    trustStrings.push(`statusLine:${process.execPath} $HOME${homeRelPath}`);
-    trustStrings.push(`statusLine:${process.execPath} "$HOME${homeRelPath}"`);
-    trustStrings.push(`statusLine:"${process.execPath}" $HOME${homeRelPath}`);
-    trustStrings.push(`statusLine:"${process.execPath}" "$HOME${homeRelPath}"`);
-  }
-  // 3. 裸命令 node 歷史相容變體
-  trustStrings.push(`statusLine:node ${statuslineQuotaMjsPath}`);
-  trustStrings.push(`statusLine:node "${statuslineQuotaMjsPath}"`);
-  trustStrings.push(`statusLine:node $HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs`);
-  trustStrings.push(`statusLine:node "$HOME/.gemini/antigravity-cli/hooks/statusline-quota.mjs"`);
-}
-
-const keysToRegister = [homeDir, '*'];
-if (process.platform === 'win32') {
-  keysToRegister.push(homeDir.replace(/\\/g, '/'));
-}
-if (workspacePath) {
-  keysToRegister.push(path.resolve(workspacePath));
-  if (process.platform === 'win32') {
-    keysToRegister.push(path.resolve(workspacePath).replace(/\\/g, '/'));
-  }
-}
-
-for (const key of keysToRegister) {
-  if (!trustedHooks[key]) {
-    trustedHooks[key] = [];
-  }
-  for (const ts of trustStrings) {
-    if (!trustedHooks[key].includes(ts)) {
-      trustedHooks[key].push(ts);
-    }
-  }
-}
-
-writeJsonAndVerifyNoBOM(trustedHooksPath, trustedHooks);
-console.log('已成功更新信任掛鉤。');
+console.log(`狀態列執行指令：/statusline ${statusLineCommand}`);
 
 // 6. Windows sh.exe 編譯
 if (process.platform === 'win32') {
