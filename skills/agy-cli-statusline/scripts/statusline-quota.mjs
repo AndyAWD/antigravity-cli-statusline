@@ -1,5 +1,5 @@
 import { promises as fs, realpathSync } from 'fs';
-import { spawn, exec } from 'child_process';
+import { spawn, exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import path, { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -203,6 +203,7 @@ export const EMOJI_MAP = {
 // System Information Retrieval
 // ==========================================
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 function withTimeout(promise, ms, fallbackVal) {
   let timer;
@@ -221,14 +222,24 @@ function withTimeout(promise, ms, fallbackVal) {
   ]);
 }
 
+/**
+ * Runs a probe command and never throws.
+ * When `options.execFile` and `options.execArgs` are set, the binary runs directly
+ * (no `cmd.exe` / shell wrapper), so the timeout kills the probe itself instead of
+ * leaving an orphan grandchild. `cmd` then only describes the call.
+ */
 async function runCmdDetailedAsync(cmd, options = {}) {
-  const defaultOpts = {
+  const { execFile: file, execArgs, ...execOpts } = options;
+  const opts = {
     encoding: 'utf8',
     windowsHide: true,
-    timeout: 500
+    timeout: 500,
+    ...execOpts
   };
   try {
-    const { stdout } = await execAsync(cmd, { ...defaultOpts, ...options });
+    const { stdout } = (file && Array.isArray(execArgs))
+      ? await execFileAsync(file, execArgs, opts)
+      : await execAsync(cmd, opts);
     return { stdout: (stdout || '').trim(), ok: true, notFound: false };
   } catch (err) {
     const errMsg = `${err?.stderr || ''} ${err?.message || ''}`;
@@ -238,11 +249,6 @@ async function runCmdDetailedAsync(cmd, options = {}) {
       /not found|not recognized|找不到|不是內部或外部命令|不是内部或外部命令/i.test(errMsg);
     return { stdout: (err?.stdout || '').trim(), ok: false, notFound };
   }
-}
-
-async function runCmdAsync(cmd, options = {}) {
-  const res = await runCmdDetailedAsync(cmd, options);
-  return res.ok ? res.stdout : '';
 }
 
 function getGitFallbackPaths() {
@@ -262,17 +268,20 @@ function getGitFallbackPaths() {
   ];
 }
 
+function runGitAsync(execFn, gitBin, args, projectPath) {
+  const cwd = (typeof projectPath === 'string' && projectPath) ? projectPath : process.cwd();
+  const display = gitBin === 'git' ? 'git' : `"${gitBin}"`;
+  return execFn(`${display} ${args.join(' ')}`, { cwd, execFile: gitBin, execArgs: args });
+}
+
 export async function getGitBranch(lang, projectPath, execFn = runCmdDetailedAsync) {
   const normLang = normalizeLanguage(lang);
   const noVcStr = normLang === 'zh-tw' ? '無版本控制' : (normLang === 'zh-cn' ? '无版本控制' : (normLang === 'jp' ? 'バージョン管理なし' : 'No VC'));
   try {
-    const opts = {
-      cwd: projectPath || process.cwd()
-    };
-    const res = await execFn('git branch --show-current', opts);
+    const res = await runGitAsync(execFn, 'git', ['branch', '--show-current'], projectPath);
     if (res.ok) {
       if (res.stdout) return res.stdout;
-      const revRes = await execFn('git rev-parse --abbrev-ref HEAD', opts);
+      const revRes = await runGitAsync(execFn, 'git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
       return (revRes.ok && revRes.stdout) ? revRes.stdout : noVcStr;
     }
 
@@ -281,10 +290,10 @@ export async function getGitBranch(lang, projectPath, execFn = runCmdDetailedAsy
       for (const gitPath of paths) {
         try {
           await fs.access(gitPath);
-          const fbRes = await execFn(`"${gitPath}" branch --show-current`, opts);
+          const fbRes = await runGitAsync(execFn, gitPath, ['branch', '--show-current'], projectPath);
           if (fbRes.ok && fbRes.stdout) return fbRes.stdout;
           if (fbRes.ok) {
-            const fbRev = await execFn(`"${gitPath}" rev-parse --abbrev-ref HEAD`, opts);
+            const fbRev = await runGitAsync(execFn, gitPath, ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
             return (fbRev.ok && fbRev.stdout) ? fbRev.stdout : noVcStr;
           }
           break;
@@ -299,10 +308,7 @@ export async function getGitBranch(lang, projectPath, execFn = runCmdDetailedAsy
 
 export async function getGitDirty(projectPath, execFn = runCmdDetailedAsync) {
   try {
-    const opts = {
-      cwd: projectPath || process.cwd()
-    };
-    const res = await execFn('git status --porcelain', opts);
+    const res = await runGitAsync(execFn, 'git', ['status', '--porcelain'], projectPath);
     if (res.ok) {
       return res.stdout.length > 0;
     }
@@ -312,7 +318,7 @@ export async function getGitDirty(projectPath, execFn = runCmdDetailedAsync) {
       for (const gitPath of paths) {
         try {
           await fs.access(gitPath);
-          const fbRes = await execFn(`"${gitPath}" status --porcelain`, opts);
+          const fbRes = await runGitAsync(execFn, gitPath, ['status', '--porcelain'], projectPath);
           return fbRes.ok ? fbRes.stdout.length > 0 : false;
         } catch (e) {}
       }
@@ -323,12 +329,14 @@ export async function getGitDirty(projectPath, execFn = runCmdDetailedAsync) {
   }
 }
 
-async function getCliMemoryMB() {
+async function getCliMemoryMB(execFn = runCmdDetailedAsync) {
   try {
     if (process.platform === 'win32') {
       try {
-        const cmd = `powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter 'ProcessId = ${process.ppid}' | ForEach-Object { if ($_.Name -like '*agy*') { $_ } else { Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $_.ParentProcessId) } } | ForEach-Object { if ($_.Name -like '*agy*') { $_.WorkingSetSize } }"`;
-        const output = await runCmdAsync(cmd);
+        const script = `Get-CimInstance Win32_Process -Filter 'ProcessId = ${process.ppid}' | ForEach-Object { if ($_.Name -like '*agy*') { $_ } else { Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $_.ParentProcessId) } } | ForEach-Object { if ($_.Name -like '*agy*') { $_.WorkingSetSize } }`;
+        const execArgs = ['-NoProfile', '-Command', script];
+        const res = await execFn(`powershell.exe -NoProfile -Command "${script}"`, { execFile: 'powershell.exe', execArgs });
+        const output = res?.ok ? (res.stdout || '') : '';
         const memBytes = parseInt(output.trim(), 10);
         if (!isNaN(memBytes) && memBytes > 0) {
           return Math.round(memBytes / 1024 / 1024);
@@ -336,7 +344,9 @@ async function getCliMemoryMB() {
       } catch (err) {}
       return Math.round(process.memoryUsage().rss / 1024 / 1024);
     } else {
-      const output = await runCmdAsync(`ps -o rss= -p ${process.ppid}`);
+      const execArgs = ['-o', 'rss=', '-p', String(process.ppid)];
+      const res = await execFn(`ps ${execArgs.join(' ')}`, { execFile: 'ps', execArgs });
+      const output = res?.ok ? (res.stdout || '') : '';
       const memKb = parseInt(output.trim(), 10);
       if (!isNaN(memKb)) return Math.round(memKb / 1024);
     }
@@ -1163,7 +1173,7 @@ async function readEmailFromCliLogAsync() {
   return '';
 }
 
-async function manageAccountMetaCacheAsync(meta) {
+async function manageAccountMetaCacheAsync(meta, { allowCliLogScan = true } = {}) {
   const accountMetaPath = join(os.homedir(), '.gemini', 'tmp', 'account_meta_cache.json');
   let cachedAccount = {};
   try {
@@ -1172,7 +1182,7 @@ async function manageAccountMetaCacheAsync(meta) {
   } catch (e) {}
   
   let email = meta?.email || meta?.account?.email;
-  if (!email && !cachedAccount.email) {
+  if (allowCliLogScan && !email && !cachedAccount.email) {
     email = await readEmailFromCliLogAsync();
   }
   const planTier = meta?.plan_tier || meta?.account?.plan_tier;
@@ -1295,17 +1305,28 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const agentState = meta?.agent_state || 'idle';
   const toolConfirmPending = !!meta?.tool_confirmation_pending;
 
-  // Filter out inactive subagents before counting
-  if (Array.isArray(meta?.subagents)) {
-    meta.subagents = meta.subagents.filter(s => {
-      if (typeof s === 'object' && s.status) {
-        return s.status !== 'completed' && s.status !== 'stopped' && s.status !== 'error';
-      }
-      return true; // Keep if format is unknown
-    });
-  }
-
   const countersCachePath = join(os.homedir(), '.gemini', 'tmp', 'statusline_counters.json');
+  const rawFooterItems = options?.footerItems;
+  const enabledFooterItems = rawFooterItems === undefined || rawFooterItems === null
+    ? null
+    : (rawFooterItems instanceof Set
+        ? rawFooterItems
+        : new Set(Array.isArray(rawFooterItems) ? rawFooterItems : []));
+  const hasFooterItem = (item) => enabledFooterItems === null || enabledFooterItems.has(item);
+  const execFn = typeof options?.execFn === 'function' ? options.execFn : runCmdDetailedAsync;
+
+  // Count only active subagents, on a copy so the caller's meta stays unchanged
+  const subagentsMeta = (hasFooterItem('subagents') && Array.isArray(meta?.subagents))
+    ? {
+        ...meta,
+        subagents: meta.subagents.filter(s => {
+          if (s !== null && typeof s === 'object' && s.status) {
+            return s.status !== 'completed' && s.status !== 'stopped' && s.status !== 'error';
+          }
+          return s !== null && s !== undefined;
+        })
+      }
+    : meta;
 
   // 併行執行非同步操作（含逾時保護避免系統休眠喚醒時被 CLI SIGKILL）
   const [
@@ -1318,123 +1339,137 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     artifactsCount
   ] = await Promise.all([
     // 1. Git 分支
-    (typeof meta?.vcs?.branch === 'string' && meta.vcs.branch)
-      ? Promise.resolve(meta.vcs.branch)
-      : withTimeout(getGitBranch(normLang, projectPath), 600, noVcFallback),
+    !hasFooterItem('git-branch')
+      ? Promise.resolve(noVcFallback)
+      : ((typeof meta?.vcs?.branch === 'string' && meta.vcs.branch)
+          ? Promise.resolve(meta.vcs.branch)
+          : withTimeout(getGitBranch(normLang, projectPath, execFn), 600, noVcFallback)),
 
     // 2. Git Dirty
-    (typeof meta?.vcs?.dirty === 'boolean')
-      ? Promise.resolve(meta.vcs.dirty)
-      : withTimeout(getGitDirty(projectPath), 600, false),
+    !hasFooterItem('vcs-dirty')
+      ? Promise.resolve(false)
+      : ((typeof meta?.vcs?.dirty === 'boolean')
+          ? Promise.resolve(meta.vcs.dirty)
+          : withTimeout(getGitDirty(projectPath, execFn), 600, false)),
 
     // 3. Memory
-    withTimeout(getCliMemoryMB(), 600, Math.round(process.memoryUsage().rss / 1024 / 1024)),
+    !hasFooterItem('memory-usage')
+      ? Promise.resolve(0)
+      : withTimeout(getCliMemoryMB(execFn), 600, Math.round(process.memoryUsage().rss / 1024 / 1024)),
 
     // 4. Pending Input
-    getMetricValueAsync(
-      meta,
-      ['pending_input_count', 'pending_input', 'pending_inputs'],
-      countersCachePath,
-      async () => {
-        const pendingInputFilePath = join(os.homedir(), '.gemini', 'tmp', 'pending_input_count');
-        try {
-          const fileContent = (await fs.readFile(pendingInputFilePath, 'utf8')).trim();
-          const parsed = Number(fileContent);
-          return isNaN(parsed) ? 0 : parsed;
-        } catch (e) {
-          if (process.env.PENDING_INPUT_COUNT !== undefined) {
-            const parsed = Number(process.env.PENDING_INPUT_COUNT);
-            return isNaN(parsed) ? 0 : parsed;
+    !hasFooterItem('pending-input')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          meta,
+          ['pending_input_count', 'pending_input', 'pending_inputs'],
+          countersCachePath,
+          async () => {
+            const pendingInputFilePath = join(os.homedir(), '.gemini', 'tmp', 'pending_input_count');
+            try {
+              const fileContent = (await fs.readFile(pendingInputFilePath, 'utf8')).trim();
+              const parsed = Number(fileContent);
+              return isNaN(parsed) ? 0 : parsed;
+            } catch (e) {
+              if (process.env.PENDING_INPUT_COUNT !== undefined) {
+                const parsed = Number(process.env.PENDING_INPUT_COUNT);
+                return isNaN(parsed) ? 0 : parsed;
+              }
+              return 0;
+            }
           }
-          return 0;
-        }
-      }
-    ),
+        ),
 
     // 5. Background Tasks
-    getMetricValueAsync(
-      meta,
-      ['background_tasks', 'background_tasks_count', 'task_count', 'background_jobs'],
-      countersCachePath,
-      async () => {
-        const bgTasksDir = join(os.homedir(), '.gemini', 'tmp', 'background-processes');
-        try {
-          const files = await fs.readdir(bgTasksDir);
-          const stats = await Promise.all(
-            files.map(async (file) => {
-              if (file.startsWith('.')) return false;
-              try {
-                const stat = await fs.stat(join(bgTasksDir, file));
-                return stat.isFile();
-              } catch (e) {
-                return false;
-              }
-            })
-          );
-          return stats.filter(Boolean).length;
-        } catch (e) {
-          return 0;
-        }
-      }
-    ),
+    !hasFooterItem('background-tasks')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          meta,
+          ['background_tasks', 'background_tasks_count', 'task_count', 'background_jobs'],
+          countersCachePath,
+          async () => {
+            const bgTasksDir = join(os.homedir(), '.gemini', 'tmp', 'background-processes');
+            try {
+              const files = await fs.readdir(bgTasksDir);
+              const stats = await Promise.all(
+                files.map(async (file) => {
+                  if (file.startsWith('.')) return false;
+                  try {
+                    const stat = await fs.stat(join(bgTasksDir, file));
+                    return stat.isFile();
+                  } catch (e) {
+                    return false;
+                  }
+                })
+              );
+              return stats.filter(Boolean).length;
+            } catch (e) {
+              return 0;
+            }
+          }
+        ),
 
     // 6. Subagents
-    getMetricValueAsync(
-      meta,
-      ['subagents', 'subagents_count', 'active_subagents'],
-      countersCachePath,
-      async () => {
-        const agentsDir = join(projectPath, '.agents');
-        try {
-          const dirs = await fs.readdir(agentsDir);
-          const now = Date.now();
-          const results = await Promise.all(
-            dirs.map(async (d) => {
-              if (d.startsWith('.')) return 0;
-              const dPath = join(agentsDir, d);
-              try {
-                const statD = await fs.stat(dPath);
-                if (statD.isDirectory()) {
-                  const progressPath = join(dPath, 'progress.md');
-                  const statP = await fs.stat(progressPath);
-                  if (now - statP.mtimeMs <= 300000) {
-                    return 1;
-                  }
-                }
-              } catch (e) {}
+    !hasFooterItem('subagents')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          subagentsMeta,
+          ['subagents', 'subagents_count', 'active_subagents'],
+          countersCachePath,
+          async () => {
+            const agentsDir = join(projectPath, '.agents');
+            try {
+              const dirs = await fs.readdir(agentsDir);
+              const now = Date.now();
+              const results = await Promise.all(
+                dirs.map(async (d) => {
+                  if (d.startsWith('.')) return 0;
+                  const dPath = join(agentsDir, d);
+                  try {
+                    const statD = await fs.stat(dPath);
+                    if (statD.isDirectory()) {
+                      const progressPath = join(dPath, 'progress.md');
+                      const statP = await fs.stat(progressPath);
+                      if (now - statP.mtimeMs <= 300000) {
+                        return 1;
+                      }
+                    }
+                  } catch (e) {}
+                  return 0;
+                })
+              );
+              return results.reduce((sum, val) => sum + val, 0);
+            } catch (e) {
               return 0;
-            })
-          );
-          return results.reduce((sum, val) => sum + val, 0);
-        } catch (e) {
-          return 0;
-        }
-      }
-    ),
+            }
+          }
+        ),
 
     // 7. Artifacts
-    getMetricValueAsync(
-      meta,
-      ['artifacts', 'artifacts_count', 'artifact_count'],
-      countersCachePath,
-      async () => {
-        const rawConvId = (typeof meta?.conversation_id === 'string' && meta.conversation_id)
-          ? meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '')
-          : '';
-        if (rawConvId) {
-          const brainDir = join(os.homedir(), '.gemini', 'antigravity-cli', 'brain', rawConvId);
-          try {
-            const files = await fs.readdir(brainDir);
-            const metadataFiles = files.filter(f => f.endsWith('.metadata.json'));
-            return metadataFiles.length;
-          } catch (e) {
-            return 0;
+    !hasFooterItem('artifacts')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          meta,
+          ['artifacts', 'artifacts_count', 'artifact_count'],
+          countersCachePath,
+          async () => {
+            const rawConvId = (typeof meta?.conversation_id === 'string' && meta.conversation_id)
+              ? meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '')
+              : '';
+            if (rawConvId) {
+              const brainDir = join(os.homedir(), '.gemini', 'antigravity-cli', 'brain', rawConvId);
+              try {
+                const files = await fs.readdir(brainDir);
+                const metadataFiles = files.filter(f => f.endsWith('.metadata.json'));
+                return metadataFiles.length;
+              } catch (e) {
+                return 0;
+              }
+            } else {
+              return 0;
+            }
           }
-        } else {
-          return 0;
-        }
-      }
-    )
+        )
   ]);
 
   const memUsage = `${rssMem}MB`;
@@ -1838,10 +1873,11 @@ async function main() {
     const stdinStr = await readStdin();
     try { if (stdinStr.trim()) meta = JSON.parse(stdinStr.replace(/^\uFEFF/, '')); } catch (e) {}
 
-    const [settings, cachedAccount] = await Promise.all([
+    const [settings, initialCachedAccount] = await Promise.all([
       getSettingsAsync(meta),
-      manageAccountMetaCacheAsync(meta)
+      manageAccountMetaCacheAsync(meta, { allowCliLogScan: false })
     ]);
+    let cachedAccount = initialCachedAccount;
     const termWidth = resolveTerminalWidth(meta, cachedAccount);
     
     let fallbackModel = 'Gemini 3.5 Flash (High)';
@@ -1859,6 +1895,16 @@ async function main() {
     
     const lang = normalizeLanguage(settings?.ui?.language || 'zh-tw');
     const footerItems = settings.ui.footer.items;
+    const footerItemsSet = new Set(footerItems);
+    const needsQuotaOrAccount = footerItems.some(
+      item => typeof item === 'string' && (item.startsWith('quota') || item === 'plan-tier' || item === 'account-email')
+    );
+    const needsContext = footerItems.some(
+      item => typeof item === 'string' && (item.startsWith('context-used') || item.startsWith('token-count'))
+    );
+    if (footerItemsSet.has('account-email') && !cachedAccount.email && !(meta?.email || meta?.account?.email)) {
+      cachedAccount = await manageAccountMetaCacheAsync(meta);
+    }
     let conversationId = 'default';
     if (typeof meta?.conversation_id === 'string' && meta.conversation_id) {
       conversationId = meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '');
@@ -1867,13 +1913,15 @@ async function main() {
     // 讀取快取並優先整合 Antigravity CLI 原生 meta.quota
     const cachePath = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
     let cache = null;
-    try {
-      const cacheContent = await fs.readFile(cachePath, 'utf8');
-      const parsedCache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
-      if (parsedCache && typeof parsedCache === 'object' && !Array.isArray(parsedCache)) {
-        cache = parsedCache;
-      }
-    } catch (e) {}
+    if (needsQuotaOrAccount) {
+      try {
+        const cacheContent = await fs.readFile(cachePath, 'utf8');
+        const parsedCache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
+        if (parsedCache && typeof parsedCache === 'object' && !Array.isArray(parsedCache)) {
+          cache = parsedCache;
+        }
+      } catch (e) {}
+    }
 
     const normFallbackModel = normalizeModelName(fallbackModel);
     const activePool = normFallbackModel.includes('gemini') ? 'gemini' : ((normFallbackModel.includes('claude') || normFallbackModel.includes('gpt')) ? '3p' : '');
@@ -1928,7 +1976,7 @@ async function main() {
     let timedOut = false;
     let shouldPersistCache = false;
 
-    if (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale) {
+    if (needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale)) {
       const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
         cachePath,
         missingRequiredBuckets
@@ -1937,7 +1985,7 @@ async function main() {
       freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
       timedOut = updateRes.timedOut;
     }
-    if (metaQuota) {
+    if (needsQuotaOrAccount && metaQuota) {
       if (!cache || typeof cache !== 'object') cache = {};
       cache.shortTerm = mergeQuotaBuckets(cache.shortTerm, metaQuota.shortTerm, true);
       cache.weekly = mergeQuotaBuckets(cache.weekly, metaQuota.weekly, true);
@@ -1976,7 +2024,9 @@ async function main() {
     const quotaInfo = resolveModelQuota(fallbackModel, cache);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
     const argonInfo = resolveArgonQuota(cache);
-    const contextInfo = await calculateContextUsageAsync(meta, conversationId, settings);
+    const contextInfo = needsContext
+      ? await calculateContextUsageAsync(meta, conversationId, settings)
+      : { totalInput: 0, contextSize: 1048576, effectiveTokenCeiling: DEFAULT_COMPACTION_THRESHOLD, usedPctNum: 0 };
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
     const barLength = settings?.ui?.footer?.barLength || settings?.ui?.barLength || 10;
@@ -1984,7 +2034,7 @@ async function main() {
     const rawItemStyles = settings?.ui?.footer?.itemStyles;
 
     // 格式化指標並繪製
-    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo });
+    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo, footerItems: footerItemsSet });
     const activeDict = buildI18nDict(lang, metrics, labelStyle, rawItemStyles);
     renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, rawItemStyles, labelStyle);
 
