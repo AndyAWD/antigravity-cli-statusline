@@ -535,11 +535,9 @@ async function testCase6CrossPlatformCommandAndTrustDefense() {
 
     const globalSettingsPath = path.join(mockHome, '.gemini', 'settings.json');
     const cliSettingsPath = path.join(mockHome, '.gemini', 'antigravity-cli', 'settings.json');
-    const trustedHooksPath = path.join(mockHome, '.gemini', 'trusted_hooks.json');
 
     const globalSettings = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
     const cliSettings = JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8'));
-    const trustedHooks = JSON.parse(fs.readFileSync(trustedHooksPath, 'utf8'));
 
     // 1. 驗證 statusLine 物件結構
     assert.strictEqual(globalSettings.statusLine.enabled, true, 'statusLine.enabled 必須為 true');
@@ -568,20 +566,9 @@ async function testCase6CrossPlatformCommandAndTrustDefense() {
       assert.ok(cmd.includes('"'), '當路徑包含空格時，Unix 參數必須包含雙引號包裹');
     }
 
-    // 2. 驗證 trusted_hooks.json 必須包含寫入 settings.json 的精確 command
-    const exactTrustKey = `statusLine:${cmd}`;
-    const allTrustEntries = [
-      ...(trustedHooks[mockHome] || []),
-      ...(trustedHooks['*'] || [])
-    ];
-    assert.ok(
-      allTrustEntries.includes(exactTrustKey),
-      `trusted_hooks.json 必須包含精確的信任字串: ${exactTrustKey}`
-    );
-
-    // 3. 驗證 trusted_hooks.json 包含歷史相容條目
-    const hasLegacyOrPathEntry = allTrustEntries.some(e => e.includes('statusline-quota.mjs'));
-    assert.ok(hasLegacyOrPathEntry, 'trusted_hooks.json 必須包含 statusline-quota.mjs 相關條目');
+    // 2. 驗證掛鉤腳本已正確部署至目標路徑
+    const deployedHookPath = path.join(mockHome, '.gemini', 'antigravity-cli', 'hooks', 'statusline-quota.mjs');
+    assert.ok(fs.existsSync(deployedHookPath), 'statusline-quota.mjs 必須部署至 hooks 目錄');
 
     console.log('✅ 測試情境 6 通過！');
   } finally {
@@ -1198,6 +1185,71 @@ async function testCase12PureNumbersOverwritesResidualEmojiStyle() {
 }
 
 // ==========================================
+// 測試情境 13：保護損壞或非標準 JSON 設定檔不被空物件覆寫（防洗白防禦）與舊腳本清理
+// ==========================================
+async function testCase13NonDestructiveConfigAndLegacyCleanup() {
+  console.log('\n--- 執行測試情境 13：保護損壞或非標準 JSON 設定檔不被空物件覆寫與舊腳本清理 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case13-'));
+
+  try {
+    const cliSettingsPath = path.join(sandbox, '.gemini', 'antigravity-cli', 'settings.json');
+    const globalSettingsPath = path.join(sandbox, '.gemini', 'settings.json');
+    const legacyHooksDir = path.join(sandbox, '.gemini', 'hooks');
+    fs.mkdirSync(path.dirname(cliSettingsPath), { recursive: true });
+    fs.mkdirSync(legacyHooksDir, { recursive: true });
+
+    // 1. 建立損壞的 CLI settings.json（含使用者自訂權限字串）與合法的 global settings.json（含既有屬性）
+    const corruptedCliContent = '{\n  "permissions": { "allow": ["command(git status)"] },\n  // user comment causing JSON.parse error\n}';
+    fs.writeFileSync(cliSettingsPath, corruptedCliContent, 'utf8');
+
+    const validGlobalContent = {
+      allowNonWorkspaceAccess: true,
+      colorScheme: 'tokyo night',
+      statusLine: {
+        padding: 1,
+        stack_with_default: true
+      }
+    };
+    fs.writeFileSync(globalSettingsPath, JSON.stringify(validGlobalContent, null, 2), 'utf8');
+
+    // 2. 建立舊版遺留腳本與使用者自訂的其他掛鉤腳本
+    const legacyQuotaHook = path.join(legacyHooksDir, 'statusline-quota.mjs');
+    const legacyFetchHook = path.join(legacyHooksDir, 'fetch-local-quota.mjs');
+    const userCustomHook = path.join(legacyHooksDir, 'my-custom-hook.mjs');
+    fs.writeFileSync(legacyQuotaHook, '// legacy', 'utf8');
+    fs.writeFileSync(legacyFetchHook, '// legacy', 'utf8');
+    fs.writeFileSync(userCustomHook, '// user custom hook', 'utf8');
+
+    const selected = JSON.stringify(['model-name', 'quota']);
+    const args = ['--lang', 'zh-tw', '--selected', selected, '--order', '1,2', '--workspace', sandbox];
+    const env = { HOME: sandbox, USERPROFILE: sandbox };
+    const res = await runScript(configureScriptSrc, args, env);
+    assert.strictEqual(res.code, 0, '當單一設定檔損壞時，腳本仍應優雅完成而不崩潰');
+
+    // 驗證損壞的 CLI 設定檔未被空物件洗白覆蓋
+    const afterCliContent = fs.readFileSync(cliSettingsPath, 'utf8');
+    assert.strictEqual(afterCliContent, corruptedCliContent, '損壞的設定檔內容必須原封不動保留，絕不可被洗白覆蓋');
+
+    // 驗證合法的 Global 設定檔保留了所有既有屬性（allowNonWorkspaceAccess, colorScheme, statusLine.padding, stack_with_default）
+    const afterGlobal = JSON.parse(fs.readFileSync(globalSettingsPath, 'utf8'));
+    assert.strictEqual(afterGlobal.allowNonWorkspaceAccess, true, '既有 allowNonWorkspaceAccess 必須保留');
+    assert.strictEqual(afterGlobal.colorScheme, 'tokyo night', '既有 colorScheme 必須保留');
+    assert.strictEqual(afterGlobal.statusLine.padding, 1, '既有 statusLine.padding 必須保留');
+    assert.strictEqual(afterGlobal.statusLine.stack_with_default, true, '既有 statusLine.stack_with_default 必須保留');
+    assert.strictEqual(afterGlobal.statusLine.enabled, true, 'statusLine.enabled 必須設為 true');
+
+    // 驗證舊版遺留腳本已自動清理，且使用者自己的 my-custom-hook.mjs 完好保留
+    assert.strictEqual(fs.existsSync(legacyQuotaHook), false, '舊版 ~/.gemini/hooks/statusline-quota.mjs 應被自動清理');
+    assert.strictEqual(fs.existsSync(legacyFetchHook), false, '舊版 ~/.gemini/hooks/fetch-local-quota.mjs 應被自動清理');
+    assert.strictEqual(fs.existsSync(userCustomHook), true, '使用者自訂的 ~/.gemini/hooks/my-custom-hook.mjs 必須完好保留');
+
+    console.log('✅ 測試情境 13 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -1214,6 +1266,7 @@ async function runAllTests() {
     await testCase10FiveCategoryTabsAndParenthesisDefense();
     await testCase11ItemStylesPrefixAndConfig();
     await testCase12PureNumbersOverwritesResidualEmojiStyle();
+    await testCase13NonDestructiveConfigAndLegacyCleanup();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {

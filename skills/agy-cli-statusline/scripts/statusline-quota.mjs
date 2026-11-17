@@ -363,12 +363,31 @@ async function readStdin() {
   });
 }
 
+function resolveProjectPath(meta) {
+  const candidates = [
+    meta?.project?.path,
+    meta?.workspace?.project_dir,
+    meta?.workspace?.current_dir,
+    meta?.cwd
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) {
+      const cleaned = c.trim();
+      if (cleaned.startsWith('file://')) {
+        try {
+          return fileURLToPath(cleaned);
+        } catch (_) {}
+      }
+      return cleaned;
+    }
+  }
+  return process.cwd();
+}
+
 async function getSettingsAsync(meta) {
   const globalPath = join(os.homedir(), '.gemini', 'settings.json');
   const cliPath = join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
-  const projectDir = (typeof meta?.project?.path === 'string' && meta.project.path)
-    ? meta.project.path
-    : process.cwd();
+  const projectDir = resolveProjectPath(meta);
   const projectPath = join(projectDir, '.gemini', 'settings.json');
   let settings = {};
 
@@ -1112,6 +1131,40 @@ export function resolveTerminalWidth(meta, cachedAccount = {}) {
   return Math.max(40, fallbackCols - 15);
 }
 
+async function readEmailFromCliLogAsync() {
+  const cliDir = join(os.homedir(), '.gemini', 'antigravity-cli');
+  const candidates = [join(cliDir, 'cli.log')];
+  try {
+    const logDir = join(cliDir, 'log');
+    const files = await fs.readdir(logDir);
+    const latestLogs = files.filter(f => f.startsWith('cli-') && f.endsWith('.log')).sort().reverse().slice(0, 2);
+    for (const f of latestLogs) {
+      candidates.push(join(logDir, f));
+    }
+  } catch (_) {}
+
+  for (const logPath of candidates) {
+    let fh;
+    try {
+      fh = await fs.open(logPath, 'r');
+      const buf = Buffer.alloc(65536);
+      const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+      await fh.close();
+      fh = null;
+      if (bytesRead > 0) {
+        const text = buf.subarray(0, bytesRead).toString('utf8');
+        const m = text.match(/(?:applyAuthResult:\s*email=|authenticated successfully as\s+)([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (m && m[1]) return m[1];
+      }
+    } catch (_) {
+      if (fh) {
+        try { await fh.close(); } catch (_) {}
+      }
+    }
+  }
+  return '';
+}
+
 async function manageAccountMetaCacheAsync(meta) {
   const accountMetaPath = join(os.homedir(), '.gemini', 'tmp', 'account_meta_cache.json');
   let cachedAccount = {};
@@ -1120,7 +1173,10 @@ async function manageAccountMetaCacheAsync(meta) {
     cachedAccount = JSON.parse(content.replace(/^\uFEFF/, ''));
   } catch (e) {}
   
-  const email = meta?.email || meta?.account?.email;
+  let email = meta?.email || meta?.account?.email;
+  if (!email && !cachedAccount.email) {
+    email = await readEmailFromCliLogAsync();
+  }
   const planTier = meta?.plan_tier || meta?.account?.plan_tier;
   const termWidth = (typeof meta?.terminal_width === 'number' && meta.terminal_width > 80) ? meta.terminal_width : 0;
 
@@ -1229,7 +1285,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const tokenCount = `${tokenColor}${formatTokens(contextInfo.totalInput)}${RESET} / ${formatTokens(effectiveTokenMax)}`;
   const tokenBarVal = renderBarGraph(tokenPct, barLength, tokenColor);
 
-  const projectPath = (typeof meta?.project?.path === 'string' && meta.project.path) ? meta.project.path : process.cwd();
+  const projectPath = resolveProjectPath(meta);
   const projectName = basename(projectPath);
   const projectFullPath = projectPath;
 
@@ -1318,7 +1374,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
       ? Promise.resolve(0)
       : getMetricValueAsync(
           meta,
-          ['background_tasks', 'background_tasks_count', 'background_jobs'],
+          ['background_tasks', 'background_tasks_count', 'task_count', 'background_jobs'],
           countersCachePath,
           async () => {
             const bgTasksDir = join(os.homedir(), '.gemini', 'tmp', 'background-processes');
