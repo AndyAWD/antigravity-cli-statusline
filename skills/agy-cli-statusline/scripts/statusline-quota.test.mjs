@@ -1,4 +1,4 @@
-import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync } from 'fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import { spawn, execFileSync } from 'child_process';
@@ -78,6 +78,22 @@ function makeTempHome(cache, settings) {
   writeFileSync(join(home, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify(cache), 'utf8');
   writeFileSync(join(home, '.gemini', 'settings.json'), JSON.stringify(settings), 'utf8');
   return home;
+}
+
+// os.homedir() reads USERPROFILE on Windows and HOME elsewhere, so both are overridden
+async function withHomeEnv(home, fn) {
+  const origHome = process.env.HOME;
+  const origUserProfile = process.env.USERPROFILE;
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+  try {
+    return await fn();
+  } finally {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    if (origUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = origUserProfile;
+  }
 }
 
 async function main() {
@@ -2011,11 +2027,13 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
         context_window_size: 1048576 // 200k out of 1.0M = 19.1% used -> 80.9% remain (>=75% -> BLUE)
       }
     };
-    const ctxInfoR33_200k = await calculateContextUsageAsync(metaR33_200k, 'r33_200k_test');
+    // Direct calls in Subtests 2, 3 and 6 write ctx_*.json under os.homedir(), so they run in a sandbox home
+    const homeR33_Direct = makeTempHome({}, {});
+    const ctxInfoR33_200k = await withHomeEnv(homeR33_Direct, () => calculateContextUsageAsync(metaR33_200k, 'r33_200k_test'));
     assert.strictEqual(ctxInfoR33_200k.effectiveTokenCeiling, 256000);
-    const metricsR33_200k = await extractMetricsAsync(
-      metaR33_200k, 'zh-tw', 'Gemini 3.5 Flash', null, {}, {}, ctxInfoR33_200k, { remaining_percentage: 100, refreshes_in: '' }, { barLength: 10 }
-    );
+    const metricsR33_200k = await withHomeEnv(homeR33_Direct, () => extractMetricsAsync(
+      metaR33_200k, 'zh-tw', 'Gemini 3.5 Flash', null, {}, {}, ctxInfoR33_200k, { remaining_percentage: 100, refreshes_in: '' }, { barLength: 10, footerItems: ['token-count', 'context-used'] }
+    ));
     // Context is based on 1.0M physical window -> remain > 75% -> BLUE
     assert.strictEqual(metricsR33_200k.contextColor, "\x1b[38;2;87;202;255m", "Context color must remain BLUE (80.9% remaining of 1.0M)");
     // Token is based on 256k compaction threshold -> remain < 25% -> RED
@@ -2032,7 +2050,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
         context_window_size: 200000
       }
     };
-    const ctxInfoR33_Claude = await calculateContextUsageAsync(metaR33_Claude, 'r33_claude_test');
+    const ctxInfoR33_Claude = await withHomeEnv(homeR33_Direct, () => calculateContextUsageAsync(metaR33_Claude, 'r33_claude_test'));
     assert.strictEqual(ctxInfoR33_Claude.effectiveTokenCeiling, 200000, "Claude 200k context size must NOT be enlarged to 256k");
     const homeR33_Claude = makeTempHome({}, {
       ui: {
@@ -2189,14 +2207,14 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       conversation_id: 'conv-r33-turn-cache',
       context_window: { total_input_tokens: 50000, context_window_size: 1048576, compaction_token_limit: 400000 }
     };
-    const ctxTurn1 = await calculateContextUsageAsync(metaR33_Turn1, 'conv-r33-turn-cache');
+    const ctxTurn1 = await withHomeEnv(homeR33_Direct, () => calculateContextUsageAsync(metaR33_Turn1, 'conv-r33-turn-cache'));
     assert.strictEqual(ctxTurn1.effectiveTokenCeiling, 400000, "Turn 1 must sniff compaction_token_limit = 400k");
 
     const metaR33_Turn2 = {
       conversation_id: 'conv-r33-turn-cache',
       context_window: { total_input_tokens: 0, total_output_tokens: 0 }
     };
-    const ctxTurn2 = await calculateContextUsageAsync(metaR33_Turn2, 'conv-r33-turn-cache');
+    const ctxTurn2 = await withHomeEnv(homeR33_Direct, () => calculateContextUsageAsync(metaR33_Turn2, 'conv-r33-turn-cache'));
     assert.strictEqual(ctxTurn2.effectiveTokenCeiling, 400000, "Turn 2 (idle) must restore sniffed 400k from ctx cache");
 
     // 6B: 原生欄位字串後綴 (如 "400k", "1m")
@@ -2204,7 +2222,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       conversation_id: 'conv-r33-str-limit',
       context_window: { total_input_tokens: 1000, context_window_size: 1048576, compact_threshold: '400k' }
     };
-    const ctxStrLimit = await calculateContextUsageAsync(metaR33_StrLimit, 'conv-r33-str-limit');
+    const ctxStrLimit = await withHomeEnv(homeR33_Direct, () => calculateContextUsageAsync(metaR33_StrLimit, 'conv-r33-str-limit'));
     assert.strictEqual(ctxStrLimit.effectiveTokenCeiling, 400000, "compact_threshold='400k' string must parse to 400000");
 
     // 6C: 負數與無效設定值防禦退讓
@@ -2212,13 +2230,14 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       conversation_id: 'conv-r33-neg',
       context_window: { total_input_tokens: 1000, context_window_size: 1048576 }
     };
-    const ctxNeg = await calculateContextUsageAsync(metaR33_Neg, 'conv-r33-neg', { ui: { footer: { tokenCeiling: -100 } } });
+    const ctxNeg = await withHomeEnv(homeR33_Direct, () => calculateContextUsageAsync(metaR33_Neg, 'conv-r33-neg', { ui: { footer: { tokenCeiling: -100 } } }));
     assert.strictEqual(ctxNeg.effectiveTokenCeiling, 256000, "Negative tokenCeiling must safely fall back to 256k");
 
-    const metricsNeg = await extractMetricsAsync(
-      metaR33_Neg, 'zh-tw', 'Gemini 3.5 Flash', null, {}, {}, ctxNeg, { remaining_percentage: 100, refreshes_in: '' }, { barLength: 10 }
-    );
+    const metricsNeg = await withHomeEnv(homeR33_Direct, () => extractMetricsAsync(
+      metaR33_Neg, 'zh-tw', 'Gemini 3.5 Flash', null, {}, {}, ctxNeg, { remaining_percentage: 100, refreshes_in: '' }, { barLength: 10, footerItems: ['token-count'] }
+    ));
     assert.ok(metricsNeg.tokenCount.includes("/ 256.0k"), "tokenCount must safely fall back to / 256.0k on negative config");
+    try { rmSync(homeR33_Direct, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
     console.log("  -> Subtest 6 passed: Cross-turn cache persistence, string unit sniffing, and negative setting guards verified.");
 
     // (7) 高並發 20 個版本同時寫入狀態檔原子性與既有屬性保留
@@ -2228,9 +2247,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       mkdirSync(join(homeR33_Conc, '.gemini', 'tmp'), { recursive: true });
       writeFileSync(statePathConc, JSON.stringify({ existingProp: "preserved", unlockedVersions: {} }), 'utf8');
 
-      const originalHome = process.env.HOME;
-      process.env.HOME = homeR33_Conc;
-      try {
+      await withHomeEnv(homeR33_Conc, async () => {
         const concPromises = [];
         for (let i = 0; i < 20; i++) {
           const metaConc = {
@@ -2247,9 +2264,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
         assert.strictEqual(parsedSaved.existingProp, "preserved", "Existing properties must be preserved during concurrent writes");
         const unlockedCount = Object.keys(parsedSaved.unlockedVersions || {}).length;
         assert.strictEqual(unlockedCount, 20, `All 20 concurrent versions must be recorded! Got: ${unlockedCount}`);
-      } finally {
-        process.env.HOME = originalHome;
-      }
+      });
     } finally {
       try { rmSync(homeR33_Conc, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
     }
@@ -2283,6 +2298,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       writeFileSync(join(homeR34, '.gemini', 'tmp', 'background-processes', 'job-1.json'), '{}', 'utf8');
       writeFileSync(join(projR34, '.agents', 'worker-1', 'progress.md'), 'active', 'utf8');
       writeFileSync(join(homeR34, '.gemini', 'antigravity-cli', 'brain', convIdR34, 'artifact.metadata.json'), '{}', 'utf8');
+      writeFileSync(join(homeR34, '.gemini', 'antigravity-cli', 'cli.log'), 'applyAuthResult: email=r34-user@example.com\n', 'utf8');
 
       execFileSync('git', ['init', '-b', 'feat-r34'], { cwd: projR34, windowsHide: true, stdio: 'ignore' });
       execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: projR34, windowsHide: true, stdio: 'ignore' });
@@ -2407,6 +2423,17 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
         }
       }
 
+      // Subagent filtering tolerates null entries and leaves the caller's meta unchanged
+      const rawSubagents = [null, { status: 'completed' }, { status: 'running' }, 'legacy-entry'];
+      const metaSubagents = { ...metaR34, subagents: rawSubagents };
+      const subagentMetrics = await extractMetricsAsync(
+        metaSubagents, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
+        { footerItems: ['subagents'] }
+      );
+      assert.strictEqual(subagentMetrics.subagentsCount, 2, 'Only active, non-null subagents must be counted');
+      assert.strictEqual(metaSubagents.subagents, rawSubagents, 'meta.subagents must not be reassigned');
+      assert.strictEqual(rawSubagents.length, 4, 'meta.subagents entries must not be removed');
+
       // 3. Enabled real probes & E2E output stay unchanged
       const allProbeItems = [
         'model-name', 'git-branch', 'vcs-dirty', 'memory-usage',
@@ -2424,6 +2451,9 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       assert.strictEqual(enabledRealMetrics.subagentsCount, 1);
       assert.strictEqual(enabledRealMetrics.artifactsCount, 1);
 
+      const tmpDirR34 = join(homeR34, '.gemini', 'tmp');
+      const quotaCachePathR34 = join(tmpDirR34, 'real_quota_cache.json');
+      const quotaCacheBefore = readFileSync(quotaCachePathR34, 'utf8');
       writeFileSync(join(homeR34, '.gemini', 'settings.json'), JSON.stringify({
         ui: { language: 'us', footer: { items: allProbeItems } }
       }), 'utf8');
@@ -2445,6 +2475,21 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       const plainE2eDisabled = stripAnsi(resE2eDisabled.stdout).trim();
       assert.strictEqual(resE2eDisabled.code, 0);
       assert.strictEqual(plainE2eDisabled, 'Model: Gemini 3.5 Flash');
+
+      // main() skips quota, context and CLI log I/O when no footer item needs them
+      assert.strictEqual(readFileSync(quotaCachePathR34, 'utf8'), quotaCacheBefore, 'Quota cache must stay untouched without quota/account items');
+      const ctxFiles = readdirSync(tmpDirR34).filter(f => f.startsWith('ctx_'));
+      assert.deepStrictEqual(ctxFiles, [], 'Context cache must not be written without context/token items');
+      const accountCachePathR34 = join(tmpDirR34, 'account_meta_cache.json');
+      const accountCacheAfter = existsSync(accountCachePathR34) ? JSON.parse(readFileSync(accountCachePathR34, 'utf8')) : {};
+      assert.strictEqual(accountCacheAfter.email, undefined, 'CLI log must not be scanned without account-email');
+
+      writeFileSync(join(homeR34, '.gemini', 'settings.json'), JSON.stringify({
+        ui: { language: 'us', footer: { items: ['account-email'] } }
+      }), 'utf8');
+      const resE2eEmail = await runStatusline(metaR34, homeR34);
+      assert.strictEqual(resE2eEmail.code, 0);
+      assert.ok(stripAnsi(resE2eEmail.stdout).includes('r34-user@example.com'), `account-email must still read the CLI log, got: ${resE2eEmail.stdout}`);
 
       console.log("✅ Test R34 passed! (Subprocess and filesystem probes are gated on configured footer items)");
     } finally {
