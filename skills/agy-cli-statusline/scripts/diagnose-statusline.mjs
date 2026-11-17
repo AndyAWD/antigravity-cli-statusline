@@ -85,37 +85,8 @@ function inspectSettings(label, path) {
   return { exists: true, readable: true, parsed: true, data: p.value };
 }
 
-function inspectTrustedHooks(path, expectedHomeAbs, expectedWorkspaceAbs) {
-  console.log(`\n${head('--- trusted_hooks.json ---')}`);
-  console.log(`路徑: ${path}`);
-  if (!existsSync(path)) {
-    console.log(bad('狀態: 不存在 ← CLI 可能將 Hook 視為未信任而拒絕執行'));
-    return;
-  }
-  const r = safeRead(path);
-  if (!r.ok) { console.log(bad(`讀取失敗: ${r.error}`)); return; }
-  console.log(ok(`存在（${r.bytes.length} bytes）`));
-  if (process.platform === 'win32' && hasBOM(r.bytes)) console.log(alert('含 UTF-8 BOM'));
-  const p = parseJSON(r.raw);
-  if (!p.ok) { console.log(alert(`JSON 解析失敗: ${p.error}`)); return; }
-  const keys = Object.keys(p.value);
-  console.log(`鍵總數: ${keys.length}`);
-  const checkKey = (k, label) => {
-    const arr = p.value[k];
-    if (!arr) { console.log(`  ${bad(label + ' 鍵缺失')} (${k})`); return; }
-    if (!Array.isArray(arr)) { console.log(`  ${alert(label + ' 值非陣列')}`); return; }
-    const hits = arr.filter(s => typeof s === 'string' && s.startsWith('statusLine:') && (s.includes('node') || s.includes('statusline-quota.mjs')));
-    if (hits.length === 0) console.log(`  ${warn(label + ' 鍵存在但無 statusLine 條目')} (${k})`);
-    else console.log(`  ${ok(label + `：${hits.length} 條 statusLine 信任字串`)} (${k})`);
-    hits.forEach(h => console.log(`     ${dim('•')} ${h}`));
-  };
-  checkKey(expectedWorkspaceAbs, '當前工作區');
-  checkKey(expectedHomeAbs, '家目錄');
-  checkKey('*', '萬用字元（Wildcard） "*"');
-}
-
 function inspectHookFiles(hooksDir) {
-  console.log(`\n${head('--- Hook 檔案 ---')}`);
+  console.log(`\n${head('--- 狀態列腳本檔案 ---')}`);
   ['statusline-quota.mjs', 'fetch-local-quota.mjs'].forEach(f => {
     const p = join(hooksDir, f);
     if (existsSync(p)) {
@@ -185,7 +156,6 @@ function main() {
     project: inspectSettings('--- 第 3/3 層：專案（條件性）---', projectPath),
   };
 
-  inspectTrustedHooks(join(home, '.gemini', 'trusted_hooks.json'), home, cwd);
   inspectHookFiles(join(home, '.gemini', 'antigravity-cli', 'hooks'));
   diagnose(layers);
 
