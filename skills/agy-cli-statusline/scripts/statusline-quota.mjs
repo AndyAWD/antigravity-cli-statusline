@@ -323,12 +323,13 @@ export async function getGitDirty(projectPath, execFn = runCmdDetailedAsync) {
   }
 }
 
-async function getCliMemoryMB() {
+async function getCliMemoryMB(execFn = runCmdDetailedAsync) {
   try {
     if (process.platform === 'win32') {
       try {
         const cmd = `powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter 'ProcessId = ${process.ppid}' | ForEach-Object { if ($_.Name -like '*agy*') { $_ } else { Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $_.ParentProcessId) } } | ForEach-Object { if ($_.Name -like '*agy*') { $_.WorkingSetSize } }"`;
-        const output = await runCmdAsync(cmd);
+        const res = await execFn(cmd);
+        const output = res?.ok ? (res.stdout || '') : '';
         const memBytes = parseInt(output.trim(), 10);
         if (!isNaN(memBytes) && memBytes > 0) {
           return Math.round(memBytes / 1024 / 1024);
@@ -336,7 +337,8 @@ async function getCliMemoryMB() {
       } catch (err) {}
       return Math.round(process.memoryUsage().rss / 1024 / 1024);
     } else {
-      const output = await runCmdAsync(`ps -o rss= -p ${process.ppid}`);
+      const res = await execFn(`ps -o rss= -p ${process.ppid}`);
+      const output = res?.ok ? (res.stdout || '') : '';
       const memKb = parseInt(output.trim(), 10);
       if (!isNaN(memKb)) return Math.round(memKb / 1024);
     }
@@ -1250,6 +1252,14 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   }
 
   const countersCachePath = join(os.homedir(), '.gemini', 'tmp', 'statusline_counters.json');
+  const rawFooterItems = options?.footerItems;
+  const enabledFooterItems = rawFooterItems === undefined || rawFooterItems === null
+    ? null
+    : (rawFooterItems instanceof Set
+        ? rawFooterItems
+        : new Set(Array.isArray(rawFooterItems) ? rawFooterItems : []));
+  const hasFooterItem = (item) => enabledFooterItems === null || enabledFooterItems.has(item);
+  const execFn = typeof options?.execFn === 'function' ? options.execFn : runCmdDetailedAsync;
 
   // 併行執行非同步操作（含逾時保護避免系統休眠喚醒時被 CLI SIGKILL）
   const [
@@ -1262,123 +1272,137 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     artifactsCount
   ] = await Promise.all([
     // 1. Git 分支
-    (typeof meta?.vcs?.branch === 'string' && meta.vcs.branch)
-      ? Promise.resolve(meta.vcs.branch)
-      : withTimeout(getGitBranch(normLang, projectPath), 600, noVcFallback),
+    !hasFooterItem('git-branch')
+      ? Promise.resolve(noVcFallback)
+      : ((typeof meta?.vcs?.branch === 'string' && meta.vcs.branch)
+          ? Promise.resolve(meta.vcs.branch)
+          : withTimeout(getGitBranch(normLang, projectPath, execFn), 600, noVcFallback)),
 
     // 2. Git Dirty
-    (typeof meta?.vcs?.dirty === 'boolean')
-      ? Promise.resolve(meta.vcs.dirty)
-      : withTimeout(getGitDirty(projectPath), 600, false),
+    !hasFooterItem('vcs-dirty')
+      ? Promise.resolve(false)
+      : ((typeof meta?.vcs?.dirty === 'boolean')
+          ? Promise.resolve(meta.vcs.dirty)
+          : withTimeout(getGitDirty(projectPath, execFn), 600, false)),
 
     // 3. Memory
-    withTimeout(getCliMemoryMB(), 600, Math.round(process.memoryUsage().rss / 1024 / 1024)),
+    !hasFooterItem('memory-usage')
+      ? Promise.resolve(0)
+      : withTimeout(getCliMemoryMB(execFn), 600, Math.round(process.memoryUsage().rss / 1024 / 1024)),
 
     // 4. Pending Input
-    getMetricValueAsync(
-      meta,
-      ['pending_input_count', 'pending_input', 'pending_inputs'],
-      countersCachePath,
-      async () => {
-        const pendingInputFilePath = join(os.homedir(), '.gemini', 'tmp', 'pending_input_count');
-        try {
-          const fileContent = (await fs.readFile(pendingInputFilePath, 'utf8')).trim();
-          const parsed = Number(fileContent);
-          return isNaN(parsed) ? 0 : parsed;
-        } catch (e) {
-          if (process.env.PENDING_INPUT_COUNT !== undefined) {
-            const parsed = Number(process.env.PENDING_INPUT_COUNT);
-            return isNaN(parsed) ? 0 : parsed;
+    !hasFooterItem('pending-input')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          meta,
+          ['pending_input_count', 'pending_input', 'pending_inputs'],
+          countersCachePath,
+          async () => {
+            const pendingInputFilePath = join(os.homedir(), '.gemini', 'tmp', 'pending_input_count');
+            try {
+              const fileContent = (await fs.readFile(pendingInputFilePath, 'utf8')).trim();
+              const parsed = Number(fileContent);
+              return isNaN(parsed) ? 0 : parsed;
+            } catch (e) {
+              if (process.env.PENDING_INPUT_COUNT !== undefined) {
+                const parsed = Number(process.env.PENDING_INPUT_COUNT);
+                return isNaN(parsed) ? 0 : parsed;
+              }
+              return 0;
+            }
           }
-          return 0;
-        }
-      }
-    ),
+        ),
 
     // 5. Background Tasks
-    getMetricValueAsync(
-      meta,
-      ['background_tasks', 'background_tasks_count', 'background_jobs'],
-      countersCachePath,
-      async () => {
-        const bgTasksDir = join(os.homedir(), '.gemini', 'tmp', 'background-processes');
-        try {
-          const files = await fs.readdir(bgTasksDir);
-          const stats = await Promise.all(
-            files.map(async (file) => {
-              if (file.startsWith('.')) return false;
-              try {
-                const stat = await fs.stat(join(bgTasksDir, file));
-                return stat.isFile();
-              } catch (e) {
-                return false;
-              }
-            })
-          );
-          return stats.filter(Boolean).length;
-        } catch (e) {
-          return 0;
-        }
-      }
-    ),
+    !hasFooterItem('background-tasks')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          meta,
+          ['background_tasks', 'background_tasks_count', 'background_jobs'],
+          countersCachePath,
+          async () => {
+            const bgTasksDir = join(os.homedir(), '.gemini', 'tmp', 'background-processes');
+            try {
+              const files = await fs.readdir(bgTasksDir);
+              const stats = await Promise.all(
+                files.map(async (file) => {
+                  if (file.startsWith('.')) return false;
+                  try {
+                    const stat = await fs.stat(join(bgTasksDir, file));
+                    return stat.isFile();
+                  } catch (e) {
+                    return false;
+                  }
+                })
+              );
+              return stats.filter(Boolean).length;
+            } catch (e) {
+              return 0;
+            }
+          }
+        ),
 
     // 6. Subagents
-    getMetricValueAsync(
-      meta,
-      ['subagents', 'subagents_count', 'active_subagents'],
-      countersCachePath,
-      async () => {
-        const agentsDir = join(projectPath, '.agents');
-        try {
-          const dirs = await fs.readdir(agentsDir);
-          const now = Date.now();
-          const results = await Promise.all(
-            dirs.map(async (d) => {
-              if (d.startsWith('.')) return 0;
-              const dPath = join(agentsDir, d);
-              try {
-                const statD = await fs.stat(dPath);
-                if (statD.isDirectory()) {
-                  const progressPath = join(dPath, 'progress.md');
-                  const statP = await fs.stat(progressPath);
-                  if (now - statP.mtimeMs <= 300000) {
-                    return 1;
-                  }
-                }
-              } catch (e) {}
+    !hasFooterItem('subagents')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          meta,
+          ['subagents', 'subagents_count', 'active_subagents'],
+          countersCachePath,
+          async () => {
+            const agentsDir = join(projectPath, '.agents');
+            try {
+              const dirs = await fs.readdir(agentsDir);
+              const now = Date.now();
+              const results = await Promise.all(
+                dirs.map(async (d) => {
+                  if (d.startsWith('.')) return 0;
+                  const dPath = join(agentsDir, d);
+                  try {
+                    const statD = await fs.stat(dPath);
+                    if (statD.isDirectory()) {
+                      const progressPath = join(dPath, 'progress.md');
+                      const statP = await fs.stat(progressPath);
+                      if (now - statP.mtimeMs <= 300000) {
+                        return 1;
+                      }
+                    }
+                  } catch (e) {}
+                  return 0;
+                })
+              );
+              return results.reduce((sum, val) => sum + val, 0);
+            } catch (e) {
               return 0;
-            })
-          );
-          return results.reduce((sum, val) => sum + val, 0);
-        } catch (e) {
-          return 0;
-        }
-      }
-    ),
+            }
+          }
+        ),
 
     // 7. Artifacts
-    getMetricValueAsync(
-      meta,
-      ['artifacts', 'artifacts_count', 'artifact_count'],
-      countersCachePath,
-      async () => {
-        const rawConvId = (typeof meta?.conversation_id === 'string' && meta.conversation_id)
-          ? meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '')
-          : '';
-        if (rawConvId) {
-          const brainDir = join(os.homedir(), '.gemini', 'antigravity-cli', 'brain', rawConvId);
-          try {
-            const files = await fs.readdir(brainDir);
-            const metadataFiles = files.filter(f => f.endsWith('.metadata.json'));
-            return metadataFiles.length;
-          } catch (e) {
-            return 0;
+    !hasFooterItem('artifacts')
+      ? Promise.resolve(0)
+      : getMetricValueAsync(
+          meta,
+          ['artifacts', 'artifacts_count', 'artifact_count'],
+          countersCachePath,
+          async () => {
+            const rawConvId = (typeof meta?.conversation_id === 'string' && meta.conversation_id)
+              ? meta.conversation_id.replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '')
+              : '';
+            if (rawConvId) {
+              const brainDir = join(os.homedir(), '.gemini', 'antigravity-cli', 'brain', rawConvId);
+              try {
+                const files = await fs.readdir(brainDir);
+                const metadataFiles = files.filter(f => f.endsWith('.metadata.json'));
+                return metadataFiles.length;
+              } catch (e) {
+                return 0;
+              }
+            } else {
+              return 0;
+            }
           }
-        } else {
-          return 0;
-        }
-      }
-    )
+        )
   ]);
 
   const memUsage = `${rssMem}MB`;
@@ -1928,7 +1952,8 @@ async function main() {
     const rawItemStyles = settings?.ui?.footer?.itemStyles;
 
     // 格式化指標並繪製
-    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo });
+    const footerItemsSet = new Set(footerItems);
+    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo, footerItems: footerItemsSet });
     const activeDict = buildI18nDict(lang, metrics, labelStyle, rawItemStyles);
     renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, rawItemStyles, labelStyle);
 
