@@ -1,6 +1,7 @@
-import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync, existsSync, readdirSync } from 'fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync, existsSync, readdirSync, copyFileSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
+import http from 'http';
 import { spawn, execFileSync } from 'child_process';
 import assert from 'assert';
 import { fileURLToPath } from 'url';
@@ -22,11 +23,16 @@ import {
   mergeQuotaBuckets,
   formatResetTime,
   DEFAULT_COMPACTION_THRESHOLD,
+  STEP_UP_INTERMEDIATE_THRESHOLD,
+  parseCeilingValue,
+  extractModelCandidateKeys,
+  computeSteppedCeiling,
   calculateContextUsageAsync,
   extractMetricsAsync
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
+const FETCH_SCRIPT_PATH = fileURLToPath(new URL('./fetch-local-quota.mjs', import.meta.url));
 
 const BLUE_BOLD = "\x1b[38;2;87;202;255m\x1b[1m";
 const GREEN_BOLD = "\x1b[38;2;92;219;109m\x1b[1m";
@@ -40,10 +46,13 @@ const RESET = "\x1b[0m";
  * @param {string} homeDir - Isolated temporary directory path
  * @returns {Promise<{code: number, stdout: string, stderr: string}>}
  */
-function runStatusline(stdinData, homeDir, scriptPath = SCRIPT_PATH) {
+function runStatusline(stdinData, homeDir, scriptPath = SCRIPT_PATH, extraEnv = {}) {
   return new Promise((resolve) => {
     const env = { ...process.env, HOME: homeDir, USERPROFILE: homeDir, STATUSLINE_QUOTA_WAIT_MS: '800' };
     delete env.DISABLE_QUOTA_HOOK;            // explicit unset — Finding #1
+    delete env.ANTIGRAVITY_LS_ADDRESS;        // prevent test isolation leak from parent agent shell
+    delete env.ANTIGRAVITY_CSRF_TOKEN;
+    Object.assign(env, extraEnv);
     const child = spawn('node', [scriptPath], {
       env,
       cwd: homeDir,                            // project settings resolve under temp home — Finding #2
@@ -2069,7 +2078,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
     }
     console.log("  -> Subtest 3 passed: Small window model (Claude 200.0k) is preserved and not enlarged.");
 
-    // (4) 破頂自動跳檔解鎖（>256000 時分母變 1.0M，進度條不卡死 100%）與同 CLI 版本跨對話記憶
+    // (4) 方案 B：離線無快取時退回 256k 基準＋單一模型／單一對話破頂步進自癒（256k -> 512k -> 1.0M），不跨模型污染，且無視舊版 unlockedVersions
     const homeR33_StepUp = makeTempHome({}, {
       ui: {
         language: 'zh-tw',
@@ -2077,11 +2086,28 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       }
     });
     try {
-      // 4A: 第一個對話突破 256k 門檻 (totalInput = 300,000)
+      // 先預埋舊版 unlockedVersions，確認新版徹底無視之
+      const stateFilePath = join(homeR33_StepUp, '.gemini', 'tmp', 'compaction_ceiling_state.json');
+      writeFileSync(stateFilePath, JSON.stringify({
+        unlockedVersions: { "1.5.9": true, "1.5.10": true, "1.11.0": true }
+      }, null, 2), 'utf8');
+
+      // 4A: 剛開局 1.0k (同在 legacy unlockedVersions 中) 必須仍為 256.0k
+      const resLegacyIgnored = await runStatusline({
+        version: "1.5.10",
+        conversation_id: "conv-r33-legacy-ignored",
+        model: { id: "Gemini 3.8 Flash (High)", display_name: "Gemini 3.8 Flash (High)" },
+        context_window: { total_input_tokens: 1000, context_window_size: 1048576 },
+        terminal_width: 120
+      }, homeR33_StepUp);
+      assert.strictEqual(resLegacyIgnored.code, 0);
+      assert.ok(stripAnsi(resLegacyIgnored.stdout).includes("1.0k / 256.0k"), `Legacy unlockedVersions must be ignored! Got: "${stripAnsi(resLegacyIgnored.stdout).trim()}"`);
+
+      // 4B: 第一個對話突破 256k 門檻 (totalInput = 300,000) -> 步進至 512.0k（非直接鎖死 1.0M）
       const metaR33_OverCeiling = {
-        version: "1.11.0",
+        version: "1.5.10",
         conversation_id: "conv-r33-session-1",
-        model: { display_name: "Gemini 3.5 Flash" },
+        model: { id: "Gemini 4 Hydrogen (Medium)", display_name: "Gemini 4 Hydrogen (Medium)" },
         context_window: {
           total_input_tokens: 300000,
           context_window_size: 1048576
@@ -2091,34 +2117,54 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       const resOver = await runStatusline(metaR33_OverCeiling, homeR33_StepUp);
       assert.strictEqual(resOver.code, 0);
       const plainOver = stripAnsi(resOver.stdout);
-      assert.ok(plainOver.includes("300.0k / 1.0M"), `Must unlock to / 1.0M on exceeding 256k! Got: "${plainOver.trim()}"`);
+      assert.ok(plainOver.includes("300.0k / 512.0k"), `Must step up to / 512.0k on 300k tokens! Got: "${plainOver.trim()}"`);
       assert.ok(!plainOver.includes("[██████████]"), `Progress bar must NOT be stuck at 100%! Got: "${plainOver.trim()}"`);
 
-      // 驗證 ~/.gemini/tmp/compaction_ceiling_state.json 記錄了 unlockedVersions
-      const stateFilePath = join(homeR33_StepUp, '.gemini', 'tmp', 'compaction_ceiling_state.json');
-      const stateFileContent = readFileSync(stateFilePath, 'utf8');
-      const parsedState = JSON.parse(stateFileContent);
-      assert.ok(parsedState.unlockedVersions && parsedState.unlockedVersions["1.11.0"], "Version 1.11.0 must be recorded in unlockedVersions");
+      const parsedState = JSON.parse(readFileSync(stateFilePath, 'utf8'));
+      assert.strictEqual(parsedState.unlockedVersions, undefined, "Legacy unlockedVersions must not be retained");
+      assert.strictEqual(parsedState.modelCeilings?.gemini4hydrogenmedium, 512000, "Per-model ceiling 512000 must be recorded under modelCeilings");
 
-      // 4B: 第二個新對話 (token 數僅 1,000，但同一 CLI 版本 1.11.0)
-      const metaR33_NextConv = {
-        version: "1.11.0",
-        conversation_id: "conv-r33-session-2-fresh",
-        model: { display_name: "Gemini 3.5 Flash" },
-        context_window: {
-          total_input_tokens: 1000,
-          context_window_size: 1048576
-        },
+      // 4C: 同模型新對話 (1,000 tokens) 繼承該模型 512.0k；同 CLI 版本另一模型 (Gemini 3.8 Flash) 不受影響維持 256.0k
+      const resSameModel = await runStatusline({
+        version: "1.5.10",
+        conversation_id: "conv-r33-session-2-same-model",
+        model: { id: "Gemini 4 Hydrogen (Medium)", display_name: "Gemini 4 Hydrogen (Medium)" },
+        context_window: { total_input_tokens: 1000, context_window_size: 1048576 },
         terminal_width: 120
-      };
-      const resNext = await runStatusline(metaR33_NextConv, homeR33_StepUp);
-      assert.strictEqual(resNext.code, 0);
-      const plainNext = stripAnsi(resNext.stdout);
-      assert.ok(plainNext.includes("1.0k / 1.0M"), `Next conversation must inherit unlocked 1.0M window for remembered version! Got: "${plainNext.trim()}"`);
+      }, homeR33_StepUp);
+      assert.ok(stripAnsi(resSameModel.stdout).includes("1.0k / 512.0k"), `Same model must inherit 512.0k! Got: "${stripAnsi(resSameModel.stdout).trim()}"`);
+
+      const resOtherModel = await runStatusline({
+        version: "1.5.10",
+        conversation_id: "conv-r33-session-3-other-model",
+        model: { id: "Gemini 3.8 Flash (High)", display_name: "Gemini 3.8 Flash (High)" },
+        context_window: { total_input_tokens: 1000, context_window_size: 1048576 },
+        terminal_width: 120
+      }, homeR33_StepUp);
+      assert.ok(stripAnsi(resOtherModel.stdout).includes("1.0k / 256.0k"), `Other model on same CLI version must stay at 256.0k! Got: "${stripAnsi(resOtherModel.stdout).trim()}"`);
+
+      // 4D: 單一極端對話超過 512k (600,000) -> 僅該對話步進至 1.0M，不將模型跨對話上限鎖死為 1.0M
+      const resOutlier = await runStatusline({
+        version: "1.5.10",
+        conversation_id: "conv-r33-session-4-outlier",
+        model: { id: "Gemini 4 Hydrogen (Medium)", display_name: "Gemini 4 Hydrogen (Medium)" },
+        context_window: { total_input_tokens: 600000, context_window_size: 1048576 },
+        terminal_width: 120
+      }, homeR33_StepUp);
+      assert.ok(stripAnsi(resOutlier.stdout).includes("600.0k / 1.0M"), `Outlier >512k conversation must step up to 1.0M! Got: "${stripAnsi(resOutlier.stdout).trim()}"`);
+
+      const resFreshHydrogen = await runStatusline({
+        version: "1.5.10",
+        conversation_id: "conv-r33-session-5-fresh",
+        model: { id: "Gemini 4 Hydrogen (Medium)", display_name: "Gemini 4 Hydrogen (Medium)" },
+        context_window: { total_input_tokens: 1000, context_window_size: 1048576 },
+        terminal_width: 120
+      }, homeR33_StepUp);
+      assert.ok(stripAnsi(resFreshHydrogen.stdout).includes("1.0k / 512.0k"), `Fresh Hydrogen conversation must stay at 512.0k, NOT poisoned to 1.0M! Got: "${stripAnsi(resFreshHydrogen.stdout).trim()}"`);
     } finally {
       try { rmSync(homeR33_StepUp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
     }
-    console.log("  -> Subtest 4 passed: Step-Up Auto-Unlock (>256k unlocks to 1.0M, bar not stuck at 100%) and cross-session version cache memory.");
+    console.log("  -> Subtest 4 passed: Per-model / per-conversation step-up (256k -> 512k -> 1.0M) verified without cross-model pollution.");
 
     // (5) 外部設定檔 tokenCeiling 覆寫與原生欄位嗅探
     // 5A: ui.footer.tokenCeiling = "model"
@@ -2240,12 +2286,12 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
     try { rmSync(homeR33_Direct, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
     console.log("  -> Subtest 6 passed: Cross-turn cache persistence, string unit sniffing, and negative setting guards verified.");
 
-    // (7) 高並發 20 個版本同時寫入狀態檔原子性與既有屬性保留
+    // (7) 高並發 20 個模型同時寫入狀態檔原子性、既有屬性保留與清理舊版 unlockedVersions
     const homeR33_Conc = makeTempHome({}, {});
     try {
       const statePathConc = join(homeR33_Conc, '.gemini', 'tmp', 'compaction_ceiling_state.json');
       mkdirSync(join(homeR33_Conc, '.gemini', 'tmp'), { recursive: true });
-      writeFileSync(statePathConc, JSON.stringify({ existingProp: "preserved", unlockedVersions: {} }), 'utf8');
+      writeFileSync(statePathConc, JSON.stringify({ existingProp: "preserved", unlockedVersions: { "1.5.9": true } }), 'utf8');
 
       await withHomeEnv(homeR33_Conc, async () => {
         const concPromises = [];
@@ -2253,6 +2299,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
           const metaConc = {
             version: `2.0.${i}`,
             conversation_id: `conv-conc-${i}`,
+            model: { display_name: `Test Model ${i}` },
             context_window: { total_input_tokens: 300000, context_window_size: 1048576 }
           };
           concPromises.push(calculateContextUsageAsync(metaConc, `conv-conc-${i}`));
@@ -2262,15 +2309,268 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
         const savedContent = readFileSync(statePathConc, 'utf8');
         const parsedSaved = JSON.parse(savedContent);
         assert.strictEqual(parsedSaved.existingProp, "preserved", "Existing properties must be preserved during concurrent writes");
-        const unlockedCount = Object.keys(parsedSaved.unlockedVersions || {}).length;
-        assert.strictEqual(unlockedCount, 20, `All 20 concurrent versions must be recorded! Got: ${unlockedCount}`);
+        assert.strictEqual(parsedSaved.unlockedVersions, undefined, "Legacy unlockedVersions must be stripped when rewriting state");
+        const modelCount = Object.keys(parsedSaved.modelCeilings || {}).length;
+        assert.strictEqual(modelCount, 20, `All 20 concurrent models must be recorded! Got: ${modelCount}`);
       });
     } finally {
       try { rmSync(homeR33_Conc, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
     }
-    console.log("  -> Subtest 7 passed: High concurrency (20 parallel versions) atomic writes and metadata preservation verified.");
+    console.log("  -> Subtest 7 passed: High concurrency (20 parallel models) atomic writes and metadata preservation verified.");
 
-    console.log("✅ Test R33 passed! (256.0k compaction threshold, 4-language i18n, independent alert colors, small window preservation, auto-unlock, and tokenCeiling overrides all verified)");
+    // (8) Layer 1 環境變數覆寫 (AGY_TOKEN_CEILING 與 AGY_CLI_AUTO_COMPACT_OVERRIDE 百分比/數值)
+    assert.strictEqual(parseCeilingValue('50%', 1000000, true), 500000);
+    assert.strictEqual(parseCeilingValue('50%', 1000000, false), null);
+    assert.strictEqual(parseCeilingValue('-50', 1000000, true), null);
+    assert.deepStrictEqual(
+      extractModelCandidateKeys({ model: { id: 'Gemini 4 Argon (Medium)', display_name: 'Gemini 4 Argon (Medium)' } }),
+      ['gemini4argonmedium']
+    );
+    assert.strictEqual(computeSteppedCeiling(300000, 1048576, 256000), STEP_UP_INTERMEDIATE_THRESHOLD);
+
+    const homeR33_Env = makeTempHome({}, {
+      ui: { language: 'zh-tw', footer: { items: ['token-count'] } }
+    });
+    try {
+      const metaR33_Env = {
+        conversation_id: 'conv-r33-env',
+        model: { id: 'Gemini 3.8 Flash (High)', display_name: 'Gemini 3.8 Flash (High)' },
+        context_window: { total_input_tokens: 1000, context_window_size: 1048576 },
+        terminal_width: 120
+      };
+      const resAgyToken = await runStatusline(metaR33_Env, homeR33_Env, SCRIPT_PATH, { AGY_TOKEN_CEILING: '512k' });
+      assert.ok(stripAnsi(resAgyToken.stdout).includes('1.0k / 512.0k'), `AGY_TOKEN_CEILING=512k failed: ${resAgyToken.stdout}`);
+
+      const resCompactPct = await runStatusline(metaR33_Env, homeR33_Env, SCRIPT_PATH, {
+        AGY_TOKEN_CEILING: '',
+        AGY_CLI_AUTO_COMPACT_OVERRIDE: '50%'
+      });
+      assert.ok(stripAnsi(resCompactPct.stdout).includes('1.0k / 524.3k'), `AGY_CLI_AUTO_COMPACT_OVERRIDE=50% of 1048576 failed: ${resCompactPct.stdout}`);
+    } finally {
+      try { rmSync(homeR33_Env, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+    console.log("  -> Subtest 8 passed: AGY_TOKEN_CEILING & AGY_CLI_AUTO_COMPACT_OVERRIDE overrides verified.");
+
+    // (9) Layer 3 動態模型目錄對照 (GetAvailableModels 快取) 與 /model 即時切換（含僅設定 token-count 且 meta.model.id === display_name）
+    const catalogLimits = {
+      gemini4argonmedium: { limit: 512000, maxTokens: 1048576, slug: 'gemini-4-argon-medium', displayName: 'Gemini 4 Argon (Medium)' },
+      gemini4carbon: { limit: 512000, maxTokens: 1048576, slug: 'gemini-4-carbon-disabled', displayName: 'Gemini 4 Carbon' },
+      gemini4hydrogenhigh: { limit: 512000, maxTokens: 1048576, slug: 'gemini-4-hydrogen-high', displayName: 'Gemini 4 Hydrogen (High)' },
+      gemini38flashhigh: { limit: 256000, maxTokens: 1048576, slug: 'gemini-3.8-flash-high', displayName: 'Gemini 3.8 Flash (High)' },
+      gemini38flashtiered: { limit: 256000, maxTokens: 1048576, slug: 'gemini-3.8-flash-tiered', displayName: '' },
+      modelplaceholderm322: { limit: 256000, maxTokens: 1048576, slug: 'gemini-3.8-flash-tiered', displayName: '' },
+      gemini35flashlite: { limit: 128000, maxTokens: 1048576, slug: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash Lite' },
+      gptoss120bmedium: { limit: 80000, maxTokens: 131072, slug: 'gpt-oss-120b-medium', displayName: 'GPT-OSS 120B (Medium)' },
+      orchestratorargon: { limit: 512000, maxTokens: 1048576, slug: 'gemini-pro-orchestrator-g1-pro', displayName: 'Orchestrator (Argon)' },
+      sharedlabel: { limit: 0, maxTokens: 1048576, ambiguous: true }
+    };
+    const homeR33_Catalog = makeTempHome({
+      updatedAt: Date.now(),
+      lsUpdatedAt: Date.now(),
+      modelLimitsUpdatedAt: Date.now(),
+      modelLimits: catalogLimits
+    }, {
+      ui: { language: 'zh-tw', footer: { items: ['token-count'] } } // Deliberately NO quota items!
+    });
+    try {
+      const modelExpectations = [
+        { id: 'Gemini 4 Argon (Medium)', display_name: 'Gemini 4 Argon (Medium)', expected: '0 / 512.0k' },
+        { id: 'Gemini 3.8 Flash (High)', display_name: 'Gemini 3.8 Flash (High)', expected: '0 / 256.0k' },
+        { id: 'Gemini 4 Carbon', display_name: 'Gemini 4 Carbon', expected: '0 / 512.0k' },
+        { id: 'Gemini 4 Hydrogen (High)', display_name: 'Gemini 4 Hydrogen (High)', expected: '0 / 512.0k' },
+        { id: 'Gemini 3.5 Flash Lite', display_name: 'Gemini 3.5 Flash Lite', expected: '0 / 128.0k' },
+        { id: 'GPT-OSS 120B (Medium)', display_name: 'GPT-OSS 120B (Medium)', expected: '0 / 80.0k' },
+        { id: 'Orchestrator (Argon)', display_name: 'Orchestrator (Argon)', expected: '0 / 512.0k' },
+        { id: 'MODEL_PLACEHOLDER_M322', display_name: 'gemini-3.8-flash-tiered', expected: '0 / 256.0k' }
+      ];
+      for (const m of modelExpectations) {
+        const resModel = await runStatusline({
+          conversation_id: 'conv-r33-catalog-switch',
+          model: { id: m.id, display_name: m.display_name },
+          context_window: { total_input_tokens: 0, context_window_size: 0 },
+          terminal_width: 120
+        }, homeR33_Catalog);
+        assert.strictEqual(resModel.code, 0);
+        const plainModel = stripAnsi(resModel.stdout).trim();
+        assert.ok(plainModel.includes(m.expected), `Model '${m.display_name}' must render '${m.expected}', got: "${plainModel}"`);
+      }
+
+      // Ambiguous displayName entry must fall back cleanly to 256.0k
+      const resAmbig = await runStatusline({
+        conversation_id: 'conv-r33-ambiguous',
+        model: { id: 'Shared Label', display_name: 'Shared Label' },
+        context_window: { total_input_tokens: 0, context_window_size: 1048576 },
+        terminal_width: 120
+      }, homeR33_Catalog);
+      assert.ok(stripAnsi(resAmbig.stdout).includes('0 / 256.0k'));
+    } finally {
+      try { rmSync(homeR33_Catalog, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+    console.log("  -> Subtest 9 passed: Layer 3 dynamic modelLimits catalog lookup (with token-count-only footer and /model switching) verified.");
+
+    // (10) Layer 2 對話執行期 maxContextTokens（區分 Claude 256k vs 840k）、切換模型失效防護與 E2E LS 背景同步
+    const homeR33_Runtime = makeTempHome({
+      updatedAt: Date.now(),
+      lsUpdatedAt: Date.now(),
+      modelLimitsUpdatedAt: Date.now(),
+      modelLimits: {
+        claudeopus55medium: { limit: 256000, maxTokens: 1000000, slug: 'claude-opus-5-5-medium', displayName: 'Claude Opus 5.5 (Medium)' },
+        gemini38flashhigh: { limit: 256000, maxTokens: 1048576, slug: 'gemini-3.8-flash-high', displayName: 'Gemini 3.8 Flash (High)' },
+        gemini4hydrogenmedium: { limit: 512000, maxTokens: 1048576, slug: 'gemini-4-hydrogen-medium', displayName: 'Gemini 4 Hydrogen (Medium)' }
+      }
+    }, {
+      ui: { language: 'zh-tw', footer: { items: ['token-count'] } }
+    });
+    try {
+      const runtimeConvId = 'conv-r33-runtime-claude';
+      const runtimeCtxPath = join(homeR33_Runtime, '.gemini', 'tmp', `ctx_${runtimeConvId}.json`);
+      writeFileSync(runtimeCtxPath, JSON.stringify({
+        total_input_tokens: 12000,
+        context_window_size: 1000000,
+        runtime_max_context_tokens: 840000,
+        runtime_model_display_name: 'Claude Opus 5.5 (Medium)',
+        runtime_model_enum: 'MODEL_PLACEHOLDER_M401',
+        runtime_model_key: 'claudeopus55medium',
+        generator_metadata_offset: 3
+      }), 'utf8');
+
+      // 10A: Claude 對話匹配 runtime_max_context_tokens = 840000（覆蓋目錄預設 256000）
+      const resClaude840 = await runStatusline({
+        conversation_id: runtimeConvId,
+        model: { id: 'Claude Opus 5.5 (Medium)', display_name: 'Claude Opus 5.5 (Medium)' },
+        context_window: { total_input_tokens: 12000, context_window_size: 1000000 },
+        terminal_width: 120
+      }, homeR33_Runtime);
+      assert.ok(stripAnsi(resClaude840.stdout).includes('12.0k / 840.0k'), `Claude runtime 840k must override catalog 256k! Got: "${stripAnsi(resClaude840.stdout).trim()}"`);
+
+      // 10B: 同一對話切換至 Gemini 3.8 Flash (High) -> 不得沿用 Claude 舊的 840k，立即改用目錄 256.0k
+      const resSwitchToFlash = await runStatusline({
+        conversation_id: runtimeConvId,
+        model: { id: 'Gemini 3.8 Flash (High)', display_name: 'Gemini 3.8 Flash (High)' },
+        context_window: { total_input_tokens: 12000, context_window_size: 1048576 },
+        terminal_width: 120
+      }, homeR33_Runtime);
+      assert.ok(stripAnsi(resSwitchToFlash.stdout).includes('12.0k / 256.0k'), `Model switch must invalidate stale Claude 840k runtime ceiling! Got: "${stripAnsi(resSwitchToFlash.stdout).trim()}"`);
+    } finally {
+      try { rmSync(homeR33_Runtime, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // 10C: E2E statusline-quota.mjs -> spawn real fetch-local-quota.mjs with STATUSLINE_CONVERSATION_ID against mock HTTP LS
+    const e2eServer = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        if (req.url === '/exa.language_server_pb.LanguageServerService/GetUserStatus') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ userStatus: { email: 'e2e@example.com', cascadeModelConfigData: { clientModelConfigs: [] } } }));
+        } else if (req.url === '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ groups: [] }));
+        } else if (req.url === '/exa.language_server_pb.LanguageServerService/GetAvailableModels') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            response: {
+              models: {
+                'gemini-4-argon-medium': {
+                  displayName: 'Gemini 4 Argon (Medium)',
+                  maxTokens: 1048576,
+                  model: 'MODEL_PLACEHOLDER_M418',
+                  modelExperiments: {
+                    experiments: {
+                      CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                        stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+                      }
+                    }
+                  }
+                },
+                'claude-opus-5-5-medium': {
+                  displayName: 'Claude Opus 5.5 (Medium)',
+                  maxTokens: 1000000,
+                  model: 'MODEL_PLACEHOLDER_M401',
+                  modelExperiments: {
+                    experiments: {
+                      CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                        stringValue: JSON.stringify({ max_token_limit: '256000', enabled: true })
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }));
+        } else if (req.url === '/exa.language_server_pb.LanguageServerService/GetCascadeTrajectoryGeneratorMetadata') {
+          const parsedBody = JSON.parse(body || '{}');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          if (parsedBody.cascadeId === 'conv-e2e-dynamic-ls' && parsedBody.generatorMetadataOffset === 0) {
+            res.end(JSON.stringify({
+              generatorMetadata: [
+                {
+                  chatModel: {
+                    model: 'MODEL_PLACEHOLDER_M401',
+                    modelDisplayName: 'Claude Opus 5.5 (Medium)',
+                    chatStartMetadata: { contextWindowMetadata: { maxContextTokens: 840000 } }
+                  }
+                }
+              ]
+            }));
+          } else {
+            res.end(JSON.stringify({}));
+          }
+        } else {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+    });
+
+    const homeR33_E2E = mkdtempSync(join(os.tmpdir(), 'statusline-r33-e2e-'));
+    try {
+      await new Promise(resolve => e2eServer.listen(0, '127.0.0.1', resolve));
+      const e2ePort = e2eServer.address().port;
+      mkdirSync(join(homeR33_E2E, '.gemini', 'tmp'), { recursive: true });
+      mkdirSync(join(homeR33_E2E, '.gemini', 'antigravity-cli', 'hooks'), { recursive: true });
+      copyFileSync(FETCH_SCRIPT_PATH, join(homeR33_E2E, '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs'));
+      writeFileSync(join(homeR33_E2E, '.gemini', 'tmp', 'antigravity_ls_env.json'), JSON.stringify({
+        ls_address: `127.0.0.1:${e2ePort}`,
+        csrf_token: 'e2e-csrf',
+        prefer_https: false
+      }), 'utf8');
+      writeFileSync(join(homeR33_E2E, '.gemini', 'settings.json'), JSON.stringify({
+        ui: { language: 'zh-tw', footer: { items: ['token-count'] } }
+      }), 'utf8');
+
+      // Frame 1: Empty cache -> statusline spawns real fetch-local-quota.mjs -> resolves Claude 840k runtime + Argon 512k catalog
+      const resE2eClaude = await runStatusline({
+        conversation_id: 'conv-e2e-dynamic-ls',
+        model: { id: 'Claude Opus 5.5 (Medium)', display_name: 'Claude Opus 5.5 (Medium)' },
+        context_window: { total_input_tokens: 5000, context_window_size: 1000000 },
+        terminal_width: 120
+      }, homeR33_E2E);
+      assert.strictEqual(resE2eClaude.code, 0);
+      assert.ok(stripAnsi(resE2eClaude.stdout).includes('5.0k / 840.0k'), `E2E spawn must resolve runtime 840.0k! Got: "${stripAnsi(resE2eClaude.stdout).trim()}"`);
+
+      // Frame 2: Brand-new conversation on Argon -> immediately hits newly synced modelLimits 512.0k
+      const resE2eArgon = await runStatusline({
+        conversation_id: 'conv-e2e-argon-turn0',
+        model: { id: 'Gemini 4 Argon (Medium)', display_name: 'Gemini 4 Argon (Medium)' },
+        context_window: { total_input_tokens: 0, context_window_size: 1048576 },
+        terminal_width: 120
+      }, homeR33_E2E);
+      assert.strictEqual(resE2eArgon.code, 0);
+      assert.ok(stripAnsi(resE2eArgon.stdout).includes('0 / 512.0k'), `E2E turn 0 Argon must render synced 512.0k! Got: "${stripAnsi(resE2eArgon.stdout).trim()}"`);
+      console.log("  -> Subtest 10 passed: Runtime maxContextTokens override, /model switch invalidation, and E2E LS sync verified.");
+    } catch (err) {
+      if (err.code === 'EPERM' || err.message?.includes('EPERM')) {
+        console.log("  -> Subtest 10 skipped loopback bind due to sandbox EPERM (10A/10B passed).");
+      } else {
+        throw err;
+      }
+    } finally {
+      try { await new Promise(resolve => e2eServer.close(resolve)); } catch (_) {}
+      try { rmSync(homeR33_E2E, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    console.log("✅ Test R33 passed! (4-layer dynamic ceiling resolution, per-model/per-conversation step-up, modelLimits catalog, runtime maxContextTokens, and overrides all verified)");
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;
