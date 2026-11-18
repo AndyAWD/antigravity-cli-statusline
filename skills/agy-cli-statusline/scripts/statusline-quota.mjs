@@ -758,8 +758,12 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
       };
       const timer = setTimeout(() => finish(true), waitMs);
       try {
+        const spawnEnv = { ...process.env, DISABLE_QUOTA_HOOK: '1' };
+        if (options?.conversationId && options.conversationId !== 'default') {
+          spawnEnv.STATUSLINE_CONVERSATION_ID = options.conversationId;
+        }
         const proc = spawn(process.execPath, [updaterScript], {
-          env: { ...process.env, DISABLE_QUOTA_HOOK: '1' },
+          env: spawnEnv,
           stdio: 'ignore',
           detached: true,
           windowsHide: true
@@ -784,7 +788,15 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
               freshCache.shortTerm = mergeQuotaBuckets(cacheInfo.shortTerm, freshCache.shortTerm, true);
               freshCache.weekly = mergeQuotaBuckets(cacheInfo.weekly, freshCache.weekly, true);
               freshCache.models = { ...(cacheInfo.models || {}), ...(freshCache.models || {}) };
+              if (cacheInfo.modelLimits || freshCache.modelLimits) {
+                freshCache.modelLimits = { ...(cacheInfo.modelLimits || {}), ...(freshCache.modelLimits || {}) };
+              }
+              if (!freshCache.modelLimitsUpdatedAt && cacheInfo.modelLimitsUpdatedAt) {
+                freshCache.modelLimitsUpdatedAt = cacheInfo.modelLimitsUpdatedAt;
+              }
               if (cacheInfo.lastPollAttemptAt !== undefined) freshCache.lastPollAttemptAt = cacheInfo.lastPollAttemptAt;
+              if (cacheInfo.lastModelKey !== undefined) freshCache.lastModelKey = cacheInfo.lastModelKey;
+              if (cacheInfo.lastModelLimitAttemptAt !== undefined) freshCache.lastModelLimitAttemptAt = cacheInfo.lastModelLimitAttemptAt;
             }
             return { cache: freshCache, freshlyFetchedFromLs, timedOut };
           }
@@ -963,27 +975,156 @@ async function writeFileAndVerifyNoBOM(filePath, content) {
 }
 
 let stateWriteQueue = Promise.resolve();
+let ctxWriteQueue = Promise.resolve();
 
 export const DEFAULT_COMPACTION_THRESHOLD = 256000;
+export const STEP_UP_INTERMEDIATE_THRESHOLD = 512000;
 
-export async function calculateContextUsageAsync(meta, conversationId, settings = {}) {
+/**
+ * Parses numeric, k/m-suffixed, keyword ("model"/"physical"/"full"/"1m"/"0"), or percentage ceiling overrides.
+ */
+export function parseCeilingValue(rawValue, contextSize, allowPercent = false) {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+  if (typeof rawValue === 'number') {
+    if (isNaN(rawValue) || rawValue < 0) return null;
+    if (rawValue === 0) return contextSize > 0 ? contextSize : null;
+    return rawValue;
+  }
+  if (typeof rawValue === 'string') {
+    const s = rawValue.trim().toLowerCase();
+    if (!s) return null;
+    if (s === 'model' || s === 'physical' || s === 'full' || s === '1m' || s === '0') {
+      return contextSize > 0 ? contextSize : null;
+    }
+    if (allowPercent && s.endsWith('%')) {
+      const pct = Number(s.slice(0, -1));
+      if (!isNaN(pct) && pct > 0 && pct <= 100 && contextSize > 0) {
+        return Math.round((contextSize * pct) / 100);
+      }
+      return null;
+    }
+    if (s.endsWith('k') && !isNaN(Number(s.slice(0, -1)))) {
+      const val = Number(s.slice(0, -1)) * 1000;
+      return val > 0 ? val : null;
+    }
+    if (s.endsWith('m') && !isNaN(Number(s.slice(0, -1)))) {
+      const val = Number(s.slice(0, -1)) * 1000000;
+      return val > 0 ? val : null;
+    }
+    if (!isNaN(Number(s))) {
+      const num = Number(s);
+      if (num < 0) return null;
+      return num === 0 ? (contextSize > 0 ? contextSize : null) : num;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extracts deduplicated normalized model lookup keys from statusline metadata.
+ */
+export function extractModelCandidateKeys(meta, fallbackModel = '') {
+  const raw = [
+    meta?.model?.id,
+    meta?.model?.display_name,
+    meta?.model?.name,
+    fallbackModel
+  ];
+  const seen = new Set();
+  const keys = [];
+  for (const item of raw) {
+    if (typeof item !== 'string' || !item.trim()) continue;
+    const norm = normalizeModelName(item);
+    if (norm && !seen.has(norm)) {
+      seen.add(norm);
+      keys.push(norm);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Resolves the catalog entry from cache.modelLimits using exact normalized keys.
+ */
+export function resolveCatalogEntry(modelKeys, modelLimits) {
+  if (!Array.isArray(modelKeys) || modelKeys.length === 0 || !modelLimits || typeof modelLimits !== 'object') {
+    return null;
+  }
+  let maxTokensFallback = null;
+  for (const key of modelKeys) {
+    const entry = modelLimits[key];
+    if (!entry || typeof entry !== 'object' || entry.ambiguous) continue;
+    if (typeof entry.limit === 'number' && entry.limit > 0) {
+      return entry;
+    }
+    if (!maxTokensFallback && typeof entry.maxTokens === 'number' && entry.maxTokens > 0) {
+      maxTokensFallback = entry;
+    }
+  }
+  return maxTokensFallback;
+}
+
+/**
+ * Computes stepped-up token ceiling (base -> 512k -> physical contextSize) so progress bars never lock at 100%.
+ */
+export function computeSteppedCeiling(totalInput, contextSize, baseCeiling = DEFAULT_COMPACTION_THRESHOLD) {
+  const safeBase = baseCeiling > 0 ? baseCeiling : DEFAULT_COMPACTION_THRESHOLD;
+  const cap = contextSize > 0 ? contextSize : safeBase;
+  const clampedBase = Math.min(cap, safeBase);
+  if (totalInput <= clampedBase) {
+    return clampedBase;
+  }
+  if (clampedBase < STEP_UP_INTERMEDIATE_THRESHOLD && totalInput <= STEP_UP_INTERMEDIATE_THRESHOLD && cap >= STEP_UP_INTERMEDIATE_THRESHOLD) {
+    return STEP_UP_INTERMEDIATE_THRESHOLD;
+  }
+  return Math.max(clampedBase, cap);
+}
+
+async function readJsonSafeAsync(filePath) {
+  try {
+    const content = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(content.replace(/^\uFEFF/, ''));
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function updateCtxCacheAsync(ctxCachePath, patch) {
+  ctxWriteQueue = ctxWriteQueue.then(async () => {
+    try {
+      await fs.mkdir(dirname(ctxCachePath), { recursive: true });
+      const latest = (await readJsonSafeAsync(ctxCachePath)) || {};
+      const merged = { ...latest, ...patch };
+      if (latest.step_up_ceilings || patch.step_up_ceilings) {
+        merged.step_up_ceilings = {
+          ...(latest.step_up_ceilings || {}),
+          ...(patch.step_up_ceilings || {})
+        };
+      }
+      await writeFileAndVerifyNoBOM(ctxCachePath, JSON.stringify(merged));
+    } catch (_) {}
+  }).catch(() => {});
+  return ctxWriteQueue;
+}
+
+export async function calculateContextUsageAsync(meta, conversationId, settings = {}, cache = null) {
   const contextWindow = meta?.context_window || {};
   const ctxCachePath = join(os.homedir(), '.gemini', 'tmp', `ctx_${conversationId}.json`);
-  
+  const cachedCtx = await readJsonSafeAsync(ctxCachePath);
+
   let totalInput = contextWindow.total_input_tokens || 0;
   let totalOutput = contextWindow.total_output_tokens || 0;
   let usedPctNum = contextWindow.used_percentage || 0;
   let contextSize = contextWindow.context_window_size || 0;
-  
+
   const nativeLimitSniffed = contextWindow.compaction_threshold ??
     contextWindow.compaction_token_limit ??
     contextWindow.compact_threshold ??
     contextWindow.effective_context_window_size;
 
   if (totalInput === 0 && totalOutput === 0) {
-    try {
-      const content = await fs.readFile(ctxCachePath, 'utf8');
-      const cachedCtx = JSON.parse(content.replace(/^\uFEFF/, ''));
+    if (cachedCtx) {
       totalInput = cachedCtx.total_input_tokens || 0;
       totalOutput = cachedCtx.total_output_tokens || 0;
       if (cachedCtx.used_percentage) usedPctNum = cachedCtx.used_percentage;
@@ -991,136 +1132,138 @@ export async function calculateContextUsageAsync(meta, conversationId, settings 
       if (cachedCtx.compaction_threshold !== undefined && contextWindow.compaction_threshold === undefined) {
         contextWindow.compaction_threshold = cachedCtx.compaction_threshold;
       }
-    } catch (e) {}
+    }
   } else {
-    try {
-      await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-      await writeFileAndVerifyNoBOM(ctxCachePath, JSON.stringify({
-        total_input_tokens: totalInput,
-        total_output_tokens: totalOutput,
-        used_percentage: usedPctNum,
-        context_window_size: contextSize,
-        compaction_threshold: nativeLimitSniffed !== undefined ? nativeLimitSniffed : contextWindow.compaction_threshold
-      }));
-    } catch (e) {}
+    const ctxPatch = {
+      total_input_tokens: totalInput,
+      total_output_tokens: totalOutput,
+      used_percentage: usedPctNum,
+      context_window_size: contextSize
+    };
+    const resolvedCompaction = nativeLimitSniffed !== undefined ? nativeLimitSniffed : contextWindow.compaction_threshold;
+    if (resolvedCompaction !== undefined) {
+      ctxPatch.compaction_threshold = resolvedCompaction;
+    }
+    await updateCtxCacheAsync(ctxCachePath, ctxPatch);
   }
-  
-  if (!contextSize) contextSize = 1048576;
+
+  const currentModelKeys = extractModelCandidateKeys(meta);
+  const catalogEntry = resolveCatalogEntry(currentModelKeys, cache?.modelLimits);
+
+  if (!contextSize) {
+    contextSize = (catalogEntry && catalogEntry.maxTokens > 0) ? catalogEntry.maxTokens : 1048576;
+  }
   if (contextSize > 0 && totalInput > 0 && !usedPctNum) {
     usedPctNum = (totalInput / contextSize) * 100;
   }
 
   let effectiveTokenCeiling = null;
 
-  // (1) contextWindow 原生擴充欄位嗅探（compaction_threshold, compaction_token_limit, compact_threshold, effective_context_window_size）
+  // 第 1 層：(1a) contextWindow 原生擴充欄位嗅探
   const nativeLimit = contextWindow.compaction_threshold ??
     contextWindow.compaction_token_limit ??
     contextWindow.compact_threshold ??
     contextWindow.effective_context_window_size;
 
-  if (nativeLimit !== undefined && nativeLimit !== null && nativeLimit !== '') {
-    if (typeof nativeLimit === 'string') {
-      const s = nativeLimit.trim().toLowerCase();
-      if (s.endsWith('k') && !isNaN(Number(s.slice(0, -1)))) {
-        effectiveTokenCeiling = Number(s.slice(0, -1)) * 1000;
-      } else if (s.endsWith('m') && !isNaN(Number(s.slice(0, -1)))) {
-        effectiveTokenCeiling = Number(s.slice(0, -1)) * 1000000;
-      } else if (!isNaN(Number(s)) && Number(s) > 0) {
-        effectiveTokenCeiling = Number(s);
-      }
-    } else {
-      const parsedNative = Number(nativeLimit);
-      if (!isNaN(parsedNative) && parsedNative > 0) {
-        effectiveTokenCeiling = parsedNative;
+  const parsedNative = parseCeilingValue(nativeLimit, contextSize, false);
+  if (parsedNative !== null) {
+    effectiveTokenCeiling = parsedNative;
+  }
+
+  // 第 1 層：(1b) 外部設定檔與環境變數覆寫 (settings / AGY_TOKEN_CEILING / AGY_CLI_AUTO_COMPACT_OVERRIDE)
+  if (effectiveTokenCeiling === null) {
+    const overrideSources = [
+      { raw: settings?.ui?.footer?.tokenCeiling, allowPercent: false },
+      { raw: settings?.ui?.tokenCeiling, allowPercent: false },
+      { raw: process.env.AGY_TOKEN_CEILING, allowPercent: false },
+      { raw: process.env.AGY_CLI_AUTO_COMPACT_OVERRIDE, allowPercent: true }
+    ];
+    for (const src of overrideSources) {
+      const parsedOverride = parseCeilingValue(src.raw, contextSize, src.allowPercent);
+      if (parsedOverride !== null) {
+        effectiveTokenCeiling = parsedOverride;
+        break;
       }
     }
   }
 
-  // (2) 外部設定檔 (ui.footer.tokenCeiling / ui.tokenCeiling) 或環境變數 (AGY_TOKEN_CEILING)，支援數值與 "model"/"physical"/"full"/"1m"/"0"
-  if (effectiveTokenCeiling === null) {
-    const rawCeiling = settings?.ui?.footer?.tokenCeiling ??
-      settings?.ui?.tokenCeiling ??
-      process.env.AGY_TOKEN_CEILING;
-
-    if (rawCeiling !== undefined && rawCeiling !== null && rawCeiling !== '') {
-      if (typeof rawCeiling === 'string') {
-        const s = rawCeiling.trim().toLowerCase();
-        if (s === 'model' || s === 'physical' || s === 'full' || s === '1m' || s === '0') {
-          effectiveTokenCeiling = contextSize;
-        } else if (s.endsWith('k') && !isNaN(Number(s.slice(0, -1)))) {
-          const val = Number(s.slice(0, -1)) * 1000;
-          if (val > 0) effectiveTokenCeiling = val;
-        } else if (s.endsWith('m') && !isNaN(Number(s.slice(0, -1)))) {
-          const val = Number(s.slice(0, -1)) * 1000000;
-          if (val > 0) effectiveTokenCeiling = val;
-        } else if (!isNaN(Number(s))) {
-          const num = Number(s);
-          if (num >= 0) {
-            effectiveTokenCeiling = num === 0 ? contextSize : num;
-          }
-        }
-      } else if (typeof rawCeiling === 'number' && !isNaN(rawCeiling) && rawCeiling >= 0) {
-        effectiveTokenCeiling = rawCeiling === 0 ? contextSize : rawCeiling;
-      }
+  // 第 2 層：單一對話執行期 maxContextTokens（來自 GetCascadeTrajectoryGeneratorMetadata），需與當前模型吻合
+  if (effectiveTokenCeiling === null && cachedCtx && typeof cachedCtx.runtime_max_context_tokens === 'number' && cachedCtx.runtime_max_context_tokens > 0) {
+    const runtimeKeys = [
+      cachedCtx.runtime_model_display_name,
+      cachedCtx.runtime_model_enum,
+      cachedCtx.runtime_model_key
+    ].map(normalizeModelName).filter(Boolean);
+    const modelMatches = currentModelKeys.length === 0 || runtimeKeys.some(rk => currentModelKeys.includes(rk));
+    if (modelMatches) {
+      const runtimeBase = contextSize > 0
+        ? Math.min(contextSize, cachedCtx.runtime_max_context_tokens)
+        : cachedCtx.runtime_max_context_tokens;
+      effectiveTokenCeiling = computeSteppedCeiling(totalInput, contextSize, runtimeBase);
     }
   }
 
-  // (3) 破頂自動跳檔解鎖 + CLI 版本記憶快取 (Step-Up Auto-Unlock)：若 totalInput > DEFAULT_COMPACTION_THRESHOLD (256000)，effectiveTokenCeiling 立即跳檔解鎖回模型物理視窗 contextSize（絕不可顯示 300k / 300k 卡死 100%），並將 meta.version 寫入 ~/.gemini/tmp/compaction_ceiling_state.json 的 unlockedVersions 物件中；若該版本已記錄過，後續新對話直接沿用 contextSize
+  // 第 3 層：動態模型目錄對照（來自 GetAvailableModels 快取 modelLimits）
+  if (effectiveTokenCeiling === null && catalogEntry && typeof catalogEntry.limit === 'number' && catalogEntry.limit > 0) {
+    const catalogBase = contextSize > 0 ? Math.min(contextSize, catalogEntry.limit) : catalogEntry.limit;
+    effectiveTokenCeiling = computeSteppedCeiling(totalInput, contextSize, catalogBase);
+  }
+
+  // 第 4 層（方案 B）：無連線與無快取時退回 256k 基準，並僅針對單一模型／單一對話破頂步進自癒（256k -> 512k -> contextSize），絕不跨模型或全版本鎖死 1.0M
   if (effectiveTokenCeiling === null) {
+    const baseDefault = Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD);
+    const primaryModelKey = currentModelKeys[0] || '';
+    const convStepKey = primaryModelKey || '_default';
+
     const statePath = join(os.homedir(), '.gemini', 'tmp', 'compaction_ceiling_state.json');
-    let unlockedVersions = {};
-    let fullState = {};
-    try {
-      const stateContent = await fs.readFile(statePath, 'utf8');
-      const parsedState = JSON.parse(stateContent.replace(/^\uFEFF/, ''));
-      if (parsedState && typeof parsedState === 'object' && !Array.isArray(parsedState)) {
-        fullState = parsedState;
-        if (typeof parsedState.unlockedVersions === 'object' && parsedState.unlockedVersions !== null) {
-          unlockedVersions = parsedState.unlockedVersions;
+    const parsedState = await readJsonSafeAsync(statePath);
+    const modelCeilings = (parsedState && typeof parsedState.modelCeilings === 'object' && parsedState.modelCeilings !== null && !Array.isArray(parsedState.modelCeilings))
+      ? parsedState.modelCeilings
+      : {};
+
+    const convRemembered = Number(cachedCtx?.step_up_ceilings?.[convStepKey] || 0);
+    const rawModelRemembered = primaryModelKey ? Number(modelCeilings[primaryModelKey] || 0) : 0;
+    const modelRemembered = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
+      ? Math.min(rawModelRemembered, STEP_UP_INTERMEDIATE_THRESHOLD)
+      : rawModelRemembered;
+
+    const rememberedBase = Math.max(baseDefault, Math.min(contextSize, Math.max(convRemembered, modelRemembered)));
+    const stepped = computeSteppedCeiling(totalInput, contextSize, rememberedBase);
+
+    if (totalInput > baseDefault) {
+      if (stepped > convRemembered) {
+        await updateCtxCacheAsync(ctxCachePath, {
+          step_up_ceilings: { [convStepKey]: stepped }
+        });
+      }
+      if (primaryModelKey) {
+        const persistModelCeiling = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
+          ? Math.min(stepped, STEP_UP_INTERMEDIATE_THRESHOLD)
+          : stepped;
+        if (persistModelCeiling > baseDefault && persistModelCeiling > modelRemembered) {
+          stateWriteQueue = stateWriteQueue.then(async () => {
+            try {
+              await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
+              const diskParsed = (await readJsonSafeAsync(statePath)) || {};
+              const { unlockedVersions: _legacyVersions, ...restState } = diskParsed;
+              const latestModels = (restState.modelCeilings && typeof restState.modelCeilings === 'object' && !Array.isArray(restState.modelCeilings))
+                ? { ...restState.modelCeilings }
+                : {};
+              const existingVal = Number(latestModels[primaryModelKey] || 0);
+              if (persistModelCeiling > existingVal) {
+                latestModels[primaryModelKey] = persistModelCeiling;
+              }
+              await writeFileAndVerifyNoBOM(statePath, JSON.stringify({ ...restState, modelCeilings: latestModels }, null, 2));
+            } catch (_) {}
+          }).catch(() => {});
+          await stateWriteQueue;
         }
       }
-    } catch (_) {}
-
-    const rawVersion = meta?.version
-      ? String(meta.version).trim()
-      : (meta?.cli_version ? String(meta.cli_version).trim() : '');
-    const cleanVersion = rawVersion.replace(/^v/, '');
-
-    if (rawVersion && (unlockedVersions[rawVersion] || (cleanVersion && unlockedVersions[cleanVersion]))) {
-      effectiveTokenCeiling = contextSize;
-    } else if (totalInput > DEFAULT_COMPACTION_THRESHOLD) {
-      effectiveTokenCeiling = contextSize;
-      if (rawVersion) {
-        stateWriteQueue = stateWriteQueue.then(async () => {
-          try {
-            await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-            let latestState = {};
-            let latestUnlocked = {};
-            try {
-              const diskContent = await fs.readFile(statePath, 'utf8');
-              const diskParsed = JSON.parse(diskContent.replace(/^\uFEFF/, ''));
-              if (diskParsed && typeof diskParsed === 'object' && !Array.isArray(diskParsed)) {
-                latestState = diskParsed;
-                if (typeof diskParsed.unlockedVersions === 'object' && diskParsed.unlockedVersions !== null) {
-                  latestUnlocked = diskParsed.unlockedVersions;
-                }
-              }
-            } catch (_) {}
-            latestUnlocked[rawVersion] = true;
-            if (cleanVersion) latestUnlocked[cleanVersion] = true;
-            await writeFileAndVerifyNoBOM(statePath, JSON.stringify({ ...latestState, unlockedVersions: latestUnlocked }, null, 2));
-          } catch (_) {}
-        }).catch(() => {});
-        await stateWriteQueue;
-      }
     }
+
+    effectiveTokenCeiling = stepped;
   }
 
-  // (4) 預設為 Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD)（小於 256k 的模型如 Claude 200k 保持 200k）
-  if (effectiveTokenCeiling === null) {
-    effectiveTokenCeiling = Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD);
-  }
-  
   return { totalInput, contextSize, effectiveTokenCeiling, usedPctNum };
 }
 
@@ -1902,6 +2045,7 @@ async function main() {
     const needsContext = footerItems.some(
       item => typeof item === 'string' && (item.startsWith('context-used') || item.startsWith('token-count'))
     );
+    const needsCache = needsQuotaOrAccount || needsContext;
     if (footerItemsSet.has('account-email') && !cachedAccount.email && !(meta?.email || meta?.account?.email)) {
       cachedAccount = await manageAccountMetaCacheAsync(meta);
     }
@@ -1913,7 +2057,7 @@ async function main() {
     // 讀取快取並優先整合 Antigravity CLI 原生 meta.quota
     const cachePath = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
     let cache = null;
-    if (needsQuotaOrAccount) {
+    if (needsCache) {
       try {
         const cacheContent = await fs.readFile(cachePath, 'utf8');
         const parsedCache = JSON.parse(cacheContent.replace(/^\uFEFF/, ''));
@@ -1954,6 +2098,21 @@ async function main() {
     );
     const missingRequiredBuckets = (!hasMetaShortTerm && !hasCacheShortTerm) || (!hasMetaArgon && !hasCacheArgon);
 
+    const currentModelKeys = extractModelCandidateKeys(meta, fallbackModel);
+    const primaryModelKey = currentModelKeys[0] || '';
+    const catalogEntry = resolveCatalogEntry(currentModelKeys, cache?.modelLimits);
+    const hasCatalogCeiling = Boolean(catalogEntry && typeof catalogEntry.limit === 'number' && catalogEntry.limit > 0);
+
+    const now = Date.now();
+    const modelJustChanged = Boolean(primaryModelKey && cache?.lastModelKey && cache.lastModelKey !== primaryModelKey);
+    const modelLimitAttemptAgeMs = now - (cache?.lastModelLimitAttemptAt || cache?.lastPollAttemptAt || 0);
+    const missingModelLimits = Boolean(
+      needsContext &&
+      currentModelKeys.length > 0 &&
+      !hasCatalogCeiling &&
+      (modelJustChanged || !cache?.modelLimitsUpdatedAt || modelLimitAttemptAgeMs >= 15000)
+    );
+
     const currentState = typeof meta?.agent_state === 'string' ? meta.agent_state.trim().toLowerCase() : '';
     const prevState = typeof cache?.lastAgentState === 'string' ? cache.lastAgentState.trim().toLowerCase() : '';
     const currentOutputTokens = Number(meta?.context_window?.total_output_tokens || 0);
@@ -1966,7 +2125,6 @@ async function main() {
       (currentOutputTokens > 0 && currentOutputTokens !== prevOutputTokens) ||
       (currentTotalTokens > 0 && currentTotalTokens !== prevTotalTokens);
 
-    const now = Date.now();
     const lastUpdatedAt = cache?.lsUpdatedAt || cache?.updatedAt || 0;
     const cacheAgeMs = now - lastUpdatedAt;
     const lastAttemptAgeMs = now - (cache?.lastPollAttemptAt || 0);
@@ -1976,10 +2134,13 @@ async function main() {
     let timedOut = false;
     let shouldPersistCache = false;
 
-    if (needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale)) {
+    const shouldUpdateForQuota = needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale);
+    const shouldUpdateForContext = needsContext && (missingModelLimits || stateOrTokensChanged || isCacheStale);
+    if (needsCache && (shouldUpdateForQuota || shouldUpdateForContext)) {
       const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
         cachePath,
-        missingRequiredBuckets
+        missingRequiredBuckets: (needsQuotaOrAccount && missingRequiredBuckets) || missingModelLimits,
+        conversationId
       });
       cache = updateRes.cache;
       freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
@@ -2012,6 +2173,14 @@ async function main() {
         cache.lastTotalTokens = currentTotalTokens;
         shouldPersistCache = true;
       }
+      if (primaryModelKey && cache.lastModelKey !== primaryModelKey) {
+        cache.lastModelKey = primaryModelKey;
+        shouldPersistCache = true;
+      }
+      if (missingModelLimits && !freshlyFetchedFromLs) {
+        cache.lastModelLimitAttemptAt = now;
+        shouldPersistCache = true;
+      }
       if (shouldPersistCache && !timedOut) {
         try {
           await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
@@ -2025,7 +2194,7 @@ async function main() {
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
     const argonInfo = resolveArgonQuota(cache);
     const contextInfo = needsContext
-      ? await calculateContextUsageAsync(meta, conversationId, settings)
+      ? await calculateContextUsageAsync(meta, conversationId, settings, cache)
       : { totalInput: 0, contextSize: 1048576, effectiveTokenCeiling: DEFAULT_COMPACTION_THRESHOLD, usedPctNum: 0 };
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';

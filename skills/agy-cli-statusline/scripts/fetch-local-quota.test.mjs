@@ -84,7 +84,16 @@ import http from 'http';
 import fs from 'fs';
 import os from 'os';
 import path, { join } from 'path';
-import { requestUserStatus, requestQuotaSummary, fetchLiveQuotaCache } from './fetch-local-quota.mjs';
+import {
+  requestUserStatus,
+  requestQuotaSummary,
+  requestAvailableModels,
+  requestTrajectoryGeneratorMetadata,
+  parseModelLimits,
+  extractRuntimeGeneratorContext,
+  persistRuntimeContextToCtxFile,
+  fetchLiveQuotaCache
+} from './fetch-local-quota.mjs';
 
 async function testHttpEndpointAndEnvDiscovery() {
   console.log("Testing HTTP endpoint and ANTIGRAVITY_LS_ADDRESS discovery...");
@@ -314,12 +323,352 @@ function testMergeQuotaBuckets() {
   console.log("✅ mergeQuotaBuckets preservation and anti-jitter tests passed.");
 }
 
+function testParseModelLimitsAndGeneratorContext() {
+  console.log("Testing parseModelLimits and extractRuntimeGeneratorContext...");
+  const mockGam = {
+    response: {
+      models: {
+        'gemini-4-argon-medium': {
+          displayName: 'Gemini 4 Argon (Medium)',
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M418',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-4-carbon-disabled': {
+          displayName: 'Gemini 4 Carbon',
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M670',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-4-hydrogen-high': {
+          displayName: 'Gemini 4 Hydrogen (High)',
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M525',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-4-hydrogen-tiered-high': {
+          displayName: 'Gemini 4 Hydrogen (High)',
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M530',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-3.8-flash-high': {
+          displayName: 'Gemini 3.8 Flash (High)',
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M318',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '256000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-3.8-flash-tiered': {
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M322',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '256000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-2.5-flash': {
+          displayName: 'Gemini 3.5 Flash Lite',
+          maxTokens: 1048576,
+          model: 'MODEL_GOOGLE_GEMINI_2_5_FLASH',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '128000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-3.5-flash-lite': {
+          displayName: 'Gemini 3.5 Flash Lite',
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M198',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '128000', enabled: true })
+              }
+            }
+          }
+        },
+        'gemini-pro-orchestrator-g1-pro': {
+          displayName: 'Orchestrator (Argon)',
+          maxTokens: 1048576,
+          model: 'MODEL_PLACEHOLDER_M668',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+              }
+            }
+          }
+        },
+        'gpt-oss-120b-medium': {
+          displayName: 'GPT-OSS 120B (Medium)',
+          maxTokens: 131072,
+          model: 'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '80000', enabled: true })
+              }
+            }
+          }
+        },
+        'claude-opus-5-5-medium': {
+          displayName: 'Claude Opus 5.5 (Medium)',
+          maxTokens: 1000000,
+          model: 'MODEL_PLACEHOLDER_M401',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '256000', enabled: true })
+              },
+              'CASCADE_USE_EXPERIMENT_CHECKPOINTER/claude-1m_840k': {
+                stringValue: JSON.stringify({ max_token_limit: '840000', enabled: true })
+              }
+            }
+          }
+        },
+        'collision-a': {
+          displayName: 'Shared Label',
+          maxTokens: 1048576,
+          model: 'MODEL_COLLISION_A',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '128000', enabled: true })
+              }
+            }
+          }
+        },
+        'collision-b': {
+          displayName: 'Shared Label',
+          maxTokens: 1048576,
+          model: 'MODEL_COLLISION_B',
+          modelExperiments: {
+            experiments: {
+              CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const limits = parseModelLimits(mockGam);
+  assert.strictEqual(limits['gemini4argonmedium']?.limit, 512000);
+  assert.strictEqual(limits['gemini4carbon']?.limit, 512000);
+  assert.strictEqual(limits['gemini4hydrogenhigh']?.limit, 512000);
+  assert.strictEqual(limits['gemini4hydrogentieredhigh']?.limit, 512000);
+  assert.strictEqual(limits['gemini38flashhigh']?.limit, 256000);
+  assert.strictEqual(limits['gemini38flashtiered']?.limit, 256000);
+  assert.strictEqual(limits['modelplaceholderm322']?.limit, 256000);
+  assert.strictEqual(limits['gemini35flashlite']?.limit, 128000);
+  assert.strictEqual(limits['orchestratorargon']?.limit, 512000);
+  assert.strictEqual(limits['geminiproorchestratorg1pro']?.limit, 512000);
+  assert.strictEqual(limits['gptoss120bmedium']?.limit, 80000);
+  assert.strictEqual(limits['gptoss120bmedium']?.maxTokens, 131072);
+  assert.strictEqual(limits['claudeopus55medium']?.limit, 256000);
+  assert.strictEqual(limits['sharedlabel']?.ambiguous, true, "Conflicting displayName limits must be marked ambiguous");
+  assert.strictEqual(limits['collisiona']?.limit, 128000, "Primary slug key must remain unambiguous");
+  assert.strictEqual(limits['collisionb']?.limit, 512000, "Primary slug key must remain unambiguous");
+
+  const emptyCtx = extractRuntimeGeneratorContext({});
+  assert.strictEqual(emptyCtx.maxContextTokens, 0);
+  assert.strictEqual(emptyCtx.count, 0);
+
+  const populatedCtx = extractRuntimeGeneratorContext({
+    generatorMetadata: [
+      { chatModel: { model: 'MODEL_A', modelDisplayName: 'Old Model', chatStartMetadata: { contextWindowMetadata: { maxContextTokens: 256000 } } } },
+      { chatModel: { model: 'MODEL_PLACEHOLDER_M401', modelDisplayName: 'Claude Opus 5.5 (Medium)', chatStartMetadata: { contextWindowMetadata: { maxContextTokens: 840000 } } } }
+    ]
+  });
+  assert.strictEqual(populatedCtx.maxContextTokens, 840000);
+  assert.strictEqual(populatedCtx.modelDisplayName, 'Claude Opus 5.5 (Medium)');
+  assert.strictEqual(populatedCtx.model, 'MODEL_PLACEHOLDER_M401');
+  assert.strictEqual(populatedCtx.count, 2);
+  console.log("✅ parseModelLimits and extractRuntimeGeneratorContext tests passed.");
+}
+
+async function testAvailableModelsAndTrajectoryPagination() {
+  console.log("Testing GetAvailableModels & paginated GetCascadeTrajectoryGeneratorMetadata...");
+  const offsetsSeen = [];
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      if (req.url === '/exa.language_server_pb.LanguageServerService/GetUserStatus') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          userStatus: {
+            email: 'dynamic@example.com',
+            userTier: { name: 'Pro' },
+            cascadeModelConfigData: { clientModelConfigs: [] }
+          }
+        }));
+      } else if (req.url === '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ groups: [] }));
+      } else if (req.url === '/exa.language_server_pb.LanguageServerService/GetAvailableModels') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          response: {
+            models: {
+              'gemini-4-argon-medium': {
+                displayName: 'Gemini 4 Argon (Medium)',
+                maxTokens: 1048576,
+                model: 'MODEL_PLACEHOLDER_M418',
+                modelExperiments: {
+                  experiments: {
+                    CASCADE_USE_EXPERIMENT_CHECKPOINTER: {
+                      stringValue: JSON.stringify({ max_token_limit: '512000', enabled: true })
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }));
+      } else if (req.url === '/exa.language_server_pb.LanguageServerService/GetCascadeTrajectoryGeneratorMetadata') {
+        const parsedReq = JSON.parse(body || '{}');
+        offsetsSeen.push(parsedReq.generatorMetadataOffset);
+        if (parsedReq.cascadeId === 'conv-missing-404') {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ code: 'not_found' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (parsedReq.generatorMetadataOffset === 0) {
+          const page1 = Array.from({ length: 256 }, () => ({
+            chatModel: {
+              model: 'MODEL_PLACEHOLDER_M418',
+              modelDisplayName: 'Gemini 4 Argon (Medium)',
+              chatStartMetadata: { contextWindowMetadata: { maxContextTokens: 512000 } }
+            }
+          }));
+          res.end(JSON.stringify({ generatorMetadata: page1 }));
+        } else {
+          res.end(JSON.stringify({
+            generatorMetadata: [
+              {
+                chatModel: {
+                  model: 'MODEL_PLACEHOLDER_M401',
+                  modelDisplayName: 'Claude Opus 5.5 (Medium)',
+                  chatStartMetadata: { contextWindowMetadata: { maxContextTokens: 840000 } }
+                }
+              }
+            ]
+          }));
+        }
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+  });
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  const tempHome = fs.mkdtempSync(join(os.tmpdir(), 'fetch-quota-pag-'));
+  const origHome = process.env.HOME;
+  const origProfile = process.env.USERPROFILE;
+  const origLs = process.env.ANTIGRAVITY_LS_ADDRESS;
+  const origTok = process.env.ANTIGRAVITY_CSRF_TOKEN;
+
+  try {
+    process.env.HOME = tempHome;
+    process.env.USERPROFILE = tempHome;
+    process.env.ANTIGRAVITY_LS_ADDRESS = `127.0.0.1:${port}`;
+    process.env.ANTIGRAVITY_CSRF_TOKEN = 'tok-pag';
+
+    const gamRes = await requestAvailableModels(port, 'tok-pag', '127.0.0.1', false);
+    assert.ok(gamRes.response.models['gemini-4-argon-medium']);
+    const genRes = await requestTrajectoryGeneratorMetadata(port, 'tok-pag', 'conv-pag-1', 256, '127.0.0.1', false);
+    assert.strictEqual(genRes.generatorMetadata.length, 1);
+
+    offsetsSeen.length = 0;
+    const ctxPath = join(tempHome, '.gemini', 'tmp', 'ctx_conv-pag-1.json');
+    fs.mkdirSync(path.dirname(ctxPath), { recursive: true });
+    fs.writeFileSync(ctxPath, JSON.stringify({ total_input_tokens: 12000, context_window_size: 1000000 }), 'utf8');
+
+    const cache = await fetchLiveQuotaCache({ conversationId: 'conv-pag-1' });
+    assert.ok(cache, "Cache must be returned from GetAvailableModels even when quota buckets are empty");
+    assert.strictEqual(cache.modelLimits['gemini4argonmedium']?.limit, 512000);
+    assert.ok(cache.modelLimitsUpdatedAt > 0);
+    assert.deepStrictEqual(offsetsSeen, [0, 256], "Must paginate past 256-entry cap");
+    assert.strictEqual(cache._runtimeContext?.maxContextTokens, 840000);
+    assert.strictEqual(cache._runtimeContext?.nextOffset, 257);
+
+    persistRuntimeContextToCtxFile(ctxPath, cache._runtimeContext);
+    const savedCtx = JSON.parse(fs.readFileSync(ctxPath, 'utf8'));
+    assert.strictEqual(savedCtx.total_input_tokens, 12000, "Existing token stats must be preserved");
+    assert.strictEqual(savedCtx.runtime_max_context_tokens, 840000);
+    assert.strictEqual(savedCtx.runtime_model_key, 'claudeopus55medium');
+    assert.strictEqual(savedCtx.generator_metadata_offset, 257);
+
+    // 404 from trajectory metadata must not break GetAvailableModels
+    const cache404 = await fetchLiveQuotaCache({ conversationId: 'conv-missing-404' });
+    assert.strictEqual(cache404.modelLimits['gemini4argonmedium']?.limit, 512000);
+    console.log("✅ GetAvailableModels & paginated GetCascadeTrajectoryGeneratorMetadata tests passed.");
+  } catch (err) {
+    if (err.code === 'EPERM' || err.message?.includes('EPERM')) {
+      console.log("⚠️ Sandbox network restriction detected (EPERM). Loopback pagination test skipped.");
+      return;
+    }
+    throw err;
+  } finally {
+    if (origHome === undefined) delete process.env.HOME; else process.env.HOME = origHome;
+    if (origProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = origProfile;
+    if (origLs === undefined) delete process.env.ANTIGRAVITY_LS_ADDRESS; else process.env.ANTIGRAVITY_LS_ADDRESS = origLs;
+    if (origTok === undefined) delete process.env.ANTIGRAVITY_CSRF_TOKEN; else process.env.ANTIGRAVITY_CSRF_TOKEN = origTok;
+    try { fs.rmSync(tempHome, { recursive: true, force: true }); } catch (_) {}
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 async function runAll() {
   try {
     testParseWeeklyBucketsUnwrapped();
     testParseWeeklyBucketsWrappedAndCamelCase();
     testMergeQuotaBuckets();
+    testParseModelLimitsAndGeneratorContext();
     await testHttpEndpointAndEnvDiscovery();
+    await testAvailableModelsAndTrajectoryPagination();
     console.log("✅ All R0 tests passed successfully!");
   } catch (err) {
     console.error("❌ R0 test failed:", err);
