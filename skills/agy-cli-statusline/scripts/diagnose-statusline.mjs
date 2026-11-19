@@ -1,9 +1,20 @@
 #!/usr/bin/env node
-import { readFileSync, existsSync, statSync, realpathSync, readdirSync } from 'fs';
-import { createHash } from 'crypto';
+import { readFileSync, existsSync, statSync, realpathSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
+import {
+  hasBOM,
+  sha256FileSync,
+  readJsonSafeSync,
+  listMjsFilesRecursiveSync,
+  isDirectExecution as coreIsDirectExecution
+} from './lib/core/fs-utils.mjs';
+import { compareSemver } from './lib/core/semver.mjs';
+import {
+  discoverInstalledPluginSync,
+  readPluginManifestFromDirSync
+} from './lib/core/plugin-manifest.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,13 +34,9 @@ function alert(msg) { return `${RED}${BOLD}🚨 ${msg}${RESET}`; }
 function head(msg) { return `${BOLD}${CYAN}${msg}${RESET}`; }
 function dim(msg) { return `${DIM}${msg}${RESET}`; }
 
-function safeRead(path) {
-  try { return { ok: true, raw: readFileSync(path, 'utf8'), bytes: readFileSync(path) }; }
+function safeRead(filePath) {
+  try { return { ok: true, raw: readFileSync(filePath, 'utf8'), bytes: readFileSync(filePath) }; }
   catch (e) { return { ok: false, error: e.message }; }
-}
-
-function hasBOM(buf) {
-  return buf && buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF;
 }
 
 function parseJSON(raw) {
@@ -59,14 +66,14 @@ function describeFooterItems(ui) {
   return `  ui.footer.items (${items.length} 項): ${items.join(', ')}`;
 }
 
-function inspectSettings(label, path) {
+function inspectSettings(label, filePath) {
   console.log(`\n${head(label)}`);
-  console.log(`路徑: ${path}`);
-  if (!existsSync(path)) {
+  console.log(`路徑: ${filePath}`);
+  if (!existsSync(filePath)) {
     console.log(bad('狀態: 不存在'));
     return { exists: false };
   }
-  const r = safeRead(path);
+  const r = safeRead(filePath);
   if (!r.ok) {
     console.log(bad(`狀態: 讀取失敗 — ${r.error}`));
     return { exists: true, readable: false };
@@ -103,107 +110,126 @@ function inspectHookFiles(hooksDir) {
       console.log(bad(`${f} 不存在 — ${p}`));
     }
   });
-}
 
-function sha256File(filePath) {
-  try {
-    if (!existsSync(filePath)) return '';
-    return createHash('sha256').update(readFileSync(filePath)).digest('hex');
-  } catch (_) {
-    return '';
+  const hooksLibDir = join(hooksDir, 'lib');
+  const libFiles = listMjsFilesRecursiveSync(hooksLibDir);
+  if (libFiles.length > 0) {
+    console.log(ok(`lib/ 共 ${libFiles.length} 個 .mjs 模組檔案 — ${hooksLibDir}`));
+  } else if (existsSync(hooksLibDir)) {
+    console.log(warn(`lib/ 目錄存在但無 .mjs 模組檔案 — ${hooksLibDir}`));
   }
 }
 
-function compareSemverNumeric(a, b) {
-  const parse = (s) => {
-    const m = String(s || '').trim().replace(/^v/i, '').match(/^(\d+)\.(\d+)\.(\d+)/);
-    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+/**
+ * 從已部署的 statusline-quota.mjs（或模組化 hooks/lib/core/constants.mjs）擷取內嵌 HOOK_VERSION。
+ * @param {string} hookMainPath
+ * @param {string} hooksDir
+ * @returns {string}
+ */
+function extractEmbeddedHookVersion(hookMainPath, hooksDir) {
+  if (!existsSync(hookMainPath)) return '';
+  const hr = safeRead(hookMainPath);
+  if (!hr.ok) return '';
+  const directMatch = hr.raw.match(/export\s+const\s+HOOK_VERSION\s*=\s*['"]([^'"]+)['"]/);
+  if (directMatch) {
+    return directMatch[1].trim().replace(/^v/i, '');
+  }
+  // 模組化薄入口會自 ./lib/core/constants.mjs 重新匯出 HOOK_VERSION
+  if (/\bHOOK_VERSION\b/.test(hr.raw) && /['"]\.\/lib\/core\/constants\.mjs['"]/.test(hr.raw)) {
+    const constantsRes = safeRead(join(hooksDir, 'lib', 'core', 'constants.mjs'));
+    if (constantsRes.ok) {
+      const libMatch = constantsRes.raw.match(/export\s+const\s+HOOK_VERSION\s*=\s*['"]([^'"]+)['"]/);
+      if (libMatch) {
+        return libMatch[1].trim().replace(/^v/i, '');
+      }
+    }
+  }
+  return '';
+}
+
+/**
+ * 比對外掛來源腳本（含 scripts/lib/ 遞迴模組）與已部署掛鉤目錄之間的檔案與雜湊差異。
+ * @param {string} refPluginDir
+ * @param {string} hooksDir
+ * @param {object|null} hookMeta
+ * @returns {Array<{ file: string, reason: 'missing_in_hooks'|'content_differs' }>}
+ */
+function collectHookFileDiffs(refPluginDir, hooksDir, hookMeta) {
+  const fileDiffs = [];
+  const seenFiles = new Set();
+  const pushDiff = (file, reason) => {
+    if (seenFiles.has(file)) return;
+    seenFiles.add(file);
+    fileDiffs.push({ file, reason });
   };
-  const pa = parse(a);
-  const pb = parse(b);
-  if (!pa || !pb) return null;
-  for (let i = 0; i < 3; i++) {
-    if (pa[i] < pb[i]) return -1;
-    if (pa[i] > pb[i]) return 1;
-  }
-  return 0;
-}
 
-function readManifestVersion(pluginDir, requireExplicitName = false) {
-  if (!pluginDir) return { version: '', source: '' };
-  for (const name of ['plugin.json', 'package.json']) {
-    const p = join(pluginDir, name);
-    if (!existsSync(p)) continue;
-    const r = safeRead(p);
-    if (!r.ok) continue;
-    const parsed = parseJSON(r.raw);
-    if (!parsed.ok || !parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) continue;
-    const pkgName = typeof parsed.value.name === 'string' ? parsed.value.name.trim() : '';
-    if (name === 'package.json' || requireExplicitName) {
-      if (pkgName !== 'antigravity-cli-statusline') continue;
-    } else if (pkgName && pkgName !== 'antigravity-cli-statusline') {
-      continue;
+  if (refPluginDir) {
+    const pluginScriptsDir = join(refPluginDir, 'skills', 'agy-cli-statusline', 'scripts');
+    for (const fileName of ['statusline-quota.mjs', 'fetch-local-quota.mjs']) {
+      const srcHash = sha256FileSync(join(pluginScriptsDir, fileName));
+      const dstHash = sha256FileSync(join(hooksDir, fileName));
+      if (!dstHash) {
+        pushDiff(fileName, 'missing_in_hooks');
+      } else if (srcHash && srcHash !== dstHash) {
+        pushDiff(fileName, 'content_differs');
+      }
     }
-    if (typeof parsed.value.version === 'string' && parsed.value.version.trim()) {
-      return { version: parsed.value.version.trim().replace(/^v/i, ''), source: p };
-    }
-  }
-  return { version: '', source: '' };
-}
 
-function discoverInstalledPlugin(home) {
-  const pluginsRoot = join(home, '.gemini', 'config', 'plugins');
-  const candidates = [
-    { dir: join(pluginsRoot, 'antigravity-cli-statusline'), requireExplicitName: false, priority: 3 },
-    { dir: join(home, '.agents', 'plugins', 'antigravity-cli-statusline'), requireExplicitName: false, priority: 2 }
-  ];
-  try {
-    if (existsSync(pluginsRoot)) {
-      const entries = readdirSync(pluginsRoot, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry || entry.name === 'antigravity-cli-statusline') continue;
-        if (entry.isDirectory() || entry.isSymbolicLink()) {
-          candidates.push({
-            dir: join(pluginsRoot, entry.name),
-            requireExplicitName: true,
-            priority: 1
-          });
+    // 僅當參考外掛來源具有 scripts/lib/*.mjs 檔案時才檢查 lib/，避免精簡測試夾具產生誤報
+    const pluginLibFiles = listMjsFilesRecursiveSync(join(pluginScriptsDir, 'lib'));
+    if (pluginLibFiles.length > 0) {
+      for (const rel of pluginLibFiles) {
+        const relParts = rel.split('/');
+        const srcHash = sha256FileSync(join(pluginScriptsDir, 'lib', ...relParts));
+        const dstHash = sha256FileSync(join(hooksDir, 'lib', ...relParts));
+        const fileKey = `lib/${rel}`;
+        if (!dstHash) {
+          pushDiff(fileKey, 'missing_in_hooks');
+        } else if (srcHash && srcHash !== dstHash) {
+          pushDiff(fileKey, 'content_differs');
         }
       }
     }
-  } catch (_) {}
+  }
 
-  let best = null;
-  for (const cand of candidates) {
-    const info = readManifestVersion(cand.dir, cand.requireExplicitName);
-    if (!info.version) continue;
-    const record = { dir: cand.dir, version: info.version, source: info.source, priority: cand.priority };
-    if (!best) {
-      best = record;
-      continue;
-    }
-    const cmp = compareSemverNumeric(record.version, best.version);
-    if (cmp !== null) {
-      if (cmp > 0 || (cmp === 0 && record.priority > best.priority)) {
-        best = record;
+  // 若 .hook-version.json 已記錄 lib/... 檔案但實際上已從 hooksDir 被刪除，亦納入差異清單
+  if (hookMeta?.files && typeof hookMeta.files === 'object' && !Array.isArray(hookMeta.files)) {
+    for (const recordedFile of Object.keys(hookMeta.files)) {
+      if (!recordedFile.startsWith('lib/') || seenFiles.has(recordedFile)) continue;
+      const rel = recordedFile.slice('lib/'.length);
+      if (!rel || rel.startsWith('/') || rel.split('/').includes('..')) continue;
+      const dstPath = join(hooksDir, 'lib', ...rel.split('/'));
+      if (!sha256FileSync(dstPath)) {
+        pushDiff(recordedFile, 'missing_in_hooks');
       }
-    } else if (record.priority > best.priority) {
-      best = record;
     }
   }
-  return best || { dir: join(pluginsRoot, 'antigravity-cli-statusline'), version: '', source: '' };
+
+  return fileDiffs;
 }
 
+/**
+ * 檢查已安裝外掛與 ~/.gemini/antigravity-cli/hooks/ 掛鉤腳本之版本與內容同步狀態。
+ * @param {object} [options={}]
+ */
 export function checkPluginHookSync(options = {}) {
   const home = options.home || os.homedir();
   const hooksDir = options.hooksDir || join(home, '.gemini', 'antigravity-cli', 'hooks');
   const currentPluginDir = options.currentPluginDir || resolve(__dirname, '..', '..', '..');
+  const workspacePath = options.workspacePath || process.cwd();
 
+  const installedManifest = options.installedPluginDir
+    ? readPluginManifestFromDirSync(options.installedPluginDir, false)
+    : null;
   const installedInfo = options.installedPluginDir
-    ? { dir: options.installedPluginDir, ...readManifestVersion(options.installedPluginDir, false) }
-    : discoverInstalledPlugin(home);
+    ? {
+        dir: options.installedPluginDir,
+        version: installedManifest?.version || '',
+        source: installedManifest?.source || ''
+      }
+    : discoverInstalledPluginSync(home, workspacePath);
   const installedPluginDir = installedInfo.dir;
-  const currentInfo = readManifestVersion(currentPluginDir);
+  const currentInfo = readPluginManifestFromDirSync(currentPluginDir, false) || { version: '', source: '' };
 
   let refPluginDir = '';
   let pluginVersion = '';
@@ -230,67 +256,34 @@ export function checkPluginHookSync(options = {}) {
   } catch (_) {}
 
   const hookMetaPath = join(hooksDir, '.hook-version.json');
-  let hookMeta = null;
-  if (existsSync(hookMetaPath)) {
-    const mr = safeRead(hookMetaPath);
-    if (mr.ok) {
-      const mp = parseJSON(mr.raw);
-      if (mp.ok && mp.value && typeof mp.value === 'object') {
-        hookMeta = mp.value;
-      }
-    }
-  }
+  const hookMeta = readJsonSafeSync(hookMetaPath);
 
   const hookMainPath = join(hooksDir, 'statusline-quota.mjs');
   const hookFetchPath = join(hooksDir, 'fetch-local-quota.mjs');
   const hookExists = existsSync(hookMainPath) && existsSync(hookFetchPath);
 
-  let embeddedHookVersion = '';
-  if (existsSync(hookMainPath)) {
-    const hr = safeRead(hookMainPath);
-    if (hr.ok) {
-      const m = hr.raw.match(/export\s+const\s+HOOK_VERSION\s*=\s*['"]([^'"]+)['"]/);
-      if (m) embeddedHookVersion = m[1].trim().replace(/^v/i, '');
-    }
-  }
-
+  const embeddedHookVersion = extractEmbeddedHookVersion(hookMainPath, hooksDir);
   const recordedHookVersion = (typeof hookMeta?.pluginVersion === 'string' && hookMeta.pluginVersion.trim() && hookMeta.pluginVersion !== 'unknown')
     ? hookMeta.pluginVersion.trim().replace(/^v/i, '')
     : '';
   const hookVersion = recordedHookVersion || embeddedHookVersion || '';
 
-  const fileDiffs = [];
-  if (refPluginDir) {
-    const pluginScriptsDir = join(refPluginDir, 'skills', 'agy-cli-statusline', 'scripts');
-    for (const fileName of ['statusline-quota.mjs', 'fetch-local-quota.mjs']) {
-      const srcHash = sha256File(join(pluginScriptsDir, fileName));
-      const dstHash = sha256File(join(hooksDir, fileName));
-      if (!dstHash) {
-        fileDiffs.push({ file: fileName, reason: 'missing_in_hooks' });
-      } else if (srcHash && srcHash !== dstHash) {
-        fileDiffs.push({ file: fileName, reason: 'content_differs' });
-      }
-    }
-  }
+  const fileDiffs = collectHookFileDiffs(refPluginDir, hooksDir, hookMeta);
 
-  let updateCache = null;
   const updateCachePath = options.updateCachePath || join(home, '.gemini', 'tmp', 'plugin_update_cache.json');
-  if (existsSync(updateCachePath)) {
-    const ur = safeRead(updateCachePath);
-    if (ur.ok) {
-      const up = parseJSON(ur.raw);
-      if (up.ok && up.value && typeof up.value === 'object') {
-        updateCache = up.value;
-      }
-    }
-  }
+  const updateCache = readJsonSafeSync(updateCachePath);
+
+  const versionCmp = (hookVersion && pluginVersion) ? compareSemver(hookVersion, pluginVersion) : null;
+  const isVersionMismatch = versionCmp !== null
+    ? versionCmp !== 0
+    : Boolean(hookVersion && pluginVersion && hookVersion !== pluginVersion);
 
   let status = 'in_sync';
   if (!hookExists) {
     status = 'hook_missing';
   } else if (!pluginVersion) {
     status = 'plugin_not_found';
-  } else if (hookVersion && hookVersion !== pluginVersion) {
+  } else if (hookVersion && isVersionMismatch) {
     status = 'version_mismatch';
   } else if (!hookVersion && fileDiffs.length > 0) {
     status = 'legacy_mismatch';
@@ -394,7 +387,7 @@ function diagnose(layers, syncResult) {
   findings.forEach(f => console.log(f));
 }
 
-function main() {
+export function main() {
   const home = os.homedir();
   const cwd = process.cwd();
 
@@ -417,23 +410,15 @@ function main() {
 
   const hooksDir = join(home, '.gemini', 'antigravity-cli', 'hooks');
   inspectHookFiles(hooksDir);
-  const syncResult = checkPluginHookSync({ home, hooksDir });
+  const syncResult = checkPluginHookSync({ home, hooksDir, workspacePath: cwd });
   inspectPluginHookSync(syncResult);
   diagnose(layers, syncResult);
 
   console.log(`\n${dim('將以上完整輸出複製貼給 AI 代理，協助判斷根因。')}\n`);
 }
 
-function isDirectExecution() {
-  if (!process.argv[1]) return false;
-  try {
-    const currentFile = fileURLToPath(import.meta.url);
-    const invokedFile = resolve(process.argv[1]);
-    if (currentFile === invokedFile) return true;
-    return realpathSync(currentFile) === realpathSync(invokedFile);
-  } catch (_) {
-    return false;
-  }
+export function isDirectExecution(options = {}) {
+  return coreIsDirectExecution(import.meta.url, { treatEmptyArgv1AsDirect: false, ...options });
 }
 
 if (isDirectExecution()) {

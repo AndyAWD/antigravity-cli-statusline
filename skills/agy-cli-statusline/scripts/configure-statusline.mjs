@@ -1,344 +1,65 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
+import { HOOK_VERSION, PLUGIN_PACKAGE_NAME } from './lib/core/constants.mjs';
+import {
+  readJsonWithBOMDefenseSync,
+  writeContentAndVerifyNoBOMSync,
+  writeJsonAndVerifyNoBOMSync,
+  sha256String,
+  listMjsFilesRecursiveSync,
+  isDirectExecution as coreIsDirectExecution
+} from './lib/core/fs-utils.mjs';
+import {
+  isInGitProject,
+  safeCopySync,
+  safeRemoveSync,
+  cleanupLegacyWindowsShBridge
+} from './lib/core/safe-cleanup.mjs';
+import { normalizeLanguage, normalizeLabelStyle } from './lib/core/normalize.mjs';
+import { readPluginManifestFromDirSync } from './lib/core/plugin-manifest.mjs';
+import { getStatusLineCommand } from './lib/core/settings.mjs';
+import { ALL_STANDARD_METRIC_IDS } from './lib/metrics/registry.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const sourceDir = __dirname;
 
+export {
+  normalizeLabelStyle,
+  cleanupLegacyWindowsShBridge,
+  getStatusLineCommand,
+  ALL_STANDARD_METRIC_IDS
+};
+
 // ==========================================
-// 跨平台安全性輔助函式 (Security Helpers)
+// 路徑範圍防禦輔助函式 (Path Containment Helper)
 // ==========================================
 
 /**
- * 檢查指定的檔案是否位於 Git 專案工作區中。
- * 自檔案的父目錄開始逐級向上搜尋祖先目錄，直到根目錄。
+ * 檢查目標路徑是否嚴格位於指定父目錄內部（防止路徑穿越或誤刪目錄本身）。
+ * @param {string} targetPath
+ * @param {string} parentDir
+ * @returns {boolean}
  */
-function isInGitProject(filePath) {
-  try {
-    let currentDir = path.dirname(path.resolve(filePath));
-    const root = path.parse(currentDir).root;
-    
-    while (currentDir && currentDir !== root) {
-      if (fs.existsSync(path.join(currentDir, '.git'))) {
-        return true;
-      }
-      const parent = path.dirname(currentDir);
-      if (parent === currentDir) break;
-      currentDir = parent;
-    }
-    if (root && fs.existsSync(path.join(root, '.git'))) {
-      return true;
-    }
-  } catch (err) {
-    // 忽略錯誤以確保穩定性
-  }
-  return false;
-}
-
-/**
- * 遞迴檢查目錄或其任何實體子目錄是否為 Git 專案（包含 .git 目錄）。
- * 遇到符號連結時會跳過以防止遞迴至外部連結。
- */
-function isOrContainsGitProject(dir, depth = 0) {
-  if (depth > 30) {
-    throw new RangeError('Directory recursion depth limit exceeded');
-  }
-  try {
-    const stats = fs.lstatSync(dir);
-    if (stats.isSymbolicLink()) {
-      return false; // 符號連結本身非 Git 專案，且安全移除時只會 unlink 該連結，不影響內容
-    }
-    if (!stats.isDirectory()) {
-      return false;
-    }
-    // 檢查當前層級是否為 Git 專案
-    if (fs.existsSync(path.join(dir, '.git'))) {
-      return true;
-    }
-    // 遍歷實體子目錄
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      if (isOrContainsGitProject(path.join(dir, file), depth + 1)) {
-        return true;
-      }
-    }
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      return false;
-    }
-    throw err;
-  }
-  return false;
-}
-
-/**
- * 安全地複製檔案或目錄，完全不追隨（Dereference）符號連結。
- * 對於符號連結，會在目標位置重新建立相同的連結，並處理 Windows 上的權限限制。
- */
-function safeCopySync(src, dest) {
-  const stats = fs.lstatSync(src);
-
-  if (stats.isSymbolicLink()) {
-    const linkTarget = fs.readlinkSync(src);
-    // 若目標已存在，先將其安全移除
-    try {
-      const destStats = fs.lstatSync(dest);
-      safeRemoveSync(dest);
-    } catch (e) {}
-
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    
-    try {
-      // 在目標位置建立相同的符號連結
-      let isDir = false;
-      try {
-        isDir = fs.statSync(src).isDirectory();
-      } catch (e) {}
-      
-      if (process.platform === 'win32') {
-        fs.symlinkSync(linkTarget, dest, isDir ? 'junction' : 'file');
-      } else {
-        fs.symlinkSync(linkTarget, dest);
-      }
-    } catch (linkErr) {
-      // Windows 上若無權限建立 Symlink，則寫入一個指示性文字檔以避免程序崩潰
-      if (process.platform === 'win32') {
-        console.warn(`[Safe Backup] Windows 權限不足，無法在 ${dest} 建立符號連結。改寫入 .lnk_target 文字檔案。`);
-        fs.writeFileSync(`${dest}.lnk_target`, linkTarget, 'utf8');
-      } else {
-        throw linkErr;
-      }
-    }
-    return;
-  }
-
-  if (stats.isDirectory()) {
-    if (!fs.existsSync(dest)) {
-      fs.mkdirSync(dest, { recursive: true });
-    }
-    const files = fs.readdirSync(src);
-    for (const file of files) {
-      safeCopySync(path.join(src, file), path.join(dest, file));
-    }
-    return;
-  }
-
-  // 實體檔案複製
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(src, dest);
-}
-
-/**
- * 安全地刪除指定路徑。如果是符號連結，僅解除連結（Unlink），絕不跟隨。
- * 如果是實體目錄，會進行 Git 專案防誤刪檢查，確認安全後再遞迴安全刪除子項。
- */
-function safeRemoveSync(targetPath) {
-  let stats;
-  try {
-    stats = fs.lstatSync(targetPath);
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      return; // 路徑不存在
-    }
-    throw err;
-  }
-
-  // 1. 如果是符號連結 (macOS Symlink 或 Windows Junction/Symlink)
-  if (stats.isSymbolicLink()) {
-    console.log(`[Safe Clean] 正在移除符號連結/交接點: ${targetPath}`);
-    try {
-      fs.unlinkSync(targetPath);
-    } catch (unlinkErr) {
-      // Windows 下對於目錄型交接點，有時 unlink 會失敗，改以 rmdirSync 清理連結本身
-      if (process.platform === 'win32') {
-        try {
-          fs.rmdirSync(targetPath);
-          return;
-        } catch (rmdirErr) {}
-      }
-      throw unlinkErr;
-    }
-    return;
-  }
-
-  // 2. 如果是目錄
-  if (stats.isDirectory()) {
-    // 安全防禦：防止刪除本機開發專案（包含 .git）
-    if (isOrContainsGitProject(targetPath)) {
-      throw new Error(`[Security Violation] 刪除操作已被中止。此目錄是或包含 Git 專案: ${targetPath}`);
-    }
-
-    // 遞迴安全刪除所有子項
-    const files = fs.readdirSync(targetPath);
-    for (const file of files) {
-      safeRemoveSync(path.join(targetPath, file));
-    }
-
-    // 刪除實體目錄本身
-    console.log(`[Safe Clean] 正在移除目錄: ${targetPath}`);
-    fs.rmdirSync(targetPath);
-    return;
-  }
-
-  // 3. 如果是普通檔案
-  // 檢查是否處於 Git 專案工作區中
-  if (isInGitProject(targetPath)) {
-    console.warn(`[Safe Clean] 跳過刪除。此檔案是 Git 專案的一部分: ${targetPath}`);
-    return;
-  }
-  console.log(`[Safe Clean] 正在移除檔案: ${targetPath}`);
-  fs.unlinkSync(targetPath);
+function isPathWithinDir(targetPath, parentDir) {
+  const resolvedParent = path.resolve(parentDir);
+  const resolvedTarget = path.resolve(targetPath);
+  const rel = path.relative(resolvedParent, resolvedTarget);
+  return Boolean(rel) && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
 }
 
 // ==========================================
-// 通用輔助函式 (General Helpers)
+// 排序與樣式解析 (Order & Style Parsing)
 // ==========================================
 
-function normalizeLanguage(l) {
-  if (!l || typeof l !== 'string') return 'zh-tw';
-  let norm = l.toLowerCase().replace(/_/g, '-').trim();
-  const parenMatch = norm.match(/[\(（]([a-z0-9\-_]+)[\)）]/);
-  if (parenMatch) {
-    norm = parenMatch[1].trim();
-  }
-  if (norm === 'zh-cn' || norm === 'cn' || norm === 'zh-hans' || norm === 'zh-sg' || norm.startsWith('zh-cn') || norm.startsWith('zh-hans') || norm.includes('简体') || norm.includes('簡體') || norm.includes('simplified')) {
-    return 'zh-cn';
-  }
-  if (norm === 'zh-tw' || norm === 'tw' || norm === 'zh-hant' || norm === 'zh-hk' || norm === 'zh-mo' || norm.startsWith('zh-tw') || norm.startsWith('zh-hant') || norm.includes('繁體') || norm.includes('繁体') || norm.includes('traditional')) {
-    return 'zh-tw';
-  }
-  if (norm === 'jp' || norm === 'ja' || norm === 'ja-jp' || norm.startsWith('ja-') || norm.includes('日本') || norm.includes('japanese')) {
-    return 'jp';
-  }
-  if (norm === 'us' || norm === 'en' || norm === 'en-us' || norm === 'en-gb' || norm.startsWith('en-') || norm.includes('english') || norm.includes('英文')) {
-    return 'us';
-  }
-  return norm;
-}
-
-export function normalizeLabelStyle(style) {
-  if (!style || typeof style !== 'string') return 'text';
-  let s = style.toLowerCase().trim();
-  const parenMatch = s.match(/[\(（]([a-z0-9\-_]+)[\)）]\s*$/);
-  if (parenMatch) {
-    s = parenMatch[1].trim();
-  }
-  if (s === 'emoji' || s === 'emojis' || s === 'icon' || s === 'icons' || s.includes('emoji') || s.includes('表情') || s.includes('圖示') || s.includes('图标') || s.includes('絵文字')) {
-    return 'emoji';
-  }
-  return 'text';
-}
-
-function writeContentAndVerifyNoBOM(filePath, content) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(filePath, content, { encoding: 'utf8' });
-  
-  // 驗證並就地剝除位元組順序記號（BOM）
-  let buffer = fs.readFileSync(filePath);
-  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
-    console.log(`[偵測到 BOM] 在 ${filePath} 發現 BOM，正在剝除...`);
-    buffer = buffer.slice(3);
-    fs.writeFileSync(filePath, buffer);
-  }
-}
-
-function readJsonWithBOMDefense(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return {};
-  }
-  let content = fs.readFileSync(filePath, 'utf8');
-  content = content.replace(/^\uFEFF/, '');
-  if (!content.trim()) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed;
-    }
-    return null;
-  } catch (err) {
-    console.error(`解析 ${filePath} 失敗，為保護既有設定將跳過寫入此檔案：`, err.message);
-    return null;
-  }
-}
-
-function writeJsonAndVerifyNoBOM(filePath, data) {
-  writeContentAndVerifyNoBOM(filePath, JSON.stringify(data, null, 2));
-}
-
-const LEGACY_SH_BRIDGE_MAX_BYTES = 16384;
-
 /**
- * 安全移除早期版本於 Windows %LOCALAPPDATA%\agy\bin\ 編譯遺留的微型 sh.exe 橋接器（約 4,608 bytes）。
- * 自 agy v1.3.5+ 起改用 cmd /c 原生執行狀態列，保留未簽署 sh.exe 反易觸發防毒軟體啟發式誤報。
- * 嚴格限定非符號連結、普通檔案且大小 <= 16,384 bytes，避免誤傷真實的 Git / MSYS2 sh.exe。
+ * 解析使用者輸入之排序字串與個別樣式前綴（e/t/純數字/識別碼/換行）。
+ * @param {string} orderStr
+ * @param {string[]} selectedIds
+ * @returns {{ items: string[], itemStyles: Record<string, string> }}
  */
-export function cleanupLegacyWindowsShBridge(localAppDataDir = process.env.LOCALAPPDATA, platform = process.platform) {
-  if (platform !== 'win32' || !localAppDataDir || typeof localAppDataDir !== 'string') {
-    return false;
-  }
-  const legacyShPath = path.join(localAppDataDir, 'agy', 'bin', 'sh.exe');
-  try {
-    const stats = fs.lstatSync(legacyShPath);
-    if (stats.isSymbolicLink() || !stats.isFile() || stats.size > LEGACY_SH_BRIDGE_MAX_BYTES) {
-      return false;
-    }
-    if (isInGitProject(legacyShPath)) {
-      return false;
-    }
-    fs.unlinkSync(legacyShPath);
-    console.log(`[Clean Up] 已移除舊版 Windows sh.exe 橋接器（agy v1.3.5+ 已不再需要且可避免防毒誤報）: ${legacyShPath}`);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-/**
- * 依平台產生最穩定的 statusLine 指令字串：
- * - macOS / Linux：使用 Node.js 執行檔的絕對路徑（process.execPath）。
- * - Windows：由於 agy.exe (v1.3.5+) 底層透過 Go exec.CommandContext(ctx, "cmd", "/c", command) 呼叫，
- *   Go 的 syscall.EscapeArg 會將 command 內部的任何雙引號 `"` 轉義為 `\"`，
- *   而 cmd.exe /c 不會解開 `\"`，導致 node.exe (MSVC CRT) 將 `\"` 當作字面上的雙引號字元，
- *   進而引發 `Cannot find module 'D:\cwd\"C:\...\statusline-quota.mjs"'`。
- *   因此 Windows 平台指令「絕對不可包含雙引號 `"`」：
- *   - 路徑不含空格時：使用 `node <cleanPath>`
- *   - 路徑含空格時：轉換為無空格、無引號的 `file:///` URL 並透過 `node --import <fileUrl> -e 0` 載入執行
- */
-export function getStatusLineCommand(statuslineScriptPath, platform = process.platform, execPath = process.execPath) {
-  const cleanPath = statuslineScriptPath.replace(/^"(.*)"$/, '$1');
-  if (platform === 'win32') {
-    if (cleanPath.includes(' ')) {
-      const fileUrl = 'file:///' + cleanPath.replace(/\\/g, '/').replace(/^\//, '').replace(/ /g, '%20');
-      return `node --import ${fileUrl} -e 0`;
-    }
-    return `node ${cleanPath}`;
-  } else {
-    const nodeBin = execPath.includes(' ') ? `"${execPath}"` : execPath;
-    const scriptArg = cleanPath.includes(' ') ? `"${cleanPath}"` : cleanPath;
-    return `${nodeBin} ${scriptArg}`;
-  }
-}
-
-export const ALL_STANDARD_METRIC_IDS = [
-  'model-name', 'agent-profile', 'agent-state', 'mode',
-  'quota', 'quota-bar', 'quota-reset-countdown', 'quota-reset-time',
-  'quota-weekly', 'quota-weekly-bar', 'quota-weekly-countdown', 'quota-weekly-reset-time',
-  'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time',
-  'plan-tier', 'account-email',
-  'context-used', 'context-used-bar', 'token-count', 'token-count-bar',
-  'project-path', 'project-full-path', 'git-branch', 'vcs-dirty', 'vcs-type',
-  'memory-usage', 'cli-version', 'conversation-id', 'sandbox-status',
-  'tool-confirmation', 'pending-input', 'background-tasks', 'subagents', 'artifacts', 'plugin-version'
-];
-
 export function parseOrderAndStyles(orderStr, selectedIds) {
   let items = [];
   let itemStyles = {};
@@ -386,7 +107,7 @@ export function parseOrderAndStyles(orderStr, selectedIds) {
     }
 
     // 若非括號選項，正規化該 chunk 中的前綴空格
-    let sub = chunk
+    const sub = chunk
       .replace(/\b([teTE])\s*[:_\-]\s*/g, '$1:')
       .replace(/\b([teTE])\s+(\d+)\b/g, '$1$2')
       .replace(/\b([teTE])\s+([a-zA-Z0-9\-_]+)\b/g, '$1:$2');
@@ -490,63 +211,69 @@ export function parseOrderAndStyles(orderStr, selectedIds) {
 }
 
 // ==========================================
-// 主執行流程 (Main Execution)
+// 清理與部署步驟輔助函式 (Cleanup & Deployment Helpers)
 // ==========================================
 
-export function main() {
-  const homeDir = os.homedir();
-  const oldGlobalSkillDir = path.join(homeDir, '.gemini', 'skills', 'antigravity-cli-statusline');
-const oldGlobalSkillBak = path.join(os.homedir(), '.gemini', 'skills', 'antigravity-cli-statusline.bak');
+/**
+ * 備份並安全移除舊版全域技能目錄（~/.gemini/skills/antigravity-cli-statusline）。
+ * @param {string} homeDir
+ */
+function cleanupLegacyGlobalSkillDir(homeDir) {
+  const oldGlobalSkillDir = path.join(homeDir, '.gemini', 'skills', PLUGIN_PACKAGE_NAME);
+  const oldGlobalSkillBak = path.join(homeDir, '.gemini', 'skills', `${PLUGIN_PACKAGE_NAME}.bak`);
 
-let oldDirExists = false;
-try {
-  fs.lstatSync(oldGlobalSkillDir);
-  oldDirExists = true;
-} catch (e) {}
+  let oldDirExists = false;
+  try {
+    fs.lstatSync(oldGlobalSkillDir);
+    oldDirExists = true;
+  } catch (_) {}
 
-if (oldDirExists) {
+  if (!oldDirExists) return;
+
   console.log(`[Clean Up] 偵測到舊的全域技能目錄: ${oldGlobalSkillDir}`);
   try {
     // 安全移除既有的備份目錄/連結
     safeRemoveSync(oldGlobalSkillBak);
-    
+
     console.log(`[Clean Up] 正在備份至: ${oldGlobalSkillBak}`);
     try {
       // 優先嘗試不可分割的重新命名（Rename）操作
       fs.renameSync(oldGlobalSkillDir, oldGlobalSkillBak);
-    } catch (renameErr) {
+    } catch (_) {
       // 若跨磁碟分區或其他限制導致 rename 失敗，則執行安全複製與安全刪除
       safeCopySync(oldGlobalSkillDir, oldGlobalSkillBak);
       safeRemoveSync(oldGlobalSkillDir);
     }
     console.log('[Clean Up] 舊的全域技能目錄已安全備份並移除。');
   } catch (err) {
-    console.error(`[Clean Up] 備份/移除舊的全域技能目錄失敗:`, err);
+    console.error('[Clean Up] 備份/移除舊的全域技能目錄失敗:', err);
     if (err.message && err.message.includes('[Security Violation]')) {
       process.exit(1);
     }
   }
 }
 
-// ==========================================
-// 重構後的冗餘 questions.json 清理邏輯
-// ==========================================
+/**
+ * 安全清理舊版遺留於外掛與腳本目錄的冗餘 questions.json。
+ * @param {string} homeDir
+ */
+function cleanupRedundantQuestionsJson(homeDir) {
+  const redundantQuestionsPaths = [
+    path.join(__dirname, 'questions.json'),
+    path.join(__dirname, '..', 'questions.json'),
+    path.join(homeDir, '.gemini', 'config', 'plugins', PLUGIN_PACKAGE_NAME, 'skills', PLUGIN_PACKAGE_NAME, 'questions.json'),
+    path.join(homeDir, '.gemini', 'config', 'plugins', PLUGIN_PACKAGE_NAME, 'skills', 'agy-cli-statusline', 'questions.json')
+  ];
 
-const redundantQuestionsPaths = [
-  path.join(__dirname, 'questions.json'),
-  path.join(__dirname, '..', 'questions.json'),
-  path.join(os.homedir(), '.gemini', 'config', 'plugins', 'antigravity-cli-statusline', 'skills', 'antigravity-cli-statusline', 'questions.json'),
-  path.join(os.homedir(), '.gemini', 'config', 'plugins', 'antigravity-cli-statusline', 'skills', 'agy-cli-statusline', 'questions.json')
-];
+  for (const qPath of redundantQuestionsPaths) {
+    let qExists = false;
+    try {
+      fs.lstatSync(qPath);
+      qExists = true;
+    } catch (_) {}
 
-for (const qPath of redundantQuestionsPaths) {
-  let qExists = false;
-  try {
-    fs.lstatSync(qPath);
-    qExists = true;
-  } catch (e) {}
+    if (!qExists) continue;
 
-  if (qExists) {
     console.log(`[Clean Up] 偵測到 questions.json: ${qPath}`);
     try {
       // safeRemoveSync 內部會呼叫 isInGitProject 防禦，能安全保護本機專案檔案
@@ -560,179 +287,253 @@ for (const qPath of redundantQuestionsPaths) {
   }
 }
 
+/**
+ * 解析設定腳本 CLI 參數並產出標準化設定結構。
+ * @param {string[]} argv
+ */
+function parseCliConfiguration(argv) {
+  let lang = 'zh-tw';
+  let selectedStr = '[]';
+  let orderStr = '';
+  let workspacePath = '';
+  let timeFormat = '';
+  let barLength = 0;
+  let labelStyle = '';
+  let itemStylesStr = '';
 
-// 1. 解析命令列參數
-let lang = 'zh-tw';
-let selectedStr = '[]';
-let orderStr = '';
-let workspacePath = '';
-let timeFormat = '';
-let barLength = 0;
-let labelStyle = '';
-let itemStylesStr = '';
-
-for (let i = 2; i < process.argv.length; i++) {
-  if (process.argv[i] === '--lang' && process.argv[i + 1]) {
-    lang = process.argv[i + 1];
-    i++;
-  } else if (process.argv[i] === '--selected' && process.argv[i + 1]) {
-    selectedStr = process.argv[i + 1];
-    i++;
-  } else if (process.argv[i] === '--order' && process.argv[i + 1]) {
-    orderStr = process.argv[i + 1];
-    i++;
-  } else if (process.argv[i] === '--workspace' && process.argv[i + 1]) {
-    workspacePath = process.argv[i + 1];
-    i++;
-  } else if (process.argv[i] === '--time-format' && process.argv[i + 1]) {
-    timeFormat = process.argv[i + 1];
-    i++;
-  } else if (process.argv[i] === '--bar-length' && process.argv[i + 1]) {
-    barLength = parseInt(process.argv[i + 1], 10);
-    i++;
-  } else if ((process.argv[i] === '--style' || process.argv[i] === '--label-style') && process.argv[i + 1]) {
-    labelStyle = process.argv[i + 1];
-    i++;
-  } else if (process.argv[i] === '--item-styles' && process.argv[i + 1]) {
-    itemStylesStr = process.argv[i + 1];
-    i++;
-  }
-}
-
-lang = normalizeLanguage(lang);
-if (labelStyle) {
-  labelStyle = normalizeLabelStyle(labelStyle);
-}
-
-// 2. 排序與個別樣式解析規則
-let selectedList = [];
-try {
-  selectedList = JSON.parse(selectedStr.replace(/^\uFEFF/, ''));
-} catch (e) {
-  console.error('解析 --selected JSON 字串失敗：', e);
-}
-
-// 提取英文識別碼
-const selectedIds = selectedList.map(item => {
-  if (typeof item !== 'string') return item;
-  const match = item.match(/[\(（]([^）\)]+)[\)）]\s*$/);
-  return match ? match[1].trim() : item.trim();
-});
-
-const parsed = parseOrderAndStyles(orderStr, selectedIds);
-let items = parsed.items;
-let itemStyles = parsed.itemStyles;
-
-if (itemStylesStr) {
-  try {
-    const customStyles = JSON.parse(itemStylesStr.replace(/^\uFEFF/, ''));
-    if (typeof customStyles === 'object' && customStyles !== null && !Array.isArray(customStyles)) {
-      itemStyles = { ...itemStyles, ...customStyles };
+  for (let i = 2; i < argv.length; i++) {
+    if (argv[i] === '--lang' && argv[i + 1]) {
+      lang = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--selected' && argv[i + 1]) {
+      selectedStr = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--order' && argv[i + 1]) {
+      orderStr = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--workspace' && argv[i + 1]) {
+      workspacePath = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--time-format' && argv[i + 1]) {
+      timeFormat = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--bar-length' && argv[i + 1]) {
+      barLength = parseInt(argv[i + 1], 10);
+      i++;
+    } else if ((argv[i] === '--style' || argv[i] === '--label-style') && argv[i + 1]) {
+      labelStyle = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--item-styles' && argv[i + 1]) {
+      itemStylesStr = argv[i + 1];
+      i++;
     }
+  }
+
+  lang = normalizeLanguage(lang);
+  if (labelStyle) {
+    labelStyle = normalizeLabelStyle(labelStyle);
+  }
+
+  let selectedList = [];
+  try {
+    selectedList = JSON.parse(selectedStr.replace(/^\uFEFF/, ''));
   } catch (e) {
-    console.error('解析 --item-styles JSON 字串失敗：', e);
+    console.error('解析 --selected JSON 字串失敗：', e);
   }
-}
 
-console.log('已解析的參數：');
-console.log(`- 語言：${lang}`);
-if (labelStyle) console.log(`- 標籤樣式：${labelStyle}`);
-console.log(`- 已選項目：${selectedStr}`);
-console.log(`- 排序順序：${orderStr}`);
-console.log(`- 指標清單：`, items);
-console.log(`- 個別樣式 (itemStyles)：`, itemStyles);
-console.log(`- 工作區：${workspacePath}`);
-if (timeFormat) console.log(`- 時間格式：${timeFormat}`);
-if (barLength) console.log(`- 長條圖長度：${barLength}`);
+  // 提取英文識別碼
+  const selectedIds = selectedList.map(item => {
+    if (typeof item !== 'string') return item;
+    const match = item.match(/[\(（]([^）\)]+)[\)）]\s*$/);
+    return match ? match[1].trim() : item.trim();
+  });
 
-// 3. 部署掛鉤（Hook）腳本
-const hooksDir = path.join(homeDir, '.gemini', 'antigravity-cli', 'hooks');
+  const parsed = parseOrderAndStyles(orderStr, selectedIds);
+  const items = parsed.items;
+  let itemStyles = parsed.itemStyles;
 
-console.log(`正在部署掛鉤腳本至 ${hooksDir}...`);
-if (!fs.existsSync(hooksDir)) {
-  fs.mkdirSync(hooksDir, { recursive: true });
-}
-
-const statuslineQuotaSrcPath = path.join(sourceDir, 'statusline-quota.mjs');
-const fetchLocalQuotaSrcPath = path.join(sourceDir, 'fetch-local-quota.mjs');
-
-if (!fs.existsSync(statuslineQuotaSrcPath) || !fs.existsSync(fetchLocalQuotaSrcPath)) {
-  console.error('在以下目錄找不到掛鉤腳本來源：', sourceDir);
-  process.exit(1);
-}
-
-const statuslineQuotaContent = fs.readFileSync(statuslineQuotaSrcPath, 'utf8');
-const fetchLocalQuotaContent = fs.readFileSync(fetchLocalQuotaSrcPath, 'utf8');
-
-writeContentAndVerifyNoBOM(path.join(hooksDir, 'statusline-quota.mjs'), statuslineQuotaContent);
-writeContentAndVerifyNoBOM(path.join(hooksDir, 'fetch-local-quota.mjs'), fetchLocalQuotaContent);
-
-// 寫入已部署掛鉤版本與檔案雜湊中繼資料，供 diagnose-statusline.mjs 比對外掛與掛鉤同步狀態
-let deployedPluginVersion = '';
-const pluginRootDir = path.resolve(sourceDir, '..', '..', '..');
-for (const manifestName of ['plugin.json', 'package.json']) {
-  const manifestPath = path.join(pluginRootDir, manifestName);
-  try {
-    if (fs.existsSync(manifestPath)) {
-      const manifestData = readJsonWithBOMDefense(manifestPath);
-      if (!manifestData || typeof manifestData !== 'object') continue;
-      const manifestPkgName = typeof manifestData.name === 'string' ? manifestData.name.trim() : '';
-      if (manifestName === 'package.json') {
-        if (manifestPkgName !== 'antigravity-cli-statusline') continue;
-      } else if (manifestPkgName && manifestPkgName !== 'antigravity-cli-statusline') {
-        continue;
+  if (itemStylesStr) {
+    try {
+      const customStyles = JSON.parse(itemStylesStr.replace(/^\uFEFF/, ''));
+      if (typeof customStyles === 'object' && customStyles !== null && !Array.isArray(customStyles)) {
+        itemStyles = { ...itemStyles, ...customStyles };
       }
-      if (typeof manifestData.version === 'string' && manifestData.version.trim()) {
-        deployedPluginVersion = manifestData.version.trim().replace(/^v/i, '');
-        break;
-      }
+    } catch (e) {
+      console.error('解析 --item-styles JSON 字串失敗：', e);
     }
-  } catch (_) {}
+  }
+
+  console.log('已解析的參數：');
+  console.log(`- 語言：${lang}`);
+  if (labelStyle) console.log(`- 標籤樣式：${labelStyle}`);
+  console.log(`- 已選項目：${selectedStr}`);
+  console.log(`- 排序順序：${orderStr}`);
+  console.log('- 指標清單：', items);
+  console.log('- 個別樣式 (itemStyles)：', itemStyles);
+  console.log(`- 工作區：${workspacePath}`);
+  if (timeFormat) console.log(`- 時間格式：${timeFormat}`);
+  if (barLength) console.log(`- 長條圖長度：${barLength}`);
+
+  return { lang, items, itemStyles, workspacePath, timeFormat, barLength, labelStyle };
 }
-if (!deployedPluginVersion) {
+
+/**
+ * 解析目前部署來源所屬的外掛版號（優先讀取清單，缺失時回退至內嵌或核心常數版號）。
+ * @param {string} statuslineQuotaContent
+ * @returns {string}
+ */
+function resolveDeployedPluginVersion(statuslineQuotaContent) {
+  const pluginRootDir = path.resolve(sourceDir, '..', '..', '..');
+  const manifestInfo = readPluginManifestFromDirSync(pluginRootDir, false);
+  if (manifestInfo?.version) {
+    return manifestInfo.version;
+  }
+
   const hookVerMatch = statuslineQuotaContent.match(/export\s+const\s+HOOK_VERSION\s*=\s*['"]([^'"]+)['"]/);
   if (hookVerMatch) {
-    deployedPluginVersion = hookVerMatch[1].trim().replace(/^v/i, '');
+    return hookVerMatch[1].trim().replace(/^v/i, '');
   }
+
+  return HOOK_VERSION ? String(HOOK_VERSION).trim().replace(/^v/i, '') : '';
 }
-const sha256 = (str) => createHash('sha256').update(str, 'utf8').digest('hex');
-writeJsonAndVerifyNoBOM(path.join(hooksDir, '.hook-version.json'), {
-  pluginVersion: deployedPluginVersion || 'unknown',
-  syncedAt: new Date().toISOString(),
-  files: {
-    'statusline-quota.mjs': sha256(statuslineQuotaContent),
-    'fetch-local-quota.mjs': sha256(fetchLocalQuotaContent)
-  }
-});
-console.log('掛鉤腳本部署成功。');
 
-// 4. 三層 settings.json 寫入與防禦位元組順序記號（BOM）鐵則
-const statuslineQuotaMjsPath = path.join(hooksDir, 'statusline-quota.mjs');
-const statusLineCommand = getStatusLineCommand(statuslineQuotaMjsPath);
-
-// 清理舊版遺留於 ~/.gemini/hooks/ 的同名腳本（僅清理特定檔案，保留其他使用者檔案）
-const legacyHooksDir = path.join(homeDir, '.gemini', 'hooks');
-for (const legacyFile of ['statusline-quota.mjs', 'fetch-local-quota.mjs']) {
-  const legacyPath = path.join(legacyHooksDir, legacyFile);
+/**
+ * 安全清理 hooks/lib/ 中已不再存在於來源 lib/ 的過時 .mjs 檔案。
+ * 僅操作位於 hooks/lib/ 實質目錄範圍內的路徑。
+ * @param {string} hooksLibDir
+ * @param {Set<string>} expectedLibSet
+ */
+function cleanupObsoleteHookLibFiles(hooksLibDir, expectedLibSet) {
+  let hooksLibIsRealDir = false;
   try {
-    if (fs.existsSync(legacyPath) && !isInGitProject(legacyPath)) {
-      fs.unlinkSync(legacyPath);
-      console.log(`[Clean Up] 已自動清理舊版遺留腳本: ${legacyPath}`);
-    }
+    const stats = fs.lstatSync(hooksLibDir);
+    hooksLibIsRealDir = !stats.isSymbolicLink() && stats.isDirectory();
   } catch (_) {}
+
+  if (!hooksLibIsRealDir) return;
+
+  const existingHookLibFiles = listMjsFilesRecursiveSync(hooksLibDir);
+  for (const existingRel of existingHookLibFiles) {
+    if (expectedLibSet.has(existingRel)) continue;
+
+    const candidatePath = path.join(hooksLibDir, ...existingRel.split('/'));
+    if (!isPathWithinDir(candidatePath, hooksLibDir)) {
+      console.warn(`[Safe Clean] 跳過超出 hooks/lib/ 範圍的異常路徑: ${candidatePath}`);
+      continue;
+    }
+
+    // 額外確認實體父目錄未透過符號連結逃逸至 hooks/lib/ 外部
+    try {
+      const realHooksLib = fs.realpathSync(hooksLibDir);
+      const realParent = fs.realpathSync(path.dirname(candidatePath));
+      if (realParent !== realHooksLib && !isPathWithinDir(realParent, realHooksLib)) {
+        console.warn(`[Safe Clean] 跳過指向 hooks/lib/ 外部的符號連結路徑: ${candidatePath}`);
+        continue;
+      }
+    } catch (_) {
+      continue;
+    }
+
+    safeRemoveSync(candidatePath);
+  }
 }
 
-function updateSettings(settingsPath) {
+/**
+ * 部署狀態列掛鉤主程式、遞迴 lib/ 模組與 .hook-version.json 中繼資料。
+ * @param {string} homeDir
+ * @returns {string} hooksDir
+ */
+function deployHookScripts(homeDir) {
+  const hooksDir = path.join(homeDir, '.gemini', 'antigravity-cli', 'hooks');
+
+  console.log(`正在部署掛鉤腳本至 ${hooksDir}...`);
+  if (!fs.existsSync(hooksDir)) {
+    fs.mkdirSync(hooksDir, { recursive: true });
+  }
+
+  const statuslineQuotaSrcPath = path.join(sourceDir, 'statusline-quota.mjs');
+  const fetchLocalQuotaSrcPath = path.join(sourceDir, 'fetch-local-quota.mjs');
+
+  if (!fs.existsSync(statuslineQuotaSrcPath) || !fs.existsSync(fetchLocalQuotaSrcPath)) {
+    console.error('在以下目錄找不到掛鉤腳本來源：', sourceDir);
+    process.exit(1);
+  }
+
+  const statuslineQuotaContent = fs.readFileSync(statuslineQuotaSrcPath, 'utf8');
+  const fetchLocalQuotaContent = fs.readFileSync(fetchLocalQuotaSrcPath, 'utf8');
+
+  const destStatuslinePath = path.join(hooksDir, 'statusline-quota.mjs');
+  const destFetchPath = path.join(hooksDir, 'fetch-local-quota.mjs');
+  writeContentAndVerifyNoBOMSync(destStatuslinePath, statuslineQuotaContent);
+  writeContentAndVerifyNoBOMSync(destFetchPath, fetchLocalQuotaContent);
+
+  const filesMeta = {
+    'statusline-quota.mjs': sha256String(fs.readFileSync(destStatuslinePath, 'utf8')),
+    'fetch-local-quota.mjs': sha256String(fs.readFileSync(destFetchPath, 'utf8'))
+  };
+
+  // 遞迴部署 scripts/lib/ 下所有 .mjs 模組至 hooks/lib/
+  const srcLibDir = path.join(sourceDir, 'lib');
+  const hooksLibDir = path.join(hooksDir, 'lib');
+  const libRelPaths = listMjsFilesRecursiveSync(srcLibDir);
+
+  for (const relPath of libRelPaths) {
+    const relParts = relPath.split('/');
+    const srcLibFile = path.join(srcLibDir, ...relParts);
+    const destLibFile = path.join(hooksLibDir, ...relParts);
+    const libContent = fs.readFileSync(srcLibFile, 'utf8');
+    writeContentAndVerifyNoBOMSync(destLibFile, libContent);
+    filesMeta[`lib/${relPath}`] = sha256String(fs.readFileSync(destLibFile, 'utf8'));
+  }
+
+  cleanupObsoleteHookLibFiles(hooksLibDir, new Set(libRelPaths));
+
+  // 寫入已部署掛鉤版本與檔案雜湊中繼資料，供 diagnose-statusline.mjs 比對外掛與掛鉤同步狀態
+  const deployedPluginVersion = resolveDeployedPluginVersion(statuslineQuotaContent);
+  writeJsonAndVerifyNoBOMSync(path.join(hooksDir, '.hook-version.json'), {
+    pluginVersion: deployedPluginVersion || 'unknown',
+    syncedAt: new Date().toISOString(),
+    files: filesMeta
+  });
+
+  console.log('掛鉤腳本部署成功。');
+  return hooksDir;
+}
+
+/**
+ * 清理舊版遺留於 ~/.gemini/hooks/ 的同名腳本（保留其他使用者檔案）。
+ * @param {string} homeDir
+ */
+function cleanupLegacyHooksDir(homeDir) {
+  const legacyHooksDir = path.join(homeDir, '.gemini', 'hooks');
+  for (const legacyFile of ['statusline-quota.mjs', 'fetch-local-quota.mjs']) {
+    const legacyPath = path.join(legacyHooksDir, legacyFile);
+    try {
+      if (fs.existsSync(legacyPath) && !isInGitProject(legacyPath)) {
+        fs.unlinkSync(legacyPath);
+        console.log(`[Clean Up] 已自動清理舊版遺留腳本: ${legacyPath}`);
+      }
+    } catch (_) {}
+  }
+}
+
+/**
+ * 安全更新單一 settings.json（防禦 BOM 與損壞設定檔，保留既有欄位）。
+ * @param {string} settingsPath
+ * @param {object} config
+ * @param {string} statusLineCommand
+ */
+function updateSettingsFile(settingsPath, config, statusLineCommand) {
   console.log(`正在更新設定檔：${settingsPath}`);
   try {
-    const settings = readJsonWithBOMDefense(settingsPath);
+    const settings = readJsonWithBOMDefenseSync(settingsPath);
     if (settings === null) {
       return;
     }
-    
+
     if (!settings.ui) settings.ui = {};
-    settings.ui.language = lang;
-    
+    settings.ui.language = config.lang;
+
     if (!settings.ui.footer) settings.ui.footer = {};
     if (settings.ui.footer.theme) {
       delete settings.ui.footer.theme;
@@ -743,16 +544,14 @@ function updateSettings(settingsPath) {
     if (settings.ui.labelStyle) {
       delete settings.ui.labelStyle;
     }
-    settings.ui.footer.items = items;
-    settings.ui.footer.itemStyles = itemStyles;
-    if (labelStyle) {
-      settings.ui.footer.labelStyle = labelStyle;
-    } else {
-      settings.ui.footer.labelStyle = 'text';
+    settings.ui.footer.items = config.items;
+    settings.ui.footer.itemStyles = config.itemStyles;
+    settings.ui.footer.labelStyle = config.labelStyle || 'text';
+    if (config.timeFormat) settings.ui.footer.timeFormat = config.timeFormat;
+    if (config.barLength && !isNaN(config.barLength) && config.barLength > 0) {
+      settings.ui.footer.barLength = config.barLength;
     }
-    if (timeFormat) settings.ui.footer.timeFormat = timeFormat;
-    if (barLength && !isNaN(barLength) && barLength > 0) settings.ui.footer.barLength = barLength;
-    
+
     const existingStatusLine = (settings.statusLine && typeof settings.statusLine === 'object' && !Array.isArray(settings.statusLine))
       ? settings.statusLine
       : {};
@@ -762,47 +561,61 @@ function updateSettings(settingsPath) {
       type: 'command',
       command: statusLineCommand
     };
-    
-    writeJsonAndVerifyNoBOM(settingsPath, settings);
+
+    writeJsonAndVerifyNoBOMSync(settingsPath, settings);
   } catch (err) {
     console.warn(`更新設定檔 ${settingsPath} 時略過（${err.message}）。可於 CLI 輸入 /statusline ${statusLineCommand} 手動套用。`);
   }
 }
 
-// 寫入全域與 CLI 專屬 settings.json
-const globalSettingsPath = path.join(homeDir, '.gemini', 'settings.json');
-const cliSettingsPath = path.join(homeDir, '.gemini', 'antigravity-cli', 'settings.json');
+// ==========================================
+// 主執行流程 (Main Execution)
+// ==========================================
 
-updateSettings(globalSettingsPath);
-updateSettings(cliSettingsPath);
+export function main() {
+  const homeDir = os.homedir();
 
-// 寫入專案層 settings.json （如果符合條件）
-if (workspacePath) {
-  const projectGeminiDir = path.join(workspacePath, '.gemini');
-  const projectSettingsPath = path.join(projectGeminiDir, 'settings.json');
-  if (fs.existsSync(projectGeminiDir) || fs.existsSync(projectSettingsPath)) {
-    updateSettings(projectSettingsPath);
+  cleanupLegacyGlobalSkillDir(homeDir);
+  cleanupRedundantQuestionsJson(homeDir);
+
+  // 1 & 2. 解析命令列參數、排序與個別樣式規則
+  const config = parseCliConfiguration(process.argv);
+
+  // 3. 部署掛鉤（Hook）腳本與模組
+  const hooksDir = deployHookScripts(homeDir);
+
+  // 4. 三層 settings.json 寫入與防禦位元組順序記號（BOM）鐵則
+  const statuslineQuotaMjsPath = path.join(hooksDir, 'statusline-quota.mjs');
+  const statusLineCommand = getStatusLineCommand(statuslineQuotaMjsPath);
+
+  cleanupLegacyHooksDir(homeDir);
+
+  // 寫入全域與 CLI 專屬 settings.json
+  const globalSettingsPath = path.join(homeDir, '.gemini', 'settings.json');
+  const cliSettingsPath = path.join(homeDir, '.gemini', 'antigravity-cli', 'settings.json');
+
+  updateSettingsFile(globalSettingsPath, config, statusLineCommand);
+  updateSettingsFile(cliSettingsPath, config, statusLineCommand);
+
+  // 寫入專案層 settings.json（如果符合條件）
+  if (config.workspacePath) {
+    const projectGeminiDir = path.join(config.workspacePath, '.gemini');
+    const projectSettingsPath = path.join(projectGeminiDir, 'settings.json');
+    if (fs.existsSync(projectGeminiDir) || fs.existsSync(projectSettingsPath)) {
+      updateSettingsFile(projectSettingsPath, config, statusLineCommand);
+    }
   }
-}
 
-console.log(`狀態列執行指令：/statusline ${statusLineCommand}`);
+  console.log(`狀態列執行指令：/statusline ${statusLineCommand}`);
 
-// 6. 移除舊版 Windows sh.exe 相容橋接器（agy v1.3.5+ 已改用 cmd /c 原生執行，停止編譯未簽署 sh.exe 以避免 Symantec 誤報）
-cleanupLegacyWindowsShBridge(process.env.LOCALAPPDATA);
+  // 6. 移除舊版 Windows sh.exe 相容橋接器（agy v1.3.5+ 已改用 cmd /c 原生執行，停止編譯未簽署 sh.exe 以避免 Symantec 誤報）
+  cleanupLegacyWindowsShBridge(process.env.LOCALAPPDATA);
 
   console.log('設定成功完成！');
 }
 
-export function isDirectExecution() {
-  if (!process.argv[1]) return false;
-  try {
-    const currentFile = fileURLToPath(import.meta.url);
-    const invokedFile = path.resolve(process.argv[1]);
-    if (currentFile === invokedFile) return true;
-    return fs.realpathSync(currentFile) === fs.realpathSync(invokedFile);
-  } catch (e) {
-    return false;
-  }
+export function isDirectExecution(options = {}) {
+  return coreIsDirectExecution(import.meta.url, { treatEmptyArgv1AsDirect: false, ...options });
 }
 
 if (isDirectExecution()) {
