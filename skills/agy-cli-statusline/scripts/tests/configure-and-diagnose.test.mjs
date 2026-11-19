@@ -2,92 +2,32 @@ import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
 import os from 'os';
-import { spawn, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
-import { fileURLToPath } from 'url';
-import { getStatusLineCommand, parseOrderAndStyles, cleanupLegacyWindowsShBridge } from './configure-statusline.mjs';
-import { checkPluginHookSync } from './diagnose-statusline.mjs';
+import { fileURLToPath, pathToFileURL } from 'url';
+import {
+  getStatusLineCommand,
+  parseOrderAndStyles,
+  cleanupLegacyWindowsShBridge,
+  isDirectExecution as configureIsDirectExecution
+} from '../configure-statusline.mjs';
+import {
+  checkPluginHookSync,
+  isDirectExecution as diagnoseIsDirectExecution
+} from '../diagnose-statusline.mjs';
+import { isDirectExecution, listMjsFilesRecursiveSync } from '../lib/core/fs-utils.mjs';
+import { compareSemver } from '../lib/core/semver.mjs';
+import { runScript, rmRfSync, copyScriptsWithLib } from './helpers.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 原始腳本的路徑
-const originalScriptsDir = __dirname;
+// 原始腳本的路徑（tests/ 的上一層即 scripts/）
+const originalScriptsDir = path.resolve(__dirname, '..');
 const configureScriptSrc = path.join(originalScriptsDir, 'configure-statusline.mjs');
 const statuslineQuotaSrc = path.join(originalScriptsDir, 'statusline-quota.mjs');
 const fetchLocalQuotaSrc = path.join(originalScriptsDir, 'fetch-local-quota.mjs');
-
-// 輔助函數：執行子進程
-function runScript(scriptPath, args, env) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [scriptPath, ...args], {
-      env: {
-        ...process.env,
-        ...env
-      }
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    child.on('close', (code) => {
-      resolve({ code, stdout, stderr });
-    });
-
-    child.on('error', (err) => {
-      reject(err);
-    });
-  });
-}
-
-// 輔助函數：遞迴刪除資料夾（無第三方依賴）
-function rmRfSync(dirPath) {
-  let stats;
-  try {
-    stats = fs.lstatSync(dirPath);
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      return; // 路徑不存在，直接返回
-    }
-    throw err;
-  }
-
-  if (stats.isSymbolicLink()) {
-    try {
-      fs.unlinkSync(dirPath);
-    } catch (err) {
-      if (process.platform === 'win32') {
-        try {
-          fs.rmdirSync(dirPath);
-        } catch (e) {
-          throw err;
-        }
-      } else {
-        throw err;
-      }
-    }
-    return;
-  }
-
-  if (stats.isDirectory()) {
-    fs.readdirSync(dirPath).forEach((file) => {
-      const curPath = path.join(dirPath, file);
-      rmRfSync(curPath);
-    });
-    fs.rmdirSync(dirPath);
-  } else {
-    fs.unlinkSync(dirPath);
-  }
-}
-
+const diagnoseScriptSrc = path.join(originalScriptsDir, 'diagnose-statusline.mjs');
 
 // 複製檔案輔助函數
 function copyFileSync(src, dest) {
@@ -122,9 +62,8 @@ async function testCase1SymlinkDefense() {
     // 在沙盒中建立一個執行目錄，將腳本複製過去
     const runDir = path.join(sandbox, 'run');
     const targetScript = path.join(runDir, 'configure-statusline.mjs');
-    copyFileSync(configureScriptSrc, targetScript);
-    copyFileSync(statuslineQuotaSrc, path.join(runDir, 'statusline-quota.mjs'));
-    copyFileSync(fetchLocalQuotaSrc, path.join(runDir, 'fetch-local-quota.mjs'));
+    // 連同 lib/ 一併複製，讓薄入口的 ./lib/... 相對匯入可解析
+    copyScriptsWithLib(originalScriptsDir, runDir);
 
     // 執行腳本
     const args = ['--lang', 'zh-tw', '--selected', '[]', '--order', '', '--workspace', sandbox];
@@ -222,9 +161,8 @@ async function testCase2GitProjectDefense() {
     // 複製待測腳本到沙盒執行目錄
     const runDir = path.join(sandbox, 'run');
     const targetScript = path.join(runDir, 'configure-statusline.mjs');
-    copyFileSync(configureScriptSrc, targetScript);
-    copyFileSync(statuslineQuotaSrc, path.join(runDir, 'statusline-quota.mjs'));
-    copyFileSync(fetchLocalQuotaSrc, path.join(runDir, 'fetch-local-quota.mjs'));
+    // 連同 lib/ 一併複製，讓薄入口的 ./lib/... 相對匯入可解析
+    copyScriptsWithLib(originalScriptsDir, runDir);
 
     const args = ['--lang', 'zh-tw', '--selected', '[]', '--order', '', '--workspace', sandbox];
     const env = {
@@ -293,9 +231,8 @@ async function testCase3QuestionsJsonDefense() {
 
     // 複製待測腳本到 mock-project/scripts/
     const targetScript = path.join(scriptDir, 'configure-statusline.mjs');
-    copyFileSync(configureScriptSrc, targetScript);
-    copyFileSync(statuslineQuotaSrc, path.join(scriptDir, 'statusline-quota.mjs'));
-    copyFileSync(fetchLocalQuotaSrc, path.join(scriptDir, 'fetch-local-quota.mjs'));
+    // 連同 lib/ 一併複製，讓薄入口的 ./lib/... 相對匯入可解析
+    copyScriptsWithLib(originalScriptsDir, scriptDir);
 
     const args = ['--lang', 'zh-tw', '--selected', '[]', '--order', '', '--workspace', mockProject];
     const env = {
@@ -364,9 +301,8 @@ async function testCase4SecuritySwallowDefense() {
     
     // 複製腳本
     const targetScript = path.join(runDir, 'configure-statusline.mjs');
-    copyFileSync(configureScriptSrc, targetScript);
-    copyFileSync(statuslineQuotaSrc, path.join(runDir, 'statusline-quota.mjs'));
-    copyFileSync(fetchLocalQuotaSrc, path.join(runDir, 'fetch-local-quota.mjs'));
+    // 連同 lib/ 一併複製，讓薄入口的 ./lib/... 相對匯入可解析
+    copyScriptsWithLib(originalScriptsDir, runDir);
     
     const args = ['--lang', 'zh-tw', '--selected', '[]', '--order', '', '--workspace', sandbox];
     const env = {
@@ -427,9 +363,8 @@ async function testCase5SimplifiedChineseConfig() {
     const scriptDir = path.join(sandbox, 'run');
     fs.mkdirSync(scriptDir);
     const targetScript = path.join(scriptDir, 'configure-statusline.mjs');
-    copyFileSync(configureScriptSrc, targetScript);
-    copyFileSync(statuslineQuotaSrc, path.join(scriptDir, 'statusline-quota.mjs'));
-    copyFileSync(fetchLocalQuotaSrc, path.join(scriptDir, 'fetch-local-quota.mjs'));
+    // 連同 lib/ 一併複製，讓薄入口的 ./lib/... 相對匯入可解析
+    copyScriptsWithLib(originalScriptsDir, scriptDir);
 
     const env = {
       HOME: mockHome,
@@ -521,9 +456,8 @@ async function testCase6CrossPlatformCommandAndTrustDefense() {
     const scriptDir = path.join(sandbox, 'run');
     fs.mkdirSync(scriptDir, { recursive: true });
     const targetScript = path.join(scriptDir, 'configure-statusline.mjs');
-    copyFileSync(configureScriptSrc, targetScript);
-    copyFileSync(statuslineQuotaSrc, path.join(scriptDir, 'statusline-quota.mjs'));
-    copyFileSync(fetchLocalQuotaSrc, path.join(scriptDir, 'fetch-local-quota.mjs'));
+    // 連同 lib/ 一併複製，讓薄入口的 ./lib/... 相對匯入可解析
+    copyScriptsWithLib(originalScriptsDir, scriptDir);
 
     const env = {
       HOME: mockHome,
@@ -1359,9 +1293,7 @@ async function testCase15HookVersionAndPluginHookSync() {
     fs.mkdirSync(standaloneHome, { recursive: true });
     fs.mkdirSync(standaloneScriptsDir, { recursive: true });
     fs.mkdirSync(standaloneResDir, { recursive: true });
-    fs.copyFileSync(configureScriptSrc, path.join(standaloneScriptsDir, 'configure-statusline.mjs'));
-    fs.copyFileSync(statuslineQuotaSrc, path.join(standaloneScriptsDir, 'statusline-quota.mjs'));
-    fs.copyFileSync(fetchLocalQuotaSrc, path.join(standaloneScriptsDir, 'fetch-local-quota.mjs'));
+    copyScriptsWithLib(originalScriptsDir, standaloneScriptsDir);
     fs.copyFileSync(path.join(originalScriptsDir, '..', 'resources', 'questions.json'), path.join(standaloneResDir, 'questions.json'));
 
     const resStandalone = await runScript(
@@ -1457,7 +1389,10 @@ async function testCase15HookVersionAndPluginHookSync() {
 
     // (f) legacy_mismatch（無 .hook-version.json 且無 HOOK_VERSION 的早期掛鉤）
     fs.unlinkSync(path.join(fakeHooksDir, '.hook-version.json'));
-    const strippedHook = deployedMain.replace(/export\s+const\s+HOOK_VERSION[^\r\n]*/, '// legacy script without HOOK_VERSION');
+    const strippedHook = deployedMain
+      .replace(/export\s+const\s+HOOK_VERSION[^\r\n]*/, '// legacy script without HOOK_VERSION')
+      .replace(/\bHOOK_VERSION\b\s*,?/g, '')
+      + '\n// legacy script without HOOK_VERSION\n';
     fs.writeFileSync(path.join(fakeHooksDir, 'statusline-quota.mjs'), strippedHook, 'utf8');
     r = checkPluginHookSync({
       home: syncBase,
@@ -1509,6 +1444,405 @@ async function testCase15HookVersionAndPluginHookSync() {
 }
 
 // ==========================================
+// 測試情境 16：遞迴部署 hooks/lib/**/*.mjs（無 BOM）、清理過時 .mjs 與 .hook-version.json 雜湊
+// ==========================================
+async function testCase16RecursiveHookLibDeployment() {
+  console.log('\n--- 執行測試情境 16：遞迴部署 hooks/lib/、過時檔案清理與 .hook-version.json 雜湊 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case16-'));
+  const sha256 = (str) => createHash('sha256').update(str, 'utf8').digest('hex');
+  const hasBom = (buf) => buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF;
+
+  try {
+    const mockHome = path.join(sandbox, 'home');
+    const workspace = path.join(sandbox, 'ws');
+    fs.mkdirSync(mockHome, { recursive: true });
+    fs.mkdirSync(workspace, { recursive: true });
+    const hooksDir = path.join(mockHome, '.gemini', 'antigravity-cli', 'hooks');
+    const hooksLibDir = path.join(hooksDir, 'lib');
+
+    // (a) 預先放入過時 .mjs（根目錄、巢狀）與非 .mjs 使用者檔案；過時 .mjs 應被清除、其他檔案應保留
+    fs.mkdirSync(path.join(hooksLibDir, 'core'), { recursive: true });
+    fs.mkdirSync(path.join(hooksLibDir, 'obsolete-dir'), { recursive: true });
+    fs.writeFileSync(path.join(hooksLibDir, 'stale-root.mjs'), 'export const stale = 1;\n', 'utf8');
+    fs.writeFileSync(path.join(hooksLibDir, 'core', 'stale-nested.mjs'), 'export const stale = 2;\n', 'utf8');
+    fs.writeFileSync(path.join(hooksLibDir, 'obsolete-dir', 'stale-deep.mjs'), 'export const stale = 3;\n', 'utf8');
+    fs.writeFileSync(path.join(hooksLibDir, 'user-notes.txt'), 'keep me', 'utf8');
+
+    // (b) 外部目錄中的檔案：透過符號連結指向 hooks/lib/ 外部，絕不可被清理
+    const outsideDir = path.join(sandbox, 'outside');
+    fs.mkdirSync(outsideDir, { recursive: true });
+    const outsideVictim = path.join(outsideDir, 'victim.mjs');
+    const outsideFileTarget = path.join(outsideDir, 'victim-file-target.mjs');
+    fs.writeFileSync(outsideVictim, 'export const victim = true;\n', 'utf8');
+    fs.writeFileSync(outsideFileTarget, 'export const victimFile = true;\n', 'utf8');
+    let symlinksSupported = true;
+    try {
+      fs.symlinkSync(outsideDir, path.join(hooksLibDir, 'escape-dir'), process.platform === 'win32' ? 'junction' : 'dir');
+      fs.symlinkSync(outsideFileTarget, path.join(hooksLibDir, 'escape-file.mjs'), 'file');
+    } catch (e) {
+      symlinksSupported = false;
+      console.log(`  ⚠️ 無法建立符號連結 (${e.code})，略過符號連結安全子項目。`);
+    }
+
+    const res = await runScript(
+      configureScriptSrc,
+      ['--lang', 'zh-tw', '--selected', '["model-name"]', '--order', '1', '--workspace', workspace],
+      { HOME: mockHome, USERPROFILE: mockHome }
+    );
+    assert.strictEqual(res.code, 0, `configure-statusline.mjs 必須成功執行，stderr: ${res.stderr}`);
+
+    // 1. 來源 scripts/lib/**/*.mjs 全數遞迴部署至 hooks/lib/，內容一致且無 BOM
+    const srcLibDir = path.join(originalScriptsDir, 'lib');
+    const srcLibFiles = listMjsFilesRecursiveSync(srcLibDir);
+    assert.ok(srcLibFiles.length > 0, '來源 scripts/lib/ 必須至少含有一個 .mjs 模組');
+    assert.ok(srcLibFiles.some(f => f.includes('/')), '來源 lib/ 必須包含巢狀子目錄模組（例如 core/constants.mjs）');
+    for (const rel of srcLibFiles) {
+      const dst = path.join(hooksLibDir, ...rel.split('/'));
+      assert.ok(fs.existsSync(dst), `hooks/lib/${rel} 必須已部署`);
+      const dstBuf = fs.readFileSync(dst);
+      assert.ok(!hasBom(dstBuf), `hooks/lib/${rel} 不可含 UTF-8 BOM`);
+      assert.strictEqual(
+        dstBuf.toString('utf8'),
+        fs.readFileSync(path.join(srcLibDir, ...rel.split('/')), 'utf8').replace(/^\uFEFF/, ''),
+        `hooks/lib/${rel} 內容必須與來源一致`
+      );
+    }
+    for (const entry of ['statusline-quota.mjs', 'fetch-local-quota.mjs']) {
+      assert.ok(!hasBom(fs.readFileSync(path.join(hooksDir, entry))), `${entry} 不可含 UTF-8 BOM`);
+    }
+
+    // 2. 過時 .mjs 已清除；非 .mjs 檔案保留
+    assert.ok(!fs.existsSync(path.join(hooksLibDir, 'stale-root.mjs')), 'hooks/lib/ 根目錄的過時 .mjs 必須被清除');
+    assert.ok(!fs.existsSync(path.join(hooksLibDir, 'core', 'stale-nested.mjs')), 'hooks/lib/core/ 內的過時 .mjs 必須被清除');
+    assert.ok(!fs.existsSync(path.join(hooksLibDir, 'obsolete-dir', 'stale-deep.mjs')), 'hooks/lib/obsolete-dir/ 內的過時 .mjs 必須被清除');
+    assert.strictEqual(fs.readFileSync(path.join(hooksLibDir, 'user-notes.txt'), 'utf8'), 'keep me', '非 .mjs 的使用者檔案不可被刪除');
+
+    // 3. 符號連結 / 超出 hooks/lib/ 範圍的路徑不可使外部檔案被刪除
+    assert.ok(fs.existsSync(outsideVictim), '符號連結目錄所指向的外部 victim.mjs 不可被刪除');
+    assert.strictEqual(fs.readFileSync(outsideVictim, 'utf8'), 'export const victim = true;\n');
+    assert.ok(fs.existsSync(outsideFileTarget), '符號連結 .mjs 檔案所指向的外部目標不可被刪除');
+    assert.strictEqual(fs.readFileSync(outsideFileTarget, 'utf8'), 'export const victimFile = true;\n');
+    if (symlinksSupported) {
+      assert.ok(fs.existsSync(path.join(outsideDir)), '外部目錄必須完好');
+    }
+
+    // 4. .hook-version.json 記錄入口腳本與所有 lib/... 檔案之雜湊（不含 BOM）
+    const hookMetaPath = path.join(hooksDir, '.hook-version.json');
+    const rawMeta = fs.readFileSync(hookMetaPath);
+    assert.ok(!hasBom(rawMeta), '.hook-version.json 不可含 UTF-8 BOM');
+    const hookMeta = JSON.parse(rawMeta.toString('utf8'));
+    assert.strictEqual(hookMeta.files['statusline-quota.mjs'], sha256(fs.readFileSync(path.join(hooksDir, 'statusline-quota.mjs'), 'utf8')));
+    assert.strictEqual(hookMeta.files['fetch-local-quota.mjs'], sha256(fs.readFileSync(path.join(hooksDir, 'fetch-local-quota.mjs'), 'utf8')));
+    for (const rel of srcLibFiles) {
+      const key = `lib/${rel}`;
+      assert.ok(hookMeta.files[key], `.hook-version.json 必須記錄 ${key}`);
+      assert.strictEqual(hookMeta.files[key], sha256(fs.readFileSync(path.join(hooksLibDir, ...rel.split('/')), 'utf8')), `${key} 雜湊必須相符`);
+    }
+    assert.ok(!hookMeta.files['lib/stale-root.mjs'], '已清除的過時檔案不可出現在雜湊記錄中');
+    assert.strictEqual(
+      Object.keys(hookMeta.files).filter(k => k.startsWith('lib/')).length,
+      srcLibFiles.length,
+      '.hook-version.json 的 lib/ 記錄數量必須等於來源 lib/ 模組數量'
+    );
+
+    // 5. 部署後的 hooks/ 可獨立執行（./lib/... 相對匯入可解析），且診斷為 in_sync
+    const syncAfterDeploy = checkPluginHookSync({
+      home: mockHome,
+      hooksDir,
+      installedPluginDir: path.resolve(originalScriptsDir, '..', '..', '..'),
+      currentPluginDir: path.join(sandbox, 'no-plugin')
+    });
+    assert.strictEqual(syncAfterDeploy.status, 'in_sync', `部署後應為 in_sync，實際: ${syncAfterDeploy.status} ${JSON.stringify(syncAfterDeploy.fileDiffs)}`);
+    const deployedRun = await runScript(path.join(hooksDir, 'statusline-quota.mjs'), [], { HOME: mockHome, USERPROFILE: mockHome }, { cwd: mockHome });
+    assert.strictEqual(deployedRun.code, 0, `已部署的 hooks/statusline-quota.mjs 必須可獨立執行，stderr: ${deployedRun.stderr}`);
+
+    console.log('✅ 測試情境 16 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
+// 測試情境 17：Bug #3 isDirectExecution（win32 磁碟機代號大小寫、外層引號）與 diagnose CLI 直接執行
+// ==========================================
+async function testCase17IsDirectExecutionAndDiagnoseCli() {
+  console.log('\n--- 執行測試情境 17：isDirectExecution 跨平台判斷與 diagnose-statusline CLI 直接執行 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case17-'));
+
+  try {
+    // 1. 純函式：win32 磁碟機代號大小寫差異
+    const metaUrl = 'file:///C:/Users/Dev/Repo/skills/agy-cli-statusline/scripts/diagnose-statusline.mjs';
+    const metaPath = fileURLToPath(metaUrl);
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: metaPath, platform: 'win32' }), true, '完全相同路徑應判定為直接執行');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: metaPath.toLowerCase(), platform: 'win32' }), true, 'win32 磁碟機代號與路徑大小寫不同仍應判定為直接執行');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: metaPath.toUpperCase(), platform: 'win32' }), true, 'win32 全大寫路徑仍應判定為直接執行');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: metaPath.toLowerCase(), platform: 'linux' }), false, 'linux 為區分大小寫的檔案系統，大小寫不同不得視為直接執行');
+
+    // 2. 純函式：外層雙引號包覆（Windows 命令列常見）
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: `"${metaPath}"`, platform: 'win32' }), true, '外層雙引號應被剝除後比對');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: `"${metaPath.toLowerCase()}"`, platform: 'win32' }), true, '外層雙引號加大小寫差異仍應判定為直接執行');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: `"${metaPath}"`, platform: 'linux' }), true, '外層雙引號在非 win32 平台同樣應剝除');
+
+    // 3. 純函式：不同檔案與空 argv1
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: path.join(path.dirname(metaPath), 'other.mjs'), platform: 'win32' }), false, '不同檔案不得判定為直接執行');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: '', platform: 'win32' }), false, '空 argv1 預設不得視為直接執行');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: '', platform: 'win32', treatEmptyArgv1AsDirect: true }), true, 'treatEmptyArgv1AsDirect 為 true 時空 argv1 視為直接執行');
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: null, platform: 'linux', treatEmptyArgv1AsDirect: true }), true);
+    assert.strictEqual(isDirectExecution(metaUrl, { argv1: '""', platform: 'win32' }), false);
+
+    // 4. 真實檔案：以符號連結路徑呼叫時，realpath 比對應判定為直接執行
+    const realFile = path.join(sandbox, 'real-entry.mjs');
+    fs.writeFileSync(realFile, 'export {};\n', 'utf8');
+    const realUrl = pathToFileURL(realFile).href;
+    const linkFile = path.join(sandbox, 'link-entry.mjs');
+    try {
+      fs.symlinkSync(realFile, linkFile, 'file');
+      assert.strictEqual(isDirectExecution(realUrl, { argv1: linkFile }), true, '透過符號連結呼叫應判定為直接執行');
+    } catch (e) {
+      if (e.code !== 'EPERM' && e.code !== 'EACCES') throw e;
+      console.log(`  ⚠️ 無法建立符號連結 (${e.code})，略過符號連結子項目。`);
+    }
+
+    // 5. 兩個入口腳本的 isDirectExecution 包裝：被 import 時（argv1 為測試檔）不得視為直接執行
+    assert.strictEqual(configureIsDirectExecution(), false, '被 import 時 configure-statusline.mjs 不得自動執行 main');
+    assert.strictEqual(diagnoseIsDirectExecution(), false, '被 import 時 diagnose-statusline.mjs 不得自動執行 main');
+    assert.strictEqual(diagnoseIsDirectExecution({ argv1: diagnoseScriptSrc }), true, 'argv1 指向 diagnose-statusline.mjs 時應為直接執行');
+    assert.strictEqual(diagnoseIsDirectExecution({ argv1: `"${diagnoseScriptSrc}"` }), true, '外層雙引號的 argv1 應為直接執行');
+    assert.strictEqual(configureIsDirectExecution({ argv1: configureScriptSrc }), true);
+
+    // 6. diagnose-statusline.mjs 直接以 CLI 執行必須輸出診斷內容（不得靜默結束）
+    const diagHome = path.join(sandbox, 'diag-home');
+    const diagWs = path.join(sandbox, 'diag-ws');
+    fs.mkdirSync(diagHome, { recursive: true });
+    fs.mkdirSync(diagWs, { recursive: true });
+    const diagRun = await runScript(diagnoseScriptSrc, [], { HOME: diagHome, USERPROFILE: diagHome }, { cwd: diagWs });
+    assert.strictEqual(diagRun.code, 0, `diagnose-statusline.mjs 直接執行應成功結束，stderr: ${diagRun.stderr}`);
+    assert.ok(diagRun.stdout.includes('外掛與掛鉤版本同步檢查'), `diagnose-statusline.mjs 直接執行必須輸出同步檢查區段，實際輸出: ${diagRun.stdout.slice(0, 200)}`);
+    assert.ok(diagRun.stdout.includes('診斷結論'), 'diagnose-statusline.mjs 直接執行必須輸出診斷結論');
+
+    // 7. 複製到沙箱（連同 lib/）後直接執行亦必須有輸出
+    const copiedDir = path.join(sandbox, 'copied-scripts');
+    copyScriptsWithLib(originalScriptsDir, copiedDir);
+    const copiedRun = await runScript(path.join(copiedDir, 'diagnose-statusline.mjs'), [], { HOME: diagHome, USERPROFILE: diagHome }, { cwd: diagWs });
+    assert.strictEqual(copiedRun.code, 0, `複製後的 diagnose-statusline.mjs 應成功結束，stderr: ${copiedRun.stderr}`);
+    assert.ok(copiedRun.stdout.includes('外掛與掛鉤版本同步檢查'), '複製後的 diagnose-statusline.mjs 直接執行必須輸出同步檢查區段');
+
+    // 8. 以符號連結呼叫 diagnose-statusline.mjs 亦必須有輸出
+    const diagLink = path.join(sandbox, 'diagnose-link.mjs');
+    try {
+      fs.symlinkSync(diagnoseScriptSrc, diagLink, 'file');
+      const linkRun = await runScript(diagLink, [], { HOME: diagHome, USERPROFILE: diagHome }, { cwd: diagWs });
+      assert.strictEqual(linkRun.code, 0);
+      assert.ok(linkRun.stdout.includes('外掛與掛鉤版本同步檢查'), '透過符號連結直接執行 diagnose-statusline.mjs 必須輸出同步檢查區段');
+    } catch (e) {
+      if (e.code !== 'EPERM' && e.code !== 'EACCES') throw e;
+      console.log(`  ⚠️ 無法建立符號連結 (${e.code})，略過符號連結 CLI 子項目。`);
+    }
+
+    // 9. 被其他程式 import 時 diagnose-statusline.mjs 不得有輸出副作用
+    const importProbe = path.join(sandbox, 'import-probe.mjs');
+    fs.writeFileSync(importProbe, `import ${JSON.stringify(pathToFileURL(diagnoseScriptSrc).href)};\nconsole.log('IMPORT_DONE');\n`, 'utf8');
+    const importRun = await runScript(importProbe, [], { HOME: diagHome, USERPROFILE: diagHome }, { cwd: diagWs });
+    assert.strictEqual(importRun.code, 0);
+    assert.strictEqual(importRun.stdout.trim(), 'IMPORT_DONE', 'import diagnose-statusline.mjs 不得觸發 main() 輸出');
+
+    console.log('✅ 測試情境 17 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
+// 測試情境 18：Audit #5 checkPluginHookSync（工作區外掛、完整 SemVer 先行版本、lib 差異、無 lib 精簡夾具零誤報）
+// ==========================================
+async function testCase18CheckPluginHookSyncAudit5() {
+  console.log('\n--- 執行測試情境 18：Audit #5 checkPluginHookSync 工作區外掛／SemVer／lib 差異 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case18-'));
+  const sha256 = (str) => createHash('sha256').update(str, 'utf8').digest('hex');
+  const PLUGIN_NAME = 'antigravity-cli-statusline';
+
+  const writePluginDir = (pluginDir, version, scriptFiles = {}) => {
+    fs.mkdirSync(pluginDir, { recursive: true });
+    fs.writeFileSync(path.join(pluginDir, 'plugin.json'), JSON.stringify({ name: PLUGIN_NAME, version }), 'utf8');
+    const scriptsDir = path.join(pluginDir, 'skills', 'agy-cli-statusline', 'scripts');
+    fs.mkdirSync(scriptsDir, { recursive: true });
+    for (const [rel, content] of Object.entries(scriptFiles)) {
+      const dst = path.join(scriptsDir, ...rel.split('/'));
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.writeFileSync(dst, content, 'utf8');
+    }
+  };
+  const writeHooksDir = (hooksDir, files, meta) => {
+    fs.mkdirSync(hooksDir, { recursive: true });
+    for (const [rel, content] of Object.entries(files)) {
+      const dst = path.join(hooksDir, ...rel.split('/'));
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.writeFileSync(dst, content, 'utf8');
+    }
+    if (meta) {
+      fs.writeFileSync(path.join(hooksDir, '.hook-version.json'), JSON.stringify(meta), 'utf8');
+    }
+  };
+  const baseEntryFiles = {
+    'statusline-quota.mjs': '// entry main\nexport const HOOK_VERSION_PLACEHOLDER = 1;\n',
+    'fetch-local-quota.mjs': '// entry fetch\n'
+  };
+  const libFiles = {
+    'lib/core/constants.mjs': 'export const A = 1;\n',
+    'lib/util/helper.mjs': 'export const B = 2;\n'
+  };
+
+  try {
+    // ---- 1. SemVer 完整先行版本比較 ----
+    assert.ok(compareSemver('1.12.0-beta.2', '1.12.0-beta.1') > 0, '1.12.0-beta.2 必須大於 1.12.0-beta.1');
+    assert.ok(compareSemver('1.12.0-beta.1', '1.12.0-beta.2') < 0);
+    assert.ok(compareSemver('1.12.0-beta.1', '1.12.0') < 0, '先行版本 1.12.0-beta.1 必須小於正式版 1.12.0');
+    assert.ok(compareSemver('1.12.0', '1.12.0-beta.2') > 0);
+    assert.strictEqual(compareSemver('1.12.0-beta.2', '1.12.0-beta.2'), 0);
+
+    const missingPluginDir = path.join(sandbox, 'no-plugin');
+    fs.mkdirSync(missingPluginDir, { recursive: true });
+
+    // ---- 2. 工作區 .agents/plugins/antigravity-cli-statusline 偵測 ----
+    const wsHome = path.join(sandbox, 'ws-home');
+    const wsDir = path.join(sandbox, 'workspace-a');
+    const wsPluginDir = path.join(wsDir, '.agents', 'plugins', PLUGIN_NAME);
+    const wsHooksDir = path.join(wsHome, '.gemini', 'antigravity-cli', 'hooks');
+    fs.mkdirSync(wsHome, { recursive: true });
+    writePluginDir(wsPluginDir, '1.12.0', baseEntryFiles);
+    writeHooksDir(wsHooksDir, baseEntryFiles, { pluginVersion: '1.11.0', syncedAt: '2026-11-18T00:00:00Z' });
+
+    let r = checkPluginHookSync({ home: wsHome, hooksDir: wsHooksDir, workspacePath: wsDir, currentPluginDir: missingPluginDir });
+    assert.strictEqual(r.pluginVersion, '1.12.0', '必須偵測到工作區 .agents/plugins 下的外掛版本');
+    assert.strictEqual(r.status, 'version_mismatch', '工作區外掛較新時應回報 version_mismatch');
+    assert.strictEqual(r.hookVersion, '1.11.0');
+
+    // 未提供工作區路徑時（改指向無關目錄）不得誤抓到該外掛
+    r = checkPluginHookSync({ home: wsHome, hooksDir: wsHooksDir, workspacePath: path.join(sandbox, 'unrelated-workspace'), currentPluginDir: missingPluginDir });
+    assert.strictEqual(r.status, 'plugin_not_found', '無關工作區與家目錄皆無外掛時應回報 plugin_not_found');
+
+    // 工作區版號與掛鉤版號相同 → in_sync
+    fs.writeFileSync(path.join(wsHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '1.12.0' }), 'utf8');
+    r = checkPluginHookSync({ home: wsHome, hooksDir: wsHooksDir, workspacePath: wsDir, currentPluginDir: missingPluginDir });
+    assert.strictEqual(r.status, 'in_sync');
+
+    // ---- 3. 先行版本於 checkPluginHookSync 的狀態判斷 ----
+    const preHome = path.join(sandbox, 'pre-home');
+    const prePluginDir = path.join(preHome, '.gemini', 'config', 'plugins', PLUGIN_NAME);
+    const preHooksDir = path.join(preHome, '.gemini', 'antigravity-cli', 'hooks');
+    writePluginDir(prePluginDir, '1.12.0-beta.2', baseEntryFiles);
+    writeHooksDir(preHooksDir, baseEntryFiles, { pluginVersion: '1.12.0-beta.1' });
+    const preOpts = { home: preHome, hooksDir: preHooksDir, workspacePath: path.join(sandbox, 'unrelated-workspace'), currentPluginDir: missingPluginDir };
+
+    r = checkPluginHookSync(preOpts);
+    assert.strictEqual(r.pluginVersion, '1.12.0-beta.2');
+    assert.strictEqual(r.status, 'version_mismatch', '掛鉤 1.12.0-beta.1 落後外掛 1.12.0-beta.2 時應回報 version_mismatch');
+
+    fs.writeFileSync(path.join(preHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '1.12.0-beta.2' }), 'utf8');
+    assert.strictEqual(checkPluginHookSync(preOpts).status, 'in_sync', '先行版本完全相同時應為 in_sync');
+
+    fs.writeFileSync(path.join(preHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '1.12.0' }), 'utf8');
+    assert.strictEqual(checkPluginHookSync(preOpts).status, 'version_mismatch', '掛鉤為正式版 1.12.0、外掛為 1.12.0-beta.2 時應視為不一致');
+
+    // 自動探索：同時存在 beta.1（標準目錄）與 beta.2（~/.agents/plugins）時，應選用完整 SemVer 較高者
+    const agentsPluginDir = path.join(preHome, '.agents', 'plugins', PLUGIN_NAME);
+    writePluginDir(prePluginDir, '1.12.0-beta.1', baseEntryFiles);
+    writePluginDir(agentsPluginDir, '1.12.0-beta.2', baseEntryFiles);
+    fs.writeFileSync(path.join(preHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '1.12.0-beta.2' }), 'utf8');
+    r = checkPluginHookSync(preOpts);
+    assert.strictEqual(r.pluginVersion, '1.12.0-beta.2', '自動探索必須以完整 SemVer（含先行版本）選出最高版本');
+    assert.strictEqual(r.status, 'in_sync');
+
+    // 正式版 1.12.0 應高於同目錄的 1.12.0-beta.2
+    writePluginDir(prePluginDir, '1.12.0', baseEntryFiles);
+    r = checkPluginHookSync(preOpts);
+    assert.strictEqual(r.pluginVersion, '1.12.0', '正式版 1.12.0 必須勝過 1.12.0-beta.2');
+    assert.strictEqual(r.status, 'version_mismatch');
+
+    // ---- 4. hooks/lib/*.mjs 缺漏／被修改 ----
+    const libHome = path.join(sandbox, 'lib-home');
+    const libPluginDir = path.join(sandbox, 'lib-plugin');
+    const libHooksDir = path.join(libHome, '.gemini', 'antigravity-cli', 'hooks');
+    const allFiles = { ...baseEntryFiles, ...libFiles };
+    writePluginDir(libPluginDir, '1.12.0', allFiles);
+    writeHooksDir(libHooksDir, allFiles, {
+      pluginVersion: '1.12.0',
+      files: Object.fromEntries(Object.entries(allFiles).map(([k, v]) => [k, sha256(v)]))
+    });
+    const libOpts = { home: libHome, hooksDir: libHooksDir, installedPluginDir: libPluginDir, currentPluginDir: missingPluginDir };
+
+    r = checkPluginHookSync(libOpts);
+    assert.strictEqual(r.status, 'in_sync', `含 lib/ 且完全一致時應為 in_sync，實際: ${r.status} ${JSON.stringify(r.fileDiffs)}`);
+    assert.deepStrictEqual(r.fileDiffs, []);
+
+    // (a) 刪除 hooks/lib/util/helper.mjs → content_mismatch + missing_in_hooks
+    fs.unlinkSync(path.join(libHooksDir, 'lib', 'util', 'helper.mjs'));
+    r = checkPluginHookSync(libOpts);
+    assert.strictEqual(r.status, 'content_mismatch', 'hooks/lib 缺漏模組且版號相同時應回報 content_mismatch');
+    assert.ok(r.fileDiffs.some(d => d.file === 'lib/util/helper.mjs' && d.reason === 'missing_in_hooks'), `必須標示 lib/util/helper.mjs missing_in_hooks，實際: ${JSON.stringify(r.fileDiffs)}`);
+
+    // (b) 還原後修改 hooks/lib/core/constants.mjs → content_differs
+    fs.writeFileSync(path.join(libHooksDir, 'lib', 'util', 'helper.mjs'), libFiles['lib/util/helper.mjs'], 'utf8');
+    assert.strictEqual(checkPluginHookSync(libOpts).status, 'in_sync', '還原後應回到 in_sync');
+    fs.appendFileSync(path.join(libHooksDir, 'lib', 'core', 'constants.mjs'), '// tampered\n', 'utf8');
+    r = checkPluginHookSync(libOpts);
+    assert.strictEqual(r.status, 'content_mismatch');
+    assert.ok(r.fileDiffs.some(d => d.file === 'lib/core/constants.mjs' && d.reason === 'content_differs'), `必須標示 lib/core/constants.mjs content_differs，實際: ${JSON.stringify(r.fileDiffs)}`);
+    assert.strictEqual(r.fileDiffs.length, 1, '僅被修改的檔案應被列為差異');
+
+    // (c) 舊版掛鉤（無 .hook-version.json、入口腳本無 HOOK_VERSION）+ lib 缺漏 → legacy_mismatch
+    fs.unlinkSync(path.join(libHooksDir, '.hook-version.json'));
+    fs.unlinkSync(path.join(libHooksDir, 'lib', 'util', 'helper.mjs'));
+    r = checkPluginHookSync(libOpts);
+    assert.strictEqual(r.status, 'legacy_mismatch', '舊版無中繼資料且 lib 缺漏時應回報 legacy_mismatch');
+    assert.ok(r.fileDiffs.some(d => d.file === 'lib/util/helper.mjs'));
+
+    // (d) .hook-version.json 已記錄但實際已被刪除的 lib 檔案，即使外掛來源沒有 lib/ 也要標示
+    const metaOnlyHome = path.join(sandbox, 'meta-only-home');
+    const metaOnlyPlugin = path.join(sandbox, 'meta-only-plugin');
+    const metaOnlyHooks = path.join(metaOnlyHome, '.gemini', 'antigravity-cli', 'hooks');
+    writePluginDir(metaOnlyPlugin, '1.12.0', baseEntryFiles);
+    writeHooksDir(metaOnlyHooks, baseEntryFiles, {
+      pluginVersion: '1.12.0',
+      files: { 'lib/gone.mjs': sha256('export const gone = 1;\n') }
+    });
+    r = checkPluginHookSync({ home: metaOnlyHome, hooksDir: metaOnlyHooks, installedPluginDir: metaOnlyPlugin, currentPluginDir: missingPluginDir });
+    assert.strictEqual(r.status, 'content_mismatch');
+    assert.ok(r.fileDiffs.some(d => d.file === 'lib/gone.mjs' && d.reason === 'missing_in_hooks'));
+
+    // ---- 5. 無 lib/ 的精簡外掛夾具：零誤報 ----
+    const minHome = path.join(sandbox, 'min-home');
+    const minPlugin = path.join(sandbox, 'min-plugin');
+    const minHooks = path.join(minHome, '.gemini', 'antigravity-cli', 'hooks');
+    writePluginDir(minPlugin, '1.12.0', baseEntryFiles);
+    writeHooksDir(minHooks, baseEntryFiles, { pluginVersion: '1.12.0' });
+    r = checkPluginHookSync({ home: minHome, hooksDir: minHooks, installedPluginDir: minPlugin, currentPluginDir: missingPluginDir });
+    assert.strictEqual(r.status, 'in_sync', '精簡外掛夾具（無 lib/）不得產生誤報');
+    assert.deepStrictEqual(r.fileDiffs, [], '精簡外掛夾具的 fileDiffs 必須為空');
+
+    // 精簡外掛夾具 + 掛鉤端已有額外 lib/ 檔案 → 仍為 in_sync（不以掛鉤端額外檔案作為差異）
+    fs.mkdirSync(path.join(minHooks, 'lib', 'core'), { recursive: true });
+    fs.writeFileSync(path.join(minHooks, 'lib', 'core', 'constants.mjs'), 'export const EXTRA = 1;\n', 'utf8');
+    r = checkPluginHookSync({ home: minHome, hooksDir: minHooks, installedPluginDir: minPlugin, currentPluginDir: missingPluginDir });
+    assert.strictEqual(r.status, 'in_sync');
+    assert.deepStrictEqual(r.fileDiffs, []);
+
+    // 精簡外掛夾具 + 空的 hooks/lib/ 目錄（無 .mjs）→ 仍為 in_sync
+    const emptyLibHome = path.join(sandbox, 'empty-lib-home');
+    const emptyLibHooks = path.join(emptyLibHome, '.gemini', 'antigravity-cli', 'hooks');
+    writeHooksDir(emptyLibHooks, baseEntryFiles, { pluginVersion: '1.12.0' });
+    fs.mkdirSync(path.join(emptyLibHooks, 'lib'), { recursive: true });
+    r = checkPluginHookSync({ home: emptyLibHome, hooksDir: emptyLibHooks, installedPluginDir: minPlugin, currentPluginDir: missingPluginDir });
+    assert.strictEqual(r.status, 'in_sync');
+    assert.deepStrictEqual(r.fileDiffs, []);
+
+    console.log('✅ 測試情境 18 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -1528,6 +1862,9 @@ async function runAllTests() {
     await testCase13NonDestructiveConfigAndLegacyCleanup();
     await testCase14LegacyWindowsShBridgeRemoval();
     await testCase15HookVersionAndPluginHookSync();
+    await testCase16RecursiveHookLibDeployment();
+    await testCase17IsDirectExecutionAndDiagnoseCli();
+    await testCase18CheckPluginHookSyncAudit5();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {
@@ -1537,4 +1874,3 @@ async function runAllTests() {
 }
 
 runAllTests();
-

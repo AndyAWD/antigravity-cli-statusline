@@ -1,7 +1,7 @@
-import { parseWeeklyBuckets, parseShortTermBuckets, mergeQuotaBuckets, formatResetTime } from './fetch-local-quota.mjs';
+import { parseWeeklyBuckets, parseShortTermBuckets, mergeQuotaBuckets, formatResetTime } from '../fetch-local-quota.mjs';
 import assert from 'assert';
 
-console.log("=== Running fetch-local-quota.test.mjs (R0) ===");
+console.log("=== Running tests/fetch-local-quota.test.mjs (R0) ===");
 
 // R0: endpoint shape -> cache shape (data-layer, pure)
 // Test justification: This test verifies that parseWeeklyBuckets and parseShortTermBuckets properly filter RetrieveUserQuotaSummary response to select 'weekly' and '5h' short-term buckets.
@@ -93,7 +93,7 @@ import {
   extractRuntimeGeneratorContext,
   persistRuntimeContextToCtxFile,
   fetchLiveQuotaCache
-} from './fetch-local-quota.mjs';
+} from '../fetch-local-quota.mjs';
 
 async function testHttpEndpointAndEnvDiscovery() {
   console.log("Testing HTTP endpoint and ANTIGRAVITY_LS_ADDRESS discovery...");

@@ -3,14 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { generateDemoSvg } from './generate-svg-demos.mjs';
+import { generateDemoSvg } from '../generate-svg-demos.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '../../..');
+const projectRoot = path.resolve(__dirname, '../../../..');
 const imagesDir = path.join(projectRoot, 'docs', 'images');
+// Audit #6：預期版本標籤一律動態讀自 plugin.json，避免每次發版都要手動改測試
+const pluginJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'plugin.json'), 'utf8'));
+const expectedPluginTag = `v${String(pluginJson.version).replace(/^v/i, '')}`;
 
-console.log('=== Running generate-svg-demos.test.mjs ===');
+console.log('=== Running tests/generate-svg-demos.test.mjs ===');
 
 const languages = ['us', 'zh-tw', 'zh-cn', 'jp'];
 
@@ -82,7 +85,7 @@ for (const lang of languages) {
   const expectedPluginVersionLabel = lang === 'zh-tw' ? '外掛版本:' : (lang === 'zh-cn' ? '插件版本:' : (lang === 'jp' ? 'プラグイン版:' : 'Plugin Version:'));
   assert.ok(svg.includes(expectedCliVersionLabel), `${lang}: Statusline must include ${expectedCliVersionLabel}`);
   assert.ok(svg.includes(expectedPluginVersionLabel), `${lang}: Statusline must include ${expectedPluginVersionLabel}`);
-  assert.ok(svg.includes('v1.11.4'), `${lang}: Statusline must include plugin version v1.11.4`);
+  assert.ok(svg.includes(expectedPluginTag), `${lang}: Statusline must include plugin version ${expectedPluginTag}`);
 
   // 11. Frame 6 reference table alignment: all 4 rows must have display width 91
   function charWidth(ch) {
