@@ -1,0 +1,134 @@
+{
+  "step1": {
+    "questions": [
+      {
+        "question": "選擇顯示語系 / 选择显示语言 / Select Display Language / 表示言語の選択",
+        "options": [
+          "繁體中文 (zh-tw)",
+          "简体中文 (zh-cn)",
+          "English (us)",
+          "日本語 (jp)"
+        ],
+        "is_multi_select": false
+      }
+    ]
+  },
+  "step2_missing_node": {
+    "zh-tw": {
+      "questions": [
+        {
+          "question": "⚠️ 偵測到系統未安裝 Node.js。\n\n狀態列腳本需要 Node.js 才能運作，缺少 Node.js 將導致命令列介面（CLI）底部狀態列完全空白且自動停用。\n\n建議先安裝 Node.js（例如：brew install node），再重新執行本技能。\n\n是否仍要繼續設定？（設定檔會正確寫入，但狀態列在安裝 Node.js 前不會顯示）",
+          "options": [
+            "中斷，我先去安裝 Node.js",
+            "繼續設定（安裝 Node.js 後狀態列會自動生效）"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    },
+    "zh-cn": {
+      "questions": [
+        {
+          "question": "⚠️ 检测到系统未安装 Node.js。\n\n状态栏脚本需要 Node.js 才能运作，缺少 Node.js 将导致命令行界面（CLI）底部状态栏完全空白且自动停用。\n\n建议先安装 Node.js（例如：brew install node），再重新运行本技能。\n\n是否仍要继续设置？（配置文件会正确写入，但状态栏在安装 Node.js 前不会显示）",
+          "options": [
+            "中断，我先去安装 Node.js",
+            "继续设置（安装 Node.js 后状态栏会自动生效）"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    },
+    "us": {
+      "questions": [
+        {
+          "question": "⚠️ Node.js is not installed on this system.\n\nThe statusline script requires Node.js to function. Without Node.js, the CLI footer will be completely blank and automatically disabled.\n\nIt is recommended to install Node.js first (e.g.: brew install node), then re-run this skill.\n\nDo you still want to proceed? (Configuration files will be written, but the statusline will not appear until Node.js is installed)",
+          "options": [
+            "Abort, I will install Node.js first",
+            "Continue setup (Statusline will automatically work once Node.js is installed)"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    },
+    "jp": {
+      "questions": [
+        {
+          "question": "⚠️ システムに Node.js がインストールされていません。\n\nステータスラインのスクリプトには Node.js が必要です。Node.js がないと、CLI 画面下部のステータスラインは完全に空白となり、自動的に無効化されます。\n\n先に Node.js をインストールしてから（例：brew install node）、本スキルを再実行することをお勧めします。\n\nそれでも設定を続行しますか？（設定ファイルは正常に書き込まれますが、Node.js がインストールされるまでステータスラインは表示されません）",
+          "options": [
+            "中断して、先に Node.js をインストールする",
+            "設定を続行する（Node.js インストール後にステータスラインが自動的に有効になります）"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    }
+  },
+  "step4_table": {
+    "zh-tw": {
+      "title": "📋 **目前已選取的狀態列指標（共 N 項）** — *於下方 Write-in 輸入序號或代碼（如 `2, e1, n, e:quota`；純數字/`t` 為文字、`e` 為 Emoji、`n` 為換行）：*",
+      "header": "| # | 指標名稱（識別碼） | # | 指標名稱（識別碼） | # | 指標名稱（識別碼） |"
+    },
+    "zh-cn": {
+      "title": "📋 **目前已选取的状态栏指标（共 N 项）** — *于下方 Write-in 输入序号或代码（如 `2, e1, n, e:quota`；纯数字/`t` 为文字、`e` 为 Emoji、`n` 为换行）：*",
+      "header": "| # | 指标名称（标识码） | # | 指标名称（标识码） | # | 指标名称（标识码） |"
+    },
+    "us": {
+      "title": "📋 **Currently Selected Metrics (Total N)** — *Enter comma-separated numbers/IDs in Write-in below (e.g. `2, e1, n, e:quota`; number/`t`=text, `e`=Emoji, `n`=line break):*",
+      "header": "| # | Metric (ID) | # | Metric (ID) | # | Metric (ID) |"
+    },
+    "jp": {
+      "title": "📋 **現在選択中の指標（全 N 項目）** — *下の Write-in に番号またはIDをカンマ区切りで入力（例: `2, e1, n, e:quota`；数字/`t`=テキスト、`e`=絵文字、`n`=改行）：*",
+      "header": "| # | 指標名（ID） | # | 指標名（ID） | # | 指標名（ID） |"
+    }
+  },
+  "step4_order_question": {
+    "zh-tw": {
+      "questions": [
+        {
+          "question": "請設定狀態列顯示順序與個別樣式：",
+          "options": [
+            "略過，使用原勾選順序啟用全部指標（預設文字樣式）",
+            "手動排序與設定樣式（請在下方「Write-in...」欄位中填寫）"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    },
+    "zh-cn": {
+      "questions": [
+        {
+          "question": "请设置状态栏显示顺序与个别样式：",
+          "options": [
+            "跳过，使用原勾选顺序启用全部指标（默认文字样式）",
+            "手动排序与设定样式（请在下方“Write-in...”栏位中填写）"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    },
+    "us": {
+      "questions": [
+        {
+          "question": "Please set the statusline display order and individual styles:",
+          "options": [
+            "Skip, keep current selection order (default text labels)",
+            "Manual order & styles (fill in the 'Write-in...' box below)"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    },
+    "jp": {
+      "questions": [
+        {
+          "question": "ステータスラインの表示順序と個別のスタイルを設定してください：",
+          "options": [
+            "スキップして選択順のまま全指標を有効化（デフォルトテキスト形式）",
+            "手動で並べ替えとスタイル設定（下の「Write-in...」欄に入力）"
+          ],
+          "is_multi_select": false
+        }
+      ]
+    }
+  }
+}
