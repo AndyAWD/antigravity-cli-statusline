@@ -68,7 +68,7 @@ antigravity-cli-statusline/
 
 1. **`lib/metrics/registry.mjs`**：將新語系代碼加入 `SUPPORTED_LOCALES`，於 `LOCALE_WIZARD_META` 補上階段 1 選單項目、階段 2 缺少 Node.js 警告、階段 4 表格標題／表頭與單行排序問卷，並翻譯 `METRIC_CATEGORIES` 與全部指標描述。
 2. **`lib/core/normalize.mjs`**：於 `normalizeLanguage()` 補上該語系代碼及常見地區別名的正規化規則（由 `statusline-quota.mjs` 與 `configure-statusline.mjs` 共用）。
-3. **`lib/metrics/i18n.mjs`**：於 `buildI18nDict`、`AGENT_STATE_MAP`（代理狀態文字）及 `formatPluginUpdateNoticeLines` 補齊新語系全部鍵值與更新提醒翻譯。
+3. **`lib/metrics/i18n.mjs`**：於 `buildI18nDict`、`formatAgentState(state, normLang)` 內部 `map`（代理狀態文字）及 `formatPluginUpdateNoticeLines` 補齊新語系全部鍵值與更新提醒翻譯。
 4. **`lib/collectors/probes.mjs`（及採集器退讓標籤）**：補齊「無版本控制（No VC）」、「未知」、「無」、「未提交 / 無變更」與沙盒狀態文字的在地化分支。
 5. **重新生成資源與驗證**：執行 `npm run sync:resources` 自動更新 `resources/questions.json` 與 `resources/prompts.json`（無須修改 `SKILL.md` 中的靜態文字），再執行 `npm test` 與更新 `CONTRIBUTING.md`。
 
@@ -76,7 +76,7 @@ antigravity-cli-statusline/
 
 1. **重複使用採集層輸出**：直接取用 `lib/collectors/` 產出的指標物件（包含 `agentState`、`toolConfirmPending`、配額與脈絡資訊），切勿在渲染器中重複啟動子行程或呼叫網路應用程式介面（Application Programming Interface）。
 2. **實作渲染器模組**：於 `skills/agy-cli-statusline/scripts/lib/renderers/` 新增渲染器（例如 `dino.mjs`），透過 `lib/renderers/ansi.mjs` 計算顯示寬度與色彩，並保留極窄終端或空設定時的退讓輸出（不得回傳空字串）。
-3. **向註冊表登記**：於 `skills/agy-cli-statusline/scripts/lib/renderers/index.mjs` 呼叫 `registerRenderer('dino', renderDinoStatusLine)`，與預設 `'standard'` 渲染器並列管理。
+3. **向註冊表登記並於入口匯入**：於新渲染器模組本身（例如 `dino.mjs`）從 `lib/renderers/index.mjs` 匯入並呼叫 `registerRenderer('dino', renderDinoStatusLine)`（與 `standard.mjs` 相同），並於入口腳本 `statusline-quota.mjs`（或經由 `lib/renderers/`）匯入該模組以觸發註冊，與預設 `'standard'` 渲染器並列管理。
 4. **使用明確設定鍵，嚴禁重複使用 `ui.footer.theme`**：
    > [!CAUTION]
    > `lib/core/settings.mjs`（`getSettingsAsync`）與 `configure-statusline.mjs` 內建歷史相容防禦，會在讀取與寫入 `settings.json` 時**主動刪除 `settings.ui.footer.theme`**（以及 `ui.footer.style`、`ui.labelStyle`）。新增渲染樣式時必須採用明確的新設定鍵（例如 `ui.footer.renderer`，預設 `'standard'`），絕對不可寫入 `ui.footer.theme`。
