@@ -45,9 +45,9 @@ antigravity-cli-statusline/
 | 層級 | 目錄 | 核心檔案與職責 |
 |---|---|---|
 | **第 1 層：基礎核心** | `lib/core/` | `constants.mjs`（版本常數 `HOOK_VERSION`、倉儲網址、脈絡壓縮門檻）、`fs-utils.mjs`（無位元組順序記號〔Byte Order Mark〕讀寫、SHA-256 雜湊、`listMjsFilesRecursiveSync`、`isDirectExecution`）、`safe-cleanup.mjs`（Git 目錄防護與符號連結安全移除）、`normalize.mjs`（語系、標籤樣式、模型名稱與數字正規化）、`semver.mjs`（語意化版本〔Semantic Versioning〕含先行版本比較）、`process-utils.mjs`（`withTimeout` 與強制 `windowsHide: true` 子行程呼叫）、`settings.mjs`（三層 `settings.json` 讀取合併與跨平台 `statusLine.command` 生成）、`plugin-manifest.mjs`（統一同步與非同步外掛版本探索）。 |
-| **第 2 層：資料採集** | `lib/collectors/` | `time-format.mjs`（重置倒數與時間格式）、`quota.mjs`（本地額度與語言伺服器〔Language Server〕快取）、`context.mjs`（對話脈絡與動態上限）、`account.mjs`（帳號資訊與日誌快取）、`probes.mjs`（Git、記憶體與計數器雙軌探針，匯出 `extractMetricsAsync`）、`plugin-update.mjs`（父行程樹識別與 GitHub Release 檢查）；對渲染層輸出與介面無關之結構化指標物件（含 `agentState`、`toolConfirmPending` 等狀態）。 |
-| **第 3 層：指標與在地化** | `lib/metrics/` | `registry.mjs` 為全部 37 項指標、5 個分類、4 種語系（`zh-tw`、`zh-cn`、`us`、`jp`）、`EMOJI_MAP`（42 鍵）、`ADJACENT_PAIRS`（5 組長條圖配對）與問卷提示 `LOCALE_WIZARD_META` 的單一真實來源；`i18n.mjs` 負責 `buildI18nDict` 四語系格式化字典、相鄰長條圖合併與外掛更新提示雙行訊息。 |
-| **第 4 層：視覺渲染** | `lib/renderers/` | `ansi.mjs`（美國國家標準協會〔American National Standards Institute〕24-bit 四階配色、品牌色、顯示寬度計算與進度條繪製）、`index.mjs`（以 `Map` 維護之 `registerRenderer`、`getRenderer`、`listRenderers` 註冊表）與 `standard.mjs`（預設的 `standard` 多行智慧換行渲染器）。 |
+| **第 2 層：資料採集** | `lib/collectors/` | `time-format.mjs`（重置倒數與時間格式，支援自訂 `now` 參數以即時重算倒數）、`quota.mjs`（本地額度與語言伺服器〔Language Server〕快取、四層動態配額池解析〔`modelPools`〕、60 秒過期寬限期與即時倒數重算〔`normalizeResolvedQuotaEntry`〕）、`context.mjs`（對話脈絡與動態上限）、`account.mjs`（帳號資訊與日誌快取）、`probes.mjs`（Git、記憶體與計數器雙軌探針，匯出 `extractMetricsAsync`）、`plugin-update.mjs`（父行程樹識別與 GitHub Release 檢查）；對渲染層輸出與介面無關之結構化指標物件（含 `agentState`、`toolConfirmPending` 等狀態）。 |
+| **第 3 層：指標與在地化** | `lib/metrics/` | `registry.mjs` 為全部 38 項指標、5 個分類、4 種語系（`zh-tw`、`zh-cn`、`us`、`jp`）、`EMOJI_MAP`（43 鍵）、`ADJACENT_PAIRS`（5 組長條圖配對）與問卷中繼資料 `LOCALE_WIZARD_META` 的單一真實來源；`i18n.mjs` 負責 `buildI18nDict` 四語系格式化字典、相鄰長條圖合併與狀態列更新提示雙行訊息。 |
+| **第 4 層：視覺渲染** | `lib/renderers/` | `ansi.mjs`（美國國家標準協會〔American National Standards Institute〕24-bit 四階配色、品牌色、顯示寬度計算與進度條繪製）、`index.mjs`（以 `Map` 維護之 `registerRenderer`、`getRenderer`、`listRenderers` 註冊表）與 `standard.mjs`（預設的 `standard` 多行智慧換行渲染器，支援含換行之獨立多行指標區塊〔如 `plugin-update`〕及頭尾純空白行自動修剪）。 |
 
 > [!NOTE]
 > `configure-statusline.mjs` 部署掛鉤時，會將 `statusline-quota.mjs`、`fetch-local-quota.mjs` 及整個 `scripts/lib/` 遞迴複製至 `~/.gemini/antigravity-cli/hooks/`（含 `hooks/lib/`），並將全部已部署檔案的 SHA-256 雜湊寫入 `~/.gemini/antigravity-cli/hooks/.hook-version.json`。
@@ -56,7 +56,7 @@ antigravity-cli-statusline/
 
 ## 2. 擴充開發配方（Recipes）
 
-### 2.1 新增第 38 項以上指標（Metric #38+）
+### 2.1 新增第 39 項以上指標（Metric #39+）
 
 1. **註冊指標中繼資料**：開啟 [`skills/agy-cli-statusline/scripts/lib/metrics/registry.mjs`](../skills/agy-cli-statusline/scripts/lib/metrics/registry.mjs)，於 `METRICS` 與 `ALL_STANDARD_METRIC_IDS` 新增識別碼，指定所屬分類（5 大分類之一）、於 `EMOJI_MAP` 補上繪圖符號，並填入 `zh-tw`、`zh-cn`、`us`、`jp` 4 種語系的選項說明。選項文字除末尾的 `(<metric-id>)` 外，不得額外包含括號，以免影響 `configure-statusline.mjs` 識別碼解析。若新增指標可與長條圖相鄰合併，同步於 `ADJACENT_PAIRS` 註冊配對並補上 `<metric-id>+bar` 的 Emoji。
 2. **實作資料採集**：於 `skills/agy-cli-statusline/scripts/lib/collectors/`（如 `probes.mjs` 或對應採集模組）計算該指標數值或狀態字串；所有外部子行程必須使用 `process-utils.mjs` 並搭配逾時保護與 `windowsHide: true`。

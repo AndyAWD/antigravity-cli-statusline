@@ -1,6 +1,6 @@
 ---
 name: agy-cli-statusline
-description: 設定 Antigravity 命令列介面（Command-Line Interface）（agy）狀態列（Statusline / Footer）之 37 項即時指標（含外掛版本與 GitHub Release 更新提醒）、標籤樣式（text / emoji）、排序與多語系（zh-tw / zh-cn / us / jp），並透過跨平台 configure-statusline.mjs 部署掛鉤與同步設定。適用於客製化頁尾、切換圖示或文字標籤、顯示額度 / 脈絡 / 權杖 / Git / 代理 / 版本指標、切換語系、跨機啟用，或以 /antigravity-cli-statusline:agy-cli-statusline 觸發時（支援 macOS、Linux、Windows）。
+description: 設定 Antigravity 命令列介面（Command-Line Interface）（agy）狀態列（Statusline / Footer）之 38 項即時指標（含獨立的狀態列版本顯示與 GitHub Release 更新提醒）、標籤樣式（text / emoji）、排序與多語系（zh-tw / zh-cn / us / jp），並透過跨平台 configure-statusline.mjs 部署掛鉤與同步設定。適用於客製化頁尾、切換圖示或文字標籤、顯示額度 / 脈絡 / 權杖 / Git / 代理 / 版本與更新提醒指標、切換語系、跨機啟用，或以 /antigravity-cli-statusline:agy-cli-statusline 觸發時（支援 macOS、Linux、Windows）。
 ---
 
 # Antigravity 狀態列設定技能
@@ -29,7 +29,7 @@ description: 設定 Antigravity 命令列介面（Command-Line Interface）（ag
 
 - 語系存於 `ui.language`；全域標籤樣式為 `ui.footer.labelStyle`（`"text"` / `"emoji"`）；指標順序為 `ui.footer.items`；個別覆寫為 `ui.footer.itemStyles`（未指定者預設文字）；預設採用 `standard` 渲染器。
 - 支援 24-bit 四階配色、相鄰容量長條圖自動合併（樣式衝突時拆分）、智慧換行與無位元組順序記號 UTF-8 寫入（見 [`references/technical-specs.md`](references/technical-specs.md)）。
-- 僅當 `ui.footer.items` 啟用 `plugin-version` 時，互動式 `agy` 啟動會檢查一次 GitHub Release（略過 `agy -p` 非互動模式），版本落後時於最下方顯示兩行更新提示與 `! agy plugin install` 指令。
+- 僅當 `ui.footer.items` 啟用 `plugin-update` 時，互動式 `agy` 啟動會檢查一次 GitHub Release（略過 `agy -p` 非互動模式），版本落後時於指定位置顯示兩行更新提示與 `agy plugin install` 指令；`plugin-version` 則僅顯示狀態列版本號，不觸發網路檢查或更新提醒。
 
 ## 🌐 語言鎖定規則（Locale Locking — 全域強制）
 
@@ -55,8 +55,8 @@ description: 設定 Antigravity 命令列介面（Command-Line Interface）（ag
 
 ### 步驟 3：第二階段問卷（讀取 `questions.json`、五大分類分頁勾選）
 
-1. 讀取 `<SKILL_DIR>/resources/questions.json`，依 `<lang>` 取得 `categories`（共 5 個分類、37 項指標；為符合終端機高度限制 Issue #1262 分頁，`#1–#36` 編號不變、`#37` `plugin-version` 位於第 5 分類最末）：
-   - `model-and-agent`（4 項）、`quota-and-billing`（14 項）、`context-and-tokens`（4 項）、`workspace-and-vcs`（5 項）、`system-and-tasks`（10 項）。
+1. 讀取 `<SKILL_DIR>/resources/questions.json`，依 `<lang>` 取得 `categories`（共 5 個分類、38 項指標；為符合終端機高度限制 Issue #1262 分頁，`#1–#36` 編號不變、`#37` `plugin-version` 與 `#38` `plugin-update` 位於第 5 分類最末）：
+   - `model-and-agent`（4 項）、`quota-and-billing`（14 項）、`context-and-tokens`（4 項）、`workspace-and-vcs`（5 項）、`system-and-tasks`（11 項）。
 2. 在**單次 `ask_question` 呼叫**的 `questions` 陣列依序傳入 5 個分類題目物件（各題設 `"is_multi_select": true`，CLI 渲染為 `Question 1/5:`–`5/5:`），將回傳勾選項合併為陣列 `selected`。
 
 ### 步驟 4：第三階段問卷（手動排序、樣式前綴與最終篩選）
@@ -64,13 +64,14 @@ description: 設定 Antigravity 命令列介面（Command-Line Interface）（ag
 > [!CAUTION]
 > **防截斷鐵則（Issue #1262）**：CLI 底層介面會重複渲染 `ask_question.question` 兩次，多行 `question` 或單欄長清單會把上方內容頂出視窗遭裁切。必須遵守：
 > 1. **禁止輸出單欄每項一行的長清單**。
-> 2. **在同一回合呼叫 `ask_question` 前，先於對話輸出「單行填寫規則標題 ＋ 三欄 Markdown 表格」**（最多 13 列）。
+> 2. **在同一回合呼叫 `ask_question` 前，先於對話輸出「單行填寫規則標題 ＋ 三欄 Markdown 表格」**（最多 13 列），並**必須在同一回合內立即呼叫 `ask_question`，嚴禁只輸出表格就結束回合**。
 > 3. **`ask_question.question` 嚴格限為單純 1 行短句**（禁止含 `\n`）。
 
 1. **輸出單行標題 ＋ 直向優先三欄表格**：
    - 從 `<SKILL_DIR>/resources/prompts.json` 讀取 `step4_table.<lang>.title`（將總數佔位符替換為實際選取數 $N$）與 `step4_table.<lang>.header`。
    - 將 `selected` 依序編號 `1`–$N$，每欄列數 $R = \lceil N / 3 \rceil$（37 項時 $R = 13$ 列），採**直向優先（Column-major：左欄 `1`–$R$、中欄 $R+1$–$2R$、右欄 $2R+1$–$N$）**輸出，每格簡化為 `🤖 簡稱 (\`metric-id\`)`（完整 37 項範本見 [`references/step4-table-example.md`](references/step4-table-example.md)）。
-2. **同一回合呼叫單行 `ask_question`**：
+   - 表格下方可附帶一句鎖定語系的簡短備援提示（如「若未跳出選單，請直接輸入排序或告知繼續」），避免偶發未觸發選單時使用者卡住。
+2. **同一回合立即呼叫單行 `ask_question`（不可省略或延後到下一回合）**：
    - 從 `<SKILL_DIR>/resources/prompts.json` 讀取 `step4_order_question.<lang>` 直接傳入 `ask_question`。
    - 輸入規則：純數字或 `t` 前綴為文字、`e` 前綴為 Emoji、`n` 為換行、大小寫不分、未填指標不顯示。取得排序輸入 `order`。
 
@@ -99,7 +100,7 @@ node "<SKILL_DIR>/scripts/test-counters.mjs"
 2. **生效與同步說明**：
    - **已啟用者**：順序、樣式與語系已**即時熱更新**，無須重啟。
    - **初次啟用者**：於 `agy` 輸入腳本輸出的 `/statusline <command>` 立即啟用，或重啟 `agy` CLI。
-   - **外掛升級後**：執行 `! agy plugin install` 後顯示的 `plugin-version` 會立即追平，但 `~/.gemini/antigravity-cli/hooks/` 維持手動同步，須重新執行 `/antigravity-cli-statusline:agy-cli-statusline` 才會更新掛鉤與 `hooks/lib/`。
+   - **外掛升級後**：執行 `agy plugin install` 後顯示的 `plugin-version` 會立即追平，但 `~/.gemini/antigravity-cli/hooks/` 維持手動同步，須重新執行 `/antigravity-cli-statusline:agy-cli-statusline` 才會更新掛鉤與 `hooks/lib/`。
 3. **故障診斷**：告知使用者若狀態列異常或懷疑版本不同步，可執行 `node "<SKILL_DIR>/scripts/diagnose-statusline.mjs"` 並貼上完整輸出進行診斷。
 
 ## ! 常見陷阱速查

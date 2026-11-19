@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-Google Antigravity（AGY）向けのプラグインです。Antigravity コマンドラインインターフェース（CLI）（`agy`）のステータスライン（Statusline / Footer）をカスタマイズし、37種類のリアルタイム指標から自由に選択、テキスト（`text`）または絵文字（Emoji）（`emoji`）ラベル表示スタイルの切り替え、表示順序のカスタマイズ、パーセント容量バーグラフの結合または個別表示モードの切り替え、自動および手動改行メカニズムを備え、4つの言語（`us`、`zh-tw`、`zh-cn`、`jp`）に対応しています。
+Google Antigravity（AGY）向けのプラグインです。Antigravity コマンドラインインターフェース（CLI）（`agy`）のステータスライン（Statusline / Footer）をカスタマイズし、38種類のリアルタイム指標から自由に選択、テキスト（`text`）または絵文字（Emoji）（`emoji`）ラベル表示スタイルの切り替え、表示順序のカスタマイズ、パーセント容量バーグラフの結合または個別表示モードの切り替え、自動および手動改行メカニズムを備え、4つの言語（`us`、`zh-tw`、`zh-cn`、`jp`）に対応しています。
 
 Google Antigravity の3大コアプラットフォームを包括的にサポート：Antigravity コマンドラインインターフェース（`agy`）、Antigravity 統合開発環境（IDE）、および Antigravity 2.0 デスクトップアプリケーション。
 
@@ -19,7 +19,7 @@ Google Antigravity の3大コアプラットフォームを包括的にサポー
 これは Antigravity コマンドラインインターフェース（CLI）ステータスラインの対話型設定から実際のリアルタイム動作までの動的デモです。設定コマンド `/antigravity-cli-statusline:agy-cli-statusline` の実行、各フェーズの `ask_question` アンケート対話、カスタムレイアウト入力、そして最終的に表示される 11 行の高情報密度ステータスラインを完全に収録しています：
 
 1. **設定コマンドの実行と言語選択**：`/antigravity-cli-statusline:agy-cli-statusline` を実行して対話型設定ウィザードを起動し、最初のステップで表示言語（日本語、繁体字中国語、簡体字中国語、英語）を即座に選択して固定します。
-2. **5大カテゴリ指標のページネーション選択**：`ask_question` カテゴリ別ページネーションウィザード（1/5 〜 5/5）を通じて全 37 項目の指標を網羅し、ターミナルの行数制限やスクロールによる切り捨て問題を解決します。
+2. **5大カテゴリ指標のページネーション選択**：`ask_question` カテゴリ別ページネーションウィザード（1/5 〜 5/5）を通じて全 38 項目の指標を網羅し、ターミナルの行数制限やスクロールによる切り捨て問題を解決します。
 3. **手動並び替えと個別スタイル Write-in**：1行の入力欄でカスタム順序とプレフィックスの入力に対応（例: `e:model-name` で絵文字、`quota` でテキストモード、`n` で強制改行、`n,n` で空白の区切り行を作成）。
 4. **設定同期と即時ホットリロード**：CLI 固有設定、グローバル設定、プロジェクト設定の3層の `settings.json` および `trusted_hooks.json` 信頼メカニズムを自動同期し、CLI を再起動することなく即座にホットリロードが適用され、11 行のカスタムステータスラインが展開されます。
 5. **11 行のステータスラインによるリアルタイムテレメトリ**：カスタム順序に従い、AI モデル、利用可能クォータと 10 マスのプログレスバー、コンテキストとトークン数、アクティブなサブエージェント、Git バージョン管理、システムメモリをリアルタイムに追跡します。
@@ -53,18 +53,18 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ### 有効化の挙動
 
-- **初回有効化**：ステータスラインを初めてインストールまたは有効化する場合、`agy` CLI は実行時に新しいフックプロセスを動的に登録しません。`agy` CLI を再起動（一度終了して再度開く）してステータスラインフックを読み込んでください。
+- **初回有効化**：ステータスラインを初めて有効化する場合は、`agy` 上で `configure-statusline.mjs` が出力する `/statusline <command>` を入力して即座に有効化できます。あるいは `agy` CLI を再起動（一度終了して再度開く）してステータスラインフックを読み込んでください。
 - **ホットリロード**：一度有効化された後は、指標の並び順、ラベルスタイル（`text` / `emoji`）、または表示言語を変更しても、CLI を再起動することなく即座に反映されます。
 
 ## 主な機能
 
 1. **マルチプラットフォーム対応**：Windows、macOS、Linux 上の Antigravity CLI ターミナル、Antigravity IDE サイドバーチャット、および Antigravity 2.0 デスクトップアプリケーションをサポート。
-2. **37種類のリアルタイム指標、4つのロケール＆デュアルラベルスタイル**：AI モデル状態、API クォータ（5時間、週間、Gemini 4 Argon 専用クォータプールを含む）、コンテキスト／トークン消費量、対話キュー、Git/VCS 状態、システムテレメトリなど 37 指標を英語（`us`）、繁体字中国語（`zh-tw`）、簡体字中国語（`zh-cn`）、日本語（`jp`）で提供し、**テキスト（`text`）**または**絵文字（`emoji`、コロンなしコンパクト）**ラベル表示スタイル（`ui.footer.labelStyle`）を選択可能。
+2. **38種類のリアルタイム指標、4つのロケール＆デュアルラベルスタイル**：AI モデル状態、API クォータ（5時間、週間、Gemini 4 Argon 専用クォータプールを含み、4層動的クォータプール帰属解決と60秒失効猶予期間のリアルタイムカウントダウン再計算に対応）、コンテキスト／トークン消費量、対話キュー、Git/VCS 状態、システムテレメトリなど 38 指標を英語（`us`）、繁体字中国語（`zh-tw`）、簡体字中国語（`zh-cn`）、日本語（`jp`）で提供し、**テキスト（`text`）**または**絵文字（`emoji`、コロンなしコンパクト）**ラベル表示スタイル（`ui.footer.labelStyle`）を選択可能。
 3. **柔軟なバーグラフ表示（結合または個別）**：5時間クォータ、週間クォータ、Gemini 4 Argon クォータ、コンテキスト使用量、セッショントークンに対して 10 マスの視覚的プログレスバー（`[████████░░]`）を描画。数値指標と隣接して配置された場合は自動的にラベルを結合し、離れて配置された場合は個別のラベルで表示。
 4. **カスタム並び替え＆デュアル改行メカニズム**：1始まりのインデックス並び替え、`n` による手動改行、`n,n` による空白行のセクション区切り、およびターミナル幅を考慮した自動折り返しに対応。
 5. **24ビット4段階カラーコーディング**：4つのしきい値（`100–75%` 青、`74–50%` 緑、`49–25%` 黄、`24–0%` 赤）で色が動的に変化し、各 AI モデルファミリー（Gemini、Claude、GPT）専用のブランドアクセントカラーも表示。
 6. **3層設定同期＆OS セーフガード**：CLI 固有設定、グローバル設定、ワークスペース設定の3層の `settings.json` と `trusted_hooks.json` を同期し、macOS/Linux の NVM パス解決や Windows の UTF-8 Byte Order Mark（BOM）防止を安全に処理。
-7. **初回起動時の更新チェック＆手動フック同期**：`ui.footer.items` で `plugin-version`（`#37`）が有効な場合、対話型 `agy` CLI 起動ごとに 1 回だけ GitHub Releases を確認し（`agy -p` はスキップ）、オフライン時はキャッシュ済みバージョンで比較して、古い場合は最下部に2行の更新コマンド案内を表示。フックの同期は `/antigravity-cli-statusline:agy-cli-statusline` による手動実行を維持し、`diagnose-statusline.mjs` でプラグインとフックのバージョン差異を確認可能。
+7. **初回起動時の更新チェック＆手動フック同期**：`ui.footer.items` で `plugin-update`（`#38`）が有効な場合、対話型 `agy` CLI 起動ごとに 1 回だけ GitHub Releases を確認し（`agy -p` はスキップ）、最新時は自動非表示かつ先頭・末尾の純粋な空白行を自動トリム、オフライン時はキャッシュ済みバージョンで比較して、古い場合は配置位置に2行の更新コマンド案内（絵文字スタイルでは `🆕 vX → vY` のコンパクト表示）を出します（`plugin-version` `#37` はステータスラインのバージョン表示のみを行い、単一行レイアウトを崩しません）。フックの同期は `/antigravity-cli-statusline:agy-cli-statusline` による手動実行を維持し、`diagnose-statusline.mjs` でプラグインとフックのバージョン差異を確認可能。
 
 ## プラグイン管理
 
@@ -96,33 +96,41 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ```text
 antigravity-cli-statusline/
-├── plugin.json
-├── package.json
-├── LICENSE
-├── CONTRIBUTING.md
-├── README.md
-├── README.zh-TW.md
-├── README.zh-CN.md
-├── README.ja.md
+├── plugin.json                                     # Antigravity プラグインマニフェスト
+├── package.json                                    # パッケージメタデータ・npm スクリプト
+├── LICENSE                                         # MIT ライセンス
+├── CONTRIBUTING.md                                 # 3言語コントリビューションガイド
+├── README.md / README.zh-TW.md / README.zh-CN.md / README.ja.md
 ├── docs/
-│   └── images/
+│   ├── ARCHITECTURE_HANDOVER.md                    # 4層アーキテクチャ引き継ぎ・拡張ガイド
+│   ├── images/                                     # スクリーンショット・生成デモ SVG
+│   └── workshop/                                   # ワークショップ資料・アセット
 └── skills/
     └── agy-cli-statusline/
-        ├── SKILL.md
+        ├── SKILL.md                                # スキルメイン仕様ファイル
         ├── references/
-        │   ├── config-files.md
-        │   ├── pitfalls.md
-        │   ├── step4-table-example.md
-        │   ├── technical-specs.md
-        │   └── windows.md
+        │   ├── config-files.md                     # 3層 settings.json・コマンド仕様
+        │   ├── pitfalls.md                         # よくある落とし穴とガードレール
+        │   ├── step4-table-example.md              # ステップ4の3列テーブル例
+        │   ├── technical-specs.md                  # 視覚・クォータプール・更新仕様
+        │   └── windows.md                          # Windows UTF-8 / cmd / パス仕様
         ├── resources/
-        │   └── questions.json
+        │   ├── prompts.json                        # 自動生成の4言語 UI テンプレート
+        │   └── questions.json                      # 自動生成の5カテゴリ設問データ
         └── scripts/
-            ├── configure-statusline.mjs
-            ├── diagnose-statusline.mjs
-            ├── fetch-local-quota.mjs
-            ├── statusline-quota.mjs
-            └── test-counters.mjs
+            ├── configure-statusline.mjs            # 設定書き込み・フック配置スクリプト
+            ├── diagnose-statusline.mjs             # 設定・SHA-256 同期診断ツール
+            ├── fetch-local-quota.mjs               # バックグラウンドクォータ・LS キャッシュ取得
+            ├── generate-svg-demos.mjs              # デモ SVG 生成スクリプト
+            ├── statusline-quota.mjs                # CLI statusLine フックエントリポイント
+            ├── sync-resources.mjs                  # レジストリから JSON リソース生成
+            ├── test-counters.mjs                   # カウンタ・防御的結合テスト
+            ├── lib/                                # 4層ゼロ依存 ESM コアモジュール
+            │   ├── core/
+            │   ├── collectors/
+            │   ├── metrics/
+            │   └── renderers/
+            └── tests/                              # 単体・結合テストスイート
 ```
 
 ## コマンドとスキル
@@ -138,16 +146,16 @@ antigravity-cli-statusline/
 - **使用するタイミング**：初めてステータスラインを有効化するとき、表示言語（`us` / `zh-tw` / `zh-cn` / `jp`）を切り替えるとき、テキスト（`text`）と絵文字（`emoji`）のラベルスタイルを切り替えるとき、指標を選択するとき、または複数行のレイアウト順序をカスタマイズするとき。
 - **動作の仕組み**：
   1. 表示言語の選択を求め、セッション出力をそのロケールに固定します。
-  2. Node.js 環境の利用可否を検証し、3層の `settings.json` ファイルを確認します。
+  2. Node.js 環境の利用可否を事前検証します（3層の `settings.json` の読み書きはすべてステップ 5 の `configure-statusline.mjs` 経由で安全に処理され、`~/.gemini/` へ直接アクセスしません）。
   3. `questions.json` から 5 つのカテゴリ別タブにわたって指標の選択を順次プロンプトし、ターミナル画面の高さ制限による切り捨て（Issue #1262）を防ぎます。
-  4. 選択された指標を表示し、個別スタイルプレフィックス付きのカスタム並び順を受け付け（純粋な数字、`t` テキストプレフィックス、`e` 絵文字プレフィックス、`n` 改行トークンに対応）、3層すべての `settings.json` に `ui.footer.items` と `ui.footer.itemStyles` を書き込み、フックスクリプトを `~/.gemini/antigravity-cli/hooks/` に配置します。
+  4. 選択された指標を表示し、個別スタイルプレフィックス付きのカスタム並び順を受け付け（純粋な数字、`t` テキストプレフィックス、`e` 絵文字プレフィックス、`n` 改行トークンに対応）、3層すべての `settings.json` に `ui.footer.items` と `ui.footer.itemStyles` を書き込み、フックスクリプト、4層 `lib/` モジュール、および `.hook-version.json` SHA-256 マニフェストを `~/.gemini/antigravity-cli/hooks/` に配置します。
   5. 完了時に、将来の調整で簡単にコピー＆ペーストできるよう、前回および今回のレイアウト順序文字列を含むコードブロックを自動的に出力します。
 
 ---
 
 ## 指標、並び替え＆改行
 
-### 利用可能な指標（1–37）
+### 利用可能な指標（1–38）
 
 以下の番号は、ステップ 3（`resources/questions.json`）の 5 カテゴリにわたる 1 始まりの選択肢インデックス、および `emoji` モードで使用される絵文字プレフィックスに対応しています：
 
@@ -186,7 +194,7 @@ antigravity-cli-statusline/
 - `26.` 🔍 **VCS 変更状態（`vcs-dirty`）** — `未コミット / 変更なし`
 - `27.` 🗃️ **VCS 種別（`vcs-type`）** — `git / jj / fig`
 
-**5. システム状態とバックグラウンドタスク（10項目）**
+**5. システム状態とバックグラウンドタスク（11項目）**
 - `28.` 💾 **CLI メモリ使用量（`memory-usage`）** — `agy` プロセスが消費している RSS メモリ
 - `29.` 🚀 **Antigravity CLI バージョン（`cli-version`）** — 現在の CLI バージョン文字列（テキスト表示ラベル：`Agy CLI バージョン:`）
 - `30.` 💬 **会話番号（`conversation-id`）** — デバッグ用の会話識別子の先頭8文字
@@ -196,7 +204,8 @@ antigravity-cli-statusline/
 - `34.` 🔄 **実行中バックグラウンドタスク（`background-tasks`）** — 稼働中のバックグラウンドタスク数
 - `35.` 👥 **アクティブなサブエージェント（`subagents`）** — 稼働中のサブエージェント数
 - `36.` 📄 **成果物数（`artifacts`）** — このセッションで生成された累積ファイル・成果物数
-- `37.` 🧩 **プラグインバージョン（`plugin-version`）** — インストール済みの `antigravity-cli-statusline` バージョン；有効にすると対話型 `agy` 起動ごとに GitHub Releases を確認し、更新がある場合は最下部に2行の案内を表示
+- `37.` 🧩 **ステータスライン版（`plugin-version`）** — インストール済みの `antigravity-cli-statusline` バージョン表示のみ（更新確認・通知は行いません）
+- `38.` 🆕 **ステータスライン更新通知（`plugin-update`）** — 対話型 `agy` 起動ごとに1回 GitHub Releases を確認し（`agy -p` はスキップ）、最新時は自動非表示、古い場合は配置位置に2行の更新案内を表示
 
 ### ラベル表示スタイル：テキスト（`text`）vs. 絵文字（`emoji`）
 
@@ -227,13 +236,13 @@ antigravity-cli-statusline/
   ```
 - **結合出力プレビュー（テキストモード `text`）**：
   ```text
-  コンテキスト使用: 18.5% [█░░░░░░░░░] │ トークン: 185.0k / 1.0M [█░░░░░░░░░]
+  コンテキスト使用: 18.5% [█░░░░░░░░░] │ トークン: 47.4k / 256.0k [█░░░░░░░░░]
   五時間残量: 88% [████████░░] │ 七日間残量: 78% [███████░░░]
   Argon 残量: 59% [█████░░░░░]
   ```
 - **結合出力プレビュー（絵文字モード `emoji`）**：
   ```text
-  🧠 18.5% [█░░░░░░░░░] │ 💰 185.0k / 1.0M [█░░░░░░░░░]
+  🧠 18.5% [█░░░░░░░░░] │ 💰 47.4k / 256.0k [█░░░░░░░░░]
   🔋 88% [████████░░] │ 📅 78% [███████░░░]
   ✨ 59% [█████░░░░░]
   ```
@@ -248,7 +257,7 @@ antigravity-cli-statusline/
   ```
 - **個別出力プレビュー**：
   ```text
-  コンテキスト使用: 18.5% │ トークン: 185.0k / 1.0M
+  コンテキスト使用: 18.5% │ トークン: 47.4k / 256.0k
   コンテキスト使用: [█░░░░░░░░░] │ トークン: [█░░░░░░░░░]
   五時間残量: 88% │ 五時間リセット: 4h 50m │ 五時間残量: [████████░░]
   七日間残量: 78% │ 七日間リセット: 4d 5h │ 七日間残量: [███████░░░]
@@ -261,15 +270,15 @@ antigravity-cli-statusline/
 
 - **数字インデックスバージョン**：
   ```text
-  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29,37
+  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29,37,38
   ```
 
 - **英字識別子バージョン**：
   ```text
-  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,plugin-version
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,plugin-version,plugin-update
   ```
 
-- **数字**：ステップ 3 の選択における 1 始まりの位置を表します（全 37 指標を選択した場合、数字 `1`〜`37` は上記リストに対応します）。
+- **数字**：ステップ 3 の選択における 1 始まりの位置を表します（全 38 指標を選択した場合、数字 `1`〜`38` は上記リストに対応します）。
 - **スタイルプレフィックス**：
   - プレーンな数字（例: `1`）または `t1`、プレーンな英字識別子（`quota`、`t:quota`）は**テキストラベル**としてフォーマットされます。
   - `e1` または `e:quota` は**絵文字アイコン**としてフォーマットされます（大文字・小文字を区別しません）。
@@ -280,28 +289,30 @@ antigravity-cli-statusline/
 - 空白のままにするか `スキップ` を選択すると、元の選択順序を維持し、選択されたすべての指標が有効化されます（デフォルトのテキストスタイル）。
 - **設定履歴の保持**：スキルの完了時に、以前および新しく設定された並び替え文字列が自動的に表示され、将来の調整のために即座にコピー＆ペーストできます。
 
-並び替え後のステータスライン表示プレビュー — **混在／個別スタイルモード**（4つの論理グループ、空行で区切られた計8行の情報）：
+並び替え後のステータスライン表示プレビュー — **混在／個別スタイルモード**（4つの論理グループ、空行で区切られた計9行の情報）：
 
 ```text
 🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ オフ
 🪪 Default │ 状態: 実行中 │ サブ代理: 2 │ 成果物: 0 │ 入力キュー: 0 │ BGタスク: 0 │ ご承認待ち: なし
 
-コンテキスト使用: 18.5% [█░░░░░░░░░] │ トークン: 185.0k / 1.0M [█░░░░░░░░░]
+コンテキスト使用: 18.5% [█░░░░░░░░░] │ トークン: 47.4k / 256.0k [█░░░░░░░░░]
 五時間残量: 88% [████████░░] │ 五時間リセット: 4h 50m │ 五時間リセット時刻: 15:50
 七日間残量: 78% [███████░░░] │ 七日間リセット: 4d 5h │ 七日間リセット時刻: 2026/10/18 16:00
 Argon 残量: 59% [█████░░░░░] │ Argon リセット: 6d 1h │ Argon リセット時刻: 2026/10/30 23:57
 
 版管理状態: 変更なし │ 版管理種別: git │ 🔀 main
 📁 antigravity-cli-statusline │ パス: /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ プラグイン版: v1.11.4
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ ステータスライン版: v1.11.4
 ```
 
-`plugin-version` が有効で新しい GitHub Release が利用可能な場合、最下部に2行の更新案内が自動的に追加されます（`! agy plugin install` を実行すると表示バージョンが追いつき警告は消えます。`~/.gemini/antigravity-cli/hooks/` 配下のフックスクリプトも更新したい場合は `/antigravity-cli-statusline:agy-cli-statusline` を再実行するか、`node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` でバージョン差を確認してください）：
+`plugin-update`（`#38`）が有効で新しい GitHub Release が利用可能な場合、指定した配置位置に2行の更新案内が独立表示されます（ターミナルで `agy plugin install` を実行すると表示バージョンが追いつき警告は消えます。`~/.gemini/antigravity-cli/hooks/` 配下のフックスクリプトも更新したい場合は `/antigravity-cli-statusline:agy-cli-statusline` を再実行するか、`node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` でバージョン差を確認してください）：
 
 ```text
-⚠️ プラグインの新バージョンが利用可能です（現在 v1.11.3 → 最新 v1.11.4）。以下のコマンドで更新してください：
-! agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
+⚠️ ステータスラインの新バージョンが利用可能です（現在 v1.11.3 → 最新 v1.11.4）。以下のコマンドで更新してください：
+agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
+
+絵文字スタイル（`e38` / `e:plugin-update`）では、1行目が `🆕 v1.11.3 → v1.11.4` のコンパクト表示になり、2行目に更新コマンドが独立出力されます。最新バージョンの場合は自動的に非表示となり、先頭・末尾の純粋な空白行もトリムされます。
 
 ### 改行動作
 

@@ -22,14 +22,14 @@ This project uses a 4-layer modular architecture (`core/`, `collectors/`, `metri
 ### 1. Modify `skills/agy-cli-statusline/scripts/lib/metrics/registry.mjs` & Sync Resources
 - Add `'[LANG_CODE]'` to `SUPPORTED_LOCALES`.
 - Add `'[LANG_CODE]'` entries to `LOCALE_WIZARD_META` (including Step 1 option `"[Target Language] ([LANG_CODE])"`, Step 2 missing-Node.js prompt, Step 4 table title/header, and Step 4 single-line order question).
-- Translate all 5 category titles/questions in `METRIC_CATEGORIES` and all **37 statusline indicators** (`#1` `model-name` through `#37` `plugin-version`) in `METRICS` into [Target Language] using `"<Emoji> <Localized Description> (<indicator-id>)"` (do NOT include extra parentheses besides the trailing `(<indicator-id>)`).
+- Translate all 5 category titles/questions in `METRIC_CATEGORIES` and all **38 statusline indicators** (`#1` `model-name` through `#38` `plugin-update`) in `METRICS` into [Target Language] using `"<Emoji> <Localized Description> (<indicator-id>)"` (do NOT include extra parentheses besides the trailing `(<indicator-id>)`).
 - Run `node skills/agy-cli-statusline/scripts/sync-resources.mjs` (or `npm run sync:resources`) to regenerate `skills/agy-cli-statusline/resources/questions.json` and `skills/agy-cli-statusline/resources/prompts.json`.
 
 ### 2. Modify `skills/agy-cli-statusline/scripts/lib/core/normalize.mjs`
 - **Find `normalizeLanguage(lang)`**: Add matching rules to normalize `[LANG_CODE]` and related locale aliases to `'[LANG_CODE]'` (shared by both `statusline-quota.mjs` and `configure-statusline.mjs`).
 
 ### 3. Modify `skills/agy-cli-statusline/scripts/lib/metrics/i18n.mjs`
-- **Find `buildI18nDict(lang, m, labelStyle = 'text')`**: Add a new `[LANG_CODE]` object translating all **42 keys** (**37 status indicators** + **5 merged bar graph keys**: `quota+bar`, `context-used+bar`, `quota-weekly+bar`, `quota-argon+bar`, `token-count+bar`) into [Target Language], preserving all ANSI color variables (`${BOLD}`, `${WHITE}`, `${RESET}`, etc.) and `${m.*}` template expressions.
+- **Find `buildI18nDict(lang, m, labelStyle = 'text')`**: Add a new `[LANG_CODE]` object translating all **43 keys** (**38 status indicators** + **5 merged bar graph keys**: `quota+bar`, `context-used+bar`, `quota-weekly+bar`, `quota-argon+bar`, `token-count+bar`) into [Target Language], preserving all ANSI color variables (`${BOLD}`, `${WHITE}`, `${RESET}`, etc.) and `${m.*}` template expressions.
 - Add `'[LANG_CODE]'` translations inside `formatAgentState(state, normLang)` (its internal `map` in `lib/metrics/i18n.mjs`) and `formatPluginUpdateNoticeLines()`.
 
 ### 4. Modify `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs` (and metric collectors)
@@ -98,14 +98,14 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 ### 1. 修改 `skills/agy-cli-statusline/scripts/lib/metrics/registry.mjs` 並同步資源
 - 將 `'[LANG_CODE]'` 加入 `SUPPORTED_LOCALES`。
 - 於 `LOCALE_WIZARD_META` 補上 `'[LANG_CODE]'` 的精靈提示（包含步驟 1 選項 `"【目標語言】 ([LANG_CODE])"`、步驟 2 缺少 Node.js 警告、步驟 4 表格標題／表頭與單行排序問卷）。
-- 於 `METRIC_CATEGORIES` 翻譯五大分類標題／問題，並於 `METRICS` 翻譯全部 **37 個狀態列指標**（`#1` `model-name` 至 `#37` `plugin-version`），格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`（除末尾 `(<英文識別碼>)` 外，不得出現額外括號）。
+- 於 `METRIC_CATEGORIES` 翻譯五大分類標題／問題，並於 `METRICS` 翻譯全部 **38 個狀態列指標**（`#1` `model-name` 至 `#38` `plugin-update`），格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`（除末尾 `(<英文識別碼>)` 外，不得出現額外括號）。
 - 執行 `node skills/agy-cli-statusline/scripts/sync-resources.mjs`（或 `npm run sync:resources`），自動重新生成 `skills/agy-cli-statusline/resources/questions.json` 與 `skills/agy-cli-statusline/resources/prompts.json`。
 
 ### 2. 修改 `skills/agy-cli-statusline/scripts/lib/core/normalize.mjs`
 - **尋找 `normalizeLanguage(lang)` 函式**：新增判斷規則，將 `[LANG_CODE]` 及相關語系別名標準化為 `'[LANG_CODE]'`（`statusline-quota.mjs` 與 `configure-statusline.mjs` 共用此模組）。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/lib/metrics/i18n.mjs`
-- **尋找 `buildI18nDict(lang, m, labelStyle = 'text')` 函式**：新增 `'[LANG_CODE]'` 字典，將全部 **42 個鍵值**（**37 個狀態列指標** ＋ **5 個長條圖合併鍵值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻譯為【目標語言】，保留原有的美國國家標準協會（American National Standards Institute）色彩變數（如 `${BOLD}`、`${WHITE}`、`${RESET}`）與 `${m.*}` 變數插值。
+- **尋找 `buildI18nDict(lang, m, labelStyle = 'text')` 函式**：新增 `'[LANG_CODE]'` 字典，將全部 **43 個鍵值**（**38 個狀態列指標** ＋ **5 個長條圖合併鍵值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻譯為【目標語言】，保留原有的美國國家標準協會（American National Standards Institute）色彩變數（如 `${BOLD}`、`${WHITE}`、`${RESET}`）與 `${m.*}` 變數插值。
 - 同步於 `formatAgentState(state, normLang)` 內部 `map`（位於 `lib/metrics/i18n.mjs`）與 `formatPluginUpdateNoticeLines()` 補上 `'[LANG_CODE]'` 翻譯。
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs`（及資料採集模組）
@@ -174,14 +174,14 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 ### 1. 修改 `skills/agy-cli-statusline/scripts/lib/metrics/registry.mjs` 并同步资源
 - 将 `'[LANG_CODE]'` 加入 `SUPPORTED_LOCALES`。
 - 在 `LOCALE_WIZARD_META` 补上 `'[LANG_CODE]'` 的向导提示（包含步骤 1 选项 `"【目标语言】 ([LANG_CODE])"`、步骤 2 缺少 Node.js 警告、步骤 4 表格标题／表头与单行排序问卷）。
-- 在 `METRIC_CATEGORIES` 翻译五大分类标题／问题，并在 `METRICS` 翻译全部 **37 个状态栏指标**（`#1` `model-name` 至 `#37` `plugin-version`），格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`（除末尾 `(<英文标识码>)` 外，不得出现额外括号）。
+- 在 `METRIC_CATEGORIES` 翻译五大分类标题／问题，并在 `METRICS` 翻译全部 **38 个状态栏指标**（`#1` `model-name` 至 `#38` `plugin-update`），格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`（除末尾 `(<英文标识码>)` 外，不得出现额外括号）。
 - 运行 `node skills/agy-cli-statusline/scripts/sync-resources.mjs`（或 `npm run sync:resources`），自动重新生成 `skills/agy-cli-statusline/resources/questions.json` 与 `skills/agy-cli-statusline/resources/prompts.json`。
 
 ### 2. 修改 `skills/agy-cli-statusline/scripts/lib/core/normalize.mjs`
 - **寻找 `normalizeLanguage(lang)` 函数**：新增判断规则，将 `[LANG_CODE]` 及相关语系别名标准化为 `'[LANG_CODE]'`（`statusline-quota.mjs` 与 `configure-statusline.mjs` 共用此模块）。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/lib/metrics/i18n.mjs`
-- **寻找 `buildI18nDict(lang, m, labelStyle = 'text')` 函数**：新增 `'[LANG_CODE]'` 字典，将全部 **42 个键值**（**37 个状态栏指标** + **5 个长条图合并键值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻译成【目标语言】，保留原有的 ANSI 色彩变量（如 `${BOLD}`、`${WHITE}`、`${RESET}`）与 `${m.*}` 变量插值。
+- **寻找 `buildI18nDict(lang, m, labelStyle = 'text')` 函数**：新增 `'[LANG_CODE]'` 字典，将全部 **43 个键值**（**38 个状态栏指标** + **5 个长条图合并键值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻译成【目标语言】，保留原有的 ANSI 色彩变量（如 `${BOLD}`、`${WHITE}`、`${RESET}`）与 `${m.*}` 变量插值。
 - 同步在 `formatAgentState(state, normLang)` 内部 `map`（位于 `lib/metrics/i18n.mjs`）与 `formatPluginUpdateNoticeLines()` 补上 `'[LANG_CODE]'` 翻译。
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs`（及数据采集模块）

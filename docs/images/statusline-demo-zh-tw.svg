@@ -322,9 +322,10 @@
   <text x="44" y="334" fill="#39c5cf">[✓] 🔄 進行中的背景任務數（background-tasks）</text>
   <text x="44" y="352" fill="#39c5cf">[✓] 👥 活躍子代理數（subagents）</text>
   <text x="44" y="370" fill="#39c5cf">[✓] 📄 本次對話人工智慧累計產出的檔案數量（artifacts）</text>
-  <text x="44" y="388" fill="#39c5cf">[✓] 🧩 狀態列外掛版本號（plugin-version）</text>
-  <text x="44" y="426" fill="#5cdb6d">★ 全部五大分類共 37 項指標已全數選取完成！</text>
-  <text x="24" y="448" fill="#6e7681">Space 勾選/取消 · Enter 確認並前往手動排序 (Write-in) · 零截斷勾選完畢</text>
+  <text x="44" y="388" fill="#39c5cf">[✓] 🧩 狀態列版本號（plugin-version）</text>
+  <text x="44" y="406" fill="#39c5cf">[✓] 🆕 狀態列新版本更新提醒（plugin-update）</text>
+  <text x="44" y="444" fill="#5cdb6d">★ 全部五大分類共 38 項指標已全數選取完成！</text>
+  <text x="24" y="466" fill="#6e7681">Space 勾選/取消 · Enter 確認並前往手動排序 (Write-in) · 零截斷勾選完畢</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
   <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
@@ -332,7 +333,7 @@
   <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
 
   <!-- Caption -->
-  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑥ 指標分頁勾選 (5/5 系統與背景任務) · 勾選 RAM、Agy CLI 版本、外掛版本、子代理與產出等 10 項</text>
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑥ 指標分頁勾選 (5/5 系統與背景任務) · 勾選 RAM、Agy CLI 版本、狀態列版本與更新提醒、子代理與產出等 11 項</text>
 </g>
 
 <!-- ============================================================== -->
@@ -341,7 +342,7 @@
 <g class="f f6">
   <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 37 項）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 38 項）</text>
   <text x="290" y="156" fill="#8b949e">— 於 Write-in 輸入自訂順序（e: 為 Emoji，n 為換行，n,n 為空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
@@ -382,7 +383,7 @@
   <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 腳本部署完成，已寫入版本同步資訊（.hook-version.json）</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
   <text x="44" y="204" fill="#57caff" font-weight="700">狀態列已熱重載生效！已套用自訂 11 列排版與 Emoji/Text 混合風格</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 47 個指標與排版單元已解析 · 自動合併相鄰額度與長條圖 · 支援 GitHub Release 版本檢查</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 48 個指標與排版單元已解析 · 自動合併相鄰額度與長條圖 · 支援 GitHub Release 版本檢查</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI 狀態列已就緒，隨時監控系統指標與工作區檔案變更。</text>
@@ -404,7 +405,7 @@
   <text x="24" y="484"> </text>
   <text x="24" y="503"><tspan fill="#ffffff">版控狀態:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">✓ 無變更</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版控類型: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
   <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">完整路徑: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
-  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">外掛版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.11.4</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">狀態列版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.11.4</tspan></text>
 
   <!-- Caption -->
   <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑧ 設定部署完成與即時熱重載 · 三層 settings.json 同步，立即呈現 11 列自訂狀態列</text>
@@ -444,7 +445,7 @@
   <text x="24" y="484"> </text>
   <text x="24" y="503"><tspan fill="#ffffff">版控狀態:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">✘ 未提交 (+3)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版控類型: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
   <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">完整路徑: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
-  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">外掛版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.11.4</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">狀態列版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.11.4</tspan></text>
 
   <!-- Caption -->
   <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑨ 完整狀態列即時遙測運作 · 依指定排序即時追蹤長條圖、權杖用量與子代理</text>
