@@ -13,7 +13,6 @@ import { isDirectExecution, readJsonSafeAsync, writeFileAndVerifyNoBOM } from '.
 import {
   normalizeLabelStyle,
   normalizeLanguage,
-  normalizeModelName,
   sanitizeConversationId
 } from './lib/core/normalize.mjs';
 import { resolveInstalledPluginVersionAsync } from './lib/core/plugin-manifest.mjs';
@@ -51,6 +50,7 @@ import {
   parseMetaQuota,
   resolveArgonQuota,
   resolveModelQuota,
+  resolveQuotaPool,
   resolveWeeklyQuota,
   triggerQuotaUpdateIfNeededAsync
 } from './lib/collectors/quota.mjs';
@@ -154,7 +154,8 @@ async function main() {
     const footerItemsSet = new Set(footerItems);
     const projectPath = resolveProjectPath(meta);
     const needsPluginVersion = footerItemsSet.has('plugin-version');
-    const pluginUpdatePromise = needsPluginVersion
+    const needsPluginUpdate = footerItemsSet.has('plugin-update');
+    const pluginUpdatePromise = needsPluginUpdate
       ? checkPluginUpdateAsync({ enabled: true, workspacePath: projectPath }).catch(() => null)
       : Promise.resolve(null);
     const needsQuotaOrAccount = footerItems.some(
@@ -173,8 +174,7 @@ async function main() {
     const cachePath = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
     let cache = needsCache ? await readJsonSafeAsync(cachePath) : null;
 
-    const normFallbackModel = normalizeModelName(fallbackModel);
-    const activePool = normFallbackModel.includes('gemini') ? 'gemini' : ((normFallbackModel.includes('claude') || normFallbackModel.includes('gpt')) ? '3p' : '');
+    const activePool = resolveQuotaPool(fallbackModel, cache, meta);
     const needsArgon = Array.isArray(footerItems) && footerItems.some(item => typeof item === 'string' && item.startsWith('quota-argon'));
 
     const metaQuota = parseMetaQuota(meta);
@@ -240,17 +240,48 @@ async function main() {
     let timedOut = false;
     let shouldPersistCache = false;
 
-    const shouldUpdateForQuota = needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale);
+    const isBucketExpired = (entry) => {
+      if (!entry || typeof entry !== 'object' || !entry.reset_time) return false;
+      const resetMs = new Date(entry.reset_time).getTime();
+      return !isNaN(resetMs) && resetMs > 0 && resetMs <= now;
+    };
+    const hasFutureReset = (entry) => {
+      if (!entry || typeof entry !== 'object' || !entry.reset_time) return false;
+      const resetMs = new Date(entry.reset_time).getTime();
+      return !isNaN(resetMs) && resetMs > now;
+    };
+    const activeShortBucket = (activePool && cache?.shortTerm?.[activePool])
+      ? cache.shortTerm[activePool]
+      : (primaryModelKey ? cache?.models?.[primaryModelKey] : null);
+    const activeWeeklyBucket = activePool ? cache?.weekly?.[activePool] : null;
+    const argonBucket = needsArgon ? cache?.weekly?.['gemini-argon-wtu'] : null;
+    const metaShortBucket = activePool ? metaQuota?.shortTerm?.[activePool] : null;
+    const metaWeeklyBucket = activePool ? metaQuota?.weekly?.[activePool] : null;
+    const metaArgonBucket = needsArgon ? metaQuota?.weekly?.['gemini-argon-wtu'] : null;
+    const hasExpiredActiveQuota = Boolean(
+      needsQuotaOrAccount && (
+        (isBucketExpired(activeShortBucket) && !hasFutureReset(metaShortBucket)) ||
+        (isBucketExpired(activeWeeklyBucket) && !hasFutureReset(metaWeeklyBucket)) ||
+        (isBucketExpired(argonBucket) && !hasFutureReset(metaArgonBucket))
+      )
+    );
+
+    const prevPollAttemptAt = cache?.lastPollAttemptAt || 0;
+    const shouldUpdateForQuota = needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale || hasExpiredActiveQuota);
     const shouldUpdateForContext = needsContext && (missingModelLimits || stateOrTokensChanged || isCacheStale);
     if (needsCache && (shouldUpdateForQuota || shouldUpdateForContext)) {
       const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
         cachePath,
         missingRequiredBuckets: (needsQuotaOrAccount && missingRequiredBuckets) || missingModelLimits,
+        hasExpiredQuota: hasExpiredActiveQuota,
         conversationId
       });
       cache = updateRes.cache;
       freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
       timedOut = updateRes.timedOut;
+      if (cache && typeof cache === 'object' && cache.lastPollAttemptAt && cache.lastPollAttemptAt !== prevPollAttemptAt) {
+        shouldPersistCache = true;
+      }
     }
     if (needsQuotaOrAccount && metaQuota) {
       if (!cache || typeof cache !== 'object') cache = {};
@@ -295,8 +326,8 @@ async function main() {
     }
 
     // 解析核心資料
-    const quotaInfo = resolveModelQuota(fallbackModel, cache);
-    const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache);
+    const quotaInfo = resolveModelQuota(fallbackModel, cache, meta);
+    const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache, meta);
     const argonInfo = resolveArgonQuota(cache);
     const contextInfo = needsContext
       ? await calculateContextUsageAsync(meta, conversationId, settings, cache)
@@ -324,12 +355,13 @@ async function main() {
           barLength,
           argonInfo,
           footerItems: footerItemsSet,
-          skipPluginVersionResolve: needsPluginVersion
+          workspacePath: projectPath,
+          skipPluginVersionResolve: needsPluginUpdate
         }
       )
     ]);
 
-    if (needsPluginVersion) {
+    if (needsPluginVersion && needsPluginUpdate) {
       let resolvedTag = pluginUpdateInfo?.installedTag || '';
       if (!resolvedTag) {
         const fallbackPlugin = await resolveInstalledPluginVersionAsync({ workspacePath: projectPath }).catch(() => null);
@@ -340,9 +372,17 @@ async function main() {
       }
     }
 
-    const extraLines = (needsPluginVersion && pluginUpdateInfo?.updateAvailable)
-      ? formatPluginUpdateNoticeLines(lang, pluginUpdateInfo.installedTag, pluginUpdateInfo.latestTag)
-      : [];
+    if (needsPluginUpdate && pluginUpdateInfo?.updateAvailable) {
+      metrics.pluginUpdateAvailable = true;
+      metrics.pluginUpdateCurrentTag = pluginUpdateInfo.installedTag || metrics.pluginVersion || '';
+      metrics.pluginUpdateLatestTag = pluginUpdateInfo.latestTag || '';
+    } else {
+      metrics.pluginUpdateAvailable = false;
+      metrics.pluginUpdateCurrentTag = '';
+      metrics.pluginUpdateLatestTag = '';
+    }
+
+    const extraLines = [];
 
     const activeDict = buildI18nDict(lang, metrics, labelStyle, rawItemStyles);
     const renderer = getRenderer('standard');

@@ -378,7 +378,7 @@ function diagnose(layers, syncResult) {
     findings.push('   → 建議：在 Agy CLI 執行 /antigravity-cli-statusline:agy-cli-statusline 重新部署掛鉤腳本');
   } else if (syncResult && (syncResult.status === 'version_mismatch' || syncResult.status === 'legacy_mismatch' || syncResult.status === 'content_mismatch' || syncResult.status === 'legacy_no_meta')) {
     findings.push(warn(`外掛與掛鉤版本／內容尚未同步（外掛 v${syncResult.pluginVersion || '?'} vs 掛鉤 ${syncResult.hookVersion ? 'v' + syncResult.hookVersion : '舊版/未紀錄'}）。`));
-    findings.push('   → ! agy plugin install 僅更新外掛目錄，不會自動覆寫 ~/.gemini/antigravity-cli/hooks/');
+    findings.push('   → agy plugin install 僅更新外掛目錄，不會自動覆寫 ~/.gemini/antigravity-cli/hooks/');
     findings.push('   → 建議：在 Agy CLI 執行 /antigravity-cli-statusline:agy-cli-statusline 重新配置以更新掛鉤腳本');
   } else if (syncResult && syncResult.status === 'in_sync') {
     findings.push(ok(`外掛與掛鉤版本同步正常（v${syncResult.pluginVersion}）。`));

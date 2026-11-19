@@ -9,7 +9,7 @@ import { runCmdDetailedAsync, withTimeout } from '../core/process-utils.mjs';
 import { resolveProjectPath } from '../core/settings.mjs';
 import { RESET, getColorByPercentage, renderBarGraph } from '../renderers/ansi.mjs';
 import { resolveArgonQuota } from './quota.mjs';
-import { formatAbsoluteResetTime } from './time-format.mjs';
+import { formatAbsoluteResetTime, formatResetTime } from './time-format.mjs';
 
 function getGitFallbackPaths() {
   if (process.platform === 'win32') {
@@ -195,7 +195,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const quotaPct = quotaInfo.remaining_percentage;
   const quotaColor = getColorByPercentage(quotaPct);
   const quotaVal = `${Math.round(quotaPct)}%`;
-  const countdownVal = quotaInfo.refreshes_in || noneStr;
+  const countdownVal = (quotaInfo.reset_time ? formatResetTime(quotaInfo.reset_time) : '') || quotaInfo.refreshes_in || noneStr;
   const formattedReset = quotaInfo.reset_time ? formatAbsoluteResetTime(quotaInfo.reset_time, timeFormat) : '';
   const quotaResetTimeVal = formattedReset || noneStr;
   const quotaBarVal = renderBarGraph(quotaPct, barLength, quotaColor);
@@ -204,7 +204,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const weeklyPct = weeklyInfo.remaining_percentage;
   const weeklyQuotaColor = getColorByPercentage(weeklyPct);
   const weeklyQuotaVal = `${Math.round(weeklyPct)}%`;
-  const weeklyCountdownVal = weeklyInfo.refreshes_in || noneStr;
+  const weeklyCountdownVal = (weeklyInfo.reset_time ? formatResetTime(weeklyInfo.reset_time) : '') || weeklyInfo.refreshes_in || noneStr;
   const formattedWeeklyReset = weeklyInfo.reset_time ? formatAbsoluteResetTime(weeklyInfo.reset_time, timeFormat) : '';
   const weeklyResetTimeVal = formattedWeeklyReset || noneStr;
   const weeklyQuotaBarVal = renderBarGraph(weeklyPct, barLength, weeklyQuotaColor);
@@ -214,7 +214,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const argonPct = resolvedArgon.remaining_percentage ?? 100;
   const argonQuotaColor = getColorByPercentage(argonPct);
   const argonQuotaVal = `${Math.round(argonPct)}%`;
-  const argonCountdownVal = resolvedArgon.refreshes_in || noneStr;
+  const argonCountdownVal = (resolvedArgon.reset_time ? formatResetTime(resolvedArgon.reset_time) : '') || resolvedArgon.refreshes_in || noneStr;
   const formattedArgonReset = resolvedArgon.reset_time ? formatAbsoluteResetTime(resolvedArgon.reset_time, timeFormat) : '';
   const argonResetTimeVal = formattedArgonReset || noneStr;
   const argonQuotaBarVal = renderBarGraph(argonPct, barLength, argonQuotaColor);
@@ -442,7 +442,10 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const cliVersion = rawCliVersion ? `v${rawCliVersion}` : unknownStr;
   let pluginVersion = options?.pluginVersion || '';
   if (!pluginVersion && hasFooterItem('plugin-version') && options?.skipPluginVersionResolve !== true) {
-    const resolvedPlugin = await resolveInstalledPluginVersionAsync(options);
+    const resolvedPlugin = await resolveInstalledPluginVersionAsync({
+      ...options,
+      workspacePath: options?.workspacePath || projectPath
+    });
     pluginVersion = resolvedPlugin.tag || unknownStr;
   }
   if (!pluginVersion) {
@@ -469,6 +472,9 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal,
     tokenColor,
     quotaPct, weeklyPct, argonPct, usedPctNum: contextInfo.usedPctNum,
-    totalInput: contextInfo.totalInput, effectiveTokenMax, rssMem
+    totalInput: contextInfo.totalInput, effectiveTokenMax, rssMem,
+    pluginUpdateAvailable: Boolean(options?.pluginUpdateAvailable),
+    pluginUpdateCurrentTag: options?.pluginUpdateCurrentTag || pluginVersion,
+    pluginUpdateLatestTag: options?.pluginUpdateLatestTag || ''
   };
 }

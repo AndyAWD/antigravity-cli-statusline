@@ -1,7 +1,7 @@
 /**
  * 單一真實來源（Single Source of Truth）：
- * 統一定義 4 種支援語系、5 大分類頁籤、37 項標準狀態列指標、5 組相鄰合併長條圖、
- * 42 個 Emoji 圖示對應表，以及安裝精靈各步驟之跨語系靜態提示範本。
+ * 統一定義 4 種支援語系、5 大分類頁籤、38 項標準狀態列指標、5 組相鄰合併長條圖、
+ * 43 個 Emoji 圖示對應表，以及安裝精靈各步驟之跨語系靜態提示範本。
  */
 
 export const SUPPORTED_LOCALES = ['zh-tw', 'zh-cn', 'us', 'jp'];
@@ -360,7 +360,7 @@ export const METRICS = [
     }
   },
 
-  // 5. 系統狀態與背景任務（10 項）
+  // 5. 系統狀態與背景任務（11 項）
   {
     id: 'memory-usage',
     category: 'system-and-tasks',
@@ -465,10 +465,21 @@ export const METRICS = [
     category: 'system-and-tasks',
     emoji: '🧩',
     descriptions: {
-      'zh-tw': '狀態列外掛版本號',
-      'zh-cn': '状态栏插件版本号',
-      'us': 'Statusline plugin version',
-      'jp': 'プラグインバージョン'
+      'zh-tw': '狀態列版本號',
+      'zh-cn': '状态栏版本号',
+      'us': 'Statusline version',
+      'jp': 'ステータスラインバージョン'
+    }
+  },
+  {
+    id: 'plugin-update',
+    category: 'system-and-tasks',
+    emoji: '🆕',
+    descriptions: {
+      'zh-tw': '狀態列新版本更新提醒',
+      'zh-cn': '状态栏新版本更新提醒',
+      'us': 'Statusline update reminder',
+      'jp': 'ステータスライン更新通知'
     }
   }
 ];

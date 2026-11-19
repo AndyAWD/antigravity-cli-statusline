@@ -54,6 +54,13 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   const normLang = normalizeLanguage(lang);
   const unknownStr = (normLang === 'zh-tw' || normLang === 'zh-cn') ? '未知' : (normLang === 'jp' ? '不明' : 'Unknown');
   const pluginVersionVal = m.pluginVersion || unknownStr;
+  const pluginUpdateCurrentTag = m.pluginUpdateCurrentTag || m.pluginVersion || '';
+  const pluginUpdateLatestTag = m.pluginUpdateLatestTag || m.pluginLatestVersion || '';
+  const hasPluginUpdate = Boolean(m.pluginUpdateAvailable && pluginUpdateLatestTag);
+  const pluginUpdateLines = hasPluginUpdate
+    ? formatPluginUpdateNoticeLines(normLang, pluginUpdateCurrentTag, pluginUpdateLatestTag)
+    : [];
+  const pluginUpdateText = pluginUpdateLines.join('\n');
   const localizedAgentState = formatAgentState(m.agentState, normLang);
   const argonColor = m.argonQuotaColor ?? BLUE;
   const argonVal = m.argonQuotaVal ?? '100%';
@@ -100,7 +107,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-type': `${WHITE}版控類型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙盒狀態:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
       'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
-      'plugin-version': `${WHITE}外掛版本: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-version': `${WHITE}狀態列版本: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}對話編號: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}代理角色:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}模式:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -144,7 +152,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-type': `${WHITE}版控类型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙箱状态:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
       'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
-      'plugin-version': `${WHITE}插件版本: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-version': `${WHITE}状态栏版本: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}对话编号: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}代理角色:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}模式:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -188,7 +197,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-type': `${WHITE}VCS: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}Sandbox:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
       'cli-version': `${WHITE}Agy CLI Version: ${BOLD}${m.cliVersion}${RESET}`,
-      'plugin-version': `${WHITE}Plugin Version: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-version': `${WHITE}Statusline Version: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}Conv: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}Profile:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}Mode:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -232,7 +242,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-type': `${WHITE}版管理種別: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}サンドボックス:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
       'cli-version': `${WHITE}Agy CLI バージョン: ${BOLD}${m.cliVersion}${RESET}`,
-      'plugin-version': `${WHITE}プラグイン版: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-version': `${WHITE}ステータスライン版: ${BOLD}${pluginVersionVal}${RESET}`,
+      'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}会話番号: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}プロファイル:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}モード:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -242,6 +253,19 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
 
   const emojiDict = {};
   for (const [key, val] of Object.entries(baseDict)) {
+    if (key === 'plugin-update') {
+      if (pluginUpdateLines.length >= 2) {
+        const cur = formatVersionTag(pluginUpdateCurrentTag) || String(pluginUpdateCurrentTag || '');
+        const lat = formatVersionTag(pluginUpdateLatestTag) || String(pluginUpdateLatestTag || '');
+        emojiDict[key] = [
+          `${YELLOW}${BOLD}${EMOJI_MAP['plugin-update']} ${cur} → ${lat}${RESET}`,
+          pluginUpdateLines[1]
+        ].join('\n');
+      } else {
+        emojiDict[key] = '';
+      }
+      continue;
+    }
     const emoji = EMOJI_MAP[key];
     if (emoji && val.startsWith(WHITE)) {
       const afterWhite = val.slice(WHITE.length);
@@ -304,16 +328,16 @@ export function formatPluginUpdateNoticeLines(lang, currentTag, latestTag) {
   const lat = formatVersionTag(latestTag) || String(latestTag || '');
   let msg;
   if (normLang === 'zh-cn') {
-    msg = `⚠️ 插件有新版本可用（当前 ${cur} → 最新 ${lat}），请执行以下命令更新：`;
+    msg = `⚠️ 状态栏有新版本可用（当前 ${cur} → 最新 ${lat}），请执行以下命令更新：`;
   } else if (normLang === 'us') {
-    msg = `⚠️ Plugin update available (current ${cur} → latest ${lat}). Run to update:`;
+    msg = `⚠️ Statusline update available (current ${cur} → latest ${lat}). Run to update:`;
   } else if (normLang === 'jp') {
-    msg = `⚠️ プラグインの新バージョンが利用可能です（現在 ${cur} → 最新 ${lat}）。以下のコマンドで更新してください：`;
+    msg = `⚠️ ステータスラインの新バージョンが利用可能です（現在 ${cur} → 最新 ${lat}）。以下のコマンドで更新してください：`;
   } else {
-    msg = `⚠️ 外掛有新版本可用（目前 ${cur} → 最新 ${lat}），請執行以下指令更新：`;
+    msg = `⚠️ 狀態列有新版本可用（目前 ${cur} → 最新 ${lat}），請執行以下指令更新：`;
   }
   return [
     `${YELLOW}${BOLD}${msg}${RESET}`,
-    `${BLUE}${BOLD}! agy plugin install ${PLUGIN_REPO_URL}${RESET}`
+    `${BLUE}${BOLD}agy plugin install ${PLUGIN_REPO_URL}${RESET}`
   ];
 }

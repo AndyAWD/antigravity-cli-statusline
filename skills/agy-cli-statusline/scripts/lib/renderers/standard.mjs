@@ -86,6 +86,19 @@ export function renderStatusLine(footerItems, activeDict, termWidth, fallbackMod
     const text = activeDict ? activeDict[item] : '';
     if (!text) continue;
 
+    if (text.includes('\n')) {
+      if (currentLine !== '') {
+        lines.push(currentLine);
+        currentLine = '';
+      }
+      for (const blockLine of text.split('\n')) {
+        if (blockLine.length > 0) {
+          lines.push(blockLine);
+        }
+      }
+      continue;
+    }
+
     const toAdd = currentLine === '' ? text : ` ${GRAY}│${RESET} ${text}`;
     const toAddPlain = stripAnsi(toAdd);
     const currentPlain = stripAnsi(currentLine);
@@ -98,6 +111,13 @@ export function renderStatusLine(footerItems, activeDict, termWidth, fallbackMod
     }
   }
   if (currentLine !== '') lines.push(currentLine);
+
+  while (lines.length > 0 && stripAnsi(lines[0]).trim() === '') {
+    lines.shift();
+  }
+  while (lines.length > 0 && stripAnsi(lines[lines.length - 1]).trim() === '') {
+    lines.pop();
+  }
 
   // 防禦：若渲染結果為空或全部為空白行（例如 footerItems 為空、僅有換行、或所有指標皆無內容），回退輸出退讓模式，絕不回傳空陣列或空白行
   let usedFallback = false;

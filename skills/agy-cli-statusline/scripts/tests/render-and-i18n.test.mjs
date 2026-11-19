@@ -10,7 +10,8 @@ import {
   EMOJI_MAP,
   getGitBranch,
   getGitDirty,
-  resolveTerminalWidth
+  resolveTerminalWidth,
+  PLUGIN_REPO_URL
 } from '../statusline-quota.mjs';
 import {
   runStatusline,
@@ -327,6 +328,9 @@ async function main() {
       sandboxStatusVal: '啟用（聯網）',
       cliVersion: 'v1.2.3',
       pluginVersion: 'v1.11.4',
+      pluginUpdateAvailable: true,
+      pluginUpdateCurrentTag: 'v1.11.0',
+      pluginUpdateLatestTag: 'v1.12.0',
       conversationIdShort: 'c4a861dd',
       agentProfileName: 'Default',
       mode: 'Interactive'
@@ -335,7 +339,7 @@ async function main() {
     for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
       const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
       const allKeys = Object.keys(EMOJI_MAP);
-      assert.strictEqual(allKeys.length, 42, 'EMOJI_MAP must contain 37 metrics + 5 merged bar keys (42 total)');
+      assert.strictEqual(allKeys.length, 43, 'EMOJI_MAP must contain 38 metrics + 5 merged bar keys (43 total)');
 
       for (const key of allKeys) {
         const rendered = stripAnsi(emojiDict[key]);
@@ -349,8 +353,41 @@ async function main() {
           !afterPrefix.startsWith(':'),
           `[${lang}] Metric "${key}" in emoji mode must NOT have a colon after emoji, got: "${rendered}"`
         );
+        if (key === 'plugin-update') {
+          const lines = rendered.split('\n');
+          assert.strictEqual(lines.length, 2, `[${lang}] plugin-update in emoji mode must have 2 lines`);
+          assert.strictEqual(lines[1], `agy plugin install ${PLUGIN_REPO_URL}`, `[${lang}] plugin-update line 2 must be install command without !`);
+        }
       }
+
+      const noUpdateTextDict = buildI18nDict(lang, { ...mockMetricsR21, pluginUpdateAvailable: false, pluginUpdateLatestTag: '' }, 'text');
+      const noUpdateEmojiDict = buildI18nDict(lang, { ...mockMetricsR21, pluginUpdateAvailable: false, pluginUpdateLatestTag: '' }, 'emoji');
+      assert.strictEqual(noUpdateTextDict['plugin-update'], '', `[${lang}] plugin-update text must be empty when no update`);
+      assert.strictEqual(noUpdateEmojiDict['plugin-update'], '', `[${lang}] plugin-update emoji must be empty when no update`);
     }
+
+    // 驗證 renderStatusLine 對多行區塊與頭尾空白行修剪行為
+    const blockDict = buildI18nDict('zh-tw', mockMetricsR21, 'text');
+    const noUpdateDict = buildI18nDict('zh-tw', { ...mockMetricsR21, pluginUpdateAvailable: false, pluginUpdateLatestTag: '' }, 'text');
+    const trimmedTail = renderStatusLine(['model-name', 'n', 'n', 'plugin-update'], noUpdateDict, 120);
+    assert.strictEqual(trimmedTail.length, 1, 'No-update plugin-update with trailing n,n must trim trailing blank lines');
+    assert.strictEqual(stripAnsi(trimmedTail[0]), '模型: Gemini 3.1 Pro');
+
+    const trimmedHead = renderStatusLine(['plugin-update', 'n', 'n', 'model-name'], noUpdateDict, 120);
+    assert.strictEqual(trimmedHead.length, 1, 'No-update plugin-update with leading n,n must trim leading blank lines');
+    assert.strictEqual(stripAnsi(trimmedHead[0]), '模型: Gemini 3.1 Pro');
+
+    const midUpdateLines = renderStatusLine(['model-name', 'plugin-update', 'mode'], blockDict, 40);
+    assert.strictEqual(midUpdateLines.length, 4, 'Middle plugin-update must render 2 dedicated lines between model-name and mode without width wrapping');
+    assert.strictEqual(stripAnsi(midUpdateLines[0]), '模型: Gemini 3.1 Pro');
+    assert.ok(stripAnsi(midUpdateLines[1]).includes('狀態列有新版本可用'));
+    assert.strictEqual(stripAnsi(midUpdateLines[2]), `agy plugin install ${PLUGIN_REPO_URL}`);
+    assert.strictEqual(stripAnsi(midUpdateLines[3]), '模式: Interactive');
+
+    const onlyNoUpdateFallback = renderStatusLine(['plugin-update'], noUpdateDict, 80, 'Fallback-Only-Update');
+    assert.strictEqual(onlyNoUpdateFallback.length, 1);
+    assert.ok(stripAnsi(onlyNoUpdateFallback[0]).includes('? for shortcuts'));
+    assert.ok(stripAnsi(onlyNoUpdateFallback[0]).includes('Fallback-Only-Update'));
 
     // Verify localized status values are preserved in emoji mode
     const zhTwEmojiDict = buildI18nDict('zh-tw', mockMetricsR21, 'emoji');
@@ -494,14 +531,14 @@ async function main() {
       shortTerm: {
         gemini: {
           remaining_percentage: 88,
-          reset_time: "2026-10-16T01:09:00.000Z",
+          reset_time: new Date(Date.now() + (232 * 60 - 30) * 1000).toISOString(),
           refreshes_in: "3h 52m"
         }
       },
       weekly: {
         gemini: {
           remaining_percentage: 94,
-          reset_time: "2026-10-21T06:47:00.000Z",
+          reset_time: new Date(Date.now() + ((5 * 24 + 17) * 3600 - 30) * 1000).toISOString(),
           refreshes_in: "5d 17h"
         }
       },

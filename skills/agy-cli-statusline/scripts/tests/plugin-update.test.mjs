@@ -97,10 +97,10 @@ async function main() {
     };
 
     const expectedLocalePairs = {
-      'zh-tw': { cli: 'Agy CLI 版本: v1.5.10', plugin: '外掛版本: v1.11.4' },
-      'zh-cn': { cli: 'Agy CLI 版本: v1.5.10', plugin: '插件版本: v1.11.4' },
-      'us': { cli: 'Agy CLI Version: v1.5.10', plugin: 'Plugin Version: v1.11.4' },
-      'jp': { cli: 'Agy CLI バージョン: v1.5.10', plugin: 'プラグイン版: v1.11.4' }
+      'zh-tw': { cli: 'Agy CLI 版本: v1.5.10', plugin: '狀態列版本: v1.11.4' },
+      'zh-cn': { cli: 'Agy CLI 版本: v1.5.10', plugin: '状态栏版本: v1.11.4' },
+      'us': { cli: 'Agy CLI Version: v1.5.10', plugin: 'Statusline Version: v1.11.4' },
+      'jp': { cli: 'Agy CLI バージョン: v1.5.10', plugin: 'ステータスライン版: v1.11.4' }
     };
     for (const [langCode, exp] of Object.entries(expectedLocalePairs)) {
       const textDict = buildI18nDict(langCode, metricsR35, 'text');
@@ -162,9 +162,9 @@ async function main() {
 
     // Empty pluginVersion in buildI18nDict must fall back to Unknown/未知 instead of blank
     const emptyPluginDict = buildI18nDict('zh-tw', { ...metricsR35, pluginVersion: '' }, 'text');
-    assert.strictEqual(stripAnsi(emptyPluginDict['plugin-version']), '外掛版本: 未知');
+    assert.strictEqual(stripAnsi(emptyPluginDict['plugin-version']), '狀態列版本: 未知');
     const emptyPluginDictUs = buildI18nDict('us', { ...metricsR35, pluginVersion: '' }, 'text');
-    assert.strictEqual(stripAnsi(emptyPluginDictUs['plugin-version']), 'Plugin Version: Unknown');
+    assert.strictEqual(stripAnsi(emptyPluginDictUs['plugin-version']), 'Statusline Version: Unknown');
 
     assert.deepStrictEqual(
       parseMacPsLine('  1234   1000 Wed Nov 18 09:05:01 2026 /Users/John Doe/.gemini/bin/agy'),
@@ -757,16 +757,23 @@ async function main() {
         /Promise\.all\(\[\s*pluginUpdatePromise,\s*extractMetricsAsync\(/.test(mainSource),
         'statusline-quota.mjs main() must run pluginUpdatePromise and extractMetricsAsync in parallel via Promise.all'
       );
-      assert.ok(/skipPluginVersionResolve:\s*needsPluginVersion/.test(mainSource), 'main() must skip the redundant plugin version resolve inside extractMetricsAsync');
+      assert.ok(/skipPluginVersionResolve:\s*needsPluginUpdate/.test(mainSource), 'main() must skip the redundant plugin version resolve inside extractMetricsAsync');
 
       // E8. formatPluginUpdateNoticeLines across all 4 locales
+      const expectedNoticePrefix = {
+        'zh-tw': '狀態列有新版本可用',
+        'zh-cn': '状态栏有新版本可用',
+        'us': 'Statusline update available',
+        'jp': 'ステータスラインの新バージョンが利用可能です'
+      };
       for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
         const notice = formatPluginUpdateNoticeLines(lang, 'v1.11.0', 'v1.11.4');
         assert.strictEqual(notice.length, 2, `[${lang}] Notice must be fixed at 2 lines`);
         const p1 = stripAnsi(notice[0]);
         const p2 = stripAnsi(notice[1]);
+        assert.ok(p1.includes(expectedNoticePrefix[lang]), `[${lang}] Line 1 must use statusline wording: ${p1}`);
         assert.ok(p1.includes('v1.11.0') && p1.includes('v1.11.4'), `[${lang}] Line 1 must include version diff: ${p1}`);
-        assert.strictEqual(p2, `! agy plugin install ${PLUGIN_REPO_URL}`, `[${lang}] Line 2 must be exact install command`);
+        assert.strictEqual(p2, `agy plugin install ${PLUGIN_REPO_URL}`, `[${lang}] Line 2 must be exact install command without !`);
       }
 
       // E9. fetchLatestPluginReleaseAsync invalid URL / loopback HTTP (with graceful EPERM handling)
@@ -847,12 +854,32 @@ async function main() {
       writeFileSync(join(e2eHome, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ models: {} }), 'utf8');
       writeFileSync(join(e2ePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
 
-      // F1. Without plugin-version in ui.footer.items -> never fetches release or writes update cache
+      // F1. Only plugin-version enabled (even placed in the middle, WITHOUT plugin-update) -> shows version only, NEVER fetches release, writes cache, or prints update notice
       writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
-        ui: { language: 'zh-tw', footer: { items: ['cli-version'] } }
+        ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version', 'mode'] } }
       }), 'utf8');
-      const hitsBeforeDisabled = releaseServerHits;
-      const e2eDisabled = await runStatusline(
+      writeFileSync(e2eCachePath, JSON.stringify({
+        latestVersion: '9.9.9',
+        latestTag: 'v9.9.9',
+        lastSessionKey: '2001:s1',
+        lastSessionStatus: 'ok'
+      }), 'utf8');
+      const hitsBeforeVersionOnly = releaseServerHits;
+      const e2eVersionOnly = await runStatusline(
+        { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10', mode: 'default' },
+        e2eHome,
+        SCRIPT_PATH,
+        {
+          STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 2001, startTime: 's1', nonInteractive: false }),
+          ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
+        }
+      );
+      assert.strictEqual(e2eVersionOnly.code, 0);
+      assert.strictEqual(stripAnsi(e2eVersionOnly.stdout).trim(), 'Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.11.0 │ 模式: Default');
+      assert.strictEqual(releaseServerHits, hitsBeforeVersionOnly, 'Enabling only plugin-version must not hit release server');
+      rmSync(e2eCachePath, { force: true });
+
+      const e2eVersionOnlyNoCache = await runStatusline(
         { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
         e2eHome,
         SCRIPT_PATH,
@@ -861,14 +888,14 @@ async function main() {
           ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
         }
       );
-      assert.strictEqual(e2eDisabled.code, 0);
-      assert.strictEqual(stripAnsi(e2eDisabled.stdout).trim(), 'Agy CLI 版本: v1.5.10');
-      assert.strictEqual(existsSync(e2eCachePath), false, 'Update cache must stay absent when plugin-version is not enabled');
-      assert.strictEqual(releaseServerHits, hitsBeforeDisabled);
+      assert.strictEqual(e2eVersionOnlyNoCache.code, 0);
+      assert.strictEqual(stripAnsi(e2eVersionOnlyNoCache.stdout).trim(), 'Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.11.0 │ 模式: Default');
+      assert.strictEqual(existsSync(e2eCachePath), false, 'Update cache must stay absent when plugin-update is not enabled');
+      assert.strictEqual(releaseServerHits, hitsBeforeVersionOnly);
 
-      // F2. Non-interactive agy -p -> skipped even when plugin-version is enabled
+      // F2. Non-interactive agy -p -> skipped even when both plugin-version & plugin-update are enabled
       writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
-        ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version'] } }
+        ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version', 'plugin-update'] } }
       }), 'utf8');
       const e2eNonInter = await runStatusline(
         { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
@@ -880,11 +907,11 @@ async function main() {
         }
       );
       assert.strictEqual(e2eNonInter.code, 0);
-      assert.strictEqual(stripAnsi(e2eNonInter.stdout).trim(), 'Agy CLI 版本: v1.5.10 │ 外掛版本: v1.11.0');
+      assert.strictEqual(stripAnsi(e2eNonInter.stdout).trim(), 'Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.11.0');
       assert.strictEqual(existsSync(e2eCachePath), false);
-      assert.strictEqual(releaseServerHits, hitsBeforeDisabled);
+      assert.strictEqual(releaseServerHits, hitsBeforeVersionOnly);
 
-      // F3. Interactive agy first open with plugin-version enabled across all 4 locales
+      // F3. Interactive agy first open with plugin-version + plugin-update enabled across all 4 locales
       if (!serverPort) {
         // Pre-seed cache with same session key when sandbox blocks loopback HTTP
         writeFileSync(e2eCachePath, JSON.stringify({
@@ -896,14 +923,14 @@ async function main() {
       }
       const hitsBeforeInteractive = releaseServerHits;
       const e2eLocaleExpectations = {
-        'zh-tw': { metricLine: 'Agy CLI 版本: v1.5.10 │ 外掛版本: v1.11.0', noticeSub: '外掛有新版本可用（目前 v1.11.0 → 最新 v1.12.0）' },
-        'zh-cn': { metricLine: 'Agy CLI 版本: v1.5.10 │ 插件版本: v1.11.0', noticeSub: '插件有新版本可用（当前 v1.11.0 → 最新 v1.12.0）' },
-        'us': { metricLine: 'Agy CLI Version: v1.5.10 │ Plugin Version: v1.11.0', noticeSub: 'Plugin update available (current v1.11.0 → latest v1.12.0)' },
-        'jp': { metricLine: 'Agy CLI バージョン: v1.5.10 │ プラグイン版: v1.11.0', noticeSub: 'プラグインの新バージョンが利用可能です（現在 v1.11.0 → 最新 v1.12.0）' }
+        'zh-tw': { metricLine: 'Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.11.0', noticeSub: '狀態列有新版本可用（目前 v1.11.0 → 最新 v1.12.0）' },
+        'zh-cn': { metricLine: 'Agy CLI 版本: v1.5.10 │ 状态栏版本: v1.11.0', noticeSub: '状态栏有新版本可用（当前 v1.11.0 → 最新 v1.12.0）' },
+        'us': { metricLine: 'Agy CLI Version: v1.5.10 │ Statusline Version: v1.11.0', noticeSub: 'Statusline update available (current v1.11.0 → latest v1.12.0)' },
+        'jp': { metricLine: 'Agy CLI バージョン: v1.5.10 │ ステータスライン版: v1.11.0', noticeSub: 'ステータスラインの新バージョンが利用可能です（現在 v1.11.0 → 最新 v1.12.0）' }
       };
       for (const [loc, exp] of Object.entries(e2eLocaleExpectations)) {
         writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
-          ui: { language: loc, footer: { items: ['cli-version', 'plugin-version'] } }
+          ui: { language: loc, footer: { items: ['cli-version', 'plugin-version', 'plugin-update'] } }
         }), 'utf8');
         const resLoc = await runStatusline(
           { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
@@ -916,20 +943,64 @@ async function main() {
         );
         assert.strictEqual(resLoc.code, 0);
         const lines = stripAnsi(resLoc.stdout).trimEnd().split(/\r?\n/);
-        assert.strictEqual(lines.length, 3, `[${loc}] Expected 1 metric line + 2 bottom notice lines, got: ${JSON.stringify(lines)}`);
+        assert.strictEqual(lines.length, 3, `[${loc}] Expected 1 metric line + 2 notice lines, got: ${JSON.stringify(lines)}`);
         assert.strictEqual(lines[0], exp.metricLine);
         assert.ok(lines[1].includes(exp.noticeSub), `[${loc}] Unexpected notice line: ${lines[1]}`);
-        assert.strictEqual(lines[2], `! agy plugin install ${PLUGIN_REPO_URL}`);
+        assert.strictEqual(lines[2], `agy plugin install ${PLUGIN_REPO_URL}`);
       }
       if (serverPort) {
         assert.strictEqual(releaseServerHits - hitsBeforeInteractive, 1, 'Live local HTTP server must be hit ONLY ONCE across 4 renders in the same agy session');
       }
 
-      // F4. Simulate running ! agy plugin install updating plugin.json to 1.12.0 -> version updates & bottom notice disappears
-      writeFileSync(join(e2ePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.12.0' }), 'utf8');
+      // F3b. Only plugin-update enabled (WITHOUT plugin-version) -> renders 2 update lines only
       writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
-        ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version'] } }
+        ui: { language: 'zh-tw', footer: { items: ['plugin-update'] } }
       }), 'utf8');
+      const e2eUpdateOnly = await runStatusline(
+        { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+        e2eHome,
+        SCRIPT_PATH,
+        {
+          STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 2003, startTime: 's3', nonInteractive: false }),
+          ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
+        }
+      );
+      assert.strictEqual(e2eUpdateOnly.code, 0);
+      const updateOnlyLines = stripAnsi(e2eUpdateOnly.stdout).trimEnd().split(/\r?\n/);
+      assert.strictEqual(updateOnlyLines.length, 2);
+      assert.ok(updateOnlyLines[0].includes('狀態列有新版本可用（目前 v1.11.0 → 最新 v1.12.0）'));
+      assert.strictEqual(updateOnlyLines[1], `agy plugin install ${PLUGIN_REPO_URL}`);
+
+      // F3c. Free placement + leading/trailing n,n trimming + emoji style for plugin-update
+      writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
+        ui: {
+          language: 'zh-tw',
+          footer: {
+            items: ['plugin-update', 'n', 'n', 'cli-version', 'plugin-version'],
+            itemStyles: { 'plugin-update': 'emoji' }
+          }
+        }
+      }), 'utf8');
+      const e2eTopUpdate = await runStatusline(
+        { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+        e2eHome,
+        SCRIPT_PATH,
+        {
+          STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 2003, startTime: 's3', nonInteractive: false }),
+          ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
+        }
+      );
+      assert.strictEqual(e2eTopUpdate.code, 0);
+      const topUpdateLines = stripAnsi(e2eTopUpdate.stdout).trimEnd().split(/\r?\n/);
+      assert.strictEqual(topUpdateLines.length, 5, `Expected 2 emoji update lines + 2 blank lines from n,n after block + 1 metric line, got: ${JSON.stringify(topUpdateLines)}`);
+      assert.strictEqual(topUpdateLines[0], '🆕 v1.11.0 → v1.12.0');
+      assert.strictEqual(topUpdateLines[1], `agy plugin install ${PLUGIN_REPO_URL}`);
+      assert.strictEqual(topUpdateLines[2].trim(), '');
+      assert.strictEqual(topUpdateLines[3].trim(), '');
+      assert.strictEqual(topUpdateLines[4], 'Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.11.0');
+
+      // F4. Simulate running agy plugin install updating plugin.json to 1.12.0 -> version updates, notice disappears & leading n,n trimmed
+      writeFileSync(join(e2ePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.12.0' }), 'utf8');
       const e2eAfterUpgrade = await runStatusline(
         { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
         e2eHome,
@@ -941,7 +1012,7 @@ async function main() {
       );
       assert.strictEqual(e2eAfterUpgrade.code, 0);
       const linesAfterUpgrade = stripAnsi(e2eAfterUpgrade.stdout).trimEnd().split(/\r?\n/);
-      assert.deepStrictEqual(linesAfterUpgrade, ['Agy CLI 版本: v1.5.10 │ 外掛版本: v1.12.0']);
+      assert.deepStrictEqual(linesAfterUpgrade, ['Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.12.0']);
 
       // F4b. Bug #2：main() 併行執行外掛更新檢查與系統探測（以事件時間軸證明重疊，而非脆弱的總耗時門檻）
       if (process.platform !== 'win32') {
@@ -955,7 +1026,7 @@ async function main() {
         writeFileSync(join(parHome, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ models: {} }), 'utf8');
         writeFileSync(join(parPluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
         writeFileSync(join(parHome, '.gemini', 'settings.json'), JSON.stringify({
-          ui: { language: 'us', footer: { items: ['git-branch', 'plugin-version'] } }
+          ui: { language: 'us', footer: { items: ['git-branch', 'plugin-version', 'plugin-update'] } }
         }), 'utf8');
         // 假的 git：記錄被呼叫的起訖時間戳記並回傳分支名稱
         writeFileSync(join(parBinDir, 'git'), `#!${process.execPath}
@@ -1035,7 +1106,7 @@ setTimeout(() => {
         writeFileSync(join(realTreeHome, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ models: {} }), 'utf8');
         writeFileSync(join(realTreePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
         writeFileSync(join(realTreeHome, '.gemini', 'settings.json'), JSON.stringify({
-          ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version'] } }
+          ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version', 'plugin-update'] } }
         }), 'utf8');
 
         const hitsBeforeReal = releaseServerHits;
@@ -1059,7 +1130,7 @@ setTimeout(() => {
         assert.strictEqual(realCache.lastSessionStatus, 'ok');
         const realLines1 = stripAnsi(realRun1.stdout).trimEnd().split(/\r?\n/);
         assert.strictEqual(realLines1.length, 3);
-        assert.strictEqual(realLines1[2], `! agy plugin install ${PLUGIN_REPO_URL}`);
+        assert.strictEqual(realLines1[2], `agy plugin install ${PLUGIN_REPO_URL}`);
       }
 
       console.log("✅ Test R35 passed! (cli-version rename, plugin-version, process-tree tracking & GitHub update check verified)");
