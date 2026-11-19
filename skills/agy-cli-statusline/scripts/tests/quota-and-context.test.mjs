@@ -23,6 +23,13 @@ import {
   extractMetricsAsync
 } from '../statusline-quota.mjs';
 import {
+  EXPIRED_RESET_GRACE_MS,
+  normalizeResolvedQuotaEntry,
+  resolveModelQuota,
+  resolveQuotaPool,
+  resolveWeeklyQuota
+} from '../lib/collectors/quota.mjs';
+import {
   runStatusline,
   makeTempHome,
   withHomeEnv,
@@ -52,7 +59,7 @@ async function main() {
       weekly: {
         gemini: {
           remaining_percentage: 90.07,
-          reset_time: '2026-07-05T03:22:46Z',
+          reset_time: new Date(Date.now() + ((4 * 24 + 11) * 3600 - 30) * 1000).toISOString(),
           refreshes_in: '4d 11h'
         }
       },
@@ -96,7 +103,7 @@ async function main() {
       weekly: {
         gemini: {
           remaining_percentage: 90.07,
-          reset_time: '2026-07-05T03:22:46Z',
+          reset_time: new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString(),
           refreshes_in: '4d 11h'
         }
       },
@@ -140,7 +147,7 @@ async function main() {
       weekly: {
         '3p': {
           remaining_percentage: 60.5,
-          reset_time: '2026-07-07T07:27:15Z',
+          reset_time: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
           refreshes_in: '6d 15h'
         }
       },
@@ -221,14 +228,14 @@ async function main() {
       models: {
         gemini36flashhigh: {
           remaining_percentage: 4.67,
-          reset_time: '2026-08-07T11:12:18Z',
+          reset_time: new Date(Date.now() + (80 * 60 - 30) * 1000).toISOString(),
           refreshes_in: '1h 20m'
         }
       },
       shortTerm: {
         gemini: {
           remaining_percentage: 31.8,
-          reset_time: '2026-08-07T11:54:34Z',
+          reset_time: new Date(Date.now() + (122 * 60 - 30) * 1000).toISOString(),
           refreshes_in: '2h 2m'
         }
       },
@@ -563,14 +570,14 @@ async function main() {
       shortTerm: {
         gemini: {
           remaining_percentage: 88.0,
-          reset_time: '2026-10-13T07:50:47Z',
+          reset_time: new Date(Date.now() + (190 * 60 - 30) * 1000).toISOString(),
           refreshes_in: '3h 10m'
         }
       },
       weekly: {
         gemini: {
           remaining_percentage: 90.0,
-          reset_time: '2026-10-20T07:50:47Z',
+          reset_time: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
           refreshes_in: '7d'
         }
       },
@@ -672,17 +679,19 @@ async function main() {
 
     console.log("\n[Test R28] Verifying Gemini 4 Argon quota resolution, auto-merge, and 4-locale rendering...");
     // 1. Direct function test for resolveArgonQuota
+    const futureArgonResetR28 = new Date(Date.now() + ((6 * 24 + 1) * 3600 - 30) * 1000).toISOString();
+    const futureGeminiResetR28 = new Date(Date.now() + ((4 * 24 + 11) * 3600 - 30) * 1000).toISOString();
     const mockArgonCache = {
       updatedAt: Date.now(),
       weekly: {
         "gemini-argon-wtu": {
           remaining_percentage: 58.93,
-          reset_time: "2026-10-30T14:57:31Z",
+          reset_time: futureArgonResetR28,
           refreshes_in: "6d 1h"
         },
         "gemini": {
           remaining_percentage: 90,
-          reset_time: "2026-10-25T12:00:00Z",
+          reset_time: futureGeminiResetR28,
           refreshes_in: "4d 11h"
         }
       }
@@ -691,7 +700,7 @@ async function main() {
     assert.ok(argonRes !== null, "resolveArgonQuota should find gemini-argon-wtu pool");
     assert.strictEqual(Math.round(argonRes.remaining_percentage), 59, "Argon percentage should round to 59");
     assert.strictEqual(argonRes.refreshes_in, "6d 1h");
-    assert.strictEqual(argonRes.reset_time, "2026-10-30T14:57:31Z");
+    assert.strictEqual(argonRes.reset_time, futureArgonResetR28);
 
     // Test missing Argon pool
     const mockNoArgonCache = {
@@ -699,7 +708,7 @@ async function main() {
       weekly: {
         "gemini": {
           remaining_percentage: 90,
-          reset_time: "2026-10-25T12:00:00Z",
+          reset_time: futureGeminiResetR28,
           refreshes_in: "4d 11h"
         }
       }
@@ -782,16 +791,18 @@ async function main() {
     assert.strictEqual(parsedArgonMeta.shortTerm["gemini-argon-wtu"], undefined, "gemini-argon-wtu must NOT pollute shortTerm");
 
     // 2. Unit test: mergeQuotaBuckets behavior
+    const nowR29 = Date.now();
+    const sameResetR29 = new Date(nowR29 + 14400 * 1000).toISOString();
     const mergedSameWindow = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 68, reset_time: "2026-10-25T10:00:00Z" } },
-      { gemini: { remaining_percentage: 75, reset_time: "2026-10-25T10:00:00Z" } },
+      { gemini: { remaining_percentage: 68, reset_time: sameResetR29 } },
+      { gemini: { remaining_percentage: 75, reset_time: sameResetR29 } },
       true
     );
     assert.strictEqual(mergedSameWindow.gemini.remaining_percentage, 68, "When freshlyFetchedFromLs=true in same window, lower percentage wins");
 
     const mergedResetCrossed = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 12, reset_time: "2026-10-25T05:00:00Z" } },
-      { gemini: { remaining_percentage: 100, reset_time: "2026-10-25T10:00:00Z" } },
+      { gemini: { remaining_percentage: 12, reset_time: new Date(nowR29 - 60000).toISOString() } },
+      { gemini: { remaining_percentage: 100, reset_time: new Date(nowR29 + 18000 * 1000).toISOString() } },
       true
     );
     assert.strictEqual(mergedResetCrossed.gemini.remaining_percentage, 100, "When reset_time advances by >5m, new window (100%) wins");
@@ -876,30 +887,34 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
     console.log("\n[Test R30] Verifying anti-jitter protection across 5h, weekly, and Argon quota during active conversation...");
 
     // 1. Unit test: mergeQuotaBuckets default preferLowerWhenSameReset=true prevents stale 100% from overwriting 99%
+    const nowR30Unit = Date.now();
+    const futureResetR30_5h = new Date(nowR30Unit + 17100 * 1000).toISOString();
+    const futureResetR30_Weekly = new Date(nowR30Unit + 475200 * 1000).toISOString();
+    const futureResetR30_Argon = new Date(nowR30Unit + 417600 * 1000).toISOString();
     const unjitteredSameWindow = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 99, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } },
-      { gemini: { remaining_percentage: 100, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } }
+      { gemini: { remaining_percentage: 99, reset_time: futureResetR30_5h, refreshes_in: "4h 45m" } },
+      { gemini: { remaining_percentage: 100, reset_time: futureResetR30_5h, refreshes_in: "4h 45m" } }
     );
     assert.strictEqual(unjitteredSameWindow.gemini.remaining_percentage, 99, "Lower percentage (99%) MUST win over stale 100% even without 3rd parameter");
-    assert.strictEqual(unjitteredSameWindow.gemini.reset_time, "2026-10-25T15:00:00Z");
+    assert.strictEqual(unjitteredSameWindow.gemini.reset_time, futureResetR30_5h);
 
     // 2. Unit test: mergeQuotaBuckets preserves reset_time when incoming has lower percentage without reset_time
     const incomingLowerNoReset = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 99, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } },
+      { gemini: { remaining_percentage: 99, reset_time: futureResetR30_5h, refreshes_in: "4h 45m" } },
       { gemini: { remaining_percentage: 97 } }
     );
     assert.strictEqual(incomingLowerNoReset.gemini.remaining_percentage, 97, "Incoming 97% must win over existing 99%");
-    assert.strictEqual(incomingLowerNoReset.gemini.reset_time, "2026-10-25T15:00:00Z", "reset_time must not be lost");
+    assert.strictEqual(incomingLowerNoReset.gemini.reset_time, futureResetR30_5h, "reset_time must not be lost");
 
     // 3. Unit test: weekly and argon anti-jitter behavior
     const weeklyJitterTest = mergeQuotaBuckets(
       {
-        gemini: { remaining_percentage: 93.1, reset_time: "2026-10-31T07:00:00Z" },
-        "gemini-argon-wtu": { remaining_percentage: 8.9, reset_time: "2026-10-30T14:00:00Z" }
+        gemini: { remaining_percentage: 93.1, reset_time: futureResetR30_Weekly },
+        "gemini-argon-wtu": { remaining_percentage: 8.9, reset_time: futureResetR30_Argon }
       },
       {
-        gemini: { remaining_percentage: 100, reset_time: "2026-10-31T07:00:00Z" },
-        "gemini-argon-wtu": { remaining_percentage: 50, reset_time: "2026-10-30T14:00:00Z" }
+        gemini: { remaining_percentage: 100, reset_time: futureResetR30_Weekly },
+        "gemini-argon-wtu": { remaining_percentage: 50, reset_time: futureResetR30_Argon }
       }
     );
     assert.strictEqual(weeklyJitterTest.gemini.remaining_percentage, 93.1, "Weekly lower percentage (93.1%) must win over stale 100%");
@@ -1779,16 +1794,290 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
     }
 
     console.log("✅ Test R33 passed! (4-layer dynamic ceiling resolution, per-model/per-conversation step-up, modelLimits catalog, runtime maxContextTokens, and overrides all verified)");
+
+    // =========================================================================
+    // Test Case R35: Orchestrator / Future Model Pool Mapping, Live Countdown Recalculation, and Expired Window Normalization
+    // =========================================================================
+    console.log("\n[Test R35] Verifying Orchestrator (Neon/Argon/Carbon), future model pool resolution, live countdown recalculation, and expired window reset...");
+
+    // (1) E2E 完整重現本次缺陷：Orchestrator (Neon) + 過期 cache.models.orchestratorneon (0.45%, 73m 前, "55m") + 有效 cache.shortTerm.gemini (78.7%)
+    const nowR35 = Date.now();
+    const futureGemini5hResetR35 = new Date(nowR35 + (226 * 60 - 30) * 1000).toISOString();
+    const futureGeminiWeeklyResetR35 = new Date(nowR35 + ((5 * 24 + 17) * 3600 - 30) * 1000).toISOString();
+    const futureArgonWeeklyResetR35 = new Date(nowR35 + ((5 * 24 + 18) * 3600 - 30) * 1000).toISOString();
+    const expired73MinAgoR35 = new Date(nowR35 - 73 * 60 * 1000).toISOString();
+    const expectedHhMmR35 = formatAbsoluteResetTime(futureGemini5hResetR35, 'smart', nowR35);
+
+    const reproCacheR35 = {
+      updatedAt: nowR35 - 3000,
+      lsUpdatedAt: nowR35 - 3000,
+      lastAgentState: 'working',
+      lastOutputTokens: 2481,
+      lastTotalTokens: 69401,
+      models: {
+        orchestratorneon: {
+          name: 'Orchestrator (Neon)',
+          remaining_percentage: 0.45191334,
+          reset_time: expired73MinAgoR35,
+          refreshes_in: '55m'
+        }
+      },
+      shortTerm: {
+        gemini: {
+          remaining_percentage: 78.711426,
+          reset_time: futureGemini5hResetR35,
+          refreshes_in: '1h 11m' // 故意放入過時倒數，驗證呈現端依 reset_time 即時重算為 3h 46m
+        },
+        '3p': {
+          remaining_percentage: 0,
+          reset_time: new Date(nowR35 + 150 * 60 * 1000).toISOString(),
+          refreshes_in: '2h 30m'
+        }
+      },
+      weekly: {
+        gemini: {
+          remaining_percentage: 24.837768,
+          reset_time: futureGeminiWeeklyResetR35,
+          refreshes_in: '5d 17h',
+          window: 'weekly'
+        },
+        'gemini-argon-wtu': {
+          remaining_percentage: 48.38988,
+          reset_time: futureArgonWeeklyResetR35,
+          refreshes_in: '5d 18h',
+          window: 'weekly'
+        }
+      }
+    };
+
+    const settingsR35 = {
+      ui: {
+        language: 'zh-tw',
+        footer: {
+          items: [
+            'quota', 'quota-bar', 'quota-reset-countdown', 'quota-reset-time',
+            'quota-weekly', 'quota-argon'
+          ],
+          timeFormat: 'smart'
+        }
+      }
+    };
+
+    const homeR35Repro = makeTempHome(reproCacheR35, settingsR35);
+    try {
+      const resNeon = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        agent_state: 'working',
+        context_window: { total_input_tokens: 66920, total_output_tokens: 2481 },
+        terminal_width: 240
+      }, homeR35Repro);
+      const plainNeon = stripAnsi(resNeon.stdout).trim();
+      assert.strictEqual(resNeon.code, 0);
+      assert.ok(plainNeon.includes('五小時可用: 79%'), `Orchestrator (Neon) must use shortTerm.gemini (79%), got: "${plainNeon}"`);
+      assert.ok(plainNeon.includes('五小時倒數: 3h 46m'), `Countdown must recalculate from reset_time to 3h 46m, got: "${plainNeon}"`);
+      assert.ok(plainNeon.includes(`五小時重置: ${expectedHhMmR35}`), `Reset time must show ${expectedHhMmR35}, got: "${plainNeon}"`);
+      assert.ok(!plainNeon.includes('五小時可用: 0%'), `Must NOT render stale 0% snapshot! Got: "${plainNeon}"`);
+      assert.ok(!plainNeon.includes('55m'), `Must NOT render frozen 55m countdown! Got: "${plainNeon}"`);
+
+      // (2A) Orchestrator (Argon)、Orchestrator (Carbon)、Gemini 4 Carbon 端對端顯示驗證
+      for (const modelName of ['Orchestrator (Argon)', 'Orchestrator (Carbon)', 'Gemini 4 Carbon']) {
+        const resModel = await runStatusline({
+          model: { id: modelName, display_name: modelName },
+          agent_state: 'working',
+          context_window: { total_input_tokens: 66920, total_output_tokens: 2481 },
+          terminal_width: 240
+        }, homeR35Repro);
+        const plainModel = stripAnsi(resModel.stdout).trim();
+        assert.strictEqual(resModel.code, 0);
+        assert.ok(plainModel.includes('五小時可用: 79%'), `${modelName} must resolve 5h quota to 79%, got: "${plainModel}"`);
+        assert.ok(plainModel.includes('五小時倒數: 3h 46m'), `${modelName} must resolve 5h countdown to 3h 46m, got: "${plainModel}"`);
+        assert.ok(plainModel.includes('七日內可用: 25%'), `${modelName} must resolve weekly quota to 25%, got: "${plainModel}"`);
+        assert.ok(plainModel.includes('Argon 可用: 48%'), `${modelName} must resolve Argon quota to 48%, got: "${plainModel}"`);
+      }
+    } finally {
+      try { rmSync(homeR35Repro, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // (2B) 四層配額池解析與未來新模型自動適配驗證
+    assert.strictEqual(resolveQuotaPool('Orchestrator (Claude)'), '3p', 'Orchestrator (Claude) must map to 3p');
+    assert.strictEqual(
+      resolveQuotaPool('Orchestrator (Carbon)', {
+        modelPools: { orchestratorcarbon: 'carbon' }
+      }),
+      'carbon',
+      'Layer 1 dynamic modelPools must take priority over Layer 4 fallback'
+    );
+    assert.strictEqual(
+      resolveQuotaPool('Project Future', {
+        modelLimits: {
+          projectfuture: { slug: 'gemini-pro-orchestrator-future', model: 'MODEL_PLACEHOLDER_M999', displayName: 'Project Future' }
+        }
+      }),
+      'gemini',
+      'Layer 3 catalog slug must map unknown display name to gemini'
+    );
+    assert.strictEqual(resolveQuotaPool('Nova Pro', { modelPools: { novapro: 'nova' } }), 'nova');
+
+    // E2E 驗證未來新模型獨立池 (Nova Pro -> nova-5h / nova-weekly)
+    const futureNova5h = new Date(nowR35 + (95 * 60 - 30) * 1000).toISOString();
+    const futureNovaWeekly = new Date(nowR35 + ((3 * 24 + 5) * 3600 - 30) * 1000).toISOString();
+    const homeR35Future = makeTempHome({
+      updatedAt: nowR35,
+      lsUpdatedAt: nowR35,
+      modelPools: { novapro: 'nova' },
+      shortTerm: {
+        gemini: { remaining_percentage: 20, reset_time: futureGemini5hResetR35 },
+        nova: { remaining_percentage: 91, reset_time: futureNova5h }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 15, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' },
+        nova: { remaining_percentage: 86, reset_time: futureNovaWeekly, window: 'weekly' }
+      }
+    }, settingsR35);
+    try {
+      const resNova = await runStatusline({
+        model: { id: 'Nova Pro', display_name: 'Nova Pro' },
+        terminal_width: 240
+      }, homeR35Future);
+      const plainNova = stripAnsi(resNova.stdout).trim();
+      assert.strictEqual(resNova.code, 0);
+      assert.ok(plainNova.includes('五小時可用: 91%'), `Future Nova Pro must resolve dynamic nova 5h pool (91%), got: "${plainNova}"`);
+      assert.ok(plainNova.includes('五小時倒數: 1h 35m'), `Future Nova Pro must calculate nova 5h countdown (1h 35m), got: "${plainNova}"`);
+      assert.ok(plainNova.includes('七日內可用: 86%'), `Future Nova Pro must resolve dynamic nova weekly pool (86%), got: "${plainNova}"`);
+    } finally {
+      try { rmSync(homeR35Future, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // (3) extractMetricsAsync 呈現層即時重算倒數（不使用靜態舊 refreshes_in）
+    const recalcReset = new Date(nowR35 + (30 * 60 - 15) * 1000).toISOString();
+    const homeR35Metrics = makeTempHome({}, {});
+    try {
+      const metricsRecalc = await withHomeEnv(homeR35Metrics, () => extractMetricsAsync(
+        { model: { display_name: 'Orchestrator (Neon)' } },
+        'zh-tw',
+        'Orchestrator (Neon)',
+        null,
+        {},
+        { remaining_percentage: 60, reset_time: recalcReset, refreshes_in: '4h 50m' },
+        { totalInput: 0, contextSize: 1048576, effectiveTokenCeiling: 512000, usedPctNum: 0 },
+        { remaining_percentage: 80, reset_time: recalcReset, refreshes_in: '6d 12h' },
+        { footerItems: ['quota', 'quota-reset-countdown', 'quota-weekly-countdown'] }
+      ));
+      assert.strictEqual(metricsRecalc.countdownVal, '30m', 'extractMetricsAsync must dynamically compute 30m instead of frozen 4h 50m');
+      assert.strictEqual(metricsRecalc.weeklyCountdownVal, '30m', 'extractMetricsAsync must dynamically compute weekly countdown too');
+    } finally {
+      try { rmSync(homeR35Metrics, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // (4) 60 秒寬限期、逾寬限期自動重置與新週期立即覆蓋（Unit + E2E）
+    assert.strictEqual(EXPIRED_RESET_GRACE_MS, 60000);
+    const expired30sIso = new Date(nowR35 - 30 * 1000).toISOString();
+    const expired90sIso = new Date(nowR35 - 90 * 1000).toISOString();
+
+    const inGraceEntry = normalizeResolvedQuotaEntry(
+      { remaining_percentage: 12, reset_time: expired30sIso, refreshes_in: '55m' },
+      nowR35
+    );
+    assert.strictEqual(inGraceEntry.remaining_percentage, 12, 'Within 60s grace period, percentage must remain 12');
+    assert.strictEqual(inGraceEntry.refreshes_in, 'now', 'Within 60s grace period, countdown must be now');
+
+    const beyondGraceEntry = normalizeResolvedQuotaEntry(
+      { remaining_percentage: 12, reset_time: expired90sIso, refreshes_in: '55m' },
+      nowR35
+    );
+    assert.strictEqual(beyondGraceEntry.remaining_percentage, 100, 'Beyond 60s grace period, percentage must reset to 100');
+    assert.strictEqual(beyondGraceEntry.refreshes_in, '', 'Beyond 60s grace period, refreshes_in must be cleared');
+    assert.strictEqual(beyondGraceEntry.reset_time, undefined, 'Beyond 60s grace period, stale reset_time must be cleared');
+
+    // E2E 4A: 過期 30 秒（寬限期內）顯示原百分比 + now，並將 lastPollAttemptAt 寫入磁碟（觸發重查）
+    const cacheGrace30s = {
+      updatedAt: nowR35 - 2000,
+      lsUpdatedAt: nowR35 - 2000,
+      lastPollAttemptAt: 0,
+      shortTerm: {
+        gemini: { remaining_percentage: 12, reset_time: expired30sIso, refreshes_in: '10m' }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 40, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' }
+      }
+    };
+    const homeR35Grace = makeTempHome(cacheGrace30s, settingsR35);
+    try {
+      const resGrace = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        terminal_width: 240
+      }, homeR35Grace);
+      const plainGrace = stripAnsi(resGrace.stdout).trim();
+      assert.strictEqual(resGrace.code, 0);
+      assert.ok(plainGrace.includes('五小時可用: 12%'), `Within grace period must keep 12%, got: "${plainGrace}"`);
+      assert.ok(plainGrace.includes('五小時倒數: now'), `Within grace period must display countdown 'now', got: "${plainGrace}"`);
+      const persistedGrace = JSON.parse(readFileSync(join(homeR35Grace, '.gemini', 'tmp', 'real_quota_cache.json'), 'utf8'));
+      assert.ok(persistedGrace.lastPollAttemptAt > 0, 'Expired active quota must trigger poll attempt and persist lastPollAttemptAt');
+    } finally {
+      try { rmSync(homeR35Grace, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // E2E 4B & 4C: 過期 90 秒（無更新來源）自動重置為 100% / 無 / 無；隨後收到新週期 meta.quota 立即恢復為 85%
+    const cacheExpired90s = {
+      updatedAt: nowR35 - 2000,
+      lsUpdatedAt: nowR35 - 2000,
+      shortTerm: {
+        gemini: { remaining_percentage: 0.45, reset_time: expired90sIso, refreshes_in: '55m' }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 40, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' }
+      }
+    };
+    const homeR35Expired = makeTempHome(cacheExpired90s, settingsR35);
+    try {
+      const resExpired = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        terminal_width: 240
+      }, homeR35Expired);
+      const plainExpired = stripAnsi(resExpired.stdout).trim();
+      assert.strictEqual(resExpired.code, 0);
+      assert.ok(plainExpired.includes('五小時可用: 100%'), `Beyond grace period without refresh must reset to 100%, got: "${plainExpired}"`);
+      assert.ok(plainExpired.includes('五小時倒數: 無'), `Beyond grace period countdown must show 無, got: "${plainExpired}"`);
+      assert.ok(plainExpired.includes('五小時重置: 無'), `Beyond grace period reset time must show 無, got: "${plainExpired}"`);
+
+      // 4C: 收到新週期 meta.quota (85%, 未來 5 小時) 立即覆蓋過期磁碟快取
+      const resRecovered = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        quota: {
+          'gemini-5h': { remaining_fraction: 0.85, reset_in_seconds: 18000 },
+          'gemini-weekly': { remaining_fraction: 0.40, reset_in_seconds: 400000 }
+        },
+        terminal_width: 240
+      }, homeR35Expired);
+      const plainRecovered = stripAnsi(resRecovered.stdout).trim();
+      assert.strictEqual(resRecovered.code, 0);
+      assert.ok(plainRecovered.includes('五小時可用: 85%'), `New meta.quota cycle must supersede expired cache and show 85%, got: "${plainRecovered}"`);
+      assert.ok(plainRecovered.includes('五小時倒數: 5h'), `New meta.quota cycle countdown must show 5h, got: "${plainRecovered}"`);
+    } finally {
+      try { rmSync(homeR35Expired, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // 確認 resolveModelQuota / resolveWeeklyQuota 亦尊重確定性 now 參數與跨期退讓
+    const resolvedUnitExpired = resolveModelQuota('Orchestrator (Neon)', {
+      models: { orchestratorneon: { remaining_percentage: 0.45, reset_time: expired90sIso } }
+    }, null, nowR35);
+    assert.strictEqual(resolvedUnitExpired.remaining_percentage, 100);
+    const resolvedUnitWeekly = resolveWeeklyQuota('Orchestrator (Neon)', {
+      weekly: { gemini: { remaining_percentage: 33, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' } }
+    }, null, nowR35);
+    assert.strictEqual(resolvedUnitWeekly.remaining_percentage, 33);
+
+    console.log("✅ Test R35 passed! (Orchestrator Neon/Argon/Carbon, future model dynamic pools, live countdown, grace period, and expired auto-reset verified)");
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;
   }
 
   if (testsPassed) {
-    console.log("\n🎉 All quota-and-context.test.mjs (R1-R7, R9-R15, R28-R33) tests passed successfully!");
+    console.log("\n🎉 All quota-and-context.test.mjs (R1-R7, R9-R15, R28-R33, R35) tests passed successfully!");
     process.exit(0);
   } else {
-    console.error("\n❌ Some quota-and-context.test.mjs (R1-R7, R9-R15, R28-R33) tests failed.");
+    console.error("\n❌ Some quota-and-context.test.mjs (R1-R7, R9-R15, R28-R33, R35) tests failed.");
     process.exit(1);
   }
 }

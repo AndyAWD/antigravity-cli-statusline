@@ -1,4 +1,5 @@
 import { parseWeeklyBuckets, parseShortTermBuckets, mergeQuotaBuckets, formatResetTime } from '../fetch-local-quota.mjs';
+import { parseModelPools, inferModelPoolsFromModels } from '../lib/collectors/quota.mjs';
 import assert from 'assert';
 
 console.log("=== Running tests/fetch-local-quota.test.mjs (R0) ===");
@@ -144,10 +145,16 @@ async function testHttpEndpointAndEnvDiscovery() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
 
+  const origHome = process.env.HOME;
+  const origProfile = process.env.USERPROFILE;
   const origLs = process.env.ANTIGRAVITY_LS_ADDRESS;
   const origToken = process.env.ANTIGRAVITY_CSRF_TOKEN;
+  const tempHome = fs.mkdtempSync(join(os.tmpdir(), 'fetch-quota-env-'));
 
   try {
+    process.env.HOME = tempHome;
+    process.env.USERPROFILE = tempHome;
+
     // 1. Direct requestUserStatus test over HTTP (with preferHttps=false fast path)
     const statusFast = await requestUserStatus(port, 'test-token-123', '127.0.0.1', false);
     assert.strictEqual(statusFast.userStatus.email, 'test@example.com');
@@ -194,12 +201,16 @@ async function testHttpEndpointAndEnvDiscovery() {
     }
     throw err;
   } finally {
+    if (origHome === undefined) delete process.env.HOME; else process.env.HOME = origHome;
+    if (origProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = origProfile;
+
     if (origLs !== undefined) process.env.ANTIGRAVITY_LS_ADDRESS = origLs;
     else delete process.env.ANTIGRAVITY_LS_ADDRESS;
 
     if (origToken !== undefined) process.env.ANTIGRAVITY_CSRF_TOKEN = origToken;
     else delete process.env.ANTIGRAVITY_CSRF_TOKEN;
 
+    try { fs.rmSync(tempHome, { recursive: true, force: true }); } catch (_) {}
     await new Promise(resolve => server.close(resolve));
   }
 }
@@ -661,12 +672,97 @@ async function testAvailableModelsAndTrajectoryPagination() {
   }
 }
 
+function testParseModelPoolsAndInference() {
+  console.log("Testing parseModelPools and inferModelPoolsFromModels...");
+
+  const mockSummary = {
+    response: {
+      groups: [
+        {
+          displayName: 'Gemini Models',
+          description: 'Models within this group: Gemini 4 Neon, Gemini 4 Hydrogen, Orchestrator (Neon), Gemini 3.8 Flash. Shared pool.',
+          buckets: [
+            { bucketId: 'gemini-weekly', window: 'weekly', remainingFraction: 0.25, resetTime: '2026-11-25T00:56:39Z' },
+            { bucketId: 'gemini-5h', window: '5h', remainingFraction: 0.78, resetTime: '2026-11-19T10:59:30Z' }
+          ]
+        },
+        {
+          displayName: 'Claude and GPT models',
+          description: 'Models within this group: Claude Opus 5.5, Claude Sonnet 5.5, GPT-OSS 120B',
+          buckets: [
+            { bucketId: '3p-weekly', window: 'weekly', remainingFraction: 0.49, resetTime: '2026-11-26T04:46:41Z' },
+            { bucketId: '3p-5h', window: '5h', remainingFraction: 0.18, resetTime: '2026-11-19T09:46:41Z' }
+          ]
+        },
+        {
+          displayName: 'Gemini 4 Argon',
+          description: 'Models within this group: Gemini 4 Argon, Orchestrator (Argon)',
+          buckets: [
+            { bucketId: 'gemini-argon-wtu-weekly', window: 'weekly', remainingFraction: 0.48, resetTime: '2026-11-25T01:31:39Z' }
+          ]
+        },
+        {
+          displayName: 'Future Nova Models',
+          description: 'Models within this group: Nova Pro 1.5, Project Nova',
+          buckets: [
+            { bucketId: 'nova-5h', window: '5h', remainingFraction: 0.9, resetTime: '2026-11-19T12:00:00Z' },
+            { bucketId: 'nova-weekly', window: 'weekly', remainingFraction: 0.95, resetTime: '2026-11-25T12:00:00Z' }
+          ]
+        }
+      ]
+    }
+  };
+
+  const pools = parseModelPools(mockSummary);
+  assert.strictEqual(pools['orchestratorneon'], 'gemini', 'Orchestrator (Neon) must map to gemini pool');
+  assert.strictEqual(pools['gemini38flash'], 'gemini', 'Decimal version Gemini 3.8 Flash must not be truncated by period');
+  assert.strictEqual(pools['claudeopus55'], '3p', 'Decimal version Claude Opus 5.5 must map to 3p pool');
+  assert.strictEqual(pools['gptoss120b'], '3p');
+  assert.strictEqual(pools['novapro15'], 'nova');
+  assert.strictEqual(pools['projectnova'], 'nova');
+  assert.strictEqual(pools['gemini4argon'], undefined, 'Argon group must not pollute non-Argon modelPools');
+  assert.strictEqual(pools['orchestratorargon'], undefined, 'Orchestrator (Argon) must not map to argon-wtu in modelPools');
+
+  const futureT1 = new Date(Date.now() + 3600 * 1000).toISOString();
+  const futureT2 = new Date(Date.now() + 7200 * 1000).toISOString();
+  const futureT3 = new Date(Date.now() + 400000 * 1000).toISOString();
+
+  // Unique reset_time + matching % infers pool; ambiguous shared reset_time across 2 pools must NOT infer
+  const inferred = inferModelPoolsFromModels(
+    {
+      unlistedgemini: { remaining_percentage: 78.1, reset_time: futureT1 },
+      unlisted3p: { remaining_percentage: 17.8, reset_time: futureT2 },
+      argonweekly: { remaining_percentage: 48.0, reset_time: futureT3 },
+      pctmismatch: { remaining_percentage: 10.0, reset_time: futureT1 }
+    },
+    {
+      gemini: { remaining_percentage: 78.7, reset_time: futureT1 },
+      '3p': { remaining_percentage: 17.8, reset_time: futureT2 }
+    }
+  );
+  assert.strictEqual(inferred['unlistedgemini'], 'gemini');
+  assert.strictEqual(inferred['unlisted3p'], '3p');
+  assert.strictEqual(inferred['argonweekly'], undefined);
+  assert.strictEqual(inferred['pctmismatch'], undefined);
+
+  const ambiguousInferred = inferModelPoolsFromModels(
+    { sharedtsmodel: { remaining_percentage: 80, reset_time: futureT1 } },
+    {
+      poola: { remaining_percentage: 80, reset_time: futureT1 },
+      poolb: { remaining_percentage: 80, reset_time: futureT1 }
+    }
+  );
+  assert.strictEqual(ambiguousInferred['sharedtsmodel'], undefined, 'Ambiguous reset_time shared across multiple pools must not infer');
+  console.log("✅ parseModelPools and inferModelPoolsFromModels tests passed.");
+}
+
 async function runAll() {
   try {
     testParseWeeklyBucketsUnwrapped();
     testParseWeeklyBucketsWrappedAndCamelCase();
     testMergeQuotaBuckets();
     testParseModelLimitsAndGeneratorContext();
+    testParseModelPoolsAndInference();
     await testHttpEndpointAndEnvDiscovery();
     await testAvailableModelsAndTrajectoryPagination();
     console.log("✅ All R0 tests passed successfully!");

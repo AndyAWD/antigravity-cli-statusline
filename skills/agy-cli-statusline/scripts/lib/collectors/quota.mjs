@@ -6,6 +6,279 @@ import { readJsonSafeAsync } from '../core/fs-utils.mjs';
 import { normalizeModelName } from '../core/normalize.mjs';
 import { formatResetTime, formatSecondsToCountdown } from './time-format.mjs';
 
+export const EXPIRED_RESET_GRACE_MS = 60 * 1000;
+
+function matchBrandPoolFromKey(normKey) {
+  if (!normKey) return '';
+  if (
+    normKey.includes('claude') ||
+    normKey.includes('gpt') ||
+    normKey.includes('chatgpt') ||
+    normKey.includes('openai') ||
+    normKey.includes('anthropic')
+  ) {
+    return '3p';
+  }
+  if (normKey.includes('gemini') || normKey.includes('google')) {
+    return 'gemini';
+  }
+  return '';
+}
+
+function isArgonPoolName(poolName) {
+  const lower = String(poolName || '').toLowerCase();
+  return lower.includes('argon') || lower.endsWith('-wtu');
+}
+
+function isExpiredBeyondGrace(entry, now = Date.now(), graceMs = EXPIRED_RESET_GRACE_MS) {
+  if (!entry || typeof entry !== 'object' || !entry.reset_time) return false;
+  const resetMs = new Date(entry.reset_time).getTime();
+  return !isNaN(resetMs) && resetMs > 0 && (resetMs + graceMs) <= now;
+}
+
+function collectModelCandidateKeys(fallbackModel, meta = null) {
+  const raw = [
+    fallbackModel,
+    meta?.model?.id,
+    meta?.model?.display_name,
+    meta?.model?.name
+  ];
+  const seen = new Set();
+  const keys = [];
+  for (const item of raw) {
+    if (typeof item !== 'string' || !item.trim()) continue;
+    const norm = normalizeModelName(item);
+    if (norm && !seen.has(norm)) {
+      seen.add(norm);
+      keys.push(norm);
+    }
+  }
+  return keys;
+}
+
+function resolveBrandFallbackPool(candidates, cache = null) {
+  // 第 2 層：明確品牌關鍵字
+  for (const key of candidates) {
+    const brandPool = matchBrandPoolFromKey(key);
+    if (brandPool) return brandPool;
+  }
+
+  // 第 3 層：動態模型目錄 (cache.modelLimits)
+  if (cache?.modelLimits && typeof cache.modelLimits === 'object') {
+    for (const key of candidates) {
+      const entry = cache.modelLimits[key];
+      if (!entry || typeof entry !== 'object') continue;
+      for (const field of [entry.slug, entry.model, entry.displayName]) {
+        if (typeof field !== 'string' || !field.trim()) continue;
+        const limitPool = matchBrandPoolFromKey(normalizeModelName(field));
+        if (limitPool) return limitPool;
+      }
+    }
+  }
+
+  // 第 4 層：無快取冷啟動退讓
+  for (const key of candidates) {
+    if (
+      key.includes('orchestrator') ||
+      key.includes('neon') ||
+      key.includes('hydrogen') ||
+      key.includes('argon') ||
+      key.includes('carbon')
+    ) {
+      return 'gemini';
+    }
+  }
+
+  return '';
+}
+
+/**
+ * 解析 RetrieveUserQuotaSummary 群組資訊，建立「標準化模型名稱 -> 配額池」映射表。
+ * @param {object} summaryResponse
+ * @returns {Record<string, string>}
+ */
+export function parseModelPools(summaryResponse) {
+  const modelPools = {};
+  if (!summaryResponse || typeof summaryResponse !== 'object') return modelPools;
+  const resObj = summaryResponse.response || summaryResponse;
+  if (!Array.isArray(resObj?.groups)) return modelPools;
+
+  for (const group of resObj.groups) {
+    if (!group || typeof group !== 'object') continue;
+    let pool = '';
+    if (Array.isArray(group.buckets)) {
+      let weeklyPool = '';
+      for (const bucket of group.buckets) {
+        const bucketId = typeof bucket?.bucketId === 'string' ? bucket.bucketId.trim() : '';
+        if (!bucketId) continue;
+        const lowerId = bucketId.toLowerCase();
+        if (lowerId.includes('argon') || lowerId.endsWith('-wtu') || lowerId.endsWith('-wtu-weekly')) continue;
+        const candidatePool = bucketId.replace(/-(5h|3h|hourly|shortterm|weekly)$/i, '');
+        if (!candidatePool || isArgonPoolName(candidatePool)) continue;
+        const windowVal = String(bucket.window || bucket.windowVal || '').toLowerCase();
+        const isShortTermSuffix = /-(5h|3h|hourly|shortterm)$/i.test(bucketId);
+        const isWeekly = windowVal === 'weekly' || (!windowVal && lowerId.endsWith('-weekly') && !isShortTermSuffix);
+        if (!isWeekly) {
+          pool = candidatePool;
+          break;
+        }
+        if (!weeklyPool) weeklyPool = candidatePool;
+      }
+      if (!pool) pool = weeklyPool;
+    }
+    if (!pool) continue;
+
+    if (typeof group.description === 'string') {
+      const descMatch = group.description.match(/models\s+within\s+this\s+group\s*:\s*(.+?)(?:\.\s+|\r?\n|$)/i);
+      if (descMatch && descMatch[1]) {
+        const listText = descMatch[1].replace(/\.\s*$/, '');
+        for (const rawName of listText.split(',')) {
+          const norm = normalizeModelName(rawName);
+          if (norm.length >= 2) {
+            modelPools[norm] = pool;
+          }
+        }
+      }
+    }
+
+    const structuredList = Array.isArray(group.models)
+      ? group.models
+      : (Array.isArray(group.modelIds) ? group.modelIds : []);
+    for (const item of structuredList) {
+      const rawCandidates = typeof item === 'string'
+        ? [item]
+        : (item && typeof item === 'object' ? [item.displayName, item.label, item.name, item.slug, item.model] : []);
+      for (const raw of rawCandidates) {
+        if (typeof raw !== 'string') continue;
+        const norm = normalizeModelName(raw);
+        if (norm.length >= 2) {
+          modelPools[norm] = pool;
+        }
+      }
+    }
+  }
+
+  return modelPools;
+}
+
+/**
+ * 透過 GetUserStatus 模型快照與 RetrieveUserQuotaSummary 短週期桶之唯一重置時間交叉推斷模型配額池歸屬。
+ * @param {object} [models={}]
+ * @param {object} [shortTerm={}]
+ * @returns {Record<string, string>}
+ */
+export function inferModelPoolsFromModels(models = {}, shortTerm = {}) {
+  const inferred = {};
+  if (!models || typeof models !== 'object' || !shortTerm || typeof shortTerm !== 'object') {
+    return inferred;
+  }
+
+  const resetTimeToPools = new Map();
+  for (const [pool, bucket] of Object.entries(shortTerm)) {
+    if (!bucket || typeof bucket !== 'object' || isArgonPoolName(pool) || !bucket.reset_time) continue;
+    const resetMs = new Date(bucket.reset_time).getTime();
+    if (isNaN(resetMs) || resetMs <= 0) continue;
+    const pools = resetTimeToPools.get(resetMs) || [];
+    if (!pools.includes(pool)) {
+      pools.push(pool);
+      resetTimeToPools.set(resetMs, pools);
+    }
+  }
+
+  if (resetTimeToPools.size === 0) return inferred;
+
+  for (const [normKey, entry] of Object.entries(models)) {
+    if (!normKey || !entry || typeof entry !== 'object' || !entry.reset_time) continue;
+    const resetMs = new Date(entry.reset_time).getTime();
+    if (isNaN(resetMs) || resetMs <= 0) continue;
+    const matchedPools = resetTimeToPools.get(resetMs);
+    if (!matchedPools || matchedPools.length !== 1) continue;
+
+    const pool = matchedPools[0];
+    const stEntry = shortTerm[pool];
+    const hasModelPct = typeof entry.remaining_percentage === 'number' && !isNaN(entry.remaining_percentage);
+    const hasStPct = typeof stEntry?.remaining_percentage === 'number' && !isNaN(stEntry.remaining_percentage);
+    if (!hasModelPct || !hasStPct || Math.abs(entry.remaining_percentage - stEntry.remaining_percentage) <= 5) {
+      inferred[normKey] = pool;
+    }
+  }
+
+  return inferred;
+}
+
+/**
+ * 正規化單一解析後配額條目：即時重算倒數，並於超過重置寬限期時自動轉為已重置狀態。
+ * @param {object|null|undefined} entry
+ * @param {number} [now=Date.now()]
+ * @param {number} [graceMs=EXPIRED_RESET_GRACE_MS]
+ * @returns {{ remaining_percentage: number, reset_time?: string, refreshes_in: string, window?: string }}
+ */
+export function normalizeResolvedQuotaEntry(entry, now = Date.now(), graceMs = EXPIRED_RESET_GRACE_MS) {
+  if (!entry || typeof entry !== 'object') {
+    return { remaining_percentage: 100, refreshes_in: '' };
+  }
+  const nowMs = (typeof now === 'number' && !isNaN(now)) ? now : Date.now();
+  if (entry.reset_time) {
+    const resetMs = new Date(entry.reset_time).getTime();
+    if (!isNaN(resetMs) && resetMs > 0) {
+      if ((resetMs + graceMs) <= nowMs) {
+        return {
+          remaining_percentage: 100,
+          refreshes_in: '',
+          ...(entry.window ? { window: entry.window } : {})
+        };
+      }
+      const dynamicRefreshesIn = formatResetTime(entry.reset_time, nowMs);
+      return {
+        ...entry,
+        refreshes_in: dynamicRefreshesIn || entry.refreshes_in || ''
+      };
+    }
+  }
+  return {
+    ...entry,
+    refreshes_in: entry.refreshes_in || ''
+  };
+}
+
+/**
+ * 依四層優先序解析模型所屬配額池：
+ * 1. 動態群組對照 (cache.modelPools)
+ * 2. 明確品牌關鍵字
+ * 3. 模型目錄對照 (cache.modelLimits)
+ * 4. 冷啟動編排器／代號退讓
+ * @param {string} fallbackModel
+ * @param {object|null} [cache=null]
+ * @param {object|null} [meta=null]
+ * @returns {string}
+ */
+export function resolveQuotaPool(fallbackModel, cache = null, meta = null) {
+  const candidates = collectModelCandidateKeys(fallbackModel, meta);
+  if (candidates.length === 0) return '';
+
+  // 第 1 層：動態群組對照 (cache.modelPools)
+  if (cache?.modelPools && typeof cache.modelPools === 'object') {
+    for (const key of candidates) {
+      const exact = cache.modelPools[key];
+      if (typeof exact === 'string' && exact) return exact;
+    }
+
+    let bestPool = '';
+    let bestLen = 0;
+    for (const [modelKey, poolName] of Object.entries(cache.modelPools)) {
+      if (typeof poolName !== 'string' || !poolName || modelKey.length < 4) continue;
+      const matched = candidates.some(k => k.length >= 4 && (k.includes(modelKey) || modelKey.includes(k)));
+      if (matched && modelKey.length > bestLen) {
+        bestLen = modelKey.length;
+        bestPool = poolName;
+      }
+    }
+    if (bestPool) return bestPool;
+  }
+
+  return resolveBrandFallbackPool(candidates, cache);
+}
+
 /**
  * 解析 Antigravity CLI 原生傳入的 meta.quota 欄位，分類為 shortTerm 與 weekly 配額池。
  * @param {object} [meta]
@@ -107,8 +380,8 @@ export function mergeQuotaBuckets(baseBuckets = {}, incomingBuckets = {}, prefer
     const hasValidExistReset = existResetMs > 0 && !isNaN(existResetMs);
     const hasValidIncReset = incResetMs > 0 && !isNaN(incResetMs);
 
-    // 1. 過期判定：若既有配額之重置時間已過期，且傳入配額具備較新重置時間或無時間戳記之 100% 重置額度，舊窗口讓位給新進入配額
-    if (hasValidExistReset && existResetMs <= now && (incResetMs > existResetMs || (!hasValidIncReset && inc.remaining_percentage >= 100))) {
+    // 1. 過期判定：若既有配額之重置時間已過期，且傳入配額具備較新重置時間或無時間戳記之新額度，舊窗口讓位給新進入配額
+    if (hasValidExistReset && existResetMs <= now && (incResetMs > existResetMs || !hasValidIncReset)) {
       const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
       merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
       if (isWeekly) merged[pool].window = 'weekly';
@@ -204,6 +477,8 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
     if (!cacheInfo?.lastPollAttemptAt || attemptAgeMs >= 15000) {
       needUpdate = true;
     }
+  } else if (options?.hasExpiredQuota && (!cacheInfo?.lastPollAttemptAt || attemptAgeMs >= 5000)) {
+    needUpdate = true;
   } else if ((stateJustBecameIdle || tokensJustChanged || missingBuckets) && ageMs >= 1500) {
     needUpdate = true;
   }
@@ -269,6 +544,9 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
             if (cacheInfo.modelLimits || freshCache.modelLimits) {
               freshCache.modelLimits = { ...(cacheInfo.modelLimits || {}), ...(freshCache.modelLimits || {}) };
             }
+            if (cacheInfo.modelPools || freshCache.modelPools) {
+              freshCache.modelPools = { ...(cacheInfo.modelPools || {}), ...(freshCache.modelPools || {}) };
+            }
             if (!freshCache.modelLimitsUpdatedAt && cacheInfo.modelLimitsUpdatedAt) {
               freshCache.modelLimitsUpdatedAt = cacheInfo.modelLimitsUpdatedAt;
             }
@@ -285,42 +563,61 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
   return { cache: cacheInfo, freshlyFetchedFromLs, timedOut };
 }
 
+function findMatchingPoolBucket(buckets, candidates, normModel) {
+  if (!buckets || typeof buckets !== 'object') return null;
+  const nonArgonPools = Object.keys(buckets).filter(p => !isArgonPoolName(p) && buckets[p] && typeof buckets[p] === 'object');
+  if (nonArgonPools.length === 0) return null;
+
+  for (const key of candidates) {
+    const exactPool = nonArgonPools.find(p => normalizeModelName(p) === key);
+    if (exactPool) return buckets[exactPool];
+  }
+  const matchedPool = nonArgonPools.find((p) => {
+    const normPool = normalizeModelName(p);
+    return normPool.length >= 2 && normPool !== '3p' && normModel && (normModel.includes(normPool) || normPool.includes(normModel));
+  });
+  return matchedPool ? buckets[matchedPool] : null;
+}
+
 /**
  * 依目前使用中的模型解析短週期（5 小時）可用配額（優先取 shortTerm，無則退回 cache.models）。
  * @param {string} fallbackModel
  * @param {object|null} cache
+ * @param {object|null} [meta=null]
+ * @param {number} [now=Date.now()]
  * @returns {{ remaining_percentage: number, reset_time?: string, refreshes_in?: string }}
  */
-export function resolveModelQuota(fallbackModel, cache) {
-  const normModel = normalizeModelName(fallbackModel);
+export function resolveModelQuota(fallbackModel, cache, meta = null, now = Date.now()) {
+  const candidates = collectModelCandidateKeys(fallbackModel, meta);
+  const normModel = candidates[0] || normalizeModelName(fallbackModel);
+  const pool = resolveQuotaPool(fallbackModel, cache, meta);
 
   // 1. 優先使用 RetrieveUserQuotaSummary 解析出的短週期 (5h) 配額桶
-  let pool = '';
-  if (normModel.includes('gemini')) {
-    pool = 'gemini';
-  } else if (normModel.includes('claude') || normModel.includes('gpt')) {
-    pool = '3p';
-  }
-
   if (pool && cache && cache.shortTerm && cache.shortTerm[pool]) {
-    return cache.shortTerm[pool];
+    return normalizeResolvedQuotaEntry(cache.shortTerm[pool], now);
   }
 
-  if (cache && cache.shortTerm) {
-    const pools = Object.keys(cache.shortTerm);
-    if (pools.length > 0) {
-      const matchedPool = pools.find(p => normModel.includes(p) || p.includes(normModel));
-      if (matchedPool) return cache.shortTerm[matchedPool];
-    }
+  const brandPool = resolveBrandFallbackPool(candidates, cache);
+  if (brandPool && brandPool !== pool && cache && cache.shortTerm && cache.shortTerm[brandPool]) {
+    return normalizeResolvedQuotaEntry(cache.shortTerm[brandPool], now);
   }
 
-  // 2. 若無 shortTerm 桶，降級回 GetUserStatus 中的 cache.models
+  const matchedShortBucket = findMatchingPoolBucket(cache?.shortTerm, candidates, normModel);
+  if (matchedShortBucket) {
+    return normalizeResolvedQuotaEntry(matchedShortBucket, now);
+  }
+
+  // 2. 若無對應 shortTerm 桶，降級回 GetUserStatus 中的 cache.models
   let modelQuota = null;
   if (cache && cache.models) {
-    // 2a. 精確匹配
-    if (cache.models[normModel]) {
-      modelQuota = cache.models[normModel];
-    } else {
+    // 2a. 精確匹配（檢查所有候選鍵）
+    for (const key of candidates) {
+      if (cache.models[key]) {
+        modelQuota = cache.models[key];
+        break;
+      }
+    }
+    if (!modelQuota && normModel) {
       // 2b. 子字串匹配
       for (const k in cache.models) {
         if (normModel.includes(k) || k.includes(normModel)) {
@@ -330,7 +627,7 @@ export function resolveModelQuota(fallbackModel, cache) {
       }
     }
     // 2c. 家族匹配
-    if (!modelQuota) {
+    if (!modelQuota && normModel) {
       const families = ['claude', 'gemini', 'gpt'];
       const modelFamily = families.find(f => normModel.includes(f));
       if (modelFamily) {
@@ -343,42 +640,74 @@ export function resolveModelQuota(fallbackModel, cache) {
         }
       }
     }
-  }
-  // 2d. 全域最小值退讓
-  if (!modelQuota && cache && cache.models) {
-    const allKeys = Object.keys(cache.models);
-    if (allKeys.length > 0) {
-      modelQuota = allKeys.reduce((min, k) =>
-        cache.models[k].remaining_percentage < min.remaining_percentage ? cache.models[k] : min
-      , cache.models[allKeys[0]]);
+    // 2d. 全域最小值退讓
+    if (!modelQuota) {
+      const allKeys = Object.keys(cache.models);
+      if (allKeys.length > 0) {
+        modelQuota = allKeys.reduce((min, k) =>
+          cache.models[k].remaining_percentage < min.remaining_percentage ? cache.models[k] : min
+        , cache.models[allKeys[0]]);
+      }
     }
   }
-  return modelQuota || { remaining_percentage: 100, refreshes_in: '' };
+
+  if (modelQuota && !isExpiredBeyondGrace(modelQuota, now)) {
+    return normalizeResolvedQuotaEntry(modelQuota, now);
+  }
+
+  if (cache && cache.shortTerm) {
+    const validShortEntries = Object.entries(cache.shortTerm)
+      .filter(([p, entry]) => !isArgonPoolName(p) && entry && typeof entry === 'object' && !isExpiredBeyondGrace(entry, now))
+      .map(([, entry]) => entry);
+    if (validShortEntries.length === 1) {
+      return normalizeResolvedQuotaEntry(validShortEntries[0], now);
+    }
+    if (validShortEntries.length > 1) {
+      const minShortEntry = validShortEntries.reduce((min, cur) =>
+        (Number(cur.remaining_percentage) < Number(min.remaining_percentage)) ? cur : min
+      , validShortEntries[0]);
+      return normalizeResolvedQuotaEntry(minShortEntry, now);
+    }
+  }
+
+  if (modelQuota) {
+    return normalizeResolvedQuotaEntry(modelQuota, now);
+  }
+
+  return { remaining_percentage: 100, refreshes_in: '' };
 }
 
 /**
- * 依目前模型對應至每週配額池（'gemini' | '3p'）並解析每週可用額度。
+ * 依目前模型對應至每週配額池（'gemini' | '3p' 或動態獨立池）並解析每週可用額度。
  * @param {string} fallbackModel
  * @param {object|null} cache
+ * @param {object|null} [meta=null]
+ * @param {number} [now=Date.now()]
  * @returns {{ remaining_percentage: number, reset_time?: string, refreshes_in?: string }}
  */
-export function resolveWeeklyQuota(fallbackModel, cache) {
-  const normModel = normalizeModelName(fallbackModel);
-  let pool = '';
-  if (normModel.includes('gemini')) {
-    pool = 'gemini';
-  } else if (normModel.includes('claude') || normModel.includes('gpt')) {
-    pool = '3p';
-  }
+export function resolveWeeklyQuota(fallbackModel, cache, meta = null, now = Date.now()) {
+  const candidates = collectModelCandidateKeys(fallbackModel, meta);
+  const normModel = candidates[0] || normalizeModelName(fallbackModel);
+  const pool = resolveQuotaPool(fallbackModel, cache, meta);
 
   if (pool && cache && cache.weekly && cache.weekly[pool]) {
-    return cache.weekly[pool];
+    return normalizeResolvedQuotaEntry(cache.weekly[pool], now);
+  }
+
+  const brandPool = resolveBrandFallbackPool(candidates, cache);
+  if (brandPool && brandPool !== pool && cache && cache.weekly && cache.weekly[brandPool]) {
+    return normalizeResolvedQuotaEntry(cache.weekly[brandPool], now);
+  }
+
+  const matchedWeeklyBucket = findMatchingPoolBucket(cache?.weekly, candidates, normModel);
+  if (matchedWeeklyBucket) {
+    return normalizeResolvedQuotaEntry(matchedWeeklyBucket, now);
   }
 
   // A4 退讓（非 Argon 每週配額池中取最低值，若無則取全部池中最低值）
   if (cache && cache.weekly) {
     const allPools = Object.keys(cache.weekly).filter(p => cache.weekly[p] && typeof cache.weekly[p] === 'object');
-    const generalPools = allPools.filter(p => !p.toLowerCase().includes('argon'));
+    const generalPools = allPools.filter(p => !isArgonPoolName(p));
     const pools = generalPools.length > 0 ? generalPools : allPools;
     if (pools.length > 0) {
       let minPool = pools[0];
@@ -387,7 +716,7 @@ export function resolveWeeklyQuota(fallbackModel, cache) {
           minPool = p;
         }
       }
-      return cache.weekly[minPool];
+      return normalizeResolvedQuotaEntry(cache.weekly[minPool], now);
     }
   }
 
@@ -397,12 +726,13 @@ export function resolveWeeklyQuota(fallbackModel, cache) {
 /**
  * 自快取解析 Gemini 4 Argon 配額池（'gemini-argon-wtu' 或任何含 argon 之配額桶）。
  * @param {object|null} cache
+ * @param {number} [now=Date.now()]
  * @returns {{ remaining_percentage: number, reset_time?: string, refreshes_in?: string }}
  */
-export function resolveArgonQuota(cache) {
+export function resolveArgonQuota(cache, now = Date.now()) {
   if (cache && cache.weekly && typeof cache.weekly === 'object') {
     if (cache.weekly['gemini-argon-wtu']) {
-      return cache.weekly['gemini-argon-wtu'];
+      return normalizeResolvedQuotaEntry(cache.weekly['gemini-argon-wtu'], now);
     }
     const argonPools = Object.keys(cache.weekly).filter(
       p => p.toLowerCase().includes('argon') && cache.weekly[p] && typeof cache.weekly[p] === 'object'
@@ -414,7 +744,7 @@ export function resolveArgonQuota(cache) {
           minPool = p;
         }
       }
-      return cache.weekly[minPool];
+      return normalizeResolvedQuotaEntry(cache.weekly[minPool], now);
     }
   }
 
@@ -423,7 +753,7 @@ export function resolveArgonQuota(cache) {
       p => p.toLowerCase().includes('argon') && cache.shortTerm[p] && typeof cache.shortTerm[p] === 'object'
     );
     if (argonShortPools.length > 0) {
-      return cache.shortTerm[argonShortPools[0]];
+      return normalizeResolvedQuotaEntry(cache.shortTerm[argonShortPools[0]], now);
     }
   }
 
@@ -438,7 +768,7 @@ export function resolveArgonQuota(cache) {
           minKey = k;
         }
       }
-      return cache.models[minKey];
+      return normalizeResolvedQuotaEntry(cache.models[minKey], now);
     }
   }
 

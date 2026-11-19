@@ -5,7 +5,7 @@ import https from 'https';
 import os from 'os';
 import { isDirectExecution, readJsonSafeSync, writeFileSyncAndVerifyNoBOM } from './lib/core/fs-utils.mjs';
 import { normalizeModelName, sanitizeConversationId } from './lib/core/normalize.mjs';
-import { mergeQuotaBuckets } from './lib/collectors/quota.mjs';
+import { inferModelPoolsFromModels, mergeQuotaBuckets, parseModelPools } from './lib/collectors/quota.mjs';
 import { formatResetTime } from './lib/collectors/time-format.mjs';
 
 export { sanitizeConversationId, formatResetTime, mergeQuotaBuckets };
@@ -392,6 +392,7 @@ export async function fetchLiveQuotaCache(options = {}) {
   const allModels = {};
   const weekly = {};
   const shortTerm = {};
+  const modelPools = {};
   let modelLimits = {};
   let modelLimitsUpdatedAt = 0;
   let runtimeContext = null;
@@ -448,6 +449,15 @@ export async function fetchLiveQuotaCache(options = {}) {
         if (!shortTerm[pool] || shortTermBuckets[pool].remaining_percentage < shortTerm[pool].remaining_percentage) {
           shortTerm[pool] = shortTermBuckets[pool];
         }
+      }
+      const parsedPools = parseModelPools(summaryResponse);
+      Object.assign(modelPools, parsedPools);
+    }
+
+    const inferredPools = inferModelPoolsFromModels(allModels, shortTerm);
+    for (const [k, pool] of Object.entries(inferredPools)) {
+      if (!modelPools[k]) {
+        modelPools[k] = pool;
       }
     }
   };
@@ -523,6 +533,7 @@ export async function fetchLiveQuotaCache(options = {}) {
     Object.keys(allModels).length > 0 ||
     Object.keys(weekly).length > 0 ||
     Object.keys(shortTerm).length > 0 ||
+    Object.keys(modelPools).length > 0 ||
     Object.keys(modelLimits).length > 0 ||
     runtimeContext
   ) {
@@ -531,6 +542,7 @@ export async function fetchLiveQuotaCache(options = {}) {
       models: allModels,
       weekly,
       shortTerm,
+      modelPools,
       modelLimits,
       ...(modelLimitsUpdatedAt > 0 ? { modelLimitsUpdatedAt } : {}),
       updatedAt: now,
@@ -579,7 +591,17 @@ async function main() {
           if (prev.lastModelLimitAttemptAt !== undefined) cache.lastModelLimitAttemptAt = prev.lastModelLimitAttemptAt;
           cache.shortTerm = mergeQuotaBuckets(prev.shortTerm, cache.shortTerm, true);
           cache.weekly = mergeQuotaBuckets(prev.weekly, cache.weekly, true);
-          cache.models = { ...(prev.models || {}), ...(cache.models || {}) };
+          cache.modelPools = { ...(prev.modelPools || {}), ...(cache.modelPools || {}) };
+          const nowMs = Date.now();
+          const validPrevModels = {};
+          for (const [k, v] of Object.entries(prev.models || {})) {
+            if (!v || typeof v !== 'object') continue;
+            const rMs = v.reset_time ? new Date(v.reset_time).getTime() : 0;
+            if (!rMs || isNaN(rMs) || rMs > nowMs) {
+              validPrevModels[k] = v;
+            }
+          }
+          cache.models = { ...validPrevModels, ...(cache.models || {}) };
           cache.modelLimits = { ...(prev.modelLimits || {}), ...(cache.modelLimits || {}) };
           if (!cache.modelLimitsUpdatedAt && prev.modelLimitsUpdatedAt) {
             cache.modelLimitsUpdatedAt = prev.modelLimitsUpdatedAt;

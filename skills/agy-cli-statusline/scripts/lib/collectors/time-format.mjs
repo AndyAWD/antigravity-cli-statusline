@@ -24,15 +24,17 @@ export function formatSecondsToCountdown(totalSec) {
 /**
  * 將 ISO 重置時間字串轉換為相對於現在的倒數字串；無效輸入回傳空字串。
  * @param {string} resetTimeStr
+ * @param {number} [now=Date.now()]
  * @returns {string}
  */
-export function formatResetTime(resetTimeStr) {
+export function formatResetTime(resetTimeStr, now = Date.now()) {
   try {
     if (!resetTimeStr || typeof resetTimeStr === 'boolean' || Array.isArray(resetTimeStr)) return '';
     const reset = new Date(resetTimeStr);
     const resetMs = reset.getTime();
     if (isNaN(resetMs)) return '';
-    const diffSeconds = Math.floor((resetMs - Date.now()) / 1000);
+    const nowMs = (typeof now === 'number' && !isNaN(now)) ? now : Date.now();
+    const diffSeconds = Math.floor((resetMs - nowMs) / 1000);
     return formatSecondsToCountdown(diffSeconds);
   } catch (_) {
     return '';
