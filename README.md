@@ -6,7 +6,7 @@ English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [�
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-An Antigravity plugin that customizes the Antigravity Command-Line Interface (CLI) statusline (footer) — select from 36 real-time indicators, switch between Text (`text`) and Emoji (`emoji`) label styles, arrange them in any order, display capacity bar graphs in merged or separate modes, and apply automatic or manual line wrapping across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
+An Antigravity plugin that customizes the Antigravity Command-Line Interface (CLI) statusline (footer) — select from 37 real-time indicators, switch between Text (`text`) and Emoji (`emoji`) label styles, arrange them in any order, display capacity bar graphs in merged or separate modes, and apply automatic or manual line wrapping across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
 
 Comprehensive support across the three core platforms of Google Antigravity (AGY): Antigravity Command-Line Interface (CLI) (`agy`), Antigravity Integrated Development Environment (IDE), and Antigravity 2.0 Desktop Application.
 
@@ -39,11 +39,12 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## Key Features
 
 1. **Multi-Platform Compatibility**: Supports Antigravity CLI terminal, Antigravity IDE sidebar chat, and Antigravity 2.0 Desktop Application across Windows, macOS, and Linux.
-2. **36 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 36 metrics across model status, API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
+2. **37 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 37 metrics across model status, API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
 3. **Flexible Bar Graphs (Merged or Separate)**: Renders 10-block visual progress bars (`[████████░░]`) for 5-hour quota, weekly quota, Gemini 4 Argon quota, context usage, and session tokens. Automatically merges labels when placed adjacent to numeric counterparts, or displays them with independent labels when separated.
 4. **Custom Sorting & Dual Line-Wrapping**: Supports 1-based index sorting, `n` manual line breaks, `n,n` blank-line section separators, and terminal-width-aware automatic wrapping.
 5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`#57caff` Blue `100–75%`, `#5cdb6d` Green `74–50%`, `#ffd427` Yellow `49–25%`, `#ff7daf` Pink `24–0%`) alongside model-family brand colors.
 6. **Three-Layer Config Sync & OS Safeguards**: Synchronizes CLI-specific, global, and workspace `settings.json` plus `trusted_hooks.json`, while handling macOS/Linux NVM path resolution and Windows UTF-8 Byte Order Mark (BOM) prevention.
+7. **First-Open Update Check & Manual Hook Sync**: When `plugin-version` (`#37`) is enabled in `ui.footer.items`, checks GitHub Releases once per interactive `agy` CLI launch (skipping `agy -p`), falls back cleanly to cached release info if offline, and displays a localized 2-line update command reminder at the bottom when outdated. Hook sync stays manual via `/antigravity-cli-statusline:agy-cli-statusline`, and `diagnose-statusline.mjs` inspects plugin-vs-hook version alignment.
 
 ## Plugin Management
 
@@ -83,7 +84,7 @@ Once installed, trigger the configuration workflow using the slash command:
 
 ## Indicators, Sorting & Line Wrapping
 
-### Available Indicators (1–36)
+### Available Indicators (1–37)
 
 The numbers below correspond to the 1-based option indices across the 5 categories in Step 3 (`resources/questions.json`), along with each indicator's Emoji prefix used in `emoji` mode:
 
@@ -122,9 +123,9 @@ The numbers below correspond to the 1-based option indices across the 5 categori
 - `26.` 🔍 **VCS uncommitted status (`vcs-dirty`)** — `uncommitted / no changes`
 - `27.` 🗃️ **VCS type (`vcs-type`)** — `git / jj / fig`
 
-**5. System Status & Background Tasks (9 items)**
+**5. System Status & Background Tasks (10 items)**
 - `28.` 💾 **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
-- `29.` 🚀 **Antigravity CLI version (`cli-version`)** — current CLI version string
+- `29.` 🚀 **Antigravity CLI version (`cli-version`)** — current CLI version string (`Agy CLI Version:` in text mode)
 - `30.` 💬 **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
 - `31.` 🛡️ **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
 - `32.` 🔔 **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
@@ -132,6 +133,7 @@ The numbers below correspond to the 1-based option indices across the 5 categori
 - `34.` 🔄 **Running background tasks (`background-tasks`)** — active background task count
 - `35.` 👥 **Active subagents (`subagents`)** — running subagent count
 - `36.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
+- `37.` 🧩 **Statusline plugin version (`plugin-version`)** — installed `antigravity-cli-statusline` version; enables the once-per-launch GitHub Release update check and bottom update reminder
 
 ### Sorting Rules & Style Configuration
 
@@ -155,12 +157,12 @@ In Step 4 of the skill workflow, enter a comma-separated list of indicator indic
 
 - **Numeric Version**:
   ```text
-  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
+  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29,37
   ```
 
 - **Identifier Version**:
   ```text
-  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,plugin-version
   ```
 
 *(Note: English identifiers such as `model-name` or `e:quota` are also supported, but numeric indices are recommended for conciseness.)*
@@ -180,7 +182,14 @@ Argon Available: 59% [█████░░░░░] │ Argon Reset: 6d 1h │
 
 VCS Status: no changes │ VCS: git │ 🔀 main
 📁 antigravity-cli-statusline │ Project Path: /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Version: v1.3.2
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI Version: v1.5.10 │ Plugin Version: v1.11.4
+```
+
+When `plugin-version` is enabled and a newer GitHub Release is available, two localized notice lines are appended at the very bottom (the warning disappears automatically right after running `! agy plugin install`; run `/antigravity-cli-statusline:agy-cli-statusline` afterward if you want to sync hook scripts in `~/.gemini/antigravity-cli/hooks/`, or inspect status with `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs`):
+
+```text
+⚠️ Plugin update available (current v1.11.3 → latest v1.11.4). Run to update:
+! agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
 ## Contributing

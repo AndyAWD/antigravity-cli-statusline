@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-Google Antigravity（AGY）向けのプラグインです。Antigravity コマンドラインインターフェース（CLI）（`agy`）のステータスライン（Statusline / Footer）をカスタマイズし、36種類のリアルタイム指標から自由に選択、テキスト（`text`）または絵文字（Emoji）（`emoji`）ラベル表示スタイルの切り替え、表示順序のカスタマイズ、パーセント容量バーグラフの結合または個別表示モードの切り替え、自動および手動改行メカニズムを備え、4つの言語（`us`、`zh-tw`、`zh-cn`、`jp`）に対応しています。
+Google Antigravity（AGY）向けのプラグインです。Antigravity コマンドラインインターフェース（CLI）（`agy`）のステータスライン（Statusline / Footer）をカスタマイズし、37種類のリアルタイム指標から自由に選択、テキスト（`text`）または絵文字（Emoji）（`emoji`）ラベル表示スタイルの切り替え、表示順序のカスタマイズ、パーセント容量バーグラフの結合または個別表示モードの切り替え、自動および手動改行メカニズムを備え、4つの言語（`us`、`zh-tw`、`zh-cn`、`jp`）に対応しています。
 
 Google Antigravity の3大コアプラットフォームを包括的にサポート：Antigravity コマンドラインインターフェース（`agy`）、Antigravity 統合開発環境（IDE）、および Antigravity 2.0 デスクトップアプリケーション。
 
@@ -19,7 +19,7 @@ Google Antigravity の3大コアプラットフォームを包括的にサポー
 これは Antigravity コマンドラインインターフェース（CLI）ステータスラインの対話型設定から実際のリアルタイム動作までの動的デモです。設定コマンド `/antigravity-cli-statusline:agy-cli-statusline` の実行、各フェーズの `ask_question` アンケート対話、カスタムレイアウト入力、そして最終的に表示される 11 行の高情報密度ステータスラインを完全に収録しています：
 
 1. **設定コマンドの実行と言語選択**：`/antigravity-cli-statusline:agy-cli-statusline` を実行して対話型設定ウィザードを起動し、最初のステップで表示言語（日本語、繁体字中国語、簡体字中国語、英語）を即座に選択して固定します。
-2. **5大カテゴリ指標のページネーション選択**：`ask_question` カテゴリ別ページネーションウィザード（1/5 〜 5/5）を通じて全 36 項目の指標を網羅し、ターミナルの行数制限やスクロールによる切り捨て問題を解決します。
+2. **5大カテゴリ指標のページネーション選択**：`ask_question` カテゴリ別ページネーションウィザード（1/5 〜 5/5）を通じて全 37 項目の指標を網羅し、ターミナルの行数制限やスクロールによる切り捨て問題を解決します。
 3. **手動並び替えと個別スタイル Write-in**：1行の入力欄でカスタム順序とプレフィックスの入力に対応（例: `e:model-name` で絵文字、`quota` でテキストモード、`n` で強制改行、`n,n` で空白の区切り行を作成）。
 4. **設定同期と即時ホットリロード**：CLI 固有設定、グローバル設定、プロジェクト設定の3層の `settings.json` および `trusted_hooks.json` 信頼メカニズムを自動同期し、CLI を再起動することなく即座にホットリロードが適用され、11 行のカスタムステータスラインが展開されます。
 5. **11 行のステータスラインによるリアルタイムテレメトリ**：カスタム順序に従い、AI モデル、利用可能クォータと 10 マスのプログレスバー、コンテキストとトークン数、アクティブなサブエージェント、Git バージョン管理、システムメモリをリアルタイムに追跡します。
@@ -59,11 +59,12 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## 主な機能
 
 1. **マルチプラットフォーム対応**：Windows、macOS、Linux 上の Antigravity CLI ターミナル、Antigravity IDE サイドバーチャット、および Antigravity 2.0 デスクトップアプリケーションをサポート。
-2. **36種類のリアルタイム指標、4つのロケール＆デュアルラベルスタイル**：AI モデル状態、API クォータ（5時間、週間、Gemini 4 Argon 専用クォータプールを含む）、コンテキスト／トークン消費量、対話キュー、Git/VCS 状態、システムテレメトリなど 36 指標を英語（`us`）、繁体字中国語（`zh-tw`）、簡体字中国語（`zh-cn`）、日本語（`jp`）で提供し、**テキスト（`text`）**または**絵文字（`emoji`、コロンなしコンパクト）**ラベル表示スタイル（`ui.footer.labelStyle`）を選択可能。
+2. **37種類のリアルタイム指標、4つのロケール＆デュアルラベルスタイル**：AI モデル状態、API クォータ（5時間、週間、Gemini 4 Argon 専用クォータプールを含む）、コンテキスト／トークン消費量、対話キュー、Git/VCS 状態、システムテレメトリなど 37 指標を英語（`us`）、繁体字中国語（`zh-tw`）、簡体字中国語（`zh-cn`）、日本語（`jp`）で提供し、**テキスト（`text`）**または**絵文字（`emoji`、コロンなしコンパクト）**ラベル表示スタイル（`ui.footer.labelStyle`）を選択可能。
 3. **柔軟なバーグラフ表示（結合または個別）**：5時間クォータ、週間クォータ、Gemini 4 Argon クォータ、コンテキスト使用量、セッショントークンに対して 10 マスの視覚的プログレスバー（`[████████░░]`）を描画。数値指標と隣接して配置された場合は自動的にラベルを結合し、離れて配置された場合は個別のラベルで表示。
 4. **カスタム並び替え＆デュアル改行メカニズム**：1始まりのインデックス並び替え、`n` による手動改行、`n,n` による空白行のセクション区切り、およびターミナル幅を考慮した自動折り返しに対応。
 5. **24ビット4段階カラーコーディング**：4つのしきい値（`100–75%` 青、`74–50%` 緑、`49–25%` 黄、`24–0%` 赤）で色が動的に変化し、各 AI モデルファミリー（Gemini、Claude、GPT）専用のブランドアクセントカラーも表示。
 6. **3層設定同期＆OS セーフガード**：CLI 固有設定、グローバル設定、ワークスペース設定の3層の `settings.json` と `trusted_hooks.json` を同期し、macOS/Linux の NVM パス解決や Windows の UTF-8 Byte Order Mark（BOM）防止を安全に処理。
+7. **初回起動時の更新チェック＆手動フック同期**：`ui.footer.items` で `plugin-version`（`#37`）が有効な場合、対話型 `agy` CLI 起動ごとに 1 回だけ GitHub Releases を確認し（`agy -p` はスキップ）、オフライン時はキャッシュ済みバージョンで比較して、古い場合は最下部に2行の更新コマンド案内を表示。フックの同期は `/antigravity-cli-statusline:agy-cli-statusline` による手動実行を維持し、`diagnose-statusline.mjs` でプラグインとフックのバージョン差異を確認可能。
 
 ## プラグイン管理
 
@@ -111,6 +112,8 @@ antigravity-cli-statusline/
         ├── references/
         │   ├── config-files.md
         │   ├── pitfalls.md
+        │   ├── step4-table-example.md
+        │   ├── technical-specs.md
         │   └── windows.md
         ├── resources/
         │   └── questions.json
@@ -144,7 +147,7 @@ antigravity-cli-statusline/
 
 ## 指標、並び替え＆改行
 
-### 利用可能な指標（1–36）
+### 利用可能な指標（1–37）
 
 以下の番号は、ステップ 3（`resources/questions.json`）の 5 カテゴリにわたる 1 始まりの選択肢インデックス、および `emoji` モードで使用される絵文字プレフィックスに対応しています：
 
@@ -183,9 +186,9 @@ antigravity-cli-statusline/
 - `26.` 🔍 **VCS 変更状態（`vcs-dirty`）** — `未コミット / 変更なし`
 - `27.` 🗃️ **VCS 種別（`vcs-type`）** — `git / jj / fig`
 
-**5. システム状態とバックグラウンドタスク（9項目）**
+**5. システム状態とバックグラウンドタスク（10項目）**
 - `28.` 💾 **CLI メモリ使用量（`memory-usage`）** — `agy` プロセスが消費している RSS メモリ
-- `29.` 🚀 **Antigravity CLI バージョン（`cli-version`）** — 現在の CLI バージョン文字列
+- `29.` 🚀 **Antigravity CLI バージョン（`cli-version`）** — 現在の CLI バージョン文字列（テキスト表示ラベル：`Agy CLI バージョン:`）
 - `30.` 💬 **会話番号（`conversation-id`）** — デバッグ用の会話識別子の先頭8文字
 - `31.` 🛡️ **サンドボックス状態（`sandbox-status`）** — `オフ / オン（ネット） / オン（オフライン）`
 - `32.` 🔔 **ツール承認待ち（`tool-confirmation`）** — ツール確認ダイアログの応答待ち状態
@@ -193,6 +196,7 @@ antigravity-cli-statusline/
 - `34.` 🔄 **実行中バックグラウンドタスク（`background-tasks`）** — 稼働中のバックグラウンドタスク数
 - `35.` 👥 **アクティブなサブエージェント（`subagents`）** — 稼働中のサブエージェント数
 - `36.` 📄 **成果物数（`artifacts`）** — このセッションで生成された累積ファイル・成果物数
+- `37.` 🧩 **プラグインバージョン（`plugin-version`）** — インストール済みの `antigravity-cli-statusline` バージョン；有効にすると対話型 `agy` 起動ごとに GitHub Releases を確認し、更新がある場合は最下部に2行の案内を表示
 
 ### ラベル表示スタイル：テキスト（`text`）vs. 絵文字（`emoji`）
 
@@ -257,15 +261,15 @@ antigravity-cli-statusline/
 
 - **数字インデックスバージョン**：
   ```text
-  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29
+  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29,37
   ```
 
 - **英字識別子バージョン**：
   ```text
-  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version
+  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,plugin-version
   ```
 
-- **数字**：ステップ 3 の選択における 1 始まりの位置を表します（全 36 指標を選択した場合、数字 `1`〜`36` は上記リストに対応します）。
+- **数字**：ステップ 3 の選択における 1 始まりの位置を表します（全 37 指標を選択した場合、数字 `1`〜`37` は上記リストに対応します）。
 - **スタイルプレフィックス**：
   - プレーンな数字（例: `1`）または `t1`、プレーンな英字識別子（`quota`、`t:quota`）は**テキストラベル**としてフォーマットされます。
   - `e1` または `e:quota` は**絵文字アイコン**としてフォーマットされます（大文字・小文字を区別しません）。
@@ -289,7 +293,14 @@ Argon 残量: 59% [█████░░░░░] │ Argon リセット: 6d 1h
 
 版管理状態: 変更なし │ 版管理種別: git │ 🔀 main
 📁 antigravity-cli-statusline │ パス: /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ バージョン: v1.3.2
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ プラグイン版: v1.11.4
+```
+
+`plugin-version` が有効で新しい GitHub Release が利用可能な場合、最下部に2行の更新案内が自動的に追加されます（`! agy plugin install` を実行すると表示バージョンが追いつき警告は消えます。`~/.gemini/antigravity-cli/hooks/` 配下のフックスクリプトも更新したい場合は `/antigravity-cli-statusline:agy-cli-statusline` を再実行するか、`node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` でバージョン差を確認してください）：
+
+```text
+⚠️ プラグインの新バージョンが利用可能です（現在 v1.11.3 → 最新 v1.11.4）。以下のコマンドで更新してください：
+! agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
 ### 改行動作

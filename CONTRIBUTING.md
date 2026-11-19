@@ -24,11 +24,11 @@ Since this project dynamically handles multiple languages within existing files,
 
 ### 2. Modify `skills/agy-cli-statusline/resources/questions.json`
 - Add a new `"[LANG_CODE]"` object at the root level containing `"style_question"`, `"style_options"` (2 items ending with `(text)` and `(emoji)`), `"question"`, and `"categories"` array (5 categories: `model-and-agent`, `quota-and-billing`, `context-and-tokens`, `workspace-and-vcs`, `system-and-tasks`).
-- Translate all **36 statusline indicators** across the categories into [Target Language] using the exact format `"<Emoji> <Localized Description> (<indicator-id>)"`.
+- Translate all **37 statusline indicators** across the categories into [Target Language] using the exact format `"<Emoji> <Localized Description> (<indicator-id>)"` (`#1` `model-name` through `#37` `plugin-version`).
 
 ### 3. Modify `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **Find `normalizeLanguage(lang)`**: Add matching rules to normalize `[LANG_CODE]` and related locale aliases to `'[LANG_CODE]'`.
-- **Find `buildI18nDict(lang, m, labelStyle = 'text')`**: Add a new `[LANG_CODE]` object inside the `dicts` map. Translate all **41 keys** (**36 status indicators** + **5 merged bar graph keys**: `quota+bar`, `context-used+bar`, `quota-weekly+bar`, `quota-argon+bar`, `token-count+bar`) into [Target Language]. Refer to the `zh-tw`, `zh-cn`, `us`, or `jp` entries and preserve all ANSI color variables (`${BOLD}`, `${WHITE}`, `${RESET}`, etc.) and `${m.*}` template expressions.
+- **Find `buildI18nDict(lang, m, labelStyle = 'text')`**: Add a new `[LANG_CODE]` object inside the `dicts` map. Translate all **42 keys** (**37 status indicators** + **5 merged bar graph keys**: `quota+bar`, `context-used+bar`, `quota-weekly+bar`, `quota-argon+bar`, `token-count+bar`) into [Target Language]. Also add `[LANG_CODE]` translations inside `formatPluginUpdateNoticeLines(lang, currentTag, latestTag)`. Refer to the `zh-tw`, `zh-cn`, `us`, or `jp` entries and preserve all ANSI color variables (`${BOLD}`, `${WHITE}`, `${RESET}`, etc.) and `${m.*}` template expressions.
 - **Find `AGENT_STATE_MAP`**: Add translations for `'[LANG_CODE]'` across all states (`idle`, `thinking`, `working`, `tool_use`, `initializing`).
 - **Find `getGitBranch(projectPath, lang)`**: Update both ternary expressions (inside the `return` statement and inside the `catch` block) to include the translation for `"No VC"` in [Target Language].
 - **Find `unknownStr`, `noneStr`, `vcsDirtyLabel`, `sandboxStatusVal`, and `agentProfileName` in `main()`**: Update their ternary expressions to include [Target Language] translations for `"Unknown"`, `"None"`, `"Dirty"` / `"Clean"`, `"Sandbox"` / `"Local"`, and `"Default"`.
@@ -99,11 +99,11 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 
 ### 2. 修改 `skills/agy-cli-statusline/resources/questions.json`
 - 在根物件下新增 `"[LANG_CODE]"` 子物件，包含 `"style_question"`、`"style_options"`（2 個選項，結尾維持 `（text）` 與 `（emoji）`）、`"question"` 與包含五大分類的 `"categories"` 陣列（`model-and-agent`、`quota-and-billing`、`context-and-tokens`、`workspace-and-vcs`、`system-and-tasks`）。
-- 將各分類下的全部 **36 個狀態列指標**翻譯成【目標語言】，格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`。
+- 將各分類下的全部 **37 個狀態列指標**翻譯成【目標語言】，格式維持 `"<繪圖符號> <目標語言說明> (<英文識別碼>)"`（包含 `#1` `model-name` 至 `#37` `plugin-version`）。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **尋找 `normalizeLanguage(lang)` 函式**：新增對應判斷條件，將 `[LANG_CODE]` 及相關語系別名標準化為 `'[LANG_CODE]'`。
-- **尋找 `buildI18nDict(lang, m, labelStyle = 'text')` 函式**：在 `dicts` 物件內新增 `[LANG_CODE]` 子物件，將全部 **41 個鍵值**（包含 **36 個狀態列指標**與 **5 個長條圖合併鍵值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻譯成【目標語言】。請參考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的範本，保留原有的美國國家標準協會（ANSI）色彩變數（如 `${BOLD}`、`${WHITE}`、`${RESET}`）與 `${m.*}` 變數插值。
+- **尋找 `buildI18nDict(lang, m, labelStyle = 'text')` 函式**：在 `dicts` 物件內新增 `[LANG_CODE]` 子物件，將全部 **42 個鍵值**（包含 **37 個狀態列指標**與 **5 個長條圖合併鍵值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻譯成【目標語言】，並於 `formatPluginUpdateNoticeLines(lang, currentTag, latestTag)` 補上更新提示翻譯。請參考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的範本，保留原有的美國國家標準協會（ANSI）色彩變數（如 `${BOLD}`、`${WHITE}`、`${RESET}`）與 `${m.*}` 變數插值。
 - **尋找 `AGENT_STATE_MAP` 物件**：在所有代理狀態（`idle`、`thinking`、`working`、`tool_use`、`initializing`）中新增 `'[LANG_CODE]'` 的在地化文字。
 - **尋找 `getGitBranch(projectPath, lang)` 函式**：修改 `return` 敘述與 `catch` 區塊中的三元運算子，加上【目標語言】對於「無版本控制（No VC）」的翻譯。
 - **尋找 `main()` 內的 `unknownStr`、`noneStr`、`vcsDirtyLabel`、`sandboxStatusVal` 與 `agentProfileName` 變數**：修改三元運算子，補上【目標語言】對於「未知」、「無」、「有變更 / 乾淨」、「沙盒 / 本地」與「預設」的翻譯。
@@ -174,11 +174,11 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 
 ### 2. 修改 `skills/agy-cli-statusline/resources/questions.json`
 - 在根对象下新增 `"[LANG_CODE]"` 子对象，包含 `"style_question"`、`"style_options"`（2 个选项，结尾维持 `（text）` 与 `（emoji）`）、`"question"` 与包含五大分类的 `"categories"` 数组（`model-and-agent`、`quota-and-billing`、`context-and-tokens`、`workspace-and-vcs`、`system-and-tasks`）。
-- 将各分类下的全部 **36 个状态栏指标**翻译成【目标语言】，格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`。
+- 将各分类下的全部 **37 个状态栏指标**翻译成【目标语言】，格式维持 `"<表情符号> <目标语言说明> (<英文标识码>)"`（包含 `#1` `model-name` 至 `#37` `plugin-version`）。
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/statusline-quota.mjs`
 - **寻找 `normalizeLanguage(lang)` 函数**：新增对应判断条件，将 `[LANG_CODE]` 及相关语系别名标准化为 `'[LANG_CODE]'`。
-- **寻找 `buildI18nDict(lang, m, labelStyle = 'text')` 函数**：在 `dicts` 对象内新增 `[LANG_CODE]` 子对象，将全部 **41 个键值**（包含 **36 个状态栏指标**与 **5 个长条图合并键值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻译成【目标语言】。请参考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的范本，保留原有的 ANSI 色彩变量（如 `${BOLD}`、`${WHITE}`、`${RESET}`）与 `${m.*}` 变量插值。
+- **寻找 `buildI18nDict(lang, m, labelStyle = 'text')` 函数**：在 `dicts` 对象内新增 `[LANG_CODE]` 子对象，将全部 **42 个键值**（包含 **37 个状态栏指标**与 **5 个长条图合并键值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻译成【目标语言】，并在 `formatPluginUpdateNoticeLines(lang, currentTag, latestTag)` 补上更新提示翻译。请参考 `zh-tw`、`zh-cn`、`us` 或 `jp` 的范本，保留原有的 ANSI 色彩变量（如 `${BOLD}`、`${WHITE}`、`${RESET}`）与 `${m.*}` 变量插值。
 - **寻找 `AGENT_STATE_MAP` 对象**：在所有代理状态（`idle`、`thinking`、`working`、`tool_use`、`initializing`）中新增 `'[LANG_CODE]'` 的本地化文本。
 - **寻找 `getGitBranch(projectPath, lang)` 函数**：修改 `return` 语句与 `catch` 区块中的三元运算符，加上【目标语言】对于“无版本控制（No VC）”的翻译。
 - **寻找 `main()` 内的 `unknownStr`、`noneStr`、`vcsDirtyLabel`、`sandboxStatusVal` 与 `agentProfileName` 变量**：修改三元运算符，补上【目标语言】对于“未知”、“无”、“有更改 / 干净”、“沙盒 / 本地”与“默认”的翻译。
