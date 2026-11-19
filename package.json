@@ -1,10 +1,11 @@
 {
   "name": "antigravity-cli-statusline",
-  "version": "1.11.4",
+  "version": "1.12.0",
   "description": "Customize the Antigravity CLI statusline (footer) across macOS / Linux / Windows.",
   "type": "module",
   "scripts": {
-    "test": "node --test skills/agy-cli-statusline/scripts/configure-statusline.test.mjs skills/agy-cli-statusline/scripts/fetch-local-quota.test.mjs skills/agy-cli-statusline/scripts/statusline-quota.test.mjs skills/agy-cli-statusline/scripts/generate-svg-demos.test.mjs && node skills/agy-cli-statusline/scripts/test-counters.mjs",
+    "test": "node --test skills/agy-cli-statusline/scripts/tests/core-and-registry.test.mjs skills/agy-cli-statusline/scripts/tests/quota-and-context.test.mjs skills/agy-cli-statusline/scripts/tests/render-and-i18n.test.mjs skills/agy-cli-statusline/scripts/tests/probes-and-gating.test.mjs skills/agy-cli-statusline/scripts/tests/plugin-update.test.mjs skills/agy-cli-statusline/scripts/tests/configure-and-diagnose.test.mjs skills/agy-cli-statusline/scripts/tests/fetch-local-quota.test.mjs skills/agy-cli-statusline/scripts/tests/generate-svg-demos.test.mjs && node skills/agy-cli-statusline/scripts/test-counters.mjs",
+    "sync:resources": "node skills/agy-cli-statusline/scripts/sync-resources.mjs",
     "build:svg": "node skills/agy-cli-statusline/scripts/generate-svg-demos.mjs"
   },
   "author": "andyawd",

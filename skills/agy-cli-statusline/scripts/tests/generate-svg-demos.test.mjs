@@ -3,14 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { generateDemoSvg } from './generate-svg-demos.mjs';
+import { generateDemoSvg } from '../generate-svg-demos.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '../../..');
+const projectRoot = path.resolve(__dirname, '../../../..');
 const imagesDir = path.join(projectRoot, 'docs', 'images');
+// Audit #6：預期版本標籤一律動態讀自 plugin.json，避免每次發版都要手動改測試
+const pluginJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'plugin.json'), 'utf8'));
+const expectedPluginTag = `v${String(pluginJson.version).replace(/^v/i, '')}`;
 
-console.log('=== Running generate-svg-demos.test.mjs ===');
+console.log('=== Running tests/generate-svg-demos.test.mjs ===');
 
 const languages = ['us', 'zh-tw', 'zh-cn', 'jp'];
 
@@ -38,18 +41,19 @@ for (const lang of languages) {
 
   // 4. Wizard options checkmarks [✓]
   const checkmarks = (svg.match(/\[✓\]/g) || []).length;
-  assert.strictEqual(checkmarks, 36, `${lang}: SVG must visibly render all 36 options checked across 5 categories, got ${checkmarks}`);
+  assert.strictEqual(checkmarks, 38, `${lang}: SVG must visibly render all 38 options checked across 5 categories, got ${checkmarks}`);
 
   // 5. Monospace column spacing & anti-collision: checkmark for Node.js must be at x="370"
   assert.ok(svg.includes('<text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>'), `${lang}: Node.js checkmark must be at x=370 to prevent text overlap`);
   assert.ok(svg.includes('<text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>'), `${lang}: Node.js text must be at x=390`);
 
-  // 6. Metric 13 in Frame 6 reference table must be labeled (argon), not (quota)
-  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">13</tspan> │'), `${lang}: Reference table must include metric 13`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon 額度 (quota)'), `${lang}: Metric 13 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon 额度 (quota)'), `${lang}: Metric 13 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon 残量 (quota)'), `${lang}: Metric 13 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon Quota (quota)'), `${lang}: Metric 13 must not mislabel Argon as quota`);
+  // 6. Metric 14 in Frame 6 reference table must be labeled Argon (not quota-bar) and 29 must be Agy CLI
+  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │'), `${lang}: Reference table must include metric 14`);
+  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">29</tspan> │'), `${lang}: Reference table must include metric 29`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 額度 (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 额度 (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 残量 (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon Quota (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
 
   // 7. Frame 7 cursor position must not be floating in empty space at x=650 or overlapping text
   assert.ok(!svg.includes('<rect class="cur" x="650" y="255"'), `${lang}: Frame 7 cursor must not be floating at x=650`);
@@ -75,6 +79,13 @@ for (const lang of languages) {
 
   // 12. Bottom-right model in default footer must be Gemini 3.8 Flash (Low)
   assert.ok(svg.includes('<text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>'), `${lang}: Bottom-right model must be Gemini 3.8 Flash (Low)`);
+
+  // 13. Statusline telemetry must render new Agy CLI Version and Statusline Version labels
+  const expectedCliVersionLabel = lang === 'us' ? 'Agy CLI Version:' : (lang === 'jp' ? 'Agy CLI バージョン:' : 'Agy CLI 版本:');
+  const expectedPluginVersionLabel = lang === 'zh-tw' ? '狀態列版本:' : (lang === 'zh-cn' ? '状态栏版本:' : (lang === 'jp' ? 'ステータスライン版:' : 'Statusline Version:'));
+  assert.ok(svg.includes(expectedCliVersionLabel), `${lang}: Statusline must include ${expectedCliVersionLabel}`);
+  assert.ok(svg.includes(expectedPluginVersionLabel), `${lang}: Statusline must include ${expectedPluginVersionLabel}`);
+  assert.ok(svg.includes(expectedPluginTag), `${lang}: Statusline must include plugin version ${expectedPluginTag}`);
 
   // 11. Frame 6 reference table alignment: all 4 rows must have display width 91
   function charWidth(ch) {

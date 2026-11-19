@@ -1,10 +1,9 @@
-import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync, existsSync, readdirSync, copyFileSync } from 'fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, symlinkSync, copyFileSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import http from 'http';
-import { spawn, execFileSync } from 'child_process';
+import { spawn } from 'child_process';
 import assert from 'assert';
-import { fileURLToPath } from 'url';
 import {
   formatAbsoluteResetTime,
   renderBarGraph,
@@ -12,101 +11,41 @@ import {
   preprocessAdjacentItems,
   renderStatusLine,
   stripAnsi,
-  getDisplayWidth,
-  normalizeLabelStyle,
-  EMOJI_MAP,
-  getGitBranch,
-  getGitDirty,
-  resolveTerminalWidth,
   resolveArgonQuota,
   parseMetaQuota,
   mergeQuotaBuckets,
   formatResetTime,
-  DEFAULT_COMPACTION_THRESHOLD,
   STEP_UP_INTERMEDIATE_THRESHOLD,
   parseCeilingValue,
   extractModelCandidateKeys,
   computeSteppedCeiling,
   calculateContextUsageAsync,
   extractMetricsAsync
-} from './statusline-quota.mjs';
-
-const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
-const FETCH_SCRIPT_PATH = fileURLToPath(new URL('./fetch-local-quota.mjs', import.meta.url));
-
-const BLUE_BOLD = "\x1b[38;2;87;202;255m\x1b[1m";
-const GREEN_BOLD = "\x1b[38;2;92;219;109m\x1b[1m";
-const YELLOW = "\x1b[38;2;255;212;39m";
-const WHITE = "\x1b[38;2;255;255;255m";
-const RESET = "\x1b[0m";
-
-/**
- * Spawns the statusline script with redirected HOME and project directory.
- * @param {object} stdinData - Meta payload piped to stdin
- * @param {string} homeDir - Isolated temporary directory path
- * @returns {Promise<{code: number, stdout: string, stderr: string}>}
- */
-function runStatusline(stdinData, homeDir, scriptPath = SCRIPT_PATH, extraEnv = {}) {
-  return new Promise((resolve) => {
-    const env = { ...process.env, HOME: homeDir, USERPROFILE: homeDir, STATUSLINE_QUOTA_WAIT_MS: '800' };
-    delete env.DISABLE_QUOTA_HOOK;            // explicit unset — Finding #1
-    delete env.ANTIGRAVITY_LS_ADDRESS;        // prevent test isolation leak from parent agent shell
-    delete env.ANTIGRAVITY_CSRF_TOKEN;
-    Object.assign(env, extraEnv);
-    const child = spawn('node', [scriptPath], {
-      env,
-      cwd: homeDir,                            // project settings resolve under temp home — Finding #2
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', chunk => stdout += chunk);
-    child.stderr.on('data', chunk => stderr += chunk);
-
-    child.on('close', (code) => {
-      resolve({ code, stdout, stderr });
-    });
-
-    child.stdin.write(JSON.stringify(stdinData));
-    child.stdin.end();
-  });
-}
-
-/**
- * Creates a hermetic sandbox home directory containing mock cache and settings.
- * @param {object} cache - Mock quota cache content
- * @param {object} settings - Mock settings content
- * @returns {string} Path to the created temp home directory
- */
-function makeTempHome(cache, settings) {
-  const home = mkdtempSync(join(os.tmpdir(), 'statusline-weekly-'));
-  mkdirSync(join(home, '.gemini', 'tmp'), { recursive: true });
-  writeFileSync(join(home, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify(cache), 'utf8');
-  writeFileSync(join(home, '.gemini', 'settings.json'), JSON.stringify(settings), 'utf8');
-  return home;
-}
-
-// os.homedir() reads USERPROFILE on Windows and HOME elsewhere, so both are overridden
-async function withHomeEnv(home, fn) {
-  const origHome = process.env.HOME;
-  const origUserProfile = process.env.USERPROFILE;
-  process.env.HOME = home;
-  process.env.USERPROFILE = home;
-  try {
-    return await fn();
-  } finally {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    if (origUserProfile === undefined) delete process.env.USERPROFILE;
-    else process.env.USERPROFILE = origUserProfile;
-  }
-}
+} from '../statusline-quota.mjs';
+import {
+  EXPIRED_RESET_GRACE_MS,
+  normalizeResolvedQuotaEntry,
+  resolveModelQuota,
+  resolveQuotaPool,
+  resolveWeeklyQuota
+} from '../lib/collectors/quota.mjs';
+import {
+  runStatusline,
+  makeTempHome,
+  withHomeEnv,
+  SCRIPT_PATH,
+  FETCH_SCRIPT_PATH,
+  SCRIPTS_DIR,
+  copyDirRecursiveSync,
+  BLUE_BOLD,
+  GREEN_BOLD,
+  YELLOW,
+  WHITE,
+  RESET
+} from './helpers.mjs';
 
 async function main() {
-  console.log("=== Running statusline-quota.test.mjs (R1-R4) ===");
+  console.log("=== Running quota-and-context.test.mjs (R1-R7, R9-R15, R28-R33) ===");
 
   let testsPassed = true;
 
@@ -120,7 +59,7 @@ async function main() {
       weekly: {
         gemini: {
           remaining_percentage: 90.07,
-          reset_time: '2026-07-05T03:22:46Z',
+          reset_time: new Date(Date.now() + ((4 * 24 + 11) * 3600 - 30) * 1000).toISOString(),
           refreshes_in: '4d 11h'
         }
       },
@@ -164,7 +103,7 @@ async function main() {
       weekly: {
         gemini: {
           remaining_percentage: 90.07,
-          reset_time: '2026-07-05T03:22:46Z',
+          reset_time: new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString(),
           refreshes_in: '4d 11h'
         }
       },
@@ -208,7 +147,7 @@ async function main() {
       weekly: {
         '3p': {
           remaining_percentage: 60.5,
-          reset_time: '2026-07-07T07:27:15Z',
+          reset_time: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
           refreshes_in: '6d 15h'
         }
       },
@@ -289,14 +228,14 @@ async function main() {
       models: {
         gemini36flashhigh: {
           remaining_percentage: 4.67,
-          reset_time: '2026-08-07T11:12:18Z',
+          reset_time: new Date(Date.now() + (80 * 60 - 30) * 1000).toISOString(),
           refreshes_in: '1h 20m'
         }
       },
       shortTerm: {
         gemini: {
           remaining_percentage: 31.8,
-          reset_time: '2026-08-07T11:54:34Z',
+          reset_time: new Date(Date.now() + (122 * 60 - 30) * 1000).toISOString(),
           refreshes_in: '2h 2m'
         }
       },
@@ -413,11 +352,8 @@ async function main() {
       try { rmSync(homeR7, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
-    // ----------------------------------------------------
-    // Test Case R8: Simplified Chinese (zh-cn) rendering (all 26 indicators)
-    // Justification: Verifies that zh-cn renders correct metric labels, status values, and fallback strings across all 26 indicators.
-    // ----------------------------------------------------
-    console.log("\n[Test R8] Verifying Simplified Chinese (zh-cn) rendering for all 26 indicators...");
+
+    // R9 用之 R8 共用夾具（模擬快取與 meta，拆檔後於此重新宣告）
     const mockCacheR8 = {
       shortTerm: {
         gemini: {
@@ -435,22 +371,6 @@ async function main() {
       email: 'test@example.com',
       updatedAt: Date.now()
     };
-    const all26Items = [
-      "model-name", "quota", "context-used", "memory-usage", "token-count",
-      "quota-reset-countdown", "quota-weekly", "quota-weekly-countdown", "git-branch",
-      "project-path", "project-full-path", "plan-tier", "account-email", "agent-state",
-      "tool-confirmation", "pending-input", "background-tasks", "subagents", "artifacts",
-      "vcs-dirty", "vcs-type", "sandbox-status", "cli-version", "conversation-id",
-      "agent-profile", "mode"
-    ];
-    const settingsR8 = {
-      ui: {
-        language: "zh-cn",
-        footer: {
-          items: all26Items
-        }
-      }
-    };
     const metaR8 = {
       model: { display_name: "Gemini 3.5 Flash" },
       terminal_width: 1000,
@@ -461,30 +381,6 @@ async function main() {
       agent_state: "idle",
       mode: "default"
     };
-
-    const homeR8 = makeTempHome(mockCacheR8, settingsR8);
-    try {
-      const resR8 = await runStatusline(metaR8, homeR8);
-      console.log("R8 Output:", JSON.stringify(resR8.stdout));
-
-      const expectedR8Labels = [
-        "模型:", "五小时可用:", "上下文用量:", "内存:", "令牌数:",
-        "五小时倒数:", "七日内可用:", "七日内倒数:", "分支:",
-        "项目:", "完整路径:", "订阅计划:", "账号:", "代理状态:",
-        "工具待确认:", "待处理输入:", "后台任务:", "子代理:", "产出文件:",
-        "版控状态:", "版控类型:", "沙箱状态:", "版本:", "对话编号:",
-        "代理角色:", "模式:"
-      ];
-      const missingLabels = expectedR8Labels.filter(item => !resR8.stdout.includes(item));
-      if (resR8.code === 0 && missingLabels.length === 0) {
-        console.log("✅ R8 passed! (All 26 Simplified Chinese zh-cn indicators rendered correctly)");
-      } else {
-        console.error(`❌ R8 failed! Missing labels: ${JSON.stringify(missingLabels)}. Output: ${JSON.stringify(resR8.stdout)}`);
-        testsPassed = false;
-      }
-    } finally {
-      try { rmSync(homeR8, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
 
     // ----------------------------------------------------
     // Test Case R9: Case-insensitive & complex language code normalization (zh-CN, cn & 简体中文 (zh-cn))
@@ -615,6 +511,7 @@ async function main() {
       sandboxAllowNet: false,
       sandboxStatusVal: 'off',
       cliVersion: 'v1.7.0',
+      pluginVersion: 'v1.11.4',
       conversationIdShort: '12345678',
       agentProfileName: 'Default'
     };
@@ -624,7 +521,8 @@ async function main() {
       'quota-bar', 'quota-weekly-bar',
       'context-used-bar', 'token-count-bar',
       'quota+bar', 'context-used+bar', 'quota-weekly+bar', 'token-count+bar',
-      'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'quota-argon+bar'
+      'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'quota-argon+bar',
+      'plugin-version'
     ];
 
     for (const testLang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
@@ -672,14 +570,14 @@ async function main() {
       shortTerm: {
         gemini: {
           remaining_percentage: 88.0,
-          reset_time: '2026-10-13T07:50:47Z',
+          reset_time: new Date(Date.now() + (190 * 60 - 30) * 1000).toISOString(),
           refreshes_in: '3h 10m'
         }
       },
       weekly: {
         gemini: {
           remaining_percentage: 90.0,
-          reset_time: '2026-10-20T07:50:47Z',
+          reset_time: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
           refreshes_in: '7d'
         }
       },
@@ -770,713 +668,30 @@ async function main() {
       try { rmSync(homeR15, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
-    // ----------------------------------------------------
-    // Test Case R16: Fallback when ui.footer.items is empty array [] (dino bug reproduction)
-    // ----------------------------------------------------
-    console.log("\n[Test R16] Verifying fallback mode when ui.footer.items is empty array [] (dino config)...");
-    const settingsR16 = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          theme: "dino",
-          items: []
-        }
-      }
-    };
-    const metaR16 = {
-      model: { display_name: "Gemini 3.8 Flash (High)" },
-      terminal_width: 80
-    };
-    const homeR16 = makeTempHome({}, settingsR16);
-    try {
-      const resR16 = await runStatusline(metaR16, homeR16);
-      console.log("R16 Output:", JSON.stringify(resR16.stdout));
-      const plainR16 = stripAnsi(resR16.stdout).trim();
 
-      assert.strictEqual(resR16.code, 0);
-      assert.ok(plainR16.length > 0, "Output must NOT be empty string");
-      assert.ok(plainR16.startsWith("? for shortcuts"), "Output must start with '? for shortcuts'");
-      assert.ok(plainR16.includes("Gemini 3.8 Flash (High)"), "Output must contain fallback model name");
-      console.log("✅ R16 passed! (Empty items array successfully triggered fallback mode instead of empty output)");
-    } finally {
-      try { rmSync(homeR16, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // ----------------------------------------------------
-    // Test Case R17: Fallback when ui.footer.items is null or missing
-    // ----------------------------------------------------
-    console.log("\n[Test R17] Verifying fallback mode when ui.footer.items is null/missing...");
-    const settingsR17 = {
-      ui: {
-        language: "zh-tw",
-        footer: {}
-      }
-    };
-    const metaR17 = {
-      model: { display_name: "Gemini 3.5 Pro" },
-      terminal_width: 80
-    };
-    const homeR17 = makeTempHome({}, settingsR17);
-    try {
-      const resR17 = await runStatusline(metaR17, homeR17);
-      console.log("R17 Output:", JSON.stringify(resR17.stdout));
-      const plainR17 = stripAnsi(resR17.stdout).trim();
-
-      assert.strictEqual(resR17.code, 0);
-      assert.ok(plainR17.length > 0, "Output must NOT be empty string");
-      assert.ok(plainR17.startsWith("? for shortcuts"), "Output must start with '? for shortcuts'");
-      assert.ok(plainR17.includes("Gemini 3.5 Pro"), "Output must contain fallback model name");
-      console.log("✅ R17 passed! (Missing items successfully triggered fallback mode)");
-    } finally {
-      try { rmSync(homeR17, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // ----------------------------------------------------
-    // Test Case R18: renderStatusLine defense against empty array / invalid items
-    // ----------------------------------------------------
-    console.log("\n[Test R18] Verifying renderStatusLine never returns empty array or blank line...");
-    const emptyLines1 = renderStatusLine([], {}, 80, 'Test-Model');
-    assert.strictEqual(emptyLines1.length, 1, "renderStatusLine([]) must return 1 fallback line");
-    assert.ok(stripAnsi(emptyLines1[0]).includes('? for shortcuts'), "renderStatusLine([]) must contain '? for shortcuts'");
-    assert.ok(stripAnsi(emptyLines1[0]).includes('Test-Model'), "renderStatusLine([]) must contain fallback model name");
-
-    const emptyLines2 = renderStatusLine(['nonexistent-metric'], {}, 80, 'Fallback-Model-2');
-    assert.strictEqual(emptyLines2.length, 1, "renderStatusLine with unknown items must return 1 fallback line");
-    assert.ok(stripAnsi(emptyLines2[0]).includes('Fallback-Model-2'), "renderStatusLine must contain fallback model name");
-    // ----------------------------------------------------
-    // Test Case R19: renderStatusLine defense against newline-only or null items
-    // ----------------------------------------------------
-    console.log("\n[Test R19] Verifying renderStatusLine defense against newline-only, null, or undefined items...");
-    const emptyLines3 = renderStatusLine(['n', 'newline'], {}, 80, 'Fallback-Model-3');
-    assert.strictEqual(emptyLines3.length, 1, "renderStatusLine with only newlines must return 1 fallback line");
-    assert.ok(stripAnsi(emptyLines3[0]).includes('? for shortcuts'), "renderStatusLine with only newlines must contain '? for shortcuts'");
-    assert.ok(stripAnsi(emptyLines3[0]).includes('Fallback-Model-3'), "renderStatusLine must contain fallback model name");
-
-    const emptyLines4 = renderStatusLine([null, undefined, ''], {}, 80, 'Fallback-Model-4');
-    assert.strictEqual(emptyLines4.length, 1, "renderStatusLine with null/undefined items must return 1 fallback line");
-    assert.ok(stripAnsi(emptyLines4[0]).includes('Fallback-Model-4'), "renderStatusLine must contain fallback model name");
-
-    // Also test rawModel label stripping when fallbackModel is omitted
-    const emptyLines5 = renderStatusLine([], { 'model-name': '\u001b[37m模型:\u001b[0m \u001b[1mGemini 3.5 Pro\u001b[0m' }, 80);
-    assert.strictEqual(emptyLines5.length, 1);
-    assert.ok(stripAnsi(emptyLines5[0]).includes('Gemini 3.5 Pro'), "renderStatusLine must extract raw model name without label");
-    assert.ok(!stripAnsi(emptyLines5[0]).includes('模型:'), "renderStatusLine must NOT include '模型:' label in shortcuts line");
-    console.log("✅ R19 passed! (renderStatusLine safely handles newline-only, null, and extracts raw model cleanly)");
-
-    // ----------------------------------------------------
-    // Test Case R20: E2E fallback when items is a string or non-array (e.g. items: 'dino')
-    // ----------------------------------------------------
-    console.log("\n[Test R20] Verifying E2E fallback mode when items is non-array string/object...");
-    const settingsR20 = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          theme: "custom-theme",
-          items: "dino"
-        }
-      }
-    };
-    const metaR20 = {
-      model: { display_name: "Gemini 3.8 Pro" },
-      terminal_width: 80
-    };
-    const homeR20 = makeTempHome({}, settingsR20);
-    try {
-      const resR20 = await runStatusline(metaR20, homeR20);
-      console.log("R20 Output:", JSON.stringify(resR20.stdout));
-      const plainR20 = stripAnsi(resR20.stdout).trim();
-
-      assert.strictEqual(resR20.code, 0);
-      assert.ok(plainR20.length > 0, "Output must NOT be empty string");
-      assert.ok(plainR20.startsWith("? for shortcuts"), "Output must start with '? for shortcuts'");
-      assert.ok(plainR20.includes("Gemini 3.8 Pro"), "Output must contain fallback model name");
-      console.log("✅ R20 passed! (Non-array items string successfully triggered fallback mode)");
-    } finally {
-      try { rmSync(homeR20, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // ----------------------------------------------------
-    // Test Case R21: Unit test for Emoji labelStyle, EMOJI_MAP (all 32 + 4 merged keys), and getDisplayWidth
-    // ----------------------------------------------------
-    console.log("\n[Test R21] Verifying normalizeLabelStyle, getDisplayWidth with emojis, and buildI18nDict('emoji')...");
-    assert.strictEqual(normalizeLabelStyle('text'), 'text');
-    assert.strictEqual(normalizeLabelStyle('emoji'), 'emoji');
-    assert.strictEqual(normalizeLabelStyle('Emoji 圖示（例如：🤖 Gemini 3.1 Pro）（emoji）'), 'emoji');
-    assert.strictEqual(normalizeLabelStyle('文字標籤（例如：模型: Gemini 3.1 Pro）（text）'), 'text');
-    assert.strictEqual(normalizeLabelStyle(undefined), 'text');
-
-    // Display width checks for surrogate-pair emojis and variation selectors
-    assert.strictEqual(getDisplayWidth('🤖'), 2, '🤖 should have display width 2');
-    assert.strictEqual(getDisplayWidth('🔋 100%'), 7, '🔋 (2) + space (1) + 100% (4) = 7');
-    assert.strictEqual(getDisplayWidth('⏳ 4h 30m'), 9, '⏳ (2) + space (1) + 4h 30m (6) = 9');
-
-    const mockMetricsR21 = {
-      fallbackModel: 'Gemini 3.1 Pro',
-      quotaColor: BLUE_BOLD,
-      quotaVal: '100%',
-      quotaBarVal: `${BLUE_BOLD}[██████████]${RESET}`,
-      countdownVal: '4h 59m',
-      quotaResetTimeVal: '18:30',
-      weeklyQuotaColor: GREEN_BOLD,
-      weeklyQuotaVal: '72%',
-      weeklyQuotaBarVal: `${GREEN_BOLD}[███████░░░]${RESET}`,
-      weeklyCountdownVal: '5d 12h',
-      weeklyResetTimeVal: '2026/10/20 12:00',
-      argonQuotaColor: GREEN_BOLD,
-      argonQuotaVal: '59%',
-      argonQuotaBarVal: `${GREEN_BOLD}[█████░░░░░]${RESET}`,
-      argonCountdownVal: '6d 1h',
-      argonResetTimeVal: '2026/10/30 23:57',
-      contextColor: BLUE_BOLD,
-      usedPct: '15%',
-      contextBarVal: `${BLUE_BOLD}[██░░░░░░░░]${RESET}`,
-      tokenCount: `${BLUE_BOLD}12.5k${RESET}`,
-      tokenBarVal: `${BLUE_BOLD}[█░░░░░░░░░]${RESET}`,
-      planTier: 'Pro',
-      accountEmail: 'dev@example.com',
-      agentState: 'working',
-      toolConfirmPending: true,
-      pendingInputCount: 2,
-      backgroundTasksCount: 1,
-      subagentsCount: 3,
-      artifactsCount: 4,
-      gitBranch: 'main',
-      vcsDirtyFlag: false,
-      vcsDirtyGlyph: '',
-      vcsDirtyLabel: '無變更',
-      vcsType: 'git',
-      projectName: 'my/proj',
-      projectFullPath: '/Users/dev/my/proj',
-      memUsage: '128MB',
-      sandboxEnabled: true,
-      sandboxAllowNet: true,
-      sandboxStatusVal: '啟用（聯網）',
-      cliVersion: 'v1.2.3',
-      conversationIdShort: 'c4a861dd',
-      agentProfileName: 'Default',
-      mode: 'Interactive'
-    };
-
-    for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
-      const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
-      const allKeys = Object.keys(EMOJI_MAP);
-      assert.strictEqual(allKeys.length, 41, 'EMOJI_MAP must contain 36 metrics + 5 merged bar keys (41 total)');
-
-      for (const key of allKeys) {
-        const rendered = stripAnsi(emojiDict[key]);
-        const expectedEmoji = EMOJI_MAP[key];
-        assert.ok(
-          rendered.startsWith(`${expectedEmoji} `),
-          `[${lang}] Metric "${key}" in emoji mode must start with "${expectedEmoji} ", got: "${rendered}"`
-        );
-        const afterPrefix = rendered.slice(`${expectedEmoji} `.length);
-        assert.ok(
-          !afterPrefix.startsWith(':'),
-          `[${lang}] Metric "${key}" in emoji mode must NOT have a colon after emoji, got: "${rendered}"`
-        );
-      }
-    }
-
-    // Verify localized status values are preserved in emoji mode
-    const zhTwEmojiDict = buildI18nDict('zh-tw', mockMetricsR21, 'emoji');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['agent-state']), '⚡ 執行中');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['tool-confirmation']), '🔔 待確認');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['vcs-dirty']), '🔍 無變更');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['sandbox-status']), '🛡️ 啟用（聯網）');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['agent-profile']), '🪪 Default');
-    assert.strictEqual(stripAnsi(zhTwEmojiDict['quota+bar']), '🔋 100% [██████████]');
-
-    // Verify renderStatusLine fallback rawModel extraction works with emoji dict
-    const fallbackEmojiLines = renderStatusLine([], zhTwEmojiDict, 80);
-    assert.strictEqual(fallbackEmojiLines.length, 1);
-    assert.ok(stripAnsi(fallbackEmojiLines[0]).includes('Gemini 3.1 Pro'));
-    assert.ok(!stripAnsi(fallbackEmojiLines[0]).includes('🤖'), 'Fallback shortcuts line should strip 🤖 prefix from model-name');
-    console.log("✅ R21 passed! (All 36 emoji mappings and localized status values verified)");
-
-    // ----------------------------------------------------
-    // Test Case R22: E2E test with ui.footer.labelStyle = "emoji"
-    // ----------------------------------------------------
-    console.log("\n[Test R22] Verifying E2E execution with ui.footer.labelStyle = 'emoji'...");
-    const settingsR22 = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          labelStyle: "emoji",
-          items: [
-            "model-name",
-            "quota",
-            "quota-bar",
-            "git-branch",
-            "vcs-dirty",
-            "tool-confirmation"
-          ]
-        }
-      }
-    };
-    const cacheR22 = {
-      updatedAt: Date.now(),
-      accountEmail: "dev@example.com",
-      planTier: "Pro",
-      models: {
-        "gemini 3.1 pro": {
-          remaining_percentage: 90,
-          reset_time: new Date(Date.now() + 3600 * 1000).toISOString()
-        }
-      }
-    };
-    const metaR22 = {
-      model: { display_name: "Gemini 3.1 Pro" },
-      vcs: { type: "git", branch: "feat/emoji", dirty: false },
-      has_tool_confirmation: false,
-      terminal_width: 120
-    };
-    const homeR22 = makeTempHome(cacheR22, settingsR22);
-    try {
-      const resR22 = await runStatusline(metaR22, homeR22);
-      console.log("R22 Output:", JSON.stringify(resR22.stdout));
-      const plainR22 = stripAnsi(resR22.stdout).trim();
-
-      assert.strictEqual(resR22.code, 0);
-      assert.ok(plainR22.includes("🤖 Gemini 3.1 Pro"), "Must render model with 🤖 and no colon");
-      assert.ok(plainR22.includes("🔋 90% [█████████░]"), "Must render merged quota+bar with 🔋 and no colon");
-      assert.ok(plainR22.includes("🔀 feat/emoji"), "Must render git-branch with 🔀 and no colon");
-      assert.ok(plainR22.includes("🔍 無變更"), "Must render vcs-dirty with 🔍 and localized value");
-      assert.ok(plainR22.includes("🔔 無"), "Must render tool-confirmation with 🔔 and localized value");
-      assert.ok(!plainR22.includes("模型:"), "Must NOT contain text label '模型:'");
-      assert.ok(!plainR22.includes("五小時可用:"), "Must NOT contain text label '五小時可用:'");
-      console.log("✅ R22 passed! (E2E Emoji statusline rendered cleanly)");
-    } finally {
-      try { rmSync(homeR22, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // =========================================================================
-    // Test R23: getDisplayWidth accuracy for block elements, box drawing & checkmarks
-    // =========================================================================
-    console.log("Running Test R23: getDisplayWidth accuracy for block elements & quota line wrapping...");
-    assert.strictEqual(getDisplayWidth("█"), 1, "Block element █ must have display width 1");
-    assert.strictEqual(getDisplayWidth("░"), 1, "Block element ░ must have display width 1");
-    assert.strictEqual(getDisplayWidth("│"), 1, "Box drawing │ must have display width 1");
-    assert.strictEqual(getDisplayWidth("✓"), 1, "Checkmark ✓ must have display width 1");
-    assert.strictEqual(getDisplayWidth("✗"), 1, "Cross ✗ must have display width 1");
-    assert.strictEqual(getDisplayWidth("[█████████░]"), 12, "10-char progress bar with brackets must have display width 12");
-    assert.strictEqual(getDisplayWidth("脈絡用量"), 8, "4 CJK chars must have display width 8");
-    assert.strictEqual(getDisplayWidth("🤖"), 2, "Emoji must have display width 2");
-
-    // Verify the exact 4-item quota row from the user's bug report fits within 120 columns (termWidth for 135-col terminal)
-    const quotaRowLine1 = "脈絡用量: 0.0% [░░░░░░░░░░] │ 權杖數: 0 / 1.0M [░░░░░░░░░░] │ 五小時倒數: 3h 52m │ 五小時重置: 2026/10/16 01:09";
-    const quotaRowLine2 = "五小時可用: 88% [████████░░] │ 七日內可用: 94% [█████████░] │ 七日內倒數: 5d 17h │ 七日內重置: 2026/10/21 14:47";
-    assert.ok(getDisplayWidth(quotaRowLine1) <= 120, `Quota line 1 width (${getDisplayWidth(quotaRowLine1)}) must fit in 120 cols`);
-    assert.ok(getDisplayWidth(quotaRowLine2) <= 120, `Quota line 2 width (${getDisplayWidth(quotaRowLine2)}) must fit in 120 cols`);
-    console.log("✅ R23 passed! (getDisplayWidth accurately counts 1-col symbols and prevents premature wrapping)");
-
-    // =========================================================================
-    // Test R24: getGitDirty & getGitBranch do NOT retry fallback binaries when git succeeds or exits non-ENOENT
-    // =========================================================================
-    console.log("Running Test R24: getGitDirty clean repo & getGitBranch non-repo single invocation...");
-    let dirtyCalls = 0;
-    const mockCleanGitExec = async (cmd) => {
-      dirtyCalls++;
-      return { stdout: "", ok: true, notFound: false };
-    };
-    const isDirtyClean = await getGitDirty({ vcs: { type: "git" } }, mockCleanGitExec);
-    assert.strictEqual(isDirtyClean, false, "Clean repo should return false for dirty");
-    assert.strictEqual(dirtyCalls, 1, "Clean repo must invoke git status only once (no fallback path retries)");
-
-    let branchCalls = 0;
-    const mockNonGitExec = async (cmd) => {
-      branchCalls++;
-      return { stdout: "", ok: false, notFound: false }; // git found, but non-zero exit (e.g. not a git repo)
-    };
-    const branchRes = await getGitBranch('zh-tw', '/tmp', mockNonGitExec);
-    assert.strictEqual(branchRes, "無版本控制", "Non-git repo should return '無版本控制'");
-    assert.strictEqual(branchCalls, 1, "Must only run git branch --show-current once with PATH git without probing fallback binaries");
-    console.log("✅ R24 passed! (Subprocess fallback storm eliminated)");
-
-    // =========================================================================
-    // Test R25: resolveTerminalWidth & E2E startup terminal_width fallback from account cache
-    // =========================================================================
-    console.log("Running Test R25: resolveTerminalWidth & E2E startup width stability...");
-    assert.strictEqual(resolveTerminalWidth({ terminal_width: 140 }, { terminalWidth: 160 }), 125, "Explicit width > 80 uses meta.terminal_width - 15");
-    assert.strictEqual(resolveTerminalWidth({ terminal_width: 80 }, { terminalWidth: 150 }), 135, "Default 80 width at startup falls back to cached terminalWidth - 15");
-    assert.strictEqual(resolveTerminalWidth({}, { terminalWidth: 150 }), 135, "Missing terminal_width falls back to cached terminalWidth - 15");
-    assert.strictEqual(resolveTerminalWidth({ terminal_width: 80 }, {}), 65, "Uncached 80 width preserves 80 - 15 = 65");
-
-    // E2E verify: First run with terminal_width=150 caches width; second run with terminal_width=80 (conversation start) keeps 2-line quota block
-    const settingsR25 = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          items: [
-            "context-used", "context-used-bar", "token-count", "token-count-bar", "quota-countdown", "quota-reset-time", "n",
-            "quota", "quota-bar", "quota-weekly", "quota-weekly-bar", "quota-weekly-countdown", "quota-weekly-reset-time"
-          ],
-          barLength: 10,
-          timeFormat: "smart"
-        }
-      }
-    };
-    const cacheR25 = {
-      shortTerm: {
-        gemini: {
-          remaining_percentage: 88,
-          reset_time: "2026-10-16T01:09:00.000Z",
-          refreshes_in: "3h 52m"
-        }
-      },
-      weekly: {
-        gemini: {
-          remaining_percentage: 94,
-          reset_time: "2026-10-21T06:47:00.000Z",
-          refreshes_in: "5d 17h"
-        }
-      },
-      updatedAt: Date.now()
-    };
-    const homeR25 = makeTempHome(cacheR25, settingsR25);
-    try {
-      // Step 1: Normal session with 150-col terminal caches terminalWidth=150
-      await runStatusline({
-        model: { display_name: "Gemini 3.5 Flash (High)" },
-        context_window: { total_input_tokens: 50000, context_window_size: 1000000, used_percentage: 5 },
-        terminal_width: 150
-      }, homeR25);
-
-      // Step 2: Simulate new conversation start where CLI initially passes terminal_width: 80 and 0 context tokens
-      const metaR25Start = {
-        model: { display_name: "Gemini 3.5 Flash (High)" },
-        context_window: { total_input_tokens: 0, context_window_size: 1000000, used_percentage: 0 },
-        terminal_width: 80
-      };
-      const resR25 = await runStatusline(metaR25Start, homeR25);
-      const plainR25Lines = stripAnsi(resR25.stdout).trim().split("\n");
-      assert.strictEqual(resR25.code, 0);
-      assert.strictEqual(plainR25Lines.length, 2, `Expected 2 lines for quota block at conversation start, got ${plainR25Lines.length}:\n${plainR25Lines.join("\n")}`);
-      console.log("✅ R25 passed! (Initial conversation startup maintains stable 2-line quota layout)");
-    } finally {
-      try { rmSync(homeR25, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // =========================================================================
-    // Test R26: Verifying itemStyles, style conflict in adjacent items (no merge on conflict, merge when matched)
-    // =========================================================================
-    console.log("\n[Test R26] Verifying itemStyles, style conflict in adjacent items & E2E rendering...");
-    
-    // 1. preprocessAdjacentItems with itemStyles
-    // Case A: Style conflict (quota is emoji, quota-bar is text / default) -> DO NOT MERGE
-    assert.deepStrictEqual(
-      preprocessAdjacentItems(['quota', 'quota-bar'], { quota: 'emoji' }),
-      ['quota', 'quota-bar'],
-      'Style conflict (emoji vs text) must NOT merge into quota+bar'
-    );
-    assert.deepStrictEqual(
-      preprocessAdjacentItems(['quota', 'quota-bar'], { 'quota-bar': 'emoji' }),
-      ['quota', 'quota-bar'],
-      'Style conflict (text vs emoji) must NOT merge into quota+bar'
-    );
-
-    // Case B: Same style (both emoji) -> DO MERGE
-    assert.deepStrictEqual(
-      preprocessAdjacentItems(['quota', 'quota-bar'], { quota: 'emoji', 'quota-bar': 'emoji' }),
-      ['quota+bar'],
-      'Matching emoji styles must merge into quota+bar'
-    );
-
-    // Case C: Same style (both text / empty itemStyles) -> DO MERGE
-    assert.deepStrictEqual(
-      preprocessAdjacentItems(['quota', 'quota-bar'], {}),
-      ['quota+bar'],
-      'Default matching text styles must merge into quota+bar'
-    );
-
-    // Case D: Other adjacent pairs with conflict
-    assert.deepStrictEqual(
-      preprocessAdjacentItems(['context-used', 'context-used-bar'], { 'context-used': 'emoji' }),
-      ['context-used', 'context-used-bar'],
-      'Context bar conflict must NOT merge'
-    );
-    assert.deepStrictEqual(
-      preprocessAdjacentItems(['quota-weekly', 'quota-weekly-bar'], { 'quota-weekly': 'emoji' }),
-      ['quota-weekly', 'quota-weekly-bar'],
-      'Weekly quota bar conflict must NOT merge'
-    );
-    assert.deepStrictEqual(
-      preprocessAdjacentItems(['token-count', 'token-count-bar'], { 'token-count-bar': 'emoji' }),
-      ['token-count', 'token-count-bar'],
-      'Token count bar conflict must NOT merge'
-    );
-
-    // 2. buildI18nDict with itemStyles
-    const dictR26 = buildI18nDict('zh-tw', dummyMetrics, 'text', { quota: 'emoji' });
-    const plainQuotaR26 = stripAnsi(dictR26['quota']);
-    const plainBarR26 = stripAnsi(dictR26['quota-bar']);
-    const plainModelR26 = stripAnsi(dictR26['model-name']);
-
-    assert.ok(plainQuotaR26.includes('🔋 88%'), 'Quota with emoji style must render 🔋 88%');
-    assert.ok(!plainQuotaR26.includes('五小時可用:'), 'Quota with emoji style must not have text label');
-    assert.ok(plainBarR26.includes('五小時可用: [████████░░]'), 'Quota-bar without emoji style must default to text label');
-    assert.ok(plainModelR26.includes('模型: Gemini 3.5 Flash'), 'Model without emoji style must default to text label');
-
-    // 2b. buildI18nDict when both paired items are emoji -> MUST render with emoji prefix
-    const dictR26Both = buildI18nDict('zh-tw', dummyMetrics, 'text', {
-      'quota': 'emoji',
-      'quota-bar': 'emoji',
-      'context-used': 'emoji',
-      'context-used-bar': 'emoji',
-      'quota-weekly': 'emoji',
-      'quota-weekly-bar': 'emoji',
-      'token-count': 'emoji',
-      'token-count-bar': 'emoji'
-    });
-    const plainQuotaBarBoth = stripAnsi(dictR26Both['quota+bar']);
-    const plainContextBarBoth = stripAnsi(dictR26Both['context-used+bar']);
-    const plainWeeklyBarBoth = stripAnsi(dictR26Both['quota-weekly+bar']);
-    const plainTokenBarBoth = stripAnsi(dictR26Both['token-count+bar']);
-
-    assert.ok(plainQuotaBarBoth.includes('🔋 88% [████████░░]'), 'Merged quota+bar when both are emoji must render 🔋');
-    assert.ok(!plainQuotaBarBoth.includes('五小時可用:'), 'Merged quota+bar with emoji must not contain text label');
-    assert.ok(plainContextBarBoth.includes('🧠 15.2% [█░░░░░░░░░]'), 'Merged context-used+bar when both are emoji must render 🧠');
-    assert.ok(plainWeeklyBarBoth.includes('📅 90% [█████████░]'), 'Merged quota-weekly+bar when both are emoji must render 📅');
-    assert.ok(plainTokenBarBoth.includes('💰 12.5k / 1.0M [██░░░░░░░░]'), 'Merged token-count+bar when both are emoji must render 💰');
-
-    // 3. E2E execution with itemStyles
-    // 3a. Style conflict test: quota=emoji, quota-bar=text -> separate
-    const settingsR26 = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          items: [
-            "model-name",
-            "quota",
-            "quota-bar",
-            "git-branch"
-          ],
-          itemStyles: {
-            "quota": "emoji",
-            "git-branch": "emoji"
-          }
-        }
-      }
-    };
-    const cacheR26 = {
-      updatedAt: Date.now(),
-      accountEmail: "dev@example.com",
-      planTier: "Pro",
-      models: {
-        "gemini 3.1 pro": {
-          remaining_percentage: 90,
-          reset_time: new Date(Date.now() + 3600 * 1000).toISOString()
-        }
-      }
-    };
-    const metaR26 = {
-      model: { display_name: "Gemini 3.1 Pro" },
-      vcs: { type: "git", branch: "feat/styles", dirty: false },
-      terminal_width: 140
-    };
-    const homeR26 = makeTempHome(cacheR26, settingsR26);
-    try {
-      const resR26 = await runStatusline(metaR26, homeR26);
-      const plainR26 = stripAnsi(resR26.stdout).trim();
-      console.log("R26 Output:", JSON.stringify(resR26.stdout));
-
-      assert.strictEqual(resR26.code, 0);
-      assert.ok(plainR26.includes("模型: Gemini 3.1 Pro"), "model-name without override must be text");
-      assert.ok(plainR26.includes("🔋 90%"), "quota with emoji override must be emoji");
-      assert.ok(plainR26.includes("五小時可用: [█████████░]"), "quota-bar without override must be text");
-      assert.ok(plainR26.includes("🔀 feat/styles"), "git-branch with emoji override must be emoji");
-      assert.ok(plainR26.includes("🔋 90% │ 五小時可用: [█████████░]"), "Style conflict must prevent merge and render as two separate blocks");
-      console.log("✅ R26 style conflict separation passed!");
-    } finally {
-      try { rmSync(homeR26, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // 3b. Matching emoji test: both quota and quota-bar are emoji -> merged with 🔋
-    const settingsR26Merged = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          items: [
-            "model-name",
-            "quota",
-            "quota-bar",
-            "git-branch"
-          ],
-          itemStyles: {
-            "quota": "emoji",
-            "quota-bar": "emoji",
-            "git-branch": "emoji"
-          }
-        }
-      }
-    };
-    const homeR26Merged = makeTempHome(cacheR26, settingsR26Merged);
-    try {
-      const resR26Merged = await runStatusline(metaR26, homeR26Merged);
-      const plainR26Merged = stripAnsi(resR26Merged.stdout).trim();
-      console.log("R26 Merged Output:", JSON.stringify(resR26Merged.stdout));
-
-      assert.strictEqual(resR26Merged.code, 0);
-      assert.ok(plainR26Merged.includes("模型: Gemini 3.1 Pro"), "model-name without override must be text");
-      assert.ok(plainR26Merged.includes("🔋 90% [█████████░]"), "Both quota and quota-bar with emoji override must merge into 🔋 90% [█████████░]");
-      assert.ok(!plainR26Merged.includes("五小時可用:"), "Merged emoji bar must not contain text label");
-      assert.ok(plainR26Merged.includes("🔀 feat/styles"), "git-branch with emoji override must be emoji");
-      console.log("✅ R26 matching emoji merged passed!");
-    } finally {
-      try { rmSync(homeR26Merged, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // =========================================================================
-    // Test R27: All pure numbers / skipped sorting with itemStyles: {} and residual labelStyle: "emoji"
-    // MUST strictly enforce text style across all indicators (Defects 1 & 2 regression test)
-    // =========================================================================
-    console.log("\n[Test R27] Verifying pure numbers / skipped sorting (itemStyles: {}) with residual labelStyle: 'emoji' enforces text style...");
-
-    // 1. Unit test: buildI18nDict with itemStyles: {} and global labelStyle: 'emoji'
-    const dictR27 = buildI18nDict('zh-tw', dummyMetrics, 'emoji', {});
-    const baseTextDict = buildI18nDict('zh-tw', dummyMetrics, 'text');
-    for (const key of Object.keys(baseTextDict)) {
-      const rendered = stripAnsi(dictR27[key]);
-      const expectedText = stripAnsi(baseTextDict[key]);
-      assert.strictEqual(
-        rendered,
-        expectedText,
-        `Metric "${key}" with itemStyles: {} must strictly match base text dict, got: "${rendered}"`
-      );
-      if (EMOJI_MAP[key]) {
-        assert.ok(
-          !rendered.startsWith(EMOJI_MAP[key]),
-          `Metric "${key}" must NOT start with emoji "${EMOJI_MAP[key]}" when itemStyles is {}`
-        );
-      }
-    }
-
-    // 2. Unit test: preprocessAdjacentItems with itemStyles: {} and defaultStyle: 'emoji'
-    const mergedR27 = preprocessAdjacentItems(['quota', 'quota-bar'], {}, 'emoji');
-    assert.deepStrictEqual(
-      mergedR27,
-      ['quota+bar'],
-      'preprocessAdjacentItems with itemStyles: {} and defaultStyle: "emoji" must resolve items to "text" and merge'
-    );
-
-    // 2b. Unit test: preprocessAdjacentItems with 2nd argument as defaultStyle string 'emoji'
-    const mergedStringStyle = preprocessAdjacentItems(['quota', 'quota-bar'], 'emoji');
-    assert.deepStrictEqual(
-      mergedStringStyle,
-      ['quota+bar'],
-      'preprocessAdjacentItems with 2nd argument as string "emoji" must correctly treat it as defaultStyle'
-    );
-
-    // 2c. Unit test: Array defense for itemStyles in buildI18nDict and preprocessAdjacentItems
-    const arrayGuardDict = buildI18nDict('zh-tw', dummyMetrics, 'emoji', []);
-    assert.strictEqual(
-      stripAnsi(arrayGuardDict['model-name']),
-      '🤖 Gemini 3.5 Flash',
-      'buildI18nDict with itemStyles as array [] must NOT be treated as sparse style object'
-    );
-    const arrayGuardMerged = preprocessAdjacentItems(['quota', 'quota-bar'], []);
-    assert.deepStrictEqual(
-      arrayGuardMerged,
-      ['quota+bar'],
-      'preprocessAdjacentItems with array [] itemStyles must safely merge without throwing'
-    );
-
-    // 3. E2E test: settings containing residual labelStyle: "emoji" and itemStyles: {}
-    const settingsR27 = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          labelStyle: "emoji", // residual old setting
-          itemStyles: {},      // Step 4 pure numbers generates empty sparse dictionary
-          items: [
-            "model-name",
-            "quota",
-            "quota-bar",
-            "git-branch",
-            "vcs-dirty",
-            "tool-confirmation"
-          ]
-        }
-      }
-    };
-    const cacheR27 = {
-      updatedAt: Date.now(),
-      accountEmail: "dev@example.com",
-      planTier: "Pro",
-      models: {
-        "gemini 3.1 pro": {
-          remaining_percentage: 90,
-          reset_time: new Date(Date.now() + 3600 * 1000).toISOString()
-        }
-      }
-    };
+    // R28 共用之 R27 meta 夾具（拆檔後於此重新宣告）
     const metaR27 = {
       model: { display_name: "Gemini 3.1 Pro" },
       vcs: { type: "git", branch: "feat/pure-numbers", dirty: false },
       has_tool_confirmation: false,
       terminal_width: 140
     };
-    const homeR27 = makeTempHome(cacheR27, settingsR27);
-    try {
-      const resR27 = await runStatusline(metaR27, homeR27);
-      const plainR27 = stripAnsi(resR27.stdout).trim();
-      console.log("R27 Output:", JSON.stringify(resR27.stdout));
-
-      assert.strictEqual(resR27.code, 0);
-      assert.ok(plainR27.includes("模型: Gemini 3.1 Pro"), "Must render text label '模型:'");
-      assert.ok(plainR27.includes("五小時可用: 90% [█████████░]"), "Must render merged quota+bar with text label '五小時可用:'");
-      assert.ok(plainR27.includes("分支: feat/pure-numbers"), "Must render text label '分支:'");
-      assert.ok(plainR27.includes("版控狀態: 無變更"), "Must render text label '版控狀態:'");
-      assert.ok(plainR27.includes("工具待確認: 無"), "Must render text label '工具待確認:'");
-
-      // Verify no emoji prefixes leaked into the statusline
-      assert.ok(!plainR27.includes("🤖"), "Must NOT contain robot emoji");
-      assert.ok(!plainR27.includes("🔋"), "Must NOT contain battery emoji");
-      assert.ok(!plainR27.includes("🔀"), "Must NOT contain branch emoji");
-      assert.ok(!plainR27.includes("🔍"), "Must NOT contain dirty emoji");
-      assert.ok(!plainR27.includes("🔔"), "Must NOT contain bell emoji");
-      console.log("✅ R27 pure numbers text enforcement passed!");
-    } finally {
-      try { rmSync(homeR27, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
-
-    // 4. Backward compatibility E2E test: legacy settings with labelStyle: "emoji" and NO itemStyles key
-    const settingsLegacy = {
-      ui: {
-        language: "zh-tw",
-        footer: {
-          labelStyle: "emoji",
-          items: ["model-name", "quota", "quota-bar", "git-branch"]
-        }
-      }
-    };
-    const homeLegacy = makeTempHome(cacheR27, settingsLegacy);
-    try {
-      const resLegacy = await runStatusline(metaR27, homeLegacy);
-      const plainLegacy = stripAnsi(resLegacy.stdout).trim();
-      console.log("Legacy Emoji Output:", JSON.stringify(resLegacy.stdout));
-
-      assert.strictEqual(resLegacy.code, 0);
-      assert.ok(plainLegacy.includes("🤖 Gemini 3.1 Pro"), "Legacy config without itemStyles must preserve emoji mode");
-      assert.ok(plainLegacy.includes("🔋 90% [█████████░]"), "Legacy config must preserve merged emoji bar");
-      assert.ok(plainLegacy.includes("🔀 feat/pure-numbers"), "Legacy config must preserve emoji branch");
-      console.log("✅ Legacy emoji backward compatibility passed!");
-    } finally {
-      try { rmSync(homeLegacy, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
-    }
 
     console.log("\n[Test R28] Verifying Gemini 4 Argon quota resolution, auto-merge, and 4-locale rendering...");
     // 1. Direct function test for resolveArgonQuota
+    const futureArgonResetR28 = new Date(Date.now() + ((6 * 24 + 1) * 3600 - 30) * 1000).toISOString();
+    const futureGeminiResetR28 = new Date(Date.now() + ((4 * 24 + 11) * 3600 - 30) * 1000).toISOString();
     const mockArgonCache = {
       updatedAt: Date.now(),
       weekly: {
         "gemini-argon-wtu": {
           remaining_percentage: 58.93,
-          reset_time: "2026-10-30T14:57:31Z",
+          reset_time: futureArgonResetR28,
           refreshes_in: "6d 1h"
         },
         "gemini": {
           remaining_percentage: 90,
-          reset_time: "2026-10-25T12:00:00Z",
+          reset_time: futureGeminiResetR28,
           refreshes_in: "4d 11h"
         }
       }
@@ -1485,7 +700,7 @@ async function main() {
     assert.ok(argonRes !== null, "resolveArgonQuota should find gemini-argon-wtu pool");
     assert.strictEqual(Math.round(argonRes.remaining_percentage), 59, "Argon percentage should round to 59");
     assert.strictEqual(argonRes.refreshes_in, "6d 1h");
-    assert.strictEqual(argonRes.reset_time, "2026-10-30T14:57:31Z");
+    assert.strictEqual(argonRes.reset_time, futureArgonResetR28);
 
     // Test missing Argon pool
     const mockNoArgonCache = {
@@ -1493,7 +708,7 @@ async function main() {
       weekly: {
         "gemini": {
           remaining_percentage: 90,
-          reset_time: "2026-10-25T12:00:00Z",
+          reset_time: futureGeminiResetR28,
           refreshes_in: "4d 11h"
         }
       }
@@ -1576,16 +791,18 @@ async function main() {
     assert.strictEqual(parsedArgonMeta.shortTerm["gemini-argon-wtu"], undefined, "gemini-argon-wtu must NOT pollute shortTerm");
 
     // 2. Unit test: mergeQuotaBuckets behavior
+    const nowR29 = Date.now();
+    const sameResetR29 = new Date(nowR29 + 14400 * 1000).toISOString();
     const mergedSameWindow = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 68, reset_time: "2026-10-25T10:00:00Z" } },
-      { gemini: { remaining_percentage: 75, reset_time: "2026-10-25T10:00:00Z" } },
+      { gemini: { remaining_percentage: 68, reset_time: sameResetR29 } },
+      { gemini: { remaining_percentage: 75, reset_time: sameResetR29 } },
       true
     );
     assert.strictEqual(mergedSameWindow.gemini.remaining_percentage, 68, "When freshlyFetchedFromLs=true in same window, lower percentage wins");
 
     const mergedResetCrossed = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 12, reset_time: "2026-10-25T05:00:00Z" } },
-      { gemini: { remaining_percentage: 100, reset_time: "2026-10-25T10:00:00Z" } },
+      { gemini: { remaining_percentage: 12, reset_time: new Date(nowR29 - 60000).toISOString() } },
+      { gemini: { remaining_percentage: 100, reset_time: new Date(nowR29 + 18000 * 1000).toISOString() } },
       true
     );
     assert.strictEqual(mergedResetCrossed.gemini.remaining_percentage, 100, "When reset_time advances by >5m, new window (100%) wins");
@@ -1670,30 +887,34 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
     console.log("\n[Test R30] Verifying anti-jitter protection across 5h, weekly, and Argon quota during active conversation...");
 
     // 1. Unit test: mergeQuotaBuckets default preferLowerWhenSameReset=true prevents stale 100% from overwriting 99%
+    const nowR30Unit = Date.now();
+    const futureResetR30_5h = new Date(nowR30Unit + 17100 * 1000).toISOString();
+    const futureResetR30_Weekly = new Date(nowR30Unit + 475200 * 1000).toISOString();
+    const futureResetR30_Argon = new Date(nowR30Unit + 417600 * 1000).toISOString();
     const unjitteredSameWindow = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 99, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } },
-      { gemini: { remaining_percentage: 100, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } }
+      { gemini: { remaining_percentage: 99, reset_time: futureResetR30_5h, refreshes_in: "4h 45m" } },
+      { gemini: { remaining_percentage: 100, reset_time: futureResetR30_5h, refreshes_in: "4h 45m" } }
     );
     assert.strictEqual(unjitteredSameWindow.gemini.remaining_percentage, 99, "Lower percentage (99%) MUST win over stale 100% even without 3rd parameter");
-    assert.strictEqual(unjitteredSameWindow.gemini.reset_time, "2026-10-25T15:00:00Z");
+    assert.strictEqual(unjitteredSameWindow.gemini.reset_time, futureResetR30_5h);
 
     // 2. Unit test: mergeQuotaBuckets preserves reset_time when incoming has lower percentage without reset_time
     const incomingLowerNoReset = mergeQuotaBuckets(
-      { gemini: { remaining_percentage: 99, reset_time: "2026-10-25T15:00:00Z", refreshes_in: "4h 45m" } },
+      { gemini: { remaining_percentage: 99, reset_time: futureResetR30_5h, refreshes_in: "4h 45m" } },
       { gemini: { remaining_percentage: 97 } }
     );
     assert.strictEqual(incomingLowerNoReset.gemini.remaining_percentage, 97, "Incoming 97% must win over existing 99%");
-    assert.strictEqual(incomingLowerNoReset.gemini.reset_time, "2026-10-25T15:00:00Z", "reset_time must not be lost");
+    assert.strictEqual(incomingLowerNoReset.gemini.reset_time, futureResetR30_5h, "reset_time must not be lost");
 
     // 3. Unit test: weekly and argon anti-jitter behavior
     const weeklyJitterTest = mergeQuotaBuckets(
       {
-        gemini: { remaining_percentage: 93.1, reset_time: "2026-10-31T07:00:00Z" },
-        "gemini-argon-wtu": { remaining_percentage: 8.9, reset_time: "2026-10-30T14:00:00Z" }
+        gemini: { remaining_percentage: 93.1, reset_time: futureResetR30_Weekly },
+        "gemini-argon-wtu": { remaining_percentage: 8.9, reset_time: futureResetR30_Argon }
       },
       {
-        gemini: { remaining_percentage: 100, reset_time: "2026-10-31T07:00:00Z" },
-        "gemini-argon-wtu": { remaining_percentage: 50, reset_time: "2026-10-30T14:00:00Z" }
+        gemini: { remaining_percentage: 100, reset_time: futureResetR30_Weekly },
+        "gemini-argon-wtu": { remaining_percentage: 50, reset_time: futureResetR30_Argon }
       }
     );
     assert.strictEqual(weeklyJitterTest.gemini.remaining_percentage, 93.1, "Weekly lower percentage (93.1%) must win over stale 100%");
@@ -2530,6 +1751,8 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       mkdirSync(join(homeR33_E2E, '.gemini', 'tmp'), { recursive: true });
       mkdirSync(join(homeR33_E2E, '.gemini', 'antigravity-cli', 'hooks'), { recursive: true });
       copyFileSync(FETCH_SCRIPT_PATH, join(homeR33_E2E, '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs'));
+      // fetch-local-quota.mjs 已改為薄入口，須一併部署 lib/ 讓 ./lib/... 相對匯入可解析
+      copyDirRecursiveSync(join(SCRIPTS_DIR, 'lib'), join(homeR33_E2E, '.gemini', 'antigravity-cli', 'hooks', 'lib'), (p) => p.endsWith('.mjs'));
       writeFileSync(join(homeR33_E2E, '.gemini', 'tmp', 'antigravity_ls_env.json'), JSON.stringify({
         ls_address: `127.0.0.1:${e2ePort}`,
         csrf_token: 'e2e-csrf',
@@ -2571,244 +1794,290 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
     }
 
     console.log("✅ Test R33 passed! (4-layer dynamic ceiling resolution, per-model/per-conversation step-up, modelLimits catalog, runtime maxContextTokens, and overrides all verified)");
+
+    // =========================================================================
+    // Test Case R35: Orchestrator / Future Model Pool Mapping, Live Countdown Recalculation, and Expired Window Normalization
+    // =========================================================================
+    console.log("\n[Test R35] Verifying Orchestrator (Neon/Argon/Carbon), future model pool resolution, live countdown recalculation, and expired window reset...");
+
+    // (1) E2E 完整重現本次缺陷：Orchestrator (Neon) + 過期 cache.models.orchestratorneon (0.45%, 73m 前, "55m") + 有效 cache.shortTerm.gemini (78.7%)
+    const nowR35 = Date.now();
+    const futureGemini5hResetR35 = new Date(nowR35 + (226 * 60 - 30) * 1000).toISOString();
+    const futureGeminiWeeklyResetR35 = new Date(nowR35 + ((5 * 24 + 17) * 3600 - 30) * 1000).toISOString();
+    const futureArgonWeeklyResetR35 = new Date(nowR35 + ((5 * 24 + 18) * 3600 - 30) * 1000).toISOString();
+    const expired73MinAgoR35 = new Date(nowR35 - 73 * 60 * 1000).toISOString();
+    const expectedHhMmR35 = formatAbsoluteResetTime(futureGemini5hResetR35, 'smart', nowR35);
+
+    const reproCacheR35 = {
+      updatedAt: nowR35 - 3000,
+      lsUpdatedAt: nowR35 - 3000,
+      lastAgentState: 'working',
+      lastOutputTokens: 2481,
+      lastTotalTokens: 69401,
+      models: {
+        orchestratorneon: {
+          name: 'Orchestrator (Neon)',
+          remaining_percentage: 0.45191334,
+          reset_time: expired73MinAgoR35,
+          refreshes_in: '55m'
+        }
+      },
+      shortTerm: {
+        gemini: {
+          remaining_percentage: 78.711426,
+          reset_time: futureGemini5hResetR35,
+          refreshes_in: '1h 11m' // 故意放入過時倒數，驗證呈現端依 reset_time 即時重算為 3h 46m
+        },
+        '3p': {
+          remaining_percentage: 0,
+          reset_time: new Date(nowR35 + 150 * 60 * 1000).toISOString(),
+          refreshes_in: '2h 30m'
+        }
+      },
+      weekly: {
+        gemini: {
+          remaining_percentage: 24.837768,
+          reset_time: futureGeminiWeeklyResetR35,
+          refreshes_in: '5d 17h',
+          window: 'weekly'
+        },
+        'gemini-argon-wtu': {
+          remaining_percentage: 48.38988,
+          reset_time: futureArgonWeeklyResetR35,
+          refreshes_in: '5d 18h',
+          window: 'weekly'
+        }
+      }
+    };
+
+    const settingsR35 = {
+      ui: {
+        language: 'zh-tw',
+        footer: {
+          items: [
+            'quota', 'quota-bar', 'quota-reset-countdown', 'quota-reset-time',
+            'quota-weekly', 'quota-argon'
+          ],
+          timeFormat: 'smart'
+        }
+      }
+    };
+
+    const homeR35Repro = makeTempHome(reproCacheR35, settingsR35);
+    try {
+      const resNeon = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        agent_state: 'working',
+        context_window: { total_input_tokens: 66920, total_output_tokens: 2481 },
+        terminal_width: 240
+      }, homeR35Repro);
+      const plainNeon = stripAnsi(resNeon.stdout).trim();
+      assert.strictEqual(resNeon.code, 0);
+      assert.ok(plainNeon.includes('五小時可用: 79%'), `Orchestrator (Neon) must use shortTerm.gemini (79%), got: "${plainNeon}"`);
+      assert.ok(plainNeon.includes('五小時倒數: 3h 46m'), `Countdown must recalculate from reset_time to 3h 46m, got: "${plainNeon}"`);
+      assert.ok(plainNeon.includes(`五小時重置: ${expectedHhMmR35}`), `Reset time must show ${expectedHhMmR35}, got: "${plainNeon}"`);
+      assert.ok(!plainNeon.includes('五小時可用: 0%'), `Must NOT render stale 0% snapshot! Got: "${plainNeon}"`);
+      assert.ok(!plainNeon.includes('55m'), `Must NOT render frozen 55m countdown! Got: "${plainNeon}"`);
+
+      // (2A) Orchestrator (Argon)、Orchestrator (Carbon)、Gemini 4 Carbon 端對端顯示驗證
+      for (const modelName of ['Orchestrator (Argon)', 'Orchestrator (Carbon)', 'Gemini 4 Carbon']) {
+        const resModel = await runStatusline({
+          model: { id: modelName, display_name: modelName },
+          agent_state: 'working',
+          context_window: { total_input_tokens: 66920, total_output_tokens: 2481 },
+          terminal_width: 240
+        }, homeR35Repro);
+        const plainModel = stripAnsi(resModel.stdout).trim();
+        assert.strictEqual(resModel.code, 0);
+        assert.ok(plainModel.includes('五小時可用: 79%'), `${modelName} must resolve 5h quota to 79%, got: "${plainModel}"`);
+        assert.ok(plainModel.includes('五小時倒數: 3h 46m'), `${modelName} must resolve 5h countdown to 3h 46m, got: "${plainModel}"`);
+        assert.ok(plainModel.includes('七日內可用: 25%'), `${modelName} must resolve weekly quota to 25%, got: "${plainModel}"`);
+        assert.ok(plainModel.includes('Argon 可用: 48%'), `${modelName} must resolve Argon quota to 48%, got: "${plainModel}"`);
+      }
+    } finally {
+      try { rmSync(homeR35Repro, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // (2B) 四層配額池解析與未來新模型自動適配驗證
+    assert.strictEqual(resolveQuotaPool('Orchestrator (Claude)'), '3p', 'Orchestrator (Claude) must map to 3p');
+    assert.strictEqual(
+      resolveQuotaPool('Orchestrator (Carbon)', {
+        modelPools: { orchestratorcarbon: 'carbon' }
+      }),
+      'carbon',
+      'Layer 1 dynamic modelPools must take priority over Layer 4 fallback'
+    );
+    assert.strictEqual(
+      resolveQuotaPool('Project Future', {
+        modelLimits: {
+          projectfuture: { slug: 'gemini-pro-orchestrator-future', model: 'MODEL_PLACEHOLDER_M999', displayName: 'Project Future' }
+        }
+      }),
+      'gemini',
+      'Layer 3 catalog slug must map unknown display name to gemini'
+    );
+    assert.strictEqual(resolveQuotaPool('Nova Pro', { modelPools: { novapro: 'nova' } }), 'nova');
+
+    // E2E 驗證未來新模型獨立池 (Nova Pro -> nova-5h / nova-weekly)
+    const futureNova5h = new Date(nowR35 + (95 * 60 - 30) * 1000).toISOString();
+    const futureNovaWeekly = new Date(nowR35 + ((3 * 24 + 5) * 3600 - 30) * 1000).toISOString();
+    const homeR35Future = makeTempHome({
+      updatedAt: nowR35,
+      lsUpdatedAt: nowR35,
+      modelPools: { novapro: 'nova' },
+      shortTerm: {
+        gemini: { remaining_percentage: 20, reset_time: futureGemini5hResetR35 },
+        nova: { remaining_percentage: 91, reset_time: futureNova5h }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 15, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' },
+        nova: { remaining_percentage: 86, reset_time: futureNovaWeekly, window: 'weekly' }
+      }
+    }, settingsR35);
+    try {
+      const resNova = await runStatusline({
+        model: { id: 'Nova Pro', display_name: 'Nova Pro' },
+        terminal_width: 240
+      }, homeR35Future);
+      const plainNova = stripAnsi(resNova.stdout).trim();
+      assert.strictEqual(resNova.code, 0);
+      assert.ok(plainNova.includes('五小時可用: 91%'), `Future Nova Pro must resolve dynamic nova 5h pool (91%), got: "${plainNova}"`);
+      assert.ok(plainNova.includes('五小時倒數: 1h 35m'), `Future Nova Pro must calculate nova 5h countdown (1h 35m), got: "${plainNova}"`);
+      assert.ok(plainNova.includes('七日內可用: 86%'), `Future Nova Pro must resolve dynamic nova weekly pool (86%), got: "${plainNova}"`);
+    } finally {
+      try { rmSync(homeR35Future, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // (3) extractMetricsAsync 呈現層即時重算倒數（不使用靜態舊 refreshes_in）
+    const recalcReset = new Date(nowR35 + (30 * 60 - 15) * 1000).toISOString();
+    const homeR35Metrics = makeTempHome({}, {});
+    try {
+      const metricsRecalc = await withHomeEnv(homeR35Metrics, () => extractMetricsAsync(
+        { model: { display_name: 'Orchestrator (Neon)' } },
+        'zh-tw',
+        'Orchestrator (Neon)',
+        null,
+        {},
+        { remaining_percentage: 60, reset_time: recalcReset, refreshes_in: '4h 50m' },
+        { totalInput: 0, contextSize: 1048576, effectiveTokenCeiling: 512000, usedPctNum: 0 },
+        { remaining_percentage: 80, reset_time: recalcReset, refreshes_in: '6d 12h' },
+        { footerItems: ['quota', 'quota-reset-countdown', 'quota-weekly-countdown'] }
+      ));
+      assert.strictEqual(metricsRecalc.countdownVal, '30m', 'extractMetricsAsync must dynamically compute 30m instead of frozen 4h 50m');
+      assert.strictEqual(metricsRecalc.weeklyCountdownVal, '30m', 'extractMetricsAsync must dynamically compute weekly countdown too');
+    } finally {
+      try { rmSync(homeR35Metrics, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // (4) 60 秒寬限期、逾寬限期自動重置與新週期立即覆蓋（Unit + E2E）
+    assert.strictEqual(EXPIRED_RESET_GRACE_MS, 60000);
+    const expired30sIso = new Date(nowR35 - 30 * 1000).toISOString();
+    const expired90sIso = new Date(nowR35 - 90 * 1000).toISOString();
+
+    const inGraceEntry = normalizeResolvedQuotaEntry(
+      { remaining_percentage: 12, reset_time: expired30sIso, refreshes_in: '55m' },
+      nowR35
+    );
+    assert.strictEqual(inGraceEntry.remaining_percentage, 12, 'Within 60s grace period, percentage must remain 12');
+    assert.strictEqual(inGraceEntry.refreshes_in, 'now', 'Within 60s grace period, countdown must be now');
+
+    const beyondGraceEntry = normalizeResolvedQuotaEntry(
+      { remaining_percentage: 12, reset_time: expired90sIso, refreshes_in: '55m' },
+      nowR35
+    );
+    assert.strictEqual(beyondGraceEntry.remaining_percentage, 100, 'Beyond 60s grace period, percentage must reset to 100');
+    assert.strictEqual(beyondGraceEntry.refreshes_in, '', 'Beyond 60s grace period, refreshes_in must be cleared');
+    assert.strictEqual(beyondGraceEntry.reset_time, undefined, 'Beyond 60s grace period, stale reset_time must be cleared');
+
+    // E2E 4A: 過期 30 秒（寬限期內）顯示原百分比 + now，並將 lastPollAttemptAt 寫入磁碟（觸發重查）
+    const cacheGrace30s = {
+      updatedAt: nowR35 - 2000,
+      lsUpdatedAt: nowR35 - 2000,
+      lastPollAttemptAt: 0,
+      shortTerm: {
+        gemini: { remaining_percentage: 12, reset_time: expired30sIso, refreshes_in: '10m' }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 40, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' }
+      }
+    };
+    const homeR35Grace = makeTempHome(cacheGrace30s, settingsR35);
+    try {
+      const resGrace = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        terminal_width: 240
+      }, homeR35Grace);
+      const plainGrace = stripAnsi(resGrace.stdout).trim();
+      assert.strictEqual(resGrace.code, 0);
+      assert.ok(plainGrace.includes('五小時可用: 12%'), `Within grace period must keep 12%, got: "${plainGrace}"`);
+      assert.ok(plainGrace.includes('五小時倒數: now'), `Within grace period must display countdown 'now', got: "${plainGrace}"`);
+      const persistedGrace = JSON.parse(readFileSync(join(homeR35Grace, '.gemini', 'tmp', 'real_quota_cache.json'), 'utf8'));
+      assert.ok(persistedGrace.lastPollAttemptAt > 0, 'Expired active quota must trigger poll attempt and persist lastPollAttemptAt');
+    } finally {
+      try { rmSync(homeR35Grace, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // E2E 4B & 4C: 過期 90 秒（無更新來源）自動重置為 100% / 無 / 無；隨後收到新週期 meta.quota 立即恢復為 85%
+    const cacheExpired90s = {
+      updatedAt: nowR35 - 2000,
+      lsUpdatedAt: nowR35 - 2000,
+      shortTerm: {
+        gemini: { remaining_percentage: 0.45, reset_time: expired90sIso, refreshes_in: '55m' }
+      },
+      weekly: {
+        gemini: { remaining_percentage: 40, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' }
+      }
+    };
+    const homeR35Expired = makeTempHome(cacheExpired90s, settingsR35);
+    try {
+      const resExpired = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        terminal_width: 240
+      }, homeR35Expired);
+      const plainExpired = stripAnsi(resExpired.stdout).trim();
+      assert.strictEqual(resExpired.code, 0);
+      assert.ok(plainExpired.includes('五小時可用: 100%'), `Beyond grace period without refresh must reset to 100%, got: "${plainExpired}"`);
+      assert.ok(plainExpired.includes('五小時倒數: 無'), `Beyond grace period countdown must show 無, got: "${plainExpired}"`);
+      assert.ok(plainExpired.includes('五小時重置: 無'), `Beyond grace period reset time must show 無, got: "${plainExpired}"`);
+
+      // 4C: 收到新週期 meta.quota (85%, 未來 5 小時) 立即覆蓋過期磁碟快取
+      const resRecovered = await runStatusline({
+        model: { id: 'Orchestrator (Neon)', display_name: 'Orchestrator (Neon)' },
+        quota: {
+          'gemini-5h': { remaining_fraction: 0.85, reset_in_seconds: 18000 },
+          'gemini-weekly': { remaining_fraction: 0.40, reset_in_seconds: 400000 }
+        },
+        terminal_width: 240
+      }, homeR35Expired);
+      const plainRecovered = stripAnsi(resRecovered.stdout).trim();
+      assert.strictEqual(resRecovered.code, 0);
+      assert.ok(plainRecovered.includes('五小時可用: 85%'), `New meta.quota cycle must supersede expired cache and show 85%, got: "${plainRecovered}"`);
+      assert.ok(plainRecovered.includes('五小時倒數: 5h'), `New meta.quota cycle countdown must show 5h, got: "${plainRecovered}"`);
+    } finally {
+      try { rmSync(homeR35Expired, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
+
+    // 確認 resolveModelQuota / resolveWeeklyQuota 亦尊重確定性 now 參數與跨期退讓
+    const resolvedUnitExpired = resolveModelQuota('Orchestrator (Neon)', {
+      models: { orchestratorneon: { remaining_percentage: 0.45, reset_time: expired90sIso } }
+    }, null, nowR35);
+    assert.strictEqual(resolvedUnitExpired.remaining_percentage, 100);
+    const resolvedUnitWeekly = resolveWeeklyQuota('Orchestrator (Neon)', {
+      weekly: { gemini: { remaining_percentage: 33, reset_time: futureGeminiWeeklyResetR35, window: 'weekly' } }
+    }, null, nowR35);
+    assert.strictEqual(resolvedUnitWeekly.remaining_percentage, 33);
+
+    console.log("✅ Test R35 passed! (Orchestrator Neon/Argon/Carbon, future model dynamic pools, live countdown, grace period, and expired auto-reset verified)");
   } catch (err) {
     console.error("Test execution failed:", err);
     testsPassed = false;
   }
 
-  try {
-    // =========================================================================
-    // Test Case R34: Gate subprocess & filesystem probes on configured footer items (Issue #33)
-    // =========================================================================
-    console.log("\n[Test R34] Verifying extractMetricsAsync gates subprocess and filesystem probes on footerItems...");
-    const sandboxR34 = mkdtempSync(join(os.tmpdir(), 'statusline-issue33-'));
-    const homeR34 = join(sandboxR34, 'home');
-    const projR34 = join(sandboxR34, 'repo');
-    const convIdR34 = 'conv-r34-probe-gate';
-    const origHome = process.env.HOME;
-    const origUserProfile = process.env.USERPROFILE;
-
-    try {
-      mkdirSync(join(homeR34, '.gemini', 'tmp', 'background-processes'), { recursive: true });
-      mkdirSync(join(homeR34, '.gemini', 'antigravity-cli', 'brain', convIdR34), { recursive: true });
-      mkdirSync(join(projR34, '.agents', 'worker-1'), { recursive: true });
-
-      writeFileSync(join(homeR34, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ updatedAt: Date.now() }), 'utf8');
-      writeFileSync(join(homeR34, '.gemini', 'tmp', 'pending_input_count'), '4', 'utf8');
-      writeFileSync(join(homeR34, '.gemini', 'tmp', 'background-processes', 'job-1.json'), '{}', 'utf8');
-      writeFileSync(join(projR34, '.agents', 'worker-1', 'progress.md'), 'active', 'utf8');
-      writeFileSync(join(homeR34, '.gemini', 'antigravity-cli', 'brain', convIdR34, 'artifact.metadata.json'), '{}', 'utf8');
-      writeFileSync(join(homeR34, '.gemini', 'antigravity-cli', 'cli.log'), 'applyAuthResult: email=r34-user@example.com\n', 'utf8');
-
-      execFileSync('git', ['init', '-b', 'feat-r34'], { cwd: projR34, windowsHide: true, stdio: 'ignore' });
-      execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: projR34, windowsHide: true, stdio: 'ignore' });
-      execFileSync('git', ['config', 'user.name', 'Test'], { cwd: projR34, windowsHide: true, stdio: 'ignore' });
-      execFileSync('git', ['commit', '--allow-empty', '-m', 'init'], { cwd: projR34, windowsHide: true, stdio: 'ignore' });
-      writeFileSync(join(projR34, 'dirty.txt'), 'uncommitted', 'utf8');
-
-      const metaR34 = {
-        conversation_id: convIdR34,
-        model: { display_name: 'Gemini 3.5 Flash' },
-        project: { path: projR34 },
-        terminal_width: 240
-      };
-      const quotaInfoR34 = { remaining_percentage: 100, refreshes_in: '' };
-      const ctxInfoR34 = { totalInput: 0, contextSize: 1000000, effectiveTokenCeiling: 256000, usedPctNum: 0 };
-
-      process.env.HOME = homeR34;
-      process.env.USERPROFILE = homeR34;
-
-      // 1. All 7 probes disabled when footerItems only enables 'model-name'
-      const execCallsDisabled = [];
-      const spyExecDisabled = async (cmd) => {
-        execCallsDisabled.push(cmd);
-        return { stdout: '', ok: false, notFound: false };
-      };
-      const disabledMetrics = await extractMetricsAsync(
-        metaR34, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
-        { footerItems: new Set(['model-name']), execFn: spyExecDisabled }
-      );
-      assert.strictEqual(execCallsDisabled.length, 0, `Disabled probes must not spawn subprocesses, got: ${JSON.stringify(execCallsDisabled)}`);
-      assert.strictEqual(disabledMetrics.gitBranch, 'No VC', 'Disabled git-branch must not probe git');
-      assert.strictEqual(disabledMetrics.vcsDirtyFlag, false, 'Disabled vcs-dirty must not probe git status');
-      assert.strictEqual(disabledMetrics.memUsage, '0MB', 'Disabled memory-usage must not probe process memory');
-      assert.strictEqual(disabledMetrics.pendingInputCount, 0, 'Disabled pending-input must not probe filesystem');
-      assert.strictEqual(disabledMetrics.backgroundTasksCount, 0, 'Disabled background-tasks must not probe filesystem');
-      assert.strictEqual(disabledMetrics.subagentsCount, 0, 'Disabled subagents must not probe filesystem');
-      assert.strictEqual(disabledMetrics.artifactsCount, 0, 'Disabled artifacts must not probe filesystem');
-
-      // 2. Single-item gating: enabling one probe runs only that probe
-      const branchCalls = [];
-      const branchMetrics = await extractMetricsAsync(
-        metaR34, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
-        {
-          footerItems: ['git-branch'],
-          execFn: async (cmd) => {
-            branchCalls.push(cmd);
-            return { stdout: 'feat-r34', ok: true, notFound: false };
-          }
-        }
-      );
-      assert.strictEqual(branchCalls.length, 1);
-      assert.ok(branchCalls[0].includes('branch'), `Expected git branch probe, got: ${branchCalls[0]}`);
-      assert.strictEqual(branchMetrics.gitBranch, 'feat-r34');
-      assert.strictEqual(branchMetrics.vcsDirtyFlag, false);
-      assert.strictEqual(branchMetrics.memUsage, '0MB');
-      assert.strictEqual(branchMetrics.pendingInputCount, 0);
-      assert.strictEqual(branchMetrics.backgroundTasksCount, 0);
-      assert.strictEqual(branchMetrics.subagentsCount, 0);
-      assert.strictEqual(branchMetrics.artifactsCount, 0);
-
-      const dirtyCalls = [];
-      const dirtyMetrics = await extractMetricsAsync(
-        metaR34, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
-        {
-          footerItems: ['vcs-dirty'],
-          execFn: async (cmd) => {
-            dirtyCalls.push(cmd);
-            return { stdout: '?? dirty.txt', ok: true, notFound: false };
-          }
-        }
-      );
-      assert.strictEqual(dirtyCalls.length, 1);
-      assert.ok(dirtyCalls[0].includes('status --porcelain'), `Expected git status probe, got: ${dirtyCalls[0]}`);
-      assert.strictEqual(dirtyMetrics.vcsDirtyFlag, true);
-      assert.strictEqual(dirtyMetrics.gitBranch, 'No VC');
-      assert.strictEqual(dirtyMetrics.memUsage, '0MB');
-
-      const memCalls = [];
-      const memMetrics = await extractMetricsAsync(
-        metaR34, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
-        {
-          footerItems: ['memory-usage'],
-          execFn: async (cmd) => {
-            memCalls.push(cmd);
-            return { stdout: process.platform === 'win32' ? String(256 * 1024 * 1024) : String(256 * 1024), ok: true, notFound: false };
-          }
-        }
-      );
-      assert.strictEqual(memCalls.length, 1);
-      assert.ok(
-        process.platform === 'win32' ? memCalls[0].includes('powershell.exe') : memCalls[0].includes('ps '),
-        `Expected memory probe command, got: ${memCalls[0]}`
-      );
-      assert.strictEqual(memMetrics.memUsage, '256MB');
-      assert.strictEqual(memMetrics.gitBranch, 'No VC');
-      assert.strictEqual(memMetrics.vcsDirtyFlag, false);
-
-      const fsGateExpectations = [
-        { item: 'pending-input', field: 'pendingInputCount', expected: 4 },
-        { item: 'background-tasks', field: 'backgroundTasksCount', expected: 1 },
-        { item: 'subagents', field: 'subagentsCount', expected: 1 },
-        { item: 'artifacts', field: 'artifactsCount', expected: 1 }
-      ];
-      for (const { item, field, expected } of fsGateExpectations) {
-        const calls = [];
-        const m = await extractMetricsAsync(
-          metaR34, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
-          {
-            footerItems: [item],
-            execFn: async (cmd) => {
-              calls.push(cmd);
-              return { stdout: '', ok: false, notFound: false };
-            }
-          }
-        );
-        assert.strictEqual(calls.length, 0, `${item} must not trigger subprocess probes`);
-        assert.strictEqual(m[field], expected, `${item} must still resolve ${field}=${expected}`);
-        for (const other of fsGateExpectations) {
-          if (other.item !== item) {
-            assert.strictEqual(m[other.field], 0, `${other.item} must stay 0 when only ${item} is enabled`);
-          }
-        }
-      }
-
-      // Subagent filtering tolerates null entries and leaves the caller's meta unchanged
-      const rawSubagents = [null, { status: 'completed' }, { status: 'running' }, 'legacy-entry'];
-      const metaSubagents = { ...metaR34, subagents: rawSubagents };
-      const subagentMetrics = await extractMetricsAsync(
-        metaSubagents, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
-        { footerItems: ['subagents'] }
-      );
-      assert.strictEqual(subagentMetrics.subagentsCount, 2, 'Only active, non-null subagents must be counted');
-      assert.strictEqual(metaSubagents.subagents, rawSubagents, 'meta.subagents must not be reassigned');
-      assert.strictEqual(rawSubagents.length, 4, 'meta.subagents entries must not be removed');
-
-      // 3. Enabled real probes & E2E output stay unchanged
-      const allProbeItems = [
-        'model-name', 'git-branch', 'vcs-dirty', 'memory-usage',
-        'pending-input', 'background-tasks', 'subagents', 'artifacts'
-      ];
-      const enabledRealMetrics = await extractMetricsAsync(
-        metaR34, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
-        { footerItems: new Set(allProbeItems) }
-      );
-      assert.strictEqual(enabledRealMetrics.gitBranch, 'feat-r34');
-      assert.strictEqual(enabledRealMetrics.vcsDirtyFlag, true);
-      assert.ok(parseInt(enabledRealMetrics.memUsage, 10) > 0, `Expected positive RAM MB, got: ${enabledRealMetrics.memUsage}`);
-      assert.strictEqual(enabledRealMetrics.pendingInputCount, 4);
-      assert.strictEqual(enabledRealMetrics.backgroundTasksCount, 1);
-      assert.strictEqual(enabledRealMetrics.subagentsCount, 1);
-      assert.strictEqual(enabledRealMetrics.artifactsCount, 1);
-
-      const tmpDirR34 = join(homeR34, '.gemini', 'tmp');
-      const quotaCachePathR34 = join(tmpDirR34, 'real_quota_cache.json');
-      const quotaCacheBefore = readFileSync(quotaCachePathR34, 'utf8');
-      writeFileSync(join(homeR34, '.gemini', 'settings.json'), JSON.stringify({
-        ui: { language: 'us', footer: { items: allProbeItems } }
-      }), 'utf8');
-      const resE2eEnabled = await runStatusline(metaR34, homeR34);
-      const plainE2eEnabled = stripAnsi(resE2eEnabled.stdout).trim();
-      assert.strictEqual(resE2eEnabled.code, 0);
-      assert.ok(plainE2eEnabled.includes('Branch: feat-r34'), `Expected Branch: feat-r34 in: ${plainE2eEnabled}`);
-      assert.ok(plainE2eEnabled.includes('VCS Status: uncommitted'), `Expected VCS Status: uncommitted in: ${plainE2eEnabled}`);
-      assert.ok(/RAM: \d+MB/.test(plainE2eEnabled), `Expected RAM in: ${plainE2eEnabled}`);
-      assert.ok(plainE2eEnabled.includes('Queue: 4'), `Expected Queue: 4 in: ${plainE2eEnabled}`);
-      assert.ok(plainE2eEnabled.includes('BG: 1'), `Expected BG: 1 in: ${plainE2eEnabled}`);
-      assert.ok(plainE2eEnabled.includes('Subagents: 1'), `Expected Subagents: 1 in: ${plainE2eEnabled}`);
-      assert.ok(plainE2eEnabled.includes('Outputs: 1'), `Expected Outputs: 1 in: ${plainE2eEnabled}`);
-
-      writeFileSync(join(homeR34, '.gemini', 'settings.json'), JSON.stringify({
-        ui: { language: 'us', footer: { items: ['model-name'] } }
-      }), 'utf8');
-      const resE2eDisabled = await runStatusline(metaR34, homeR34);
-      const plainE2eDisabled = stripAnsi(resE2eDisabled.stdout).trim();
-      assert.strictEqual(resE2eDisabled.code, 0);
-      assert.strictEqual(plainE2eDisabled, 'Model: Gemini 3.5 Flash');
-
-      // main() skips quota, context and CLI log I/O when no footer item needs them
-      assert.strictEqual(readFileSync(quotaCachePathR34, 'utf8'), quotaCacheBefore, 'Quota cache must stay untouched without quota/account items');
-      const ctxFiles = readdirSync(tmpDirR34).filter(f => f.startsWith('ctx_'));
-      assert.deepStrictEqual(ctxFiles, [], 'Context cache must not be written without context/token items');
-      const accountCachePathR34 = join(tmpDirR34, 'account_meta_cache.json');
-      const accountCacheAfter = existsSync(accountCachePathR34) ? JSON.parse(readFileSync(accountCachePathR34, 'utf8')) : {};
-      assert.strictEqual(accountCacheAfter.email, undefined, 'CLI log must not be scanned without account-email');
-
-      writeFileSync(join(homeR34, '.gemini', 'settings.json'), JSON.stringify({
-        ui: { language: 'us', footer: { items: ['account-email'] } }
-      }), 'utf8');
-      const resE2eEmail = await runStatusline(metaR34, homeR34);
-      assert.strictEqual(resE2eEmail.code, 0);
-      assert.ok(stripAnsi(resE2eEmail.stdout).includes('r34-user@example.com'), `account-email must still read the CLI log, got: ${resE2eEmail.stdout}`);
-
-      console.log("✅ Test R34 passed! (Subprocess and filesystem probes are gated on configured footer items)");
-    } finally {
-      if (origHome === undefined) delete process.env.HOME;
-      else process.env.HOME = origHome;
-      if (origUserProfile === undefined) delete process.env.USERPROFILE;
-      else process.env.USERPROFILE = origUserProfile;
-      try { rmSync(sandboxR34, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
-    }
-  } catch (err) {
-    console.error("Test R34 execution failed:", err);
-    testsPassed = false;
-  }
-
   if (testsPassed) {
-    console.log("\n🎉 All rendering tests passed successfully!");
+    console.log("\n🎉 All quota-and-context.test.mjs (R1-R7, R9-R15, R28-R33, R35) tests passed successfully!");
     process.exit(0);
   } else {
-    console.error("\n❌ Some rendering tests failed.");
+    console.error("\n❌ Some quota-and-context.test.mjs (R1-R7, R9-R15, R28-R33, R35) tests failed.");
     process.exit(1);
   }
 }
