@@ -1,58 +1,21 @@
-import { writeFileSync, mkdirSync, readFileSync, unlinkSync, renameSync, realpathSync } from 'fs';
-import path, { dirname, join } from 'path';
+import { unlinkSync } from 'fs';
+import { join } from 'path';
 import http from 'http';
 import https from 'https';
 import os from 'os';
-import { fileURLToPath } from 'url';
+import { isDirectExecution, readJsonSafeSync, writeFileSyncAndVerifyNoBOM } from './lib/core/fs-utils.mjs';
+import { normalizeModelName, sanitizeConversationId } from './lib/core/normalize.mjs';
+import { mergeQuotaBuckets } from './lib/collectors/quota.mjs';
+import { formatResetTime } from './lib/collectors/time-format.mjs';
+
+export { sanitizeConversationId, formatResetTime, mergeQuotaBuckets };
 
 const DEFAULT_RPC_PAYLOAD = {
   metadata: { ideName: 'antigravity', extensionName: 'antigravity', locale: 'en' }
 };
 
-function normalizeModelKey(name) {
-  return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
-export function sanitizeConversationId(id) {
-  if (typeof id !== 'string' || !id.trim()) return '';
-  return id.trim().replace(/\.\./g, '').replace(/\//g, '').replace(/\\/g, '');
-}
-
 function getTmpDir() {
   return join(os.homedir(), '.gemini', 'tmp');
-}
-
-function readJsonSafeSync(filePath) {
-  try {
-    const raw = readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-    const parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-export function formatResetTime(resetTimeStr) {
-  try {
-    if (!resetTimeStr || typeof resetTimeStr === 'boolean' || Array.isArray(resetTimeStr)) return '';
-    const reset = new Date(resetTimeStr);
-    const resetMs = reset.getTime();
-    if (isNaN(resetMs)) return '';
-    const diffSeconds = Math.floor((resetMs - Date.now()) / 1000);
-    if (diffSeconds <= 0) return 'now';
-    const minutes = Math.floor((diffSeconds + 59) / 60);
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours >= 24) {
-      const days = Math.floor(hours / 24);
-      const remHours = hours % 24;
-      return remHours ? `${days}d ${remHours}h` : `${days}d`;
-    }
-    return mins ? `${hours}h ${mins}m` : `${hours}h`;
-  } catch (e) {
-    return '';
-  }
 }
 
 function requestRpc(host, port, csrfToken, rpcPath, useHttps = false, payload = null) {
@@ -83,7 +46,7 @@ function requestRpc(host, port, csrfToken, rpcPath, useHttps = false, payload = 
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
             resolve(JSON.parse(data));
-          } catch(e) { reject(e); }
+          } catch (e) { reject(e); }
         } else {
           reject(new Error(`HTTP ${res.statusCode}`));
         }
@@ -222,9 +185,9 @@ export function parseModelLimits(availableModelsResponse) {
       model: modelEnum
     };
 
-    const normSlug = normalizeModelKey(slug);
-    const normEnum = normalizeModelKey(modelEnum);
-    const normDisplay = normalizeModelKey(displayName);
+    const normSlug = normalizeModelName(slug);
+    const normEnum = normalizeModelName(modelEnum);
+    const normDisplay = normalizeModelName(displayName);
 
     addLimitIndexEntry(index, normSlug, entry, true);
     if (normEnum && normEnum !== normSlug) {
@@ -378,12 +341,11 @@ export function persistRuntimeContextToCtxFile(ctxCachePath, runtimeContext) {
     merged.runtime_max_context_tokens = runtimeContext.maxContextTokens;
     merged.runtime_model_display_name = runtimeContext.modelDisplayName || '';
     merged.runtime_model_enum = runtimeContext.model || '';
-    merged.runtime_model_key = normalizeModelKey(runtimeContext.modelDisplayName || runtimeContext.model || '');
+    merged.runtime_model_key = normalizeModelName(runtimeContext.modelDisplayName || runtimeContext.model || '');
   }
   if (hasOffset && runtimeContext.nextOffset >= Number(existing.generator_metadata_offset || 0)) {
     merged.generator_metadata_offset = runtimeContext.nextOffset;
   }
-  mkdirSync(dirname(ctxCachePath), { recursive: true });
   writeFileSyncAndVerifyNoBOM(ctxCachePath, JSON.stringify(merged));
 }
 
@@ -468,7 +430,7 @@ export async function fetchLiveQuotaCache(options = {}) {
         entry.reset_time = quotaInfo.resetTime;
         entry.refreshes_in = formatResetTime(quotaInfo.resetTime);
       }
-      const normKey = label.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const normKey = normalizeModelName(label);
       if (!allModels[normKey] || entry.remaining_percentage < allModels[normKey].remaining_percentage) {
         allModels[normKey] = entry;
       }
@@ -499,19 +461,18 @@ export async function fetchLiveQuotaCache(options = {}) {
 
   // 若 statusLine.command 等子進程環境未繼承環境變數，從最新會話快取中載入
   if (!envLsAddr || !envCsrfToken) {
-    try {
-      const savedEnv = JSON.parse(readFileSync(envCachePath, 'utf8'));
+    const savedEnv = readJsonSafeSync(envCachePath);
+    if (savedEnv) {
       if (!envLsAddr && savedEnv.ls_address) {
         envLsAddr = savedEnv.ls_address;
         envLoadedFromDisk = true;
       }
       if (!envCsrfToken && savedEnv.csrf_token) envCsrfToken = savedEnv.csrf_token;
       if (savedEnv.prefer_https !== undefined) envPreferHttps = Boolean(savedEnv.prefer_https);
-    } catch (_) {}
+    }
   } else {
     // 將有效的直連位址與 Token 持久化，供後續未獲取環境變數的 Hook 子進程共用
     try {
-      mkdirSync(dirname(envCachePath), { recursive: true });
       writeFileSyncAndVerifyNoBOM(envCachePath, JSON.stringify({
         ls_address: envLsAddr,
         csrf_token: envCsrfToken,
@@ -589,109 +550,6 @@ export async function fetchLiveQuotaCache(options = {}) {
   return null;
 }
 
-function writeFileSyncAndVerifyNoBOM(filePath, content) {
-  const dir = dirname(filePath);
-  const tmpPath = join(dir, `.tmp_${path.basename(filePath)}_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-  writeFileSync(tmpPath, content, { encoding: 'utf8' });
-  let buffer = readFileSync(tmpPath);
-  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
-    buffer = buffer.slice(3);
-    writeFileSync(tmpPath, buffer);
-  }
-  renameSync(tmpPath, filePath);
-}
-
-export function mergeQuotaBuckets(baseBuckets = {}, incomingBuckets = {}, preferLowerWhenSameReset = true) {
-  const safeBase = (baseBuckets && typeof baseBuckets === 'object' && !Array.isArray(baseBuckets)) ? baseBuckets : {};
-  const safeIncoming = (incomingBuckets && typeof incomingBuckets === 'object' && !Array.isArray(incomingBuckets)) ? incomingBuckets : {};
-  const merged = { ...safeBase };
-  const now = Date.now();
-
-  for (const [pool, inc] of Object.entries(safeIncoming)) {
-    if (!inc || typeof inc !== 'object') continue;
-    const existing = merged[pool];
-    const existResetMs = existing?.reset_time ? new Date(existing.reset_time).getTime() : 0;
-    const incResetMs = inc.reset_time ? new Date(inc.reset_time).getTime() : 0;
-    const lowerPool = pool.toLowerCase();
-    const isWeekly = lowerPool.includes('weekly') || lowerPool.includes('argon') || lowerPool.endsWith('-wtu') ||
-      existing?.window === 'weekly' || inc?.window === 'weekly' ||
-      Math.max(existResetMs - now, incResetMs - now) > 12 * 60 * 60 * 1000;
-
-    if (!existing || typeof existing !== 'object') {
-      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
-      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
-      if (isWeekly) merged[pool].window = 'weekly';
-      continue;
-    }
-
-    const hasValidExistReset = existResetMs > 0 && !isNaN(existResetMs);
-    const hasValidIncReset = incResetMs > 0 && !isNaN(incResetMs);
-
-    // 1. 過期判定：若既有配額之重置時間已過期，且傳入配額具備較新重置時間或無時間戳記之100%重置額度，舊窗口讓位給新進入配額
-    if (hasValidExistReset && existResetMs <= now && (incResetMs > existResetMs || (!hasValidIncReset && inc.remaining_percentage >= 100))) {
-      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
-      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
-      if (isWeekly) merged[pool].window = 'weekly';
-      continue;
-    }
-    // 若傳入配額本身已過期，但既有配額仍處於未來有效窗口中，保留既有配額
-    if (hasValidIncReset && incResetMs <= now && hasValidExistReset && existResetMs > now) {
-      const dynamicExist = existing.reset_time ? formatResetTime(existing.reset_time) : '';
-      merged[pool] = dynamicExist ? { ...existing, refreshes_in: dynamicExist } : existing;
-      if (isWeekly) merged[pool].window = 'weekly';
-      continue;
-    }
-
-    // 2. 跨重置窗口判定：依配額池類別動態設定時間門檻
-    // 週額度與 Argon 週期為 7 日，門檻設為 24 小時；五小時/短週期額度門檻設為 2 小時，消除長對話時序漂移
-    const windowThresholdMs = isWeekly ? 24 * 60 * 60 * 1000 : 2 * 60 * 60 * 1000;
-
-    if (hasValidExistReset && hasValidIncReset && Math.abs(incResetMs - existResetMs) > windowThresholdMs) {
-      const chosen = incResetMs > existResetMs ? inc : existing;
-      const dynamicChosen = chosen.reset_time ? formatResetTime(chosen.reset_time) : '';
-      merged[pool] = dynamicChosen ? { ...chosen, refreshes_in: dynamicChosen } : chosen;
-      if (isWeekly) merged[pool].window = 'weekly';
-      continue;
-    }
-
-    if (!preferLowerWhenSameReset) {
-      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
-      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
-      if (isWeekly) merged[pool].window = 'weekly';
-      continue;
-    }
-
-    const hasExistPct = typeof existing.remaining_percentage === 'number' && !isNaN(existing.remaining_percentage);
-    const hasIncPct = typeof inc.remaining_percentage === 'number' && !isNaN(inc.remaining_percentage);
-    if (hasExistPct && hasIncPct) {
-      const lowerEntry = existing.remaining_percentage <= inc.remaining_percentage ? existing : inc;
-      const higherEntry = existing.remaining_percentage <= inc.remaining_percentage ? inc : existing;
-      const targetResetTime = lowerEntry.reset_time || higherEntry.reset_time;
-      let dynamicRefreshesIn = '';
-      if (targetResetTime) {
-        dynamicRefreshesIn = formatResetTime(targetResetTime);
-      }
-      merged[pool] = {
-        ...higherEntry,
-        ...lowerEntry,
-        remaining_percentage: Math.min(existing.remaining_percentage, inc.remaining_percentage),
-        reset_time: targetResetTime,
-        refreshes_in: dynamicRefreshesIn || inc.refreshes_in || lowerEntry.refreshes_in || higherEntry.refreshes_in
-      };
-      if (isWeekly) merged[pool].window = 'weekly';
-    } else if (hasIncPct) {
-      const dynamicInc = inc.reset_time ? formatResetTime(inc.reset_time) : '';
-      merged[pool] = dynamicInc ? { ...inc, refreshes_in: dynamicInc } : inc;
-      if (isWeekly) merged[pool].window = 'weekly';
-    } else {
-      const dynamicExist = existing.reset_time ? formatResetTime(existing.reset_time) : '';
-      merged[pool] = dynamicExist ? { ...existing, refreshes_in: dynamicExist } : existing;
-      if (isWeekly) merged[pool].window = 'weekly';
-    }
-  }
-  return merged;
-}
-
 async function main() {
   try {
     const convId = sanitizeConversationId(process.env.STATUSLINE_CONVERSATION_ID || '');
@@ -730,33 +588,13 @@ async function main() {
           if (!cache.planTier && prev.planTier) cache.planTier = prev.planTier;
           if (!cache.planStatus && prev.planStatus) cache.planStatus = prev.planStatus;
         }
-        mkdirSync(dirname(cacheFilePath), { recursive: true });
         writeFileSyncAndVerifyNoBOM(cacheFilePath, JSON.stringify(cache, null, 2));
       }
     }
-  } catch (e) {}
-}
-
-function isDirectExecution() {
-  if (!process.argv[1]) return false;
-  try {
-    const scriptPath = process.argv[1].replace(/^"(.*)"$/, '$1');
-    const metaPath = fileURLToPath(import.meta.url);
-    if (path.resolve(scriptPath).toLowerCase() === path.resolve(metaPath).toLowerCase()) {
-      return true;
-    }
-    try {
-      if (realpathSync(scriptPath).toLowerCase() === realpathSync(metaPath).toLowerCase()) {
-        return true;
-      }
-    } catch (_) {}
-    return false;
-  } catch (e) {
-    return false;
-  }
+  } catch (_) {}
 }
 
 // only auto-run when executed directly, not when imported by tests
-if (isDirectExecution()) {
+if (isDirectExecution(import.meta.url, { treatEmptyArgv1AsDirect: true })) {
   main();
 }
