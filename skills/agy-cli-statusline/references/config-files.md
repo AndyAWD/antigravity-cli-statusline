@@ -15,6 +15,7 @@
 - [4. ui.language 與 ui.footer.items 結構](#4-uilanguage-與-uifooteritems-結構)
 - [5. 原生 /statusline 斜線指令支援](#5-原生-statusline-斜線指令支援)
 - [6. 跨電腦移植與相容性設計](#6-跨電腦移植與相容性設計)
+- [7. 掛鉤部署清單與模組化相容規範](#7-掛鉤部署清單與模組化相容規範)
 
 ---
 
@@ -109,6 +110,7 @@
   - `ui.footer.labelStyle`：標籤顯示樣式（`"text"` 或 `"emoji"`，預設 `"text"`）
   - `ui.footer.barLength`：長條圖格數（預設 `10`）
   - `ui.footer.timeFormat`：重置時間格式，可選 `"smart"` / `"auto"`（預設，同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）、`"yyyy/MM/dd HH:mm"`、`"12h"`、`"24h"`
+  - 渲染器與歷史鍵防禦：目前狀態列採用 `standard` 渲染器（透過 `lib/renderers/index.mjs` 管理）。`ui.footer.theme`（及 `ui.footer.style`、`ui.labelStyle`）為向下相容之清理鍵，於讀取與配置時會主動移除；未來若新增動畫或自訂風格（如 `dino`），應採用明確設定鍵（例如 `ui.footer.renderer`），不得重複使用 `ui.footer.theme`
 
 ---
 
@@ -135,3 +137,14 @@ Antigravity CLI 內建 `/statusline` 斜線指令，可於 TUI 互動介面中�
 ### 跨電腦移植時的自動更新機制
 
 由於複製設定檔到新電腦時絕對路徑可能改變，在新電腦執行本技能的 `configure-statusline.mjs` 時，腳本會自動動態解析新電腦的絕對路徑並更新設定。
+
+---
+
+## 7. 掛鉤部署清單與模組化相容規範
+
+1. **四層模組化架構與遞迴部署**：
+   - `skills/agy-cli-statusline/scripts/lib/` 依職責劃分為四層：`core/`、`collectors/`、`metrics/` 與 `renderers/`。
+   - 執行 `configure-statusline.mjs` 時，會一併將 `statusline-quota.mjs`、`fetch-local-quota.mjs`、遞迴複製的 `hooks/lib/`（保留四層目錄結構）以及 `.hook-version.json` 部署至 `~/.gemini/antigravity-cli/hooks/`。
+   - `hooks/.hook-version.json` 記錄所有已部署檔案（含 `statusline-quota.mjs`、`fetch-local-quota.mjs` 與 `lib/**/*.mjs`）的 SHA-256 雜湊值，供 `diagnose-statusline.mjs` 驗證同步狀態。
+2. **`statusLine.command` 與 `trusted_hooks.json` 相容性**：
+   - 即使內部邏輯拆分為 `hooks/lib/`，`statusLine.command` 仍固定指向 `~/.gemini/antigravity-cli/hooks/statusline-quota.mjs`，以確保既有的 `~/.gemini/trusted_hooks.json` 白名單（`statusLine:<command>`）持續相容，無須變更信任規則。

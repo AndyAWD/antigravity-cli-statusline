@@ -1,7 +1,7 @@
 # 技術標準與更新檢查規格（Reference）
 
 > [!IMPORTANT]
-> 本檔案記錄狀態列渲染器（`statusline-quota.mjs`）的色彩、長條圖、時間格式、標籤樣式以及外掛版本更新檢查之完整技術規格。
+> 本檔案記錄狀態列入口（`statusline-quota.mjs`）與四層模組化架構（`scripts/lib/`）的色彩、長條圖、時間格式、標籤樣式、外掛版本更新檢查及掛鉤部署之完整技術規格。
 
 ---
 
@@ -90,6 +90,24 @@
      - 倒數第二行：依 `ui.language` 顯示版本差異與更新提示（如 `⚠️ 外掛有新版本可用（目前 v1.11.4 → 最新 v1.12.0），請執行以下指令更新：`）。
      - 最末行：獨立顯示 `! agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline`。
 5. **手動同步策略與診斷**：
-   - 執行 `! agy plugin install` 只會更新 `~/.gemini/config/plugins/antigravity-cli-statusline/`，不會自動覆寫 `~/.gemini/antigravity-cli/hooks/`。
-   - 因渲染器即時讀取外掛目錄內的 `plugin.json` 版本號，更新外掛後狀態列顯示之 `外掛版本` 會立即追平且更新提示立即消失；使用者需重跑 `/antigravity-cli-statusline:agy-cli-statusline` 才會將最新掛鉤程式碼重新部署至 `hooks/`。
-   - `scripts/diagnose-statusline.mjs` 會比對外掛清單版本、`hooks/.hook-version.json` 及掛鉤腳本 SHA-256 雜湊，若偵測到不同步會輸出明確提醒。
+   - 執行 `! agy plugin install` 只會更新 `~/.gemini/config/plugins/antigravity-cli-statusline/`，不會自動覆寫 `~/.gemini/antigravity-cli/hooks/`（含 `hooks/lib/`）。
+   - 因渲染器即時讀取外掛目錄內的 `plugin.json` 版本號，更新外掛後狀態列顯示之 `外掛版本` 會立即追平且更新提示立即消失；使用者需重跑 `/antigravity-cli-statusline:agy-cli-statusline` 才會將最新掛鉤與 `hooks/lib/` 子模組程式碼重新部署至 `hooks/`。
+   - `scripts/diagnose-statusline.mjs` 會比對外掛清單版本、`hooks/.hook-version.json` 及所有已部署掛鉤檔案（`statusline-quota.mjs`、`fetch-local-quota.mjs` 與 `lib/**/*.mjs`）的 SHA-256 雜湊，若偵測到不同步會輸出明確提醒。
+
+---
+
+## 7. 四層模組化架構、掛鉤部署與渲染器註冊
+
+1. **四層模組化架構（`skills/agy-cli-statusline/scripts/lib/`）**：
+   狀態列掛鉤與配置工具採用四層架構拆分職責（純 Node.js 零外部依賴 ESM）：
+   - `core/`：常數與版本（`constants.mjs`）、無位元組順序記號（Byte Order Mark）檔案讀寫與 SHA-256 雜湊（`fs-utils.mjs`）、安全清理與符號連結防護（`safe-cleanup.mjs`）、參數正規化（`normalize.mjs`）、語意化版本（Semantic Versioning）比較（`semver.mjs`）、`windowsHide: true` 子行程工具（`process-utils.mjs`）、三層設定檔合併與命令產生（`settings.mjs`）、外掛清單探索（`plugin-manifest.mjs`）。
+   - `collectors/`：資料採集層，包含時間格式（`time-format.mjs`）、本地額度與語言伺服器（Language Server）快取（`quota.mjs`）、對話脈絡與動態上限（`context.mjs`）、帳號快取（`account.mjs`）、系統探針（`probes.mjs` 負責 Git、記憶體與計數器探測）以及父行程樹與 GitHub Release 更新檢查（`plugin-update.mjs`）。
+   - `metrics/`：指標中繼資料與在地化層，包含單一真實來源 `registry.mjs`（管理 37 項指標、5 個分類、4 種語系、`EMOJI_MAP`、`ADJACENT_PAIRS` 與問卷中繼資料，並透過 `scripts/sync-resources.mjs` 生成 `resources/questions.json` 與 `resources/prompts.json`）以及四語系標籤字典與相鄰長條圖合併邏輯（`i18n.mjs`）。
+   - `renderers/`：視覺渲染層，包含美國國家標準協會（American National Standards Institute）24-bit 配色與終端顯示寬度計算（`ansi.mjs`）、渲染器註冊表（`index.mjs`）與預設的 `standard` 狀態列渲染器（`standard.mjs`）。
+2. **遞迴掛鉤部署與 `.hook-version.json`**：
+   - `scripts/configure-statusline.mjs` 執行時，除了部署主入口 `statusline-quota.mjs` 與背景採集器 `fetch-local-quota.mjs` 至 `~/.gemini/antigravity-cli/hooks/`，亦會遞迴同步整個 `scripts/lib/` 至 `~/.gemini/antigravity-cli/hooks/lib/`。
+   - `hooks/.hook-version.json` 的 `files` 欄位記錄所有已部署檔案（含 `statusline-quota.mjs`、`fetch-local-quota.mjs` 與 `lib/...` 下所有 `.mjs` 檔案）的 SHA-256 雜湊值，供 `diagnose-statusline.mjs` 進行完整性與同步比對。
+3. **渲染器選擇、`ui.footer.theme` 相容防禦與 `trusted_hooks.json`**：
+   - 目前狀態列預設採用 `standard` 渲染器，透過 `lib/renderers/index.mjs` 的註冊機制（`registerRenderer` / `getRenderer` / `listRenderers`）解析。
+   - `ui.footer.theme`（連同 `ui.footer.style`、`ui.labelStyle`）屬於為向下相容而主動清理的歷史鍵值：`lib/core/settings.mjs`（`getSettingsAsync`）與 `configure-statusline.mjs` 會在讀取或寫入設定時主動刪除該鍵，避免早期實驗性主題殘留干擾。未來若新增動畫或自訂風格渲染器（例如 `dino`），必須在 `lib/renderers/index.mjs` 註冊並使用明確的設定鍵（例如 `ui.footer.renderer`），不得沿用 `ui.footer.theme`。
+   - `statusLine.command` 永遠保持指向 `~/.gemini/antigravity-cli/hooks/statusline-quota.mjs`，以維持與 `~/.gemini/trusted_hooks.json` 命令字串白名單的完全相容。
