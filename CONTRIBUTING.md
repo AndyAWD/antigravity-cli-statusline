@@ -30,7 +30,7 @@ This project uses a 4-layer modular architecture (`core/`, `collectors/`, `metri
 
 ### 3. Modify `skills/agy-cli-statusline/scripts/lib/metrics/i18n.mjs`
 - **Find `buildI18nDict(lang, m, labelStyle = 'text')`**: Add a new `[LANG_CODE]` object translating all **42 keys** (**37 status indicators** + **5 merged bar graph keys**: `quota+bar`, `context-used+bar`, `quota-weekly+bar`, `quota-argon+bar`, `token-count+bar`) into [Target Language], preserving all ANSI color variables (`${BOLD}`, `${WHITE}`, `${RESET}`, etc.) and `${m.*}` template expressions.
-- Add `'[LANG_CODE]'` translations for agent states (`AGENT_STATE_MAP` / state labels) and `formatPluginUpdateNoticeLines()`.
+- Add `'[LANG_CODE]'` translations inside `formatAgentState(state, normLang)` (its internal `map` in `lib/metrics/i18n.mjs`) and `formatPluginUpdateNoticeLines()`.
 
 ### 4. Modify `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs` (and metric collectors)
 - Add `'[LANG_CODE]'` translations for `"No VC"` (`getGitBranch`), `"Unknown"`, `"None"` / `"N/A"`, `"uncommitted"` / `"no changes"` (`vcsDirtyLabel`), and sandbox status strings (`off` / `on (net)` / `on (no-net)`).
@@ -106,7 +106,7 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/lib/metrics/i18n.mjs`
 - **尋找 `buildI18nDict(lang, m, labelStyle = 'text')` 函式**：新增 `'[LANG_CODE]'` 字典，將全部 **42 個鍵值**（**37 個狀態列指標** ＋ **5 個長條圖合併鍵值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻譯為【目標語言】，保留原有的美國國家標準協會（American National Standards Institute）色彩變數（如 `${BOLD}`、`${WHITE}`、`${RESET}`）與 `${m.*}` 變數插值。
-- 同步於代理狀態對照（`AGENT_STATE_MAP`）與 `formatPluginUpdateNoticeLines()` 補上 `'[LANG_CODE]'` 翻譯。
+- 同步於 `formatAgentState(state, normLang)` 內部 `map`（位於 `lib/metrics/i18n.mjs`）與 `formatPluginUpdateNoticeLines()` 補上 `'[LANG_CODE]'` 翻譯。
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs`（及資料採集模組）
 - 補上 `'[LANG_CODE]'` 對應的「無版本控制（No VC）」（`getGitBranch`）、「未知」、「無」、「未提交 / 無變更」（`vcsDirtyLabel`）與沙盒狀態文字（`off` / `on (net)` / `on (no-net)`）。
@@ -182,7 +182,7 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 
 ### 3. 修改 `skills/agy-cli-statusline/scripts/lib/metrics/i18n.mjs`
 - **寻找 `buildI18nDict(lang, m, labelStyle = 'text')` 函数**：新增 `'[LANG_CODE]'` 字典，将全部 **42 个键值**（**37 个状态栏指标** + **5 个长条图合并键值**：`quota+bar`、`context-used+bar`、`quota-weekly+bar`、`quota-argon+bar`、`token-count+bar`）翻译成【目标语言】，保留原有的 ANSI 色彩变量（如 `${BOLD}`、`${WHITE}`、`${RESET}`）与 `${m.*}` 变量插值。
-- 同步在代理状态映射（`AGENT_STATE_MAP`）与 `formatPluginUpdateNoticeLines()` 补上 `'[LANG_CODE]'` 翻译。
+- 同步在 `formatAgentState(state, normLang)` 内部 `map`（位于 `lib/metrics/i18n.mjs`）与 `formatPluginUpdateNoticeLines()` 补上 `'[LANG_CODE]'` 翻译。
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs`（及数据采集模块）
 - 补上 `'[LANG_CODE]'` 对应的“无版本控制（No VC）”（`getGitBranch`）、“未知”、“无”、“未提交 / 无变更”（`vcsDirtyLabel`）与沙盒状态文本（`off` / `on (net)` / `on (no-net)`）。
