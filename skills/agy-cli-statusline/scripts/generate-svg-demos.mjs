@@ -178,7 +178,7 @@ function getScenarios(lang) {
     vcsType: 'git',
     gitBranch: 'main',
     cliVersion: 'v1.5.10',
-    pluginVersion: 'v1.11.4',
+    pluginVersion: 'v1.12.0',
     conversationIdShort: '557d1ccd',
     sandboxEnabled: false,
     sandboxAllowNet: false,

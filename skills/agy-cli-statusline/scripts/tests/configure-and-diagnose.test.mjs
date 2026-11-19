@@ -1367,8 +1367,10 @@ async function testCase15HookVersionAndPluginHookSync() {
     assert.strictEqual(r.status, 'in_sync', '外掛與掛鉤版本與內容一致時應回報 in_sync');
     assert.deepStrictEqual(r.fileDiffs, [], 'in_sync 時 fileDiffs 應為空');
 
-    // (d) version_mismatch（外掛已透過 agy plugin install 升至 1.12.0，但掛鉤仍為 1.11.4）
-    fs.writeFileSync(path.join(fakePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.12.0' }), 'utf8');
+    // (d) version_mismatch（外掛已透過 agy plugin install 升至較新版本，但掛鉤仍為目前版本）
+    const [majV, minV] = expectedRepoVersion.split('.').map(Number);
+    const higherVersion = `${majV}.${minV + 1}.0`;
+    fs.writeFileSync(path.join(fakePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: higherVersion }), 'utf8');
     r = checkPluginHookSync({
       home: syncBase,
       hooksDir: fakeHooksDir,
@@ -1376,11 +1378,11 @@ async function testCase15HookVersionAndPluginHookSync() {
       currentPluginDir: missingPluginDir
     });
     assert.strictEqual(r.status, 'version_mismatch', '外掛版本領先掛鉤時應回報 version_mismatch');
-    assert.strictEqual(r.pluginVersion, '1.12.0');
+    assert.strictEqual(r.pluginVersion, higherVersion);
     assert.strictEqual(r.hookVersion, expectedRepoVersion);
 
-    // (e) content_mismatch（版號皆為 1.12.0，但掛鉤腳本內容未更新）
-    fs.writeFileSync(path.join(fakeHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '1.12.0' }), 'utf8');
+    // (e) content_mismatch（版號皆為較新版本，但掛鉤腳本內容未更新）
+    fs.writeFileSync(path.join(fakeHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: higherVersion }), 'utf8');
     fs.appendFileSync(path.join(fakeHooksDir, 'statusline-quota.mjs'), '\n// modified\n', 'utf8');
     r = checkPluginHookSync({
       home: syncBase,

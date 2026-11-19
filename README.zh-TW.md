@@ -2,7 +2,7 @@
 
 [English](README.md) | 繁體中文 | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-[![版本](https://img.shields.io/badge/版本-1.11.4-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![版本](https://img.shields.io/badge/版本-1.12.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -234,17 +234,17 @@ Argon 可用: 59% [█████░░░░░] │ Argon 倒數: 6d 1h │ A
 
 版控狀態: 無變更 │ 版控類型: git │ 🔀 main
 📁 antigravity-cli-statusline │ 完整路徑: /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.11.4
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.12.0
 ```
 
 當啟用 `plugin-update`（`#38`）且偵測到較新的 GitHub Release 時，會於設定的位置獨立顯示兩行更新提醒（在終端機執行 `agy plugin install` 後版本即追平並自動消除提醒；如需同步 `~/.gemini/antigravity-cli/hooks/` 掛鉤腳本請重跑 `/antigravity-cli-statusline:agy-cli-statusline`，或執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 檢查版號差異）：
 
 ```text
-⚠️ 狀態列有新版本可用（目前 v1.11.3 → 最新 v1.11.4），請執行以下指令更新：
+⚠️ 狀態列有新版本可用（目前 v1.11.4 → 最新 v1.12.0），請執行以下指令更新：
 agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
-採用繪圖符號樣式（`e38` / `e:plugin-update`）時，第一行會精簡顯示為 `🆕 v1.11.3 → v1.11.4` 並搭配第二行獨立更新指令；若版本已是最新則自動隱藏並修剪頭尾純空白行。
+採用繪圖符號樣式（`e38` / `e:plugin-update`）時，第一行會精簡顯示為 `🆕 v1.11.4 → v1.12.0` 並搭配第二行獨立更新指令；若版本已是最新則自動隱藏並修剪頭尾純空白行。
 
 ## 貢獻指南
 
