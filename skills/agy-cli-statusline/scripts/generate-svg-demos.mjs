@@ -105,7 +105,7 @@ function ansiToTspans(ansiLine) {
 // quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,
 // vcs-dirty,vcs-type,e:git-branch,n,
 // e:project-path,project-full-path,n,
-// e:mode,e:conversation-id,e:memory-usage,cli-version]
+// e:mode,e:conversation-id,e:memory-usage,cli-version,plugin-version]
 // =============================================================================
 const USER_SORTED_ITEMS = [
   'model-name', 'account-email', 'plan-tier', 'sandbox-status', 'n',
@@ -116,7 +116,7 @@ const USER_SORTED_ITEMS = [
   'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'n', 'n',
   'vcs-dirty', 'vcs-type', 'git-branch', 'n',
   'project-path', 'project-full-path', 'n',
-  'mode', 'conversation-id', 'memory-usage', 'cli-version'
+  'mode', 'conversation-id', 'memory-usage', 'cli-version', 'plugin-version'
 ];
 
 const USER_ITEM_STYLES = {
@@ -177,7 +177,8 @@ function getScenarios(lang) {
     projectFullPath: '~/Project/antigravity-cli-statusline',
     vcsType: 'git',
     gitBranch: 'main',
-    cliVersion: 'v1.4.12',
+    cliVersion: 'v1.5.10',
+    pluginVersion: 'v1.11.4',
     conversationIdShort: '557d1ccd',
     sandboxEnabled: false,
     sandboxAllowNet: false,
@@ -265,7 +266,7 @@ const WIZARD_META = {
       '⎿ 分頁進度：[ 第 2 / 5 頁 ] · 累計選取 18 項指標',
       '⎿ 分頁進度：[ 第 3 / 5 頁 ] · 累計選取 22 項指標',
       '⎿ 分頁進度：[ 第 4 / 5 頁 ] · 累計選取 27 項指標',
-      '★ 全部五大分類共 36 項指標已全數選取完成！'
+      '★ 全部五大分類共 37 項指標已全數選取完成！'
     ],
     navHints: [
       'Space 勾選/取消 · Enter 進入下一分頁 (2/5 額度計費) · 終端機分頁免滾動零截斷',
@@ -283,7 +284,7 @@ const WIZARD_META = {
       '⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 18 项指标',
       '⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 22 项指标',
       '⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 27 项指标',
-      '★ 全部五大分类共 36 项指标已全数选取完成！'
+      '★ 全部五大分类共 37 项指标已全数选取完成！'
     ],
     navHints: [
       'Space 勾选/取消 · Enter 进入下一分页 (2/5 额度计费) · 终端分页免滚动零截断',
@@ -301,7 +302,7 @@ const WIZARD_META = {
       '⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 18 項目を選択中',
       '⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 22 項目を選択中',
       '⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 27 項目を選択中',
-      '★ 全 5 カテゴリ 36 指標の一括選択が完了しました！'
+      '★ 全 5 カテゴリ 37 指標の一括選択が完了しました！'
     ],
     navHints: [
       'Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要',
@@ -319,7 +320,7 @@ const WIZARD_META = {
       '⎿ Wizard pager: [ Page 2 / 5 ] · 18 metrics selected cumulatively',
       '⎿ Wizard pager: [ Page 3 / 5 ] · 22 metrics selected cumulatively',
       '⎿ Wizard pager: [ Page 4 / 5 ] · 27 metrics selected cumulatively',
-      '★ All 36 indicators across 5 categories successfully selected!'
+      '★ All 37 indicators across 5 categories successfully selected!'
     ],
     navHints: [
       'Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation',
@@ -376,7 +377,7 @@ export function generateDemoSvg(lang) {
       '③ 指標分頁勾選 (2/5 額度計費帳號) · 勾選 5小時/每週/Argon 額度、長條圖與時間等 14 項',
       '④ 指標分頁勾選 (3/5 脈絡與權杖) · 勾選脈絡消耗比例、脈絡長條圖、精確權杖數與長條圖',
       '⑤ 指標分頁勾選 (4/5 工作區與版控) · 勾選專案短/完整路徑、Git 分支、未提交變更與 VCS 類型',
-      '⑥ 指標分頁勾選 (5/5 系統與背景任務) · 勾選 RAM 記憶體、CLI 版本、沙盒、子代理與產出檔案等 9 項',
+      '⑥ 指標分頁勾選 (5/5 系統與背景任務) · 勾選 RAM、Agy CLI 版本、外掛版本、子代理與產出等 10 項',
       '⑦ 手動排序與個別樣式 Write-in · 支援 e: 指定 Emoji 圖示、n/n,n 換行排版',
       '⑧ 設定部署完成與即時熱重載 · 三層 settings.json 同步，立即呈現 11 列自訂狀態列',
       '⑨ 完整狀態列即時遙測運作 · 依指定排序即時追蹤長條圖、權杖用量與子代理'
@@ -388,7 +389,7 @@ export function generateDemoSvg(lang) {
         '③ 指标分页勾选 (2/5 额度计费账号) · 勾选 5小时/每周/Argon 额度、长条图与时间等 14 项',
         '④ 指标分页勾选 (3/5 上下文与令牌) · 勾选上下文消耗比例、上下文长条图、精确令牌数与长条图',
         '⑤ 指标分页勾选 (4/5 工作区与版控) · 勾选项目短/完整路径、Git 分支、未提交变更与 VCS 类型',
-        '⑥ 指标分页勾选 (5/5 系统与后台任务) · 勾选 RAM 内存、CLI 版本、沙箱、子代理与产出文件等 9 项',
+        '⑥ 指标分页勾选 (5/5 系统与后台任务) · 勾选 RAM、Agy CLI 版本、插件版本、子代理与产出等 10 项',
         '⑦ 手动排序与个别样式 Write-in · 支持 e: 指定 Emoji 图标、n/n,n 换行排版',
         '⑧ 设置部署与即时热重载 · 三层 settings.json 同步，立即呈现 11 列自订状态栏',
         '⑨ 完整状态栏即时遥测运作 · 依指定排序即时追踪长条图、令牌用量与子代理'
@@ -400,7 +401,7 @@ export function generateDemoSvg(lang) {
           '③ 指標ウィザード (2/5 クォータ・請求) · 5時間/週間/Argon クォータ、バー、時刻など14項目',
           '④ 指標ウィザード (3/5 コンテキスト・トークン) · コンテキスト使用率・バー、トークン数・バーを選択',
           '⑤ 指標ウィザード (4/5 ワークスペース・VCS) · プロジェクトパス、Gitブランチ、未コミット変更、VCS種別',
-          '⑥ 指標ウィザード (5/5 システム・タスク) · メモリ、CLIバージョン、会話ID、サブエージェント等9項目',
+          '⑥ 指標ウィザード (5/5 システム・タスク) · メモリ、CLI/プラグイン版、会話ID、サブ代理等10項目',
           '⑦ 並び順・スタイル直接入力 · e: 接頭辞で絵文字指定、n/n,n で自在に改行',
           '⑧ 設定の反映と即時ホットリロード · 3 層 settings.json 同期、11 列レイアウト即時適用',
           '⑨ リアルタイムテレメトリ稼働 · 指定順序でプログレスバー、トークン、サブ代理を追跡'
@@ -411,7 +412,7 @@ export function generateDemoSvg(lang) {
           '③ Indicator Selection (2/5 Quota & Billing) · Select 5-hr/weekly/Argon quotas, bars & reset times (14 items)',
           '④ Indicator Selection (3/5 Context & Tokens) · Select context used %, context bar, token count & bar',
           '⑤ Indicator Selection (4/5 Workspace & VCS) · Select project path, full path, Git branch, dirty status & VCS type',
-          '⑥ Indicator Selection (5/5 System & Tasks) · Select RAM usage, CLI version, sandbox, subagents & artifacts (9 items)',
+          '⑥ Indicator Selection (5/5 System & Tasks) · Select RAM, Agy CLI & plugin versions, subagents & artifacts (10 items)',
           '⑦ Custom Order & Styles Write-in · Supports e: for Emoji, text styles, and n/n,n line breaks',
           '⑧ Config Deployment & Hot Reload · Sync 3-tier settings.json & activate 11-row statusline',
           '⑨ Live Telemetry Statusline in Action · Real-time tracking of bars, tokens, and subagents'
@@ -527,14 +528,14 @@ ${optionLines}
   const termContentF6 = isZhTw
     ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 36 項）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 37 項）</text>
   <text x="290" y="156" fill="#8b949e">— 於 Write-in 輸入自訂順序（e: 為 Emoji，n 為換行，n,n 為空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon 額度 (argon)  │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 🔀 Git 分支 (branch)   │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 長條 (bar)    │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🔍 未提交變更 (dirty)  │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 狀態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 倒數 (cd)     │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版控類型 (vcs-type) │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時間 (time)   │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 記憶體量 (memory)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 長條 (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版控類型 (vcs-type) │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 倒數 (cd)     │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 記憶體量 (memory)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 狀態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時間 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 訂閱方案 (plan)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 對話 ID (conv-id)   │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -550,14 +551,14 @@ ${optionLines}
     : (isZhCn
       ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 36 项）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 37 项）</text>
   <text x="290" y="156" fill="#8b949e">— 于 Write-in 输入自定义顺序（e: 为 Emoji，n 为换行，n,n 为空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon 额度 (argon)  │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 🔀 Git 分支 (branch)   │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🔍 未提交变更 (dirty)  │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版控类型 (vcs-type) │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 内存用量 (memory)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版控类型 (vcs-type) │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 内存用量 (memory)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 对话 ID (conv-id)   │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -573,14 +574,14 @@ ${optionLines}
       : (isJp
         ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 36 項目）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 37 項目）</text>
   <text x="280" y="156" fill="#8b949e">— 下の Write-in に並び順を入力（e: で絵文字、n で改行、n,n で空行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon 残量 (argon)  │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 🔀 Git 分岐 (branch)   │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🔍 未コミット (dirty)  │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版管理種別 (vcs)    │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 メモリ (memory)     │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版管理種別 (vcs)    │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 メモリ (memory)     │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 プラン (plan)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 会話番号 (conv-id)  │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -595,14 +596,14 @@ ${optionLines}
   <text x="24" y="422" fill="#6e7681">指定された順序とスタイルに基づき、11 列の高密度ステータスラインを自動構築</text>`
         : `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 36)</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 37)</text>
   <text x="330" y="156" fill="#8b949e">— Enter custom order below (e: for Emoji, n for newline):</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">13</tspan> │ ✨ Argon Quota (argon) │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 🔀 Git Branch (branch) │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🔍 Dirty State (dirty) │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ VCS Type (vcs-type) │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 Memory (memory)     │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ VCS Type (vcs-type) │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 Memory (memory)     │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 Plan Tier (plan)    │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 Conv ID (conv-id)   │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -621,10 +622,10 @@ ${optionLines}
   <text x="24" y="156" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="156" fill="#c9d1d9">已更新三層設定檔：~/.gemini/antigravity-cli/settings.json</text>
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 腳本部署完成，已同步註冊 ~/.gemini/trusted_hooks.json</text>
+  <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 腳本部署完成，已寫入版本同步資訊（.hook-version.json）</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
   <text x="44" y="204" fill="#57caff" font-weight="700">狀態列已熱重載生效！已套用自訂 11 列排版與 Emoji/Text 混合風格</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 46 個指標與排版單元已解析 · 自動合併相鄰額度與長條圖 · 支援 24 位元真實色彩</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 47 個指標與排版單元已解析 · 自動合併相鄰額度與長條圖 · 支援 GitHub Release 版本檢查</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI 狀態列已就緒，隨時監控系統指標與工作區檔案變更。</text>
@@ -634,10 +635,10 @@ ${optionLines}
   <text x="24" y="156" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="156" fill="#c9d1d9">已更新三层配置文件：~/.gemini/antigravity-cli/settings.json</text>
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 脚本部署完成，已同步注册 ~/.gemini/trusted_hooks.json</text>
+  <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 脚本部署完成，已写入版本同步信息（.hook-version.json）</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
   <text x="44" y="204" fill="#57caff" font-weight="700">状态栏已热重载生效！已应用自定义 11 列排版与 Emoji/Text 混合风格</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 46 个指标与排版单元已解析 · 自动合并相邻额度与长条图 · 支持 24 位真彩色</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 47 个指标与排版单元已解析 · 自动合并相邻额度与长条图 · 支持 GitHub Release 版本检查</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI 状态栏已就绪，随时监控系统指标与工作区文件变更。</text>
@@ -647,10 +648,10 @@ ${optionLines}
   <text x="24" y="156" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="156" fill="#c9d1d9">3 層の設定ファイルを更新：~/.gemini/antigravity-cli/settings.json</text>
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="180" fill="#c9d1d9">フックを配置し ~/.gemini/trusted_hooks.json への登録を完了</text>
+  <text x="44" y="180" fill="#c9d1d9">フックを配置しバージョン同期情報（.hook-version.json）を記録</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
   <text x="44" y="204" fill="#57caff" font-weight="700">ステータスラインが即時反映！11 列のカスタム並び順と混合スタイルを適用</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 46 の指標・改行要素を解決 · 隣接バーの自動統合 · 24-bit フルカラー表示</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 47 の指標・改行要素を解決 · 隣接バーの自動統合 · GitHub Release 更新確認に対応</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI ステータスライン稼働中。ワークスペースを監視しています。</text>
@@ -659,10 +660,10 @@ ${optionLines}
   <text x="24" y="156" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="156" fill="#c9d1d9">Synchronized 3-tier config: ~/.gemini/antigravity-cli/settings.json</text>
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
-  <text x="44" y="180" fill="#c9d1d9">Cross-platform hook deployed &amp; registered in ~/.gemini/trusted_hooks.json</text>
+  <text x="44" y="180" fill="#c9d1d9">Cross-platform hook deployed &amp; version sync recorded (.hook-version.json)</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
   <text x="44" y="204" fill="#57caff" font-weight="700">Statusline hot reloaded! Applied custom 11-row layout with mixed Emoji/Text</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 46 metrics &amp; layout tokens resolved · Auto-merged adjacent bars · 24-bit truecolor</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 47 metrics &amp; layout tokens resolved · Auto-merged bars · GitHub Release check enabled</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI statusline active. Ready to monitor workspace and telemetry.</text>
@@ -816,7 +817,7 @@ ${generateLogoSvg(44, 48, 6, 6, 7)}
 
 <!-- Antigravity Banner Area -->
 <use href="#agy-logo"/>
-<text x="148" y="62" fill="#57caff" font-weight="700">Antigravity CLI 1.4.12</text>
+<text x="148" y="62" fill="#57caff" font-weight="700">Antigravity CLI 1.5.10</text>
 <text x="148" y="80" fill="#c9d1d9">anandydy529@gmail.com (Google AI Pro)</text>
 <text x="148" y="98" fill="#8b949e">Gemini 3.1 Pro (High)</text>
 <text x="148" y="116" fill="#6e7681">~/Project/antigravity-cli-statusline</text>
