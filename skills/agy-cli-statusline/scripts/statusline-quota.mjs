@@ -1,6 +1,8 @@
 import { promises as fs, realpathSync } from 'fs';
 import { spawn, exec, execFile } from 'child_process';
 import { promisify } from 'util';
+import http from 'http';
+import https from 'https';
 import path, { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
@@ -8,6 +10,10 @@ import os from 'os';
 // ==========================================
 // Constants & UI Styling
 // ==========================================
+export const HOOK_VERSION = '1.11.4';
+export const PLUGIN_REPO_URL = 'https://github.com/AndyAWD/antigravity-cli-statusline';
+export const GITHUB_LATEST_RELEASE_URL = 'https://github.com/AndyAWD/antigravity-cli-statusline/releases/latest';
+
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const GRAY = "\x1b[90m";
@@ -194,6 +200,7 @@ export const EMOJI_MAP = {
   'memory-usage': '💾',
   'sandbox-status': '🛡️',
   'cli-version': '🚀',
+  'plugin-version': '🧩',
   'conversation-id': '💬',
   'agent-profile': '🪪',
   'mode': '⚙️'
@@ -356,6 +363,748 @@ async function getCliMemoryMB(execFn = runCmdDetailedAsync) {
   } catch (e) {
     return 0;
   }
+}
+
+// ==========================================
+// Plugin Version & GitHub Release Update Check
+// ==========================================
+export function normalizeSemver(versionStr) {
+  if (typeof versionStr !== 'string') return '';
+  const trimmed = versionStr.trim().replace(/^v/i, '');
+  const match = trimmed.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
+  if (!match) return '';
+  return match[4] ? `${match[1]}.${match[2]}.${match[3]}-${match[4]}` : `${match[1]}.${match[2]}.${match[3]}`;
+}
+
+export function formatVersionTag(versionStr) {
+  const norm = normalizeSemver(versionStr);
+  if (norm) return `v${norm}`;
+  if (typeof versionStr === 'string' && versionStr.trim()) {
+    const t = versionStr.trim();
+    return /^v/i.test(t) ? `v${t.slice(1)}` : `v${t}`;
+  }
+  return '';
+}
+
+export function compareSemver(a, b) {
+  const normA = normalizeSemver(a);
+  const normB = normalizeSemver(b);
+  if (!normA || !normB) return null;
+  const [coreA, preA] = normA.split('-');
+  const [coreB, preB] = normB.split('-');
+  const partsA = coreA.split('.').map(Number);
+  const partsB = coreB.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (partsA[i] < partsB[i]) return -1;
+    if (partsA[i] > partsB[i]) return 1;
+  }
+  if (!preA && !preB) return 0;
+  if (!preA && preB) return 1;
+  if (preA && !preB) return -1;
+  const idsA = preA.split('.');
+  const idsB = preB.split('.');
+  const len = Math.max(idsA.length, idsB.length);
+  for (let i = 0; i < len; i++) {
+    if (i >= idsA.length) return -1;
+    if (i >= idsB.length) return 1;
+    const isNumA = /^\d+$/.test(idsA[i]);
+    const isNumB = /^\d+$/.test(idsB[i]);
+    if (isNumA && isNumB) {
+      const nA = Number(idsA[i]);
+      const nB = Number(idsB[i]);
+      if (nA < nB) return -1;
+      if (nA > nB) return 1;
+    } else if (isNumA !== isNumB) {
+      return isNumA ? -1 : 1;
+    } else {
+      if (idsA[i] < idsB[i]) return -1;
+      if (idsA[i] > idsB[i]) return 1;
+    }
+  }
+  return 0;
+}
+
+export function isVersionBehind(installedVersion, latestVersion) {
+  return compareSemver(installedVersion, latestVersion) === -1;
+}
+
+export function tokenizeCommandLine(cmdLine) {
+  if (typeof cmdLine !== 'string') return [];
+  const tokens = [];
+  let current = '';
+  let quote = '';
+  let hasToken = false;
+
+  for (let i = 0; i < cmdLine.length; i++) {
+    const ch = cmdLine[i];
+    if (quote) {
+      if (ch === '\\' && quote === '"' && i + 1 < cmdLine.length && (cmdLine[i + 1] === '"' || cmdLine[i + 1] === '\\')) {
+        current += cmdLine[i + 1];
+        i++;
+      } else if (ch === quote) {
+        quote = '';
+      } else {
+        current += ch;
+      }
+      hasToken = true;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      hasToken = true;
+    } else if (/\s/.test(ch)) {
+      if (hasToken) {
+        tokens.push(current);
+        current = '';
+        hasToken = false;
+      }
+    } else {
+      current += ch;
+      hasToken = true;
+    }
+  }
+  if (hasToken) tokens.push(current);
+  return tokens;
+}
+
+export function isAgyProcessName(nameOrPath) {
+  if (typeof nameOrPath !== 'string') return false;
+  const trimmed = nameOrPath.trim();
+  if (!trimmed) return false;
+  const parts = trimmed.split(/[\\/]/);
+  const base = parts[parts.length - 1];
+  return /^agy(?:\.exe)?$/i.test(base);
+}
+
+export function extractArgsAfterExecutable(argsInput, knownName = '') {
+  if (Array.isArray(argsInput)) {
+    return argsInput.slice(1).map(t => String(t ?? ''));
+  }
+  if (typeof argsInput !== 'string') return [];
+  const trimmed = argsInput.trim();
+  if (!trimmed) return [];
+  const tokens = tokenizeCommandLine(trimmed);
+  if (tokens.length === 0) return [];
+
+  // 若命令列開頭即為引號包裹之執行檔路徑，或 tokens[0] 本身即為 agy，直接取後續參數
+  if (trimmed.startsWith('"') || trimmed.startsWith("'") || isAgyProcessName(tokens[0])) {
+    return tokens.slice(1);
+  }
+
+  // 若無引號之執行檔路徑含空白（如 macOS ps 輸出 /Users/John Doe/.gemini/bin/agy --flag），
+  // 於第一個選項旗標之前尋找符合 agy 執行檔名稱之分界位置
+  let firstFlagIdx = tokens.findIndex(t => t.startsWith('-'));
+  if (firstFlagIdx === -1) firstFlagIdx = tokens.length;
+  for (let i = firstFlagIdx - 1; i >= 0; i--) {
+    if (isAgyProcessName(tokens[i])) {
+      return tokens.slice(i + 1);
+    }
+  }
+  if (knownName && isAgyProcessName(knownName)) {
+    return tokens.slice(firstFlagIdx);
+  }
+  return tokens.slice(1);
+}
+
+export function hasNonInteractiveAgyFlag(argsInput, knownName = '') {
+  const args = extractArgsAfterExecutable(argsInput, knownName);
+  for (const tok of args) {
+    if (tok === '--') break;
+    if (tok === '-p' || tok === '--print' || tok === '--prompt') return true;
+    const eqMatch = tok.match(/^(?:-p|--print|--prompt)=(.*)$/i);
+    if (eqMatch) {
+      const val = eqMatch[1].trim().toLowerCase();
+      if (val !== 'false' && val !== '0' && val !== 'no' && val !== '') return true;
+    }
+  }
+  return false;
+}
+
+export function isHubAgyArgs(argsInput, knownName = '') {
+  const args = extractArgsAfterExecutable(argsInput, knownName);
+  for (const tok of args) {
+    if (tok === '--') break;
+    if (tok === '--hub' || tok.startsWith('--hub=')) return true;
+  }
+  return false;
+}
+
+export function parseMacPsLine(line) {
+  if (typeof line !== 'string') return null;
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/^(\d+)\s+(\d+)\s+([A-Z][a-z]{2}\s+[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.*)$/) ||
+    trimmed.match(/^(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(.*)$/);
+  if (!match) return null;
+  return {
+    pid: parseInt(match[1], 10),
+    ppid: parseInt(match[2], 10),
+    startTime: match[3].trim(),
+    name: match[4].trim()
+  };
+}
+
+export function parseLinuxProcStat(statStr) {
+  if (typeof statStr !== 'string') return null;
+  const lparen = statStr.indexOf('(');
+  const rparen = statStr.lastIndexOf(')');
+  if (lparen === -1 || rparen === -1 || rparen <= lparen) return null;
+  const pid = parseInt(statStr.slice(0, lparen).trim(), 10);
+  const comm = statStr.slice(lparen + 1, rparen);
+  const fields = statStr.slice(rparen + 1).trim().split(/\s+/);
+  if (isNaN(pid) || fields.length < 20) return null;
+  const ppid = parseInt(fields[1], 10);
+  const startTime = fields[19];
+  if (isNaN(ppid) || !startTime) return null;
+  return { pid, ppid, name: comm, startTime };
+}
+
+export function parseWinProcessChainJson(stdout) {
+  if (typeof stdout !== 'string' || !stdout.trim()) return [];
+  try {
+    const parsed = JSON.parse(stdout.replace(/^\uFEFF/, '').trim());
+    const list = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []);
+    return list
+      .filter(p => p && typeof p === 'object')
+      .map(p => ({
+        pid: Number(p.pid),
+        ppid: Number(p.ppid),
+        name: String(p.name || ''),
+        startTime: String(p.start || ''),
+        args: String(p.cmd || '')
+      }))
+      .filter(p => !isNaN(p.pid) && p.pid > 0);
+  } catch (_) {
+    return [];
+  }
+}
+
+export async function resolveAgySessionAsync(options = {}) {
+  const envObj = options.env || process.env;
+  const overrideRaw = envObj?.STATUSLINE_AGY_SESSION_JSON;
+  if (typeof overrideRaw === 'string' && overrideRaw.trim()) {
+    try {
+      const ov = JSON.parse(overrideRaw.replace(/^\uFEFF/, '').trim());
+      if (ov && typeof ov === 'object' && ov.pid) {
+        const pid = Number(ov.pid);
+        const startTime = String(ov.startTime || '');
+        return {
+          found: true,
+          pid,
+          startTime,
+          nonInteractive: Boolean(ov.nonInteractive),
+          sessionKey: `${pid}:${startTime}`
+        };
+      }
+    } catch (_) {}
+  }
+
+  const platform = options.platform || process.platform;
+  const startPid = Number(options.ppid ?? process.ppid);
+  const execFn = typeof options.execFn === 'function' ? options.execFn : runCmdDetailedAsync;
+  const readFileFn = typeof options.readFileFn === 'function'
+    ? options.readFileFn
+    : (p, enc) => fs.readFile(p, enc);
+
+  if (!startPid || isNaN(startPid) || startPid <= 0) {
+    return { found: false, pid: 0, startTime: '', nonInteractive: false, sessionKey: '' };
+  }
+
+  try {
+    if (platform === 'win32') {
+      const script = `$cur = ${startPid}; $chain = @(); for ($i = 0; $i -lt 16 -and $cur -gt 0; $i++) { $p = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $cur); if (-not $p) { break }; $st = if ($p.CreationDate) { $p.CreationDate.ToUniversalTime().ToString('o') } else { '' }; $chain += [pscustomobject]@{ pid = [int]$p.ProcessId; ppid = [int]$p.ParentProcessId; name = [string]$p.Name; start = $st; cmd = [string]$p.CommandLine }; $next = [int]$p.ParentProcessId; if ($next -eq $cur) { break }; $cur = $next }; $chain | ConvertTo-Json -Compress`;
+      const execArgs = ['-NoProfile', '-Command', script];
+      const res = await withTimeout(
+        execFn(`powershell.exe -NoProfile -Command "${script}"`, { execFile: 'powershell.exe', execArgs, timeout: 1500 }),
+        1600,
+        null
+      );
+      if (res && res.ok && res.stdout) {
+        const chain = parseWinProcessChainJson(res.stdout);
+        for (const node of chain) {
+          const isAgy = isAgyProcessName(node.name) || (!node.name && isAgyProcessName(tokenizeCommandLine(node.args)[0] || ''));
+          if (!isAgy) continue;
+          if (isHubAgyArgs(node.args, node.name)) continue;
+          return {
+            found: true,
+            pid: node.pid,
+            startTime: node.startTime,
+            nonInteractive: hasNonInteractiveAgyFlag(node.args, node.name),
+            sessionKey: `${node.pid}:${node.startTime}`
+          };
+        }
+      }
+      return { found: false, pid: 0, startTime: '', nonInteractive: false, sessionKey: '' };
+    }
+
+    const visited = new Set();
+    let cur = startPid;
+    let useProcFs = platform === 'linux';
+
+    for (let hop = 0; hop < 16 && cur > 0 && !visited.has(cur); hop++) {
+      visited.add(cur);
+
+      if (useProcFs) {
+        try {
+          const statContent = await readFileFn(`/proc/${cur}/stat`, 'utf8');
+          const parsed = parseLinuxProcStat(statContent);
+          if (!parsed) break;
+          let argv = [];
+          let cmdlineLoaded = false;
+          const loadCmdline = async () => {
+            if (cmdlineLoaded) return;
+            cmdlineLoaded = true;
+            try {
+              const cmdRaw = await readFileFn(`/proc/${cur}/cmdline`, 'utf8');
+              argv = cmdRaw.split('\0').filter((s, idx, arr) => !(idx === arr.length - 1 && s === ''));
+            } catch (_) {}
+          };
+          let isAgy = isAgyProcessName(parsed.name);
+          if (!isAgy) {
+            await loadCmdline();
+            if (argv.length > 0 && isAgyProcessName(argv[0])) {
+              isAgy = true;
+            }
+          }
+          if (isAgy) {
+            await loadCmdline();
+            const knownName = isAgyProcessName(parsed.name) ? parsed.name : (argv[0] || '');
+            if (!isHubAgyArgs(argv, knownName)) {
+              return {
+                found: true,
+                pid: parsed.pid,
+                startTime: parsed.startTime,
+                nonInteractive: hasNonInteractiveAgyFlag(argv, knownName),
+                sessionKey: `${parsed.pid}:${parsed.startTime}`
+              };
+            }
+          }
+          if (!parsed.ppid || parsed.ppid === cur || parsed.ppid <= 0) break;
+          cur = parsed.ppid;
+          continue;
+        } catch (_) {
+          useProcFs = false;
+        }
+      }
+
+      const commField = platform === 'darwin' ? 'ucomm=' : 'comm=';
+      const psArgs = ['-ww', '-o', `pid=,ppid=,lstart=,${commField}`, '-p', String(cur)];
+      const psRes = await execFn(`ps ${psArgs.join(' ')}`, {
+        execFile: 'ps',
+        execArgs: psArgs,
+        env: { ...process.env, LC_ALL: 'C' },
+        timeout: 500
+      });
+      if (!psRes || !psRes.ok || !psRes.stdout) break;
+      const firstLine = psRes.stdout.split(/\r?\n/).find(l => l.trim());
+      const parsed = parseMacPsLine(firstLine || '');
+      if (!parsed) break;
+
+      if (isAgyProcessName(parsed.name)) {
+        const argQuery = ['-ww', '-o', 'args=', '-p', String(cur)];
+        const argRes = await execFn(`ps ${argQuery.join(' ')}`, {
+          execFile: 'ps',
+          execArgs: argQuery,
+          env: { ...process.env, LC_ALL: 'C' },
+          timeout: 500
+        });
+        const cmdLine = (argRes && argRes.ok) ? argRes.stdout : '';
+        if (!isHubAgyArgs(cmdLine, parsed.name)) {
+          return {
+            found: true,
+            pid: parsed.pid,
+            startTime: parsed.startTime,
+            nonInteractive: hasNonInteractiveAgyFlag(cmdLine, parsed.name),
+            sessionKey: `${parsed.pid}:${parsed.startTime}`
+          };
+        }
+      }
+      if (!parsed.ppid || parsed.ppid === cur || parsed.ppid <= 0) break;
+      cur = parsed.ppid;
+    }
+  } catch (_) {}
+
+  return { found: false, pid: 0, startTime: '', nonInteractive: false, sessionKey: '' };
+}
+
+async function readPluginManifestFromDirAsync(dirPath, requireExplicitName = false) {
+  if (!dirPath) return null;
+  for (const fileName of ['plugin.json', 'package.json']) {
+    const manifestPath = join(dirPath, fileName);
+    try {
+      const content = await fs.readFile(manifestPath, 'utf8');
+      const parsed = JSON.parse(content.replace(/^\uFEFF/, ''));
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      const manifestName = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+      if (fileName === 'package.json' || requireExplicitName) {
+        if (manifestName !== 'antigravity-cli-statusline') continue;
+      } else if (manifestName && manifestName !== 'antigravity-cli-statusline') {
+        continue;
+      }
+      if (typeof parsed.version === 'string' && parsed.version.trim()) {
+        const norm = normalizeSemver(parsed.version);
+        const tag = formatVersionTag(parsed.version);
+        if (norm || tag) {
+          return { version: norm || parsed.version.trim().replace(/^v/i, ''), tag, source: manifestPath };
+        }
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
+export async function resolveInstalledPluginVersionAsync(options = {}) {
+  if (options.pluginDir) {
+    const explicitMatch = await readPluginManifestFromDirAsync(options.pluginDir, false);
+    if (explicitMatch) return explicitMatch;
+  } else {
+    const homeDir = options.homeDir || os.homedir();
+    const pluginsRoot = join(homeDir, '.gemini', 'config', 'plugins');
+    const candidateDirs = [
+      { dir: join(pluginsRoot, 'antigravity-cli-statusline'), requireExplicitName: false, priority: 3 },
+      { dir: join(homeDir, '.agents', 'plugins', 'antigravity-cli-statusline'), requireExplicitName: false, priority: 2 }
+    ];
+    if (options.workspacePath) {
+      candidateDirs.push({
+        dir: join(options.workspacePath, '.agents', 'plugins', 'antigravity-cli-statusline'),
+        requireExplicitName: false,
+        priority: 2
+      });
+    }
+    try {
+      const entries = await fs.readdir(pluginsRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry || entry.name === 'antigravity-cli-statusline') continue;
+        if (entry.isDirectory() || entry.isSymbolicLink()) {
+          candidateDirs.push({
+            dir: join(pluginsRoot, entry.name),
+            requireExplicitName: true,
+            priority: 1
+          });
+        }
+      }
+    } catch (_) {}
+
+    const resolvedCandidates = await Promise.all(
+      candidateDirs.map(async (c) => {
+        const found = await readPluginManifestFromDirAsync(c.dir, c.requireExplicitName);
+        return found ? { ...found, priority: c.priority } : null;
+      })
+    );
+
+    let best = null;
+    for (const cand of resolvedCandidates) {
+      if (!cand) continue;
+      if (!best) {
+        best = cand;
+        continue;
+      }
+      const cmp = compareSemver(cand.version, best.version);
+      if (cmp !== null) {
+        if (cmp > 0 || (cmp === 0 && cand.priority > best.priority)) {
+          best = cand;
+        }
+      } else if (cand.priority > best.priority) {
+        best = cand;
+      }
+    }
+    if (best) {
+      return { version: best.version, tag: best.tag, source: best.source };
+    }
+  }
+
+  if (options.allowScriptRelativeFallback !== false) {
+    const scriptDir = dirname(fileURLToPath(import.meta.url));
+    const repoMatch = await readPluginManifestFromDirAsync(join(scriptDir, '..', '..', '..'), false);
+    if (repoMatch) return repoMatch;
+  }
+
+  if (options.fallbackVersion === null) {
+    return { version: '', tag: '', source: '' };
+  }
+  const fallbackRaw = typeof options.fallbackVersion === 'string' ? options.fallbackVersion : HOOK_VERSION;
+  const fallbackNorm = normalizeSemver(fallbackRaw);
+  return {
+    version: fallbackNorm || fallbackRaw,
+    tag: formatVersionTag(fallbackRaw),
+    source: 'embedded'
+  };
+}
+
+export function fetchLatestPluginReleaseAsync(url = GITHUB_LATEST_RELEASE_URL, timeoutMs = 1500, maxRedirects = 3) {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + Math.max(100, Number(timeoutMs) || 1500);
+    let settled = false;
+    const finish = (result) => {
+      if (!settled) {
+        settled = true;
+        resolve(result);
+      }
+    };
+
+    const requestUrl = (targetUrl, redirectsLeft) => {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        return finish({ ok: false, error: 'timeout' });
+      }
+
+      let parsedUrl;
+      try {
+        parsedUrl = new URL(targetUrl);
+      } catch (e) {
+        return finish({ ok: false, error: 'invalid_url' });
+      }
+      if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+        return finish({ ok: false, error: 'unsupported_protocol' });
+      }
+
+      const client = parsedUrl.protocol === 'https:' ? https : http;
+      const useHead = parsedUrl.hostname.toLowerCase() === 'github.com' && /\/releases\/latest\/?$/i.test(parsedUrl.pathname);
+      let req;
+      const timer = setTimeout(() => {
+        try { if (req) req.destroy(); } catch (_) {}
+        finish({ ok: false, error: 'timeout' });
+      }, remainingMs);
+
+      try {
+        req = client.request(parsedUrl, {
+          method: useHead ? 'HEAD' : 'GET',
+          agent: false,
+          headers: {
+            'User-Agent': 'antigravity-cli-statusline',
+            'Accept': 'application/vnd.github+json'
+          }
+        }, (res) => {
+          const status = res.statusCode || 0;
+          if (status >= 300 && status < 400 && res.headers.location) {
+            clearTimeout(timer);
+            res.resume();
+            try {
+              const nextUrl = new URL(res.headers.location, parsedUrl);
+              const tagMatch = nextUrl.pathname.match(/\/releases\/tag\/([^/?#]+)\/?$/i);
+              if (tagMatch) {
+                const rawTag = decodeURIComponent(tagMatch[1]).trim();
+                const norm = normalizeSemver(rawTag);
+                if (!norm) {
+                  return finish({ ok: false, error: 'invalid_tag' });
+                }
+                return finish({
+                  ok: true,
+                  latestVersion: norm,
+                  latestTag: formatVersionTag(rawTag)
+                });
+              }
+              if (redirectsLeft > 0) {
+                return requestUrl(nextUrl.toString(), redirectsLeft - 1);
+              }
+              return finish({ ok: false, error: 'too_many_redirects' });
+            } catch (_) {
+              return finish({ ok: false, error: 'invalid_redirect' });
+            }
+          }
+
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => {
+            body += chunk;
+            if (body.length > 512 * 1024) {
+              clearTimeout(timer);
+              try { req.destroy(); } catch (_) {}
+              finish({ ok: false, error: 'response_too_large' });
+            }
+          });
+          res.on('end', () => {
+            clearTimeout(timer);
+            if (status < 200 || status >= 300) {
+              return finish({ ok: false, error: `http_${status}` });
+            }
+            try {
+              const json = JSON.parse(body);
+              const rawTag = (json && typeof json.tag_name === 'string') ? json.tag_name.trim() : '';
+              const norm = normalizeSemver(rawTag);
+              if (!norm) {
+                return finish({ ok: false, error: 'invalid_tag' });
+              }
+              return finish({
+                ok: true,
+                latestVersion: norm,
+                latestTag: formatVersionTag(rawTag)
+              });
+            } catch (_) {
+              return finish({ ok: false, error: 'invalid_json' });
+            }
+          });
+          res.on('error', () => {
+            clearTimeout(timer);
+            finish({ ok: false, error: 'response_error' });
+          });
+        });
+
+        req.on('error', () => {
+          clearTimeout(timer);
+          finish({ ok: false, error: 'request_error' });
+        });
+        req.end();
+      } catch (_) {
+        clearTimeout(timer);
+        finish({ ok: false, error: 'request_throw' });
+      }
+    };
+
+    requestUrl(url, maxRedirects);
+  });
+}
+
+let pluginUpdateWriteQueue = Promise.resolve();
+
+function updatePluginUpdateCacheAsync(cachePath, updaterFn) {
+  let result = null;
+  const run = pluginUpdateWriteQueue.then(async () => {
+    const latestOnDisk = await readJsonSafeAsync(cachePath);
+    const outcome = updaterFn(latestOnDisk);
+    result = outcome?.result ?? null;
+    if (outcome && outcome.nextData) {
+      try {
+        await fs.mkdir(dirname(cachePath), { recursive: true });
+        await writeFileAndVerifyNoBOM(cachePath, JSON.stringify(outcome.nextData, null, 2));
+      } catch (_) {}
+    }
+  });
+  pluginUpdateWriteQueue = run.catch(() => {});
+  return run.then(() => result);
+}
+
+export async function checkPluginUpdateAsync(options = {}) {
+  const checkStartedAt = Date.now();
+  const installed = await resolveInstalledPluginVersionAsync(options);
+  if (options.enabled === false) {
+    return {
+      installedVersion: installed.version,
+      installedTag: installed.tag,
+      latestVersion: '',
+      latestTag: '',
+      updateAvailable: false,
+      checked: false,
+      skippedNonInteractive: false
+    };
+  }
+
+  const session = options.session !== undefined ? options.session : await resolveAgySessionAsync(options);
+  if (session.found && session.nonInteractive) {
+    return {
+      installedVersion: installed.version,
+      installedTag: installed.tag,
+      latestVersion: '',
+      latestTag: '',
+      updateAvailable: false,
+      checked: false,
+      skippedNonInteractive: true,
+      sessionKey: session.sessionKey
+    };
+  }
+
+  const homeDir = options.homeDir || os.homedir();
+  const cachePath = options.cachePath || join(homeDir, '.gemini', 'tmp', 'plugin_update_cache.json');
+  const existingCache = await readJsonSafeAsync(cachePath);
+  const cachedLatestVersion = normalizeSemver(existingCache?.latestVersion || '');
+  const cachedLatestTag = cachedLatestVersion
+    ? formatVersionTag(existingCache?.latestTag || cachedLatestVersion)
+    : '';
+
+  let latestVersion = cachedLatestVersion;
+  let latestTag = cachedLatestTag;
+  let checked = false;
+
+  if (session.found && session.sessionKey && existingCache?.lastSessionKey !== session.sessionKey) {
+    const now = Date.now();
+    // 先在序列化寫入佇列中讀取最新快取並寫入本次行程的嘗試/失敗標記，防止併發呼叫或超時中斷時重複請求或覆寫既有結果
+    const claimOutcome = await updatePluginUpdateCacheAsync(cachePath, (diskCache) => {
+      if (diskCache && diskCache.lastSessionKey === session.sessionKey) {
+        return { result: { claimed: false, diskCache } };
+      }
+      const diskLatestVersion = normalizeSemver(diskCache?.latestVersion || '');
+      const basePreserved = {};
+      if (diskLatestVersion) {
+        basePreserved.latestVersion = diskLatestVersion;
+        basePreserved.latestTag = formatVersionTag(diskCache?.latestTag || diskLatestVersion);
+        if (diskCache?.latestCheckedAt) basePreserved.latestCheckedAt = diskCache.latestCheckedAt;
+      }
+      return {
+        nextData: {
+          ...basePreserved,
+          lastSessionKey: session.sessionKey,
+          lastSessionStatus: 'failed',
+          lastAttemptAt: now
+        },
+        result: { claimed: true, diskCache }
+      };
+    });
+
+    if (claimOutcome && claimOutcome.claimed === false) {
+      const diskLatest = normalizeSemver(claimOutcome.diskCache?.latestVersion || '');
+      if (diskLatest) {
+        latestVersion = diskLatest;
+        latestTag = formatVersionTag(claimOutcome.diskCache?.latestTag || diskLatest);
+      }
+    } else {
+      const envObj = options.env || process.env;
+      const releaseUrl = options.releaseUrl || envObj?.STATUSLINE_PLUGIN_RELEASE_URL || GITHUB_LATEST_RELEASE_URL;
+      const envWait = parseInt(envObj?.STATUSLINE_PLUGIN_UPDATE_WAIT_MS || '', 10);
+      const elapsedMs = Math.max(0, Date.now() - checkStartedAt);
+      const autoBudgetTimeout = Math.min(1500, Math.max(400, 2200 - elapsedMs));
+      const timeoutMs = typeof options.timeoutMs === 'number'
+        ? options.timeoutMs
+        : (!isNaN(envWait) && envWait > 0 ? envWait : autoBudgetTimeout);
+      const fetchFn = typeof options.fetchReleaseFn === 'function' ? options.fetchReleaseFn : fetchLatestPluginReleaseAsync;
+
+      checked = true;
+      const res = await fetchFn(releaseUrl, timeoutMs).catch(() => ({ ok: false }));
+      if (res && res.ok && res.latestVersion) {
+        latestVersion = res.latestVersion;
+        latestTag = res.latestTag || formatVersionTag(res.latestVersion);
+        await updatePluginUpdateCacheAsync(cachePath, () => ({
+          nextData: {
+            latestVersion,
+            latestTag,
+            latestCheckedAt: Date.now(),
+            lastSessionKey: session.sessionKey,
+            lastSessionStatus: 'ok',
+            lastAttemptAt: now
+          }
+        }));
+      }
+    }
+  }
+
+  const updateAvailable = Boolean(installed.version && latestVersion && isVersionBehind(installed.version, latestVersion));
+  return {
+    installedVersion: installed.version,
+    installedTag: installed.tag,
+    latestVersion,
+    latestTag,
+    updateAvailable,
+    checked,
+    skippedNonInteractive: false,
+    sessionKey: session.sessionKey
+  };
+}
+
+export function formatPluginUpdateNoticeLines(lang, currentTag, latestTag) {
+  const normLang = normalizeLanguage(lang);
+  const cur = formatVersionTag(currentTag) || String(currentTag || '');
+  const lat = formatVersionTag(latestTag) || String(latestTag || '');
+  let msg;
+  if (normLang === 'zh-cn') {
+    msg = `⚠️ 插件有新版本可用（当前 ${cur} → 最新 ${lat}），请执行以下命令更新：`;
+  } else if (normLang === 'us') {
+    msg = `⚠️ Plugin update available (current ${cur} → latest ${lat}). Run to update:`;
+  } else if (normLang === 'jp') {
+    msg = `⚠️ プラグインの新バージョンが利用可能です（現在 ${cur} → 最新 ${lat}）。以下のコマンドで更新してください：`;
+  } else {
+    msg = `⚠️ 外掛有新版本可用（目前 ${cur} → 最新 ${lat}），請執行以下指令更新：`;
+  }
+  return [
+    `${YELLOW}${BOLD}${msg}${RESET}`,
+    `${BLUE}${BOLD}! agy plugin install ${PLUGIN_REPO_URL}${RESET}`
+  ];
 }
 
 // ==========================================
@@ -1640,7 +2389,16 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   else if (meta?.agent?.id) agentProfileName = meta.agent.id;
   else if (meta?.agent?.profile) agentProfileName = meta.agent.profile;
 
-  const cliVersion = meta?.version ? `v${meta.version}` : unknownStr;
+  const rawCliVersion = typeof meta?.version === 'string' ? meta.version.trim().replace(/^v/i, '') : (meta?.version ? String(meta.version) : '');
+  const cliVersion = rawCliVersion ? `v${rawCliVersion}` : unknownStr;
+  let pluginVersion = options?.pluginVersion || '';
+  if (!pluginVersion && hasFooterItem('plugin-version')) {
+    const resolvedPlugin = await resolveInstalledPluginVersionAsync(options);
+    pluginVersion = resolvedPlugin.tag || unknownStr;
+  }
+  if (!pluginVersion) {
+    pluginVersion = unknownStr;
+  }
   const rawConvId = typeof meta?.conversation_id === 'string' ? meta.conversation_id : '';
   const conversationIdShort = rawConvId ? rawConvId.replace(/-/g, '').slice(0, 8) : unknownStr;
   let modeVal = (typeof meta?.cycle_mode === 'string' && meta.cycle_mode.trim())
@@ -1656,7 +2414,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail,
     agentState, toolConfirmPending, pendingInputCount, backgroundTasksCount, subagentsCount,
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
-    sandboxAllowNet, sandboxStatusVal, cliVersion, conversationIdShort, agentProfileName,
+    sandboxAllowNet, sandboxStatusVal, cliVersion, pluginVersion, conversationIdShort, agentProfileName,
     weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode,
     quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal,
     argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal,
@@ -1671,6 +2429,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   }
   const normGlobalStyle = normalizeLabelStyle(labelStyle);
   const normLang = normalizeLanguage(lang);
+  const unknownStr = (normLang === 'zh-tw' || normLang === 'zh-cn') ? '未知' : (normLang === 'jp' ? '不明' : 'Unknown');
+  const pluginVersionVal = m.pluginVersion || unknownStr;
   const localizedAgentState = formatAgentState(m.agentState, normLang);
   const argonColor = m.argonQuotaColor ?? BLUE;
   const argonVal = m.argonQuotaVal ?? '100%';
@@ -1716,7 +2476,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版控狀態:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版控類型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙盒狀態:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'plugin-version': `${WHITE}外掛版本: ${BOLD}${pluginVersionVal}${RESET}`,
       'conversation-id': `${WHITE}對話編號: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}代理角色:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}模式:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -1759,7 +2520,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版控状态:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版控类型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙箱状态:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'plugin-version': `${WHITE}插件版本: ${BOLD}${pluginVersionVal}${RESET}`,
       'conversation-id': `${WHITE}对话编号: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}代理角色:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}模式:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -1802,7 +2564,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}VCS Status:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}VCS: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}Sandbox:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Version: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI Version: ${BOLD}${m.cliVersion}${RESET}`,
+      'plugin-version': `${WHITE}Plugin Version: ${BOLD}${pluginVersionVal}${RESET}`,
       'conversation-id': `${WHITE}Conv: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}Profile:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}Mode:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -1845,7 +2608,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版管理状態:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版管理種別: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}サンドボックス:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}バージョン: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI バージョン: ${BOLD}${m.cliVersion}${RESET}`,
+      'plugin-version': `${WHITE}プラグイン版: ${BOLD}${pluginVersionVal}${RESET}`,
       'conversation-id': `${WHITE}会話番号: ${BOLD}${m.conversationIdShort}${RESET}`,
       'agent-profile': `${WHITE}プロファイル:${RESET} ${BLUE}${BOLD}${m.agentProfileName}${RESET}`,
       'mode': `${WHITE}モード:${RESET} ${getModeColor(m.mode)}${BOLD}${m.mode}${RESET}`
@@ -1956,7 +2720,7 @@ export function preprocessAdjacentItems(items, itemStyles = undefined, defaultSt
   return result;
 }
 
-export function renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, itemStyles = undefined, defaultStyle = 'text') {
+export function renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, itemStyles = undefined, defaultStyle = 'text', extraLines = []) {
   const lines = [];
   let currentLine = '';
   const processedItems = preprocessAdjacentItems(footerItems || [], itemStyles, defaultStyle);
@@ -1990,7 +2754,9 @@ export function renderStatusLine(footerItems, activeDict, termWidth, fallbackMod
   if (currentLine !== '') lines.push(currentLine);
 
   // 防禦：若渲染結果為空或全部為空白行（例如 footerItems 為空、僅有換行、或所有指標皆無內容），回退輸出退讓模式，絕不回傳空陣列或空白行
+  let usedFallback = false;
   if (lines.length === 0 || lines.every(l => stripAnsi(l).trim() === '')) {
+    usedFallback = true;
     lines.length = 0;
     const leftText = '? for shortcuts';
     const rawModel = activeDict?.['model-name'] ? stripAnsi(activeDict['model-name']).replace(/^(?:🤖\s*|[^:]+:\s*)/, '') : '';
@@ -1999,6 +2765,14 @@ export function renderStatusLine(footerItems, activeDict, termWidth, fallbackMod
     const spacesCount = Math.max(1, width - getDisplayWidth(leftText) - getDisplayWidth(rightText) - 1);
     const fallbackLine = `${leftText}${' '.repeat(spacesCount)}${rightText}`;
     lines.push(fallbackLine);
+  }
+
+  if (!usedFallback && Array.isArray(extraLines) && extraLines.length > 0) {
+    for (const extra of extraLines) {
+      if (typeof extra === 'string' && extra.length > 0) {
+        lines.push(extra);
+      }
+    }
   }
 
   console.log(lines.join('\n'));
@@ -2039,6 +2813,10 @@ async function main() {
     const lang = normalizeLanguage(settings?.ui?.language || 'zh-tw');
     const footerItems = settings.ui.footer.items;
     const footerItemsSet = new Set(footerItems);
+    const needsPluginVersion = footerItemsSet.has('plugin-version');
+    const pluginUpdatePromise = needsPluginVersion
+      ? checkPluginUpdateAsync({ enabled: true, workspacePath: resolveProjectPath(meta) }).catch(() => null)
+      : Promise.resolve(null);
     const needsQuotaOrAccount = footerItems.some(
       item => typeof item === 'string' && (item.startsWith('quota') || item === 'plan-tier' || item === 'account-email')
     );
@@ -2202,10 +2980,16 @@ async function main() {
     const labelStyle = normalizeLabelStyle(settings?.ui?.footer?.labelStyle || settings?.ui?.footer?.style || settings?.ui?.labelStyle || 'text');
     const rawItemStyles = settings?.ui?.footer?.itemStyles;
 
+    const pluginUpdateInfo = await pluginUpdatePromise;
+    const pluginVersion = pluginUpdateInfo?.installedTag || '';
+    const extraLines = (needsPluginVersion && pluginUpdateInfo?.updateAvailable)
+      ? formatPluginUpdateNoticeLines(lang, pluginUpdateInfo.installedTag, pluginUpdateInfo.latestTag)
+      : [];
+
     // 格式化指標並繪製
-    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo, footerItems: footerItemsSet });
+    const metrics = await extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo, { timeFormat, barLength, argonInfo, footerItems: footerItemsSet, pluginVersion });
     const activeDict = buildI18nDict(lang, metrics, labelStyle, rawItemStyles);
-    renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, rawItemStyles, labelStyle);
+    renderStatusLine(footerItems, activeDict, termWidth, fallbackModel, rawItemStyles, labelStyle, extraLines);
 
   } catch (err) {
     try {

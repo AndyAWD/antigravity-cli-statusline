@@ -1,6 +1,7 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -335,7 +336,7 @@ export const ALL_STANDARD_METRIC_IDS = [
   'context-used', 'context-used-bar', 'token-count', 'token-count-bar',
   'project-path', 'project-full-path', 'git-branch', 'vcs-dirty', 'vcs-type',
   'memory-usage', 'cli-version', 'conversation-id', 'sandbox-status',
-  'tool-confirmation', 'pending-input', 'background-tasks', 'subagents', 'artifacts'
+  'tool-confirmation', 'pending-input', 'background-tasks', 'subagents', 'artifacts', 'plugin-version'
 ];
 
 export function parseOrderAndStyles(orderStr, selectedIds) {
@@ -665,6 +666,44 @@ const fetchLocalQuotaContent = fs.readFileSync(fetchLocalQuotaSrcPath, 'utf8');
 
 writeContentAndVerifyNoBOM(path.join(hooksDir, 'statusline-quota.mjs'), statuslineQuotaContent);
 writeContentAndVerifyNoBOM(path.join(hooksDir, 'fetch-local-quota.mjs'), fetchLocalQuotaContent);
+
+// 寫入已部署掛鉤版本與檔案雜湊中繼資料，供 diagnose-statusline.mjs 比對外掛與掛鉤同步狀態
+let deployedPluginVersion = '';
+const pluginRootDir = path.resolve(sourceDir, '..', '..', '..');
+for (const manifestName of ['plugin.json', 'package.json']) {
+  const manifestPath = path.join(pluginRootDir, manifestName);
+  try {
+    if (fs.existsSync(manifestPath)) {
+      const manifestData = readJsonWithBOMDefense(manifestPath);
+      if (!manifestData || typeof manifestData !== 'object') continue;
+      const manifestPkgName = typeof manifestData.name === 'string' ? manifestData.name.trim() : '';
+      if (manifestName === 'package.json') {
+        if (manifestPkgName !== 'antigravity-cli-statusline') continue;
+      } else if (manifestPkgName && manifestPkgName !== 'antigravity-cli-statusline') {
+        continue;
+      }
+      if (typeof manifestData.version === 'string' && manifestData.version.trim()) {
+        deployedPluginVersion = manifestData.version.trim().replace(/^v/i, '');
+        break;
+      }
+    }
+  } catch (_) {}
+}
+if (!deployedPluginVersion) {
+  const hookVerMatch = statuslineQuotaContent.match(/export\s+const\s+HOOK_VERSION\s*=\s*['"]([^'"]+)['"]/);
+  if (hookVerMatch) {
+    deployedPluginVersion = hookVerMatch[1].trim().replace(/^v/i, '');
+  }
+}
+const sha256 = (str) => createHash('sha256').update(str, 'utf8').digest('hex');
+writeJsonAndVerifyNoBOM(path.join(hooksDir, '.hook-version.json'), {
+  pluginVersion: deployedPluginVersion || 'unknown',
+  syncedAt: new Date().toISOString(),
+  files: {
+    'statusline-quota.mjs': sha256(statuslineQuotaContent),
+    'fetch-local-quota.mjs': sha256(fetchLocalQuotaContent)
+  }
+});
 console.log('掛鉤腳本部署成功。');
 
 // 4. 三層 settings.json 寫入與防禦位元組順序記號（BOM）鐵則

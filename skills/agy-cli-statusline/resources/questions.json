@@ -75,7 +75,8 @@
           "📥 佇列中待處理的使用者輸入數（pending-input）",
           "🔄 進行中的背景任務數（background-tasks）",
           "👥 活躍子代理數（subagents）",
-          "📄 本次對話人工智慧累計產出的檔案數量（artifacts）"
+          "📄 本次對話人工智慧累計產出的檔案數量（artifacts）",
+          "🧩 狀態列外掛版本號（plugin-version）"
         ]
       }
     ],
@@ -115,7 +116,8 @@
       "📥 佇列中待處理的使用者輸入數（pending-input）",
       "🔄 進行中的背景任務數（background-tasks）",
       "👥 活躍子代理數（subagents）",
-      "📄 本次對話人工智慧累計產出的檔案數量（artifacts）"
+      "📄 本次對話人工智慧累計產出的檔案數量（artifacts）",
+      "🧩 狀態列外掛版本號（plugin-version）"
     ]
   },
   "zh-cn": {
@@ -194,7 +196,8 @@
           "📥 队列中待处理的用户输入数（pending-input）",
           "🔄 进行中的后台任务数（background-tasks）",
           "👥 活跃子代理数（subagents）",
-          "📄 本次对话人工智能累计产出的文件数量（artifacts）"
+          "📄 本次对话人工智能累计产出的文件数量（artifacts）",
+          "🧩 状态栏插件版本号（plugin-version）"
         ]
       }
     ],
@@ -234,7 +237,8 @@
       "📥 队列中待处理的用户输入数（pending-input）",
       "🔄 进行中的后台任务数（background-tasks）",
       "👥 活跃子代理数（subagents）",
-      "📄 本次对话人工智能累计产出的文件数量（artifacts）"
+      "📄 本次对话人工智能累计产出的文件数量（artifacts）",
+      "🧩 状态栏插件版本号（plugin-version）"
     ]
   },
   "us": {
@@ -313,7 +317,8 @@
           "📥 Pending user inputs in queue (pending-input)",
           "🔄 Running background tasks (background-tasks)",
           "👥 Active subagents (subagents)",
-          "📄 Total artifacts generated in this session (artifacts)"
+          "📄 Total artifacts generated in this session (artifacts)",
+          "🧩 Statusline plugin version (plugin-version)"
         ]
       }
     ],
@@ -353,7 +358,8 @@
       "📥 Pending user inputs in queue (pending-input)",
       "🔄 Running background tasks (background-tasks)",
       "👥 Active subagents (subagents)",
-      "📄 Total artifacts generated in this session (artifacts)"
+      "📄 Total artifacts generated in this session (artifacts)",
+      "🧩 Statusline plugin version (plugin-version)"
     ]
   },
   "jp": {
@@ -432,7 +438,8 @@
           "📥 キュー内の待機中ユーザー入力数（pending-input）",
           "🔄 実行中のバックグラウンドタスク数（background-tasks）",
           "👥 アクティブなサブエージェント数（subagents）",
-          "📄 今回のセッションで生成されたアーティファクト数（artifacts）"
+          "📄 今回のセッションで生成されたアーティファクト数（artifacts）",
+          "🧩 プラグインバージョン（plugin-version）"
         ]
       }
     ],
@@ -472,7 +479,8 @@
       "📥 キュー内の待機中ユーザー入力数（pending-input）",
       "🔄 実行中のバックグラウンドタスク数（background-tasks）",
       "👥 アクティブなサブエージェント数（subagents）",
-      "📄 今回のセッションで生成されたアーティファクト数（artifacts）"
+      "📄 今回のセッションで生成されたアーティファクト数（artifacts）",
+      "🧩 プラグインバージョン（plugin-version）"
     ]
   }
 }

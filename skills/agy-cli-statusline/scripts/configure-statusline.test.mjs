@@ -3,8 +3,10 @@ import path from 'path';
 import assert from 'assert';
 import os from 'os';
 import { spawn, spawnSync } from 'child_process';
+import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import { getStatusLineCommand, parseOrderAndStyles, cleanupLegacyWindowsShBridge } from './configure-statusline.mjs';
+import { checkPluginHookSync } from './diagnose-statusline.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -685,14 +687,15 @@ async function testCase8QuestionsJsonMetricIds() {
     'quota-argon',
     'quota-argon-bar',
     'quota-argon-countdown',
-    'quota-argon-reset-time'
+    'quota-argon-reset-time',
+    'plugin-version'
   ];
 
   for (const lang of languages) {
     const langData = questionsData[lang];
     assert.ok(langData, `${lang} 語系資料必須存在`);
     assert.ok(Array.isArray(langData.options), `${lang}.options 必須為陣列`);
-    assert.strictEqual(langData.options.length, 36, `${lang}.options 必須包含全部 36 個指標選項`);
+    assert.strictEqual(langData.options.length, 37, `${lang}.options 必須包含全部 37 個指標選項`);
 
     const extractedIds = langData.options.map(item => {
       const match = item.match(/[\(（]([^）\)]+)[\)）]$/);
@@ -700,7 +703,7 @@ async function testCase8QuestionsJsonMetricIds() {
     });
 
     const uniqueIds = new Set(extractedIds);
-    assert.strictEqual(uniqueIds.size, 36, `${lang} 的所有指標識別碼必須不重複`);
+    assert.strictEqual(uniqueIds.size, 37, `${lang} 的所有指標識別碼必須不重複`);
 
     for (const newId of expectedNewIds) {
       assert.ok(uniqueIds.has(newId), `${lang} 必須包含新指標 ID: "${newId}"`);
@@ -716,10 +719,11 @@ async function testCase8QuestionsJsonMetricIds() {
       "每週重置時間（quota-weekly-reset-time）",
       "每週可用額度長條圖（quota-weekly-bar）",
       "脈絡用量長條圖（context-used-bar）",
-      "權杖數長條圖（token-count-bar）"
+      "權杖數長條圖（token-count-bar）",
+      "狀態列外掛版本號（plugin-version）"
     ]);
 
-    const args = ['--lang', 'zh-tw', '--selected', selected, '--order', '1,2,3,4,5,6', '--workspace', sandbox, '--time-format', 'smart', '--bar-length', '12'];
+    const args = ['--lang', 'zh-tw', '--selected', selected, '--order', '1,2,3,4,5,6,7', '--workspace', sandbox, '--time-format', 'smart', '--bar-length', '12'];
     const env = { HOME: sandbox, USERPROFILE: sandbox };
     const result = await runScript(configureScriptSrc, args, env);
     assert.strictEqual(result.code, 0, '配置腳本必須成功執行');
@@ -734,7 +738,8 @@ async function testCase8QuestionsJsonMetricIds() {
       'quota-weekly-reset-time',
       'quota-weekly-bar',
       'context-used-bar',
-      'token-count-bar'
+      'token-count-bar',
+      'plugin-version'
     ];
 
     assert.deepStrictEqual(
@@ -845,7 +850,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
     { id: 'quota-and-billing', count: 14 },
     { id: 'context-and-tokens', count: 4 },
     { id: 'workspace-and-vcs', count: 5 },
-    { id: 'system-and-tasks', count: 9 }
+    { id: 'system-and-tasks', count: 10 }
   ];
 
   for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
@@ -865,7 +870,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
       totalOptions += cat.options.length;
       catOptionsFlat.push(...cat.options);
     }
-    assert.strictEqual(totalOptions, 36, `${lang} 分類中的指標總和必須剛好為 36 項`);
+    assert.strictEqual(totalOptions, 37, `${lang} 分類中的指標總和必須剛好為 37 項`);
     assert.deepStrictEqual(catOptionsFlat, langData.options, `${lang} 平坦 options 必須與 5 大分類彙整選項完全一致`);
 
     // 驗證雙括號清理需求：各選項中僅允許末尾唯一的英文識別碼括號，不得含有額外說明括號
@@ -952,12 +957,13 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
     'context-used': 'emoji'
   });
 
-  // 7. 全域 1-36 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 25 代表 git-branch）
-  const subsetIds = ['model-name', 'git-branch']; // length = 2, git-branch 在 36 項中為第 25 項
-  const resGlobalFallback = parseOrderAndStyles('1, e25', subsetIds);
-  assert.deepStrictEqual(resGlobalFallback.items, ['model-name', 'git-branch']);
+  // 7. 全域 1-37 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 25 代表 git-branch、37 代表 plugin-version，且未勾選之 36 不可誤入）
+  const subsetIds = ['model-name', 'git-branch', 'plugin-version']; // length = 3, git-branch 在 37 項中為第 25 項、plugin-version 為第 37 項
+  const resGlobalFallback = parseOrderAndStyles('1, e25, 36, e37', subsetIds);
+  assert.deepStrictEqual(resGlobalFallback.items, ['model-name', 'git-branch', 'plugin-version']);
   assert.deepStrictEqual(resGlobalFallback.itemStyles, {
-    'git-branch': 'emoji'
+    'git-branch': 'emoji',
+    'plugin-version': 'emoji'
   });
 
   // 8. 貼上帶點號或完整選項文字的強健性（包含多行貼上、帶前綴貼上、尾隨標點）
@@ -1307,6 +1313,202 @@ async function testCase14LegacyWindowsShBridgeRemoval() {
 }
 
 // ==========================================
+// 測試情境 15：驗證 .hook-version.json 寫入與 diagnose-statusline 外掛／掛鉤同步檢查
+// ==========================================
+async function testCase15HookVersionAndPluginHookSync() {
+  console.log('\n--- 執行測試情境 15：驗證 .hook-version.json 寫入與 diagnose-statusline 外掛／掛鉤同步檢查 ---');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-test-case15-'));
+  const sha256 = (str) => createHash('sha256').update(str, 'utf8').digest('hex');
+
+  try {
+    // 1. 驗證執行 configure-statusline.mjs 後自動寫入 .hook-version.json（不含 UTF-8 BOM）
+    const mockHome = path.join(sandbox, 'home');
+    const workspace = path.join(sandbox, 'ws');
+    fs.mkdirSync(mockHome, { recursive: true });
+    fs.mkdirSync(workspace, { recursive: true });
+
+    const res1 = await runScript(
+      configureScriptSrc,
+      ['--lang', 'zh-tw', '--selected', '["model-name","plugin-version"]', '--order', '1,2', '--workspace', workspace],
+      { HOME: mockHome, USERPROFILE: mockHome }
+    );
+    assert.strictEqual(res1.code, 0, `configure-statusline.mjs 必須成功執行，stderr: ${res1.stderr}`);
+
+    const hooksDir = path.join(mockHome, '.gemini', 'antigravity-cli', 'hooks');
+    const hookMetaPath = path.join(hooksDir, '.hook-version.json');
+    assert.ok(fs.existsSync(hookMetaPath), '必須寫入 hooks/.hook-version.json');
+    const rawMeta = fs.readFileSync(hookMetaPath);
+    assert.ok(!(rawMeta[0] === 0xEF && rawMeta[1] === 0xBB && rawMeta[2] === 0xBF), '.hook-version.json 不可含有 UTF-8 BOM');
+
+    const hookMeta = JSON.parse(rawMeta.toString('utf8'));
+    const repoPluginMeta = JSON.parse(fs.readFileSync(path.resolve(originalScriptsDir, '..', '..', '..', 'plugin.json'), 'utf8'));
+    const expectedRepoVersion = repoPluginMeta.version.replace(/^v/i, '');
+    assert.strictEqual(hookMeta.pluginVersion, expectedRepoVersion, 'pluginVersion 必須記錄專案清單版本');
+    assert.ok(/^\d{4}-\d{2}-\d{2}T/.test(hookMeta.syncedAt), 'syncedAt 必須為合法 ISO 時間字串');
+
+    const deployedMain = fs.readFileSync(path.join(hooksDir, 'statusline-quota.mjs'), 'utf8');
+    const deployedFetch = fs.readFileSync(path.join(hooksDir, 'fetch-local-quota.mjs'), 'utf8');
+    assert.strictEqual(hookMeta.files['statusline-quota.mjs'], sha256(deployedMain), 'statusline-quota.mjs 雜湊必須相符');
+    assert.strictEqual(hookMeta.files['fetch-local-quota.mjs'], sha256(deployedFetch), 'fetch-local-quota.mjs 雜湊必須相符');
+
+    // 2. 驗證無 plugin.json 的獨立腳本複本仍可透過 HOOK_VERSION 回退記錄正確版號
+    const standaloneHome = path.join(sandbox, 'standalone-home');
+    const standaloneSkillDir = path.join(sandbox, 'standalone-skill');
+    const standaloneScriptsDir = path.join(standaloneSkillDir, 'scripts');
+    const standaloneResDir = path.join(standaloneSkillDir, 'resources');
+    fs.mkdirSync(standaloneHome, { recursive: true });
+    fs.mkdirSync(standaloneScriptsDir, { recursive: true });
+    fs.mkdirSync(standaloneResDir, { recursive: true });
+    fs.copyFileSync(configureScriptSrc, path.join(standaloneScriptsDir, 'configure-statusline.mjs'));
+    fs.copyFileSync(statuslineQuotaSrc, path.join(standaloneScriptsDir, 'statusline-quota.mjs'));
+    fs.copyFileSync(fetchLocalQuotaSrc, path.join(standaloneScriptsDir, 'fetch-local-quota.mjs'));
+    fs.copyFileSync(path.join(originalScriptsDir, '..', 'resources', 'questions.json'), path.join(standaloneResDir, 'questions.json'));
+
+    const resStandalone = await runScript(
+      path.join(standaloneScriptsDir, 'configure-statusline.mjs'),
+      ['--lang', 'us', '--selected', '["model-name","plugin-version"]', '--order', '1,2', '--workspace', workspace],
+      { HOME: standaloneHome, USERPROFILE: standaloneHome }
+    );
+    assert.strictEqual(resStandalone.code, 0, `獨立目錄執行 configure-statusline.mjs 必須成功，stderr: ${resStandalone.stderr}`);
+    const standaloneMeta = JSON.parse(fs.readFileSync(path.join(standaloneHome, '.gemini', 'antigravity-cli', 'hooks', '.hook-version.json'), 'utf8'));
+    assert.strictEqual(standaloneMeta.pluginVersion, expectedRepoVersion, '缺少 plugin.json 時必須從 HOOK_VERSION 取得版號');
+
+    // 2b. 若獨立腳本上三層目錄存在其他非本專案之 package.json，不可誤讀其版本號
+    fs.writeFileSync(path.join(sandbox, 'package.json'), JSON.stringify({ name: 'other-unrelated-project', version: '9.9.9' }), 'utf8');
+    const resStandaloneWithUnrelatedPkg = await runScript(
+      path.join(standaloneScriptsDir, 'configure-statusline.mjs'),
+      ['--lang', 'us', '--selected', '["model-name","plugin-version"]', '--order', '1,2', '--workspace', workspace],
+      { HOME: standaloneHome, USERPROFILE: standaloneHome }
+    );
+    assert.strictEqual(resStandaloneWithUnrelatedPkg.code, 0);
+    const standaloneMeta2 = JSON.parse(fs.readFileSync(path.join(standaloneHome, '.gemini', 'antigravity-cli', 'hooks', '.hook-version.json'), 'utf8'));
+    assert.strictEqual(standaloneMeta2.pluginVersion, expectedRepoVersion, '不可誤讀無關專案之 package.json 版本號');
+    fs.unlinkSync(path.join(sandbox, 'package.json'));
+
+    // 3. 驗證 checkPluginHookSync 各種狀態分支
+    const syncBase = path.join(sandbox, 'sync-test');
+    const fakePluginDir = path.join(syncBase, 'installed-plugin');
+    const fakePluginScripts = path.join(fakePluginDir, 'skills', 'agy-cli-statusline', 'scripts');
+    const fakeHooksDir = path.join(syncBase, 'hooks');
+    const missingPluginDir = path.join(syncBase, 'no-plugin');
+    fs.mkdirSync(fakePluginScripts, { recursive: true });
+    fs.mkdirSync(fakeHooksDir, { recursive: true });
+    fs.mkdirSync(missingPluginDir, { recursive: true });
+
+    // (a) hook_missing
+    let r = checkPluginHookSync({
+      home: syncBase,
+      hooksDir: fakeHooksDir,
+      installedPluginDir: fakePluginDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'hook_missing', '缺少掛鉤腳本時應回報 hook_missing');
+
+    // (b) plugin_not_found（掛鉤存在，但兩處皆無合法外掛清單，且無關專案之 package.json 必須略過）
+    fs.copyFileSync(statuslineQuotaSrc, path.join(fakePluginScripts, 'statusline-quota.mjs'));
+    fs.copyFileSync(fetchLocalQuotaSrc, path.join(fakePluginScripts, 'fetch-local-quota.mjs'));
+    fs.copyFileSync(statuslineQuotaSrc, path.join(fakeHooksDir, 'statusline-quota.mjs'));
+    fs.copyFileSync(fetchLocalQuotaSrc, path.join(fakeHooksDir, 'fetch-local-quota.mjs'));
+    fs.writeFileSync(path.join(fakePluginDir, 'package.json'), JSON.stringify({ name: 'other-package', version: '9.9.9' }), 'utf8');
+    r = checkPluginHookSync({
+      home: syncBase,
+      hooksDir: fakeHooksDir,
+      installedPluginDir: fakePluginDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'plugin_not_found', '找不到外掛清單且僅有無關 package.json 時應回報 plugin_not_found');
+    fs.unlinkSync(path.join(fakePluginDir, 'package.json'));
+
+    // (c) in_sync
+    fs.writeFileSync(path.join(fakePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: expectedRepoVersion }), 'utf8');
+    fs.writeFileSync(hookMetaPath.replace(hooksDir, fakeHooksDir), JSON.stringify({ pluginVersion: expectedRepoVersion, syncedAt: '2026-11-18T00:00:00Z' }), 'utf8');
+    r = checkPluginHookSync({
+      home: syncBase,
+      hooksDir: fakeHooksDir,
+      installedPluginDir: fakePluginDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'in_sync', '外掛與掛鉤版本與內容一致時應回報 in_sync');
+    assert.deepStrictEqual(r.fileDiffs, [], 'in_sync 時 fileDiffs 應為空');
+
+    // (d) version_mismatch（外掛已透過 agy plugin install 升至 1.12.0，但掛鉤仍為 1.11.4）
+    fs.writeFileSync(path.join(fakePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.12.0' }), 'utf8');
+    r = checkPluginHookSync({
+      home: syncBase,
+      hooksDir: fakeHooksDir,
+      installedPluginDir: fakePluginDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'version_mismatch', '外掛版本領先掛鉤時應回報 version_mismatch');
+    assert.strictEqual(r.pluginVersion, '1.12.0');
+    assert.strictEqual(r.hookVersion, expectedRepoVersion);
+
+    // (e) content_mismatch（版號皆為 1.12.0，但掛鉤腳本內容未更新）
+    fs.writeFileSync(path.join(fakeHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '1.12.0' }), 'utf8');
+    fs.appendFileSync(path.join(fakeHooksDir, 'statusline-quota.mjs'), '\n// modified\n', 'utf8');
+    r = checkPluginHookSync({
+      home: syncBase,
+      hooksDir: fakeHooksDir,
+      installedPluginDir: fakePluginDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'content_mismatch', '版號相同但腳本雜湊不同時應回報 content_mismatch');
+    assert.ok(r.fileDiffs.some(d => d.file === 'statusline-quota.mjs' && d.reason === 'content_differs'));
+
+    // (f) legacy_mismatch（無 .hook-version.json 且無 HOOK_VERSION 的早期掛鉤）
+    fs.unlinkSync(path.join(fakeHooksDir, '.hook-version.json'));
+    const strippedHook = deployedMain.replace(/export\s+const\s+HOOK_VERSION[^\r\n]*/, '// legacy script without HOOK_VERSION');
+    fs.writeFileSync(path.join(fakeHooksDir, 'statusline-quota.mjs'), strippedHook, 'utf8');
+    r = checkPluginHookSync({
+      home: syncBase,
+      hooksDir: fakeHooksDir,
+      installedPluginDir: fakePluginDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'legacy_mismatch', '舊版無中繼資料且腳本不同時應回報 legacy_mismatch');
+
+    // (g) 自動探索 Marketplace 數字安裝目錄與標準目錄並存時的最高版本優先原則
+    const autoHome = path.join(sandbox, 'auto-discover-home');
+    const autoNumericDir = path.join(autoHome, '.gemini', 'config', 'plugins', '-1870732469773246571');
+    const autoHooksDir = path.join(autoHome, '.gemini', 'antigravity-cli', 'hooks');
+    fs.mkdirSync(path.join(autoNumericDir, 'skills', 'agy-cli-statusline', 'scripts'), { recursive: true });
+    fs.mkdirSync(autoHooksDir, { recursive: true });
+    fs.copyFileSync(statuslineQuotaSrc, path.join(autoNumericDir, 'skills', 'agy-cli-statusline', 'scripts', 'statusline-quota.mjs'));
+    fs.copyFileSync(fetchLocalQuotaSrc, path.join(autoNumericDir, 'skills', 'agy-cli-statusline', 'scripts', 'fetch-local-quota.mjs'));
+    fs.copyFileSync(statuslineQuotaSrc, path.join(autoHooksDir, 'statusline-quota.mjs'));
+    fs.copyFileSync(fetchLocalQuotaSrc, path.join(autoHooksDir, 'fetch-local-quota.mjs'));
+    fs.writeFileSync(path.join(autoNumericDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
+    fs.writeFileSync(path.join(autoHooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '1.11.0' }), 'utf8');
+
+    r = checkPluginHookSync({
+      home: autoHome,
+      hooksDir: autoHooksDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'in_sync', '應能自動偵測 Marketplace 數字安裝目錄');
+    assert.strictEqual(r.pluginVersion, '1.11.0');
+
+    const autoStandardDir = path.join(autoHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+    fs.mkdirSync(path.join(autoStandardDir, 'skills', 'agy-cli-statusline', 'scripts'), { recursive: true });
+    fs.copyFileSync(statuslineQuotaSrc, path.join(autoStandardDir, 'skills', 'agy-cli-statusline', 'scripts', 'statusline-quota.mjs'));
+    fs.copyFileSync(fetchLocalQuotaSrc, path.join(autoStandardDir, 'skills', 'agy-cli-statusline', 'scripts', 'fetch-local-quota.mjs'));
+    fs.writeFileSync(path.join(autoStandardDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.12.0' }), 'utf8');
+
+    r = checkPluginHookSync({
+      home: autoHome,
+      hooksDir: autoHooksDir,
+      currentPluginDir: missingPluginDir
+    });
+    assert.strictEqual(r.status, 'version_mismatch', '標準目錄版號較高時不應被舊版 Marketplace 數字目錄遮蔽');
+    assert.strictEqual(r.pluginVersion, '1.12.0');
+
+    console.log('✅ 測試情境 15 通過！');
+  } finally {
+    rmRfSync(sandbox);
+  }
+}
+
+// ==========================================
 // 執行所有測試
 // ==========================================
 async function runAllTests() {
@@ -1325,6 +1527,7 @@ async function runAllTests() {
     await testCase12PureNumbersOverwritesResidualEmojiStyle();
     await testCase13NonDestructiveConfigAndLegacyCleanup();
     await testCase14LegacyWindowsShBridgeRemoval();
+    await testCase15HookVersionAndPluginHookSync();
     console.log('\n🎉 所有跨平台整合測試皆已成功通過！');
     process.exit(0);
   } catch (error) {

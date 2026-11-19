@@ -28,7 +28,26 @@ import {
   extractModelCandidateKeys,
   computeSteppedCeiling,
   calculateContextUsageAsync,
-  extractMetricsAsync
+  extractMetricsAsync,
+  HOOK_VERSION,
+  PLUGIN_REPO_URL,
+  normalizeSemver,
+  formatVersionTag,
+  compareSemver,
+  isVersionBehind,
+  tokenizeCommandLine,
+  isAgyProcessName,
+  extractArgsAfterExecutable,
+  hasNonInteractiveAgyFlag,
+  isHubAgyArgs,
+  parseMacPsLine,
+  parseLinuxProcStat,
+  parseWinProcessChainJson,
+  resolveAgySessionAsync,
+  resolveInstalledPluginVersionAsync,
+  fetchLatestPluginReleaseAsync,
+  checkPluginUpdateAsync,
+  formatPluginUpdateNoticeLines
 } from './statusline-quota.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./statusline-quota.mjs', import.meta.url));
@@ -472,7 +491,7 @@ async function main() {
         "五小时倒数:", "七日内可用:", "七日内倒数:", "分支:",
         "项目:", "完整路径:", "订阅计划:", "账号:", "代理状态:",
         "工具待确认:", "待处理输入:", "后台任务:", "子代理:", "产出文件:",
-        "版控状态:", "版控类型:", "沙箱状态:", "版本:", "对话编号:",
+        "版控状态:", "版控类型:", "沙箱状态:", "Agy CLI 版本:", "对话编号:",
         "代理角色:", "模式:"
       ];
       const missingLabels = expectedR8Labels.filter(item => !resR8.stdout.includes(item));
@@ -615,6 +634,7 @@ async function main() {
       sandboxAllowNet: false,
       sandboxStatusVal: 'off',
       cliVersion: 'v1.7.0',
+      pluginVersion: 'v1.11.4',
       conversationIdShort: '12345678',
       agentProfileName: 'Default'
     };
@@ -624,7 +644,8 @@ async function main() {
       'quota-bar', 'quota-weekly-bar',
       'context-used-bar', 'token-count-bar',
       'quota+bar', 'context-used+bar', 'quota-weekly+bar', 'token-count+bar',
-      'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'quota-argon+bar'
+      'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'quota-argon+bar',
+      'plugin-version'
     ];
 
     for (const testLang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
@@ -952,6 +973,7 @@ async function main() {
       sandboxAllowNet: true,
       sandboxStatusVal: '啟用（聯網）',
       cliVersion: 'v1.2.3',
+      pluginVersion: 'v1.11.4',
       conversationIdShort: 'c4a861dd',
       agentProfileName: 'Default',
       mode: 'Interactive'
@@ -960,7 +982,7 @@ async function main() {
     for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
       const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
       const allKeys = Object.keys(EMOJI_MAP);
-      assert.strictEqual(allKeys.length, 41, 'EMOJI_MAP must contain 36 metrics + 5 merged bar keys (41 total)');
+      assert.strictEqual(allKeys.length, 42, 'EMOJI_MAP must contain 37 metrics + 5 merged bar keys (42 total)');
 
       for (const key of allKeys) {
         const rendered = stripAnsi(emojiDict[key]);
@@ -991,7 +1013,7 @@ async function main() {
     assert.strictEqual(fallbackEmojiLines.length, 1);
     assert.ok(stripAnsi(fallbackEmojiLines[0]).includes('Gemini 3.1 Pro'));
     assert.ok(!stripAnsi(fallbackEmojiLines[0]).includes('🤖'), 'Fallback shortcuts line should strip 🤖 prefix from model-name');
-    console.log("✅ R21 passed! (All 36 emoji mappings and localized status values verified)");
+    console.log("✅ R21 passed! (All 42 emoji mappings across 37 metrics + 5 merged bars and localized status values verified)");
 
     // ----------------------------------------------------
     // Test Case R22: E2E test with ui.footer.labelStyle = "emoji"
@@ -2799,8 +2821,738 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       else process.env.USERPROFILE = origUserProfile;
       try { rmSync(sandboxR34, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
     }
+    } catch (err) {
+      console.error("Test R34 execution failed:", err);
+      testsPassed = false;
+    }
+
+  // ----------------------------------------------------
+  // Test Case R35: cli-version rename, plugin-version 4-locale rendering, process-tree tracking, GitHub update check & 2-line notice
+  // ----------------------------------------------------
+  console.log("\n[Test R35] Verifying cli-version rename, plugin-version, process-tree session tracking & GitHub update check...");
+  try {
+    // A. Verify 4-locale labels & emoji modes for cli-version and plugin-version
+    const metricsR35 = {
+      model: 'Gemini 3.8 Flash',
+      shortModel: 'Gemini 3.8 Flash',
+      ctxStr: '10.0%',
+      ctxPctNum: 10.0,
+      ctxColor: BLUE_BOLD,
+      tokenStr: '10k / 100k',
+      tokenExactVal: '10.0k',
+      tokenMaxVal: '100.0k',
+      tokenColor: BLUE_BOLD,
+      memUsage: '100MB',
+      quotaPct: 90,
+      quotaPctStr: '90%',
+      quotaColor: BLUE_BOLD,
+      quotaResetCountdown: '4h',
+      quotaResetTimeStr: '15:00',
+      weeklyPct: 90,
+      weeklyPctStr: '90%',
+      weeklyColor: BLUE_BOLD,
+      weeklyResetCountdown: '4d',
+      weeklyResetTimeStr: '2026/11/22 15:00',
+      argonPct: 90,
+      argonPctStr: '90%',
+      argonColor: BLUE_BOLD,
+      argonResetCountdown: '5d',
+      argonResetTimeStr: '2026/11/23 15:00',
+      projectName: 'proj',
+      projectPath: '/tmp/proj',
+      gitBranch: 'main',
+      planTier: 'Google AI Pro',
+      accountEmail: 'a@b.com',
+      agentStateStr: 'idle',
+      agentStateColor: GREEN_BOLD,
+      toolConfirmPending: false,
+      pendingInputCount: 0,
+      backgroundTasksCount: 0,
+      subagentsCount: 0,
+      artifactsCount: 0,
+      vcsDirtyFlag: false,
+      vcsDirtyGlyph: '✓',
+      vcsDirtyLabel: 'clean',
+      vcsType: 'git',
+      sandboxEnabled: false,
+      sandboxAllowNet: false,
+      sandboxStatusVal: 'off',
+      cliVersion: 'v1.5.10',
+      pluginVersion: 'v1.11.4',
+      conversationIdShort: 'aabbccdd',
+      agentProfileName: 'Default',
+      mode: 'Default'
+    };
+
+    const expectedLocalePairs = {
+      'zh-tw': { cli: 'Agy CLI 版本: v1.5.10', plugin: '外掛版本: v1.11.4' },
+      'zh-cn': { cli: 'Agy CLI 版本: v1.5.10', plugin: '插件版本: v1.11.4' },
+      'us': { cli: 'Agy CLI Version: v1.5.10', plugin: 'Plugin Version: v1.11.4' },
+      'jp': { cli: 'Agy CLI バージョン: v1.5.10', plugin: 'プラグイン版: v1.11.4' }
+    };
+    for (const [langCode, exp] of Object.entries(expectedLocalePairs)) {
+      const textDict = buildI18nDict(langCode, metricsR35, 'text');
+      assert.strictEqual(stripAnsi(textDict['cli-version']), exp.cli, `[${langCode}] cli-version text label mismatch`);
+      assert.strictEqual(stripAnsi(textDict['plugin-version']), exp.plugin, `[${langCode}] plugin-version text label mismatch`);
+
+      const emojiDict = buildI18nDict(langCode, metricsR35, 'emoji');
+      assert.strictEqual(stripAnsi(emojiDict['cli-version']), '🚀 v1.5.10', `[${langCode}] cli-version emoji label mismatch`);
+      assert.strictEqual(stripAnsi(emojiDict['plugin-version']), '🧩 v1.11.4', `[${langCode}] plugin-version emoji label mismatch`);
+    }
+
+    // B. Semver helpers & boundaries
+    assert.strictEqual(normalizeSemver('v1.11.4'), '1.11.4');
+    assert.strictEqual(normalizeSemver(' V2.0.10-beta.1 '), '2.0.10-beta.1');
+    assert.strictEqual(normalizeSemver('not-a-version'), '');
+    assert.strictEqual(formatVersionTag('1.11.4'), 'v1.11.4');
+    assert.strictEqual(formatVersionTag('V1.11.4'), 'v1.11.4');
+    assert.strictEqual(compareSemver('1.11.4', '1.11.10') < 0, true);
+    assert.strictEqual(compareSemver('1.12.0', '1.11.99') > 0, true);
+    assert.strictEqual(compareSemver('2.0.0', '2.0.0-rc.1') > 0, true);
+    assert.strictEqual(compareSemver('1.11.4', 'v1.11.4'), 0);
+    assert.strictEqual(isVersionBehind('1.11.4', '1.11.10'), true);
+    assert.strictEqual(isVersionBehind('1.11.4', '1.11.4'), false);
+    assert.strictEqual(isVersionBehind('1.12.0', '1.11.4'), false);
+    assert.strictEqual(isVersionBehind('', '1.12.0'), false);
+    assert.strictEqual(isVersionBehind('1.11.4', 'bad'), false);
+
+    // C. Command-line tokenizer, agy matcher, non-interactive/hub flags, OS parsers
+    assert.deepStrictEqual(
+      tokenizeCommandLine('"/Users/John Doe/.gemini/bin/agy" -p "hello world" --foo=\'bar baz\''),
+      ['/Users/John Doe/.gemini/bin/agy', '-p', 'hello world', '--foo=bar baz']
+    );
+    assert.strictEqual(isAgyProcessName('agy'), true);
+    assert.strictEqual(isAgyProcessName('agy.exe'), true);
+    assert.strictEqual(isAgyProcessName('/usr/local/bin/agy'), true);
+    assert.strictEqual(isAgyProcessName('C:\\Program Files\\Agy\\agy.EXE'), true);
+    assert.strictEqual(isAgyProcessName('node'), false);
+    assert.strictEqual(isAgyProcessName('agy-helper'), false);
+
+    assert.deepStrictEqual(
+      extractArgsAfterExecutable('/Users/John Doe/.gemini/bin/agy --model gemini -p hello', 'agy'),
+      ['--model', 'gemini', '-p', 'hello']
+    );
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy -p "explain this"', 'agy'), true);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy --print "explain this"', 'agy'), true);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy --prompt="explain"', 'agy'), true);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy -p=true', 'agy'), true);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy --print=1', 'agy'), true);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy -p=false', 'agy'), false);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy --print=false', 'agy'), false);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy --prompt=0', 'agy'), false);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy -i "interactive"', 'agy'), false);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy --prompt-interactive "interactive"', 'agy'), false);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy -- "-p"', 'agy'), false);
+    assert.strictEqual(hasNonInteractiveAgyFlag('agy', 'agy'), false);
+    assert.strictEqual(isHubAgyArgs('agy --hub --port 1234', 'agy'), true);
+    assert.strictEqual(isHubAgyArgs('agy --hub=1', 'agy'), true);
+    assert.strictEqual(isHubAgyArgs('agy', 'agy'), false);
+
+    // Empty pluginVersion in buildI18nDict must fall back to Unknown/未知 instead of blank
+    const emptyPluginDict = buildI18nDict('zh-tw', { ...metricsR35, pluginVersion: '' }, 'text');
+    assert.strictEqual(stripAnsi(emptyPluginDict['plugin-version']), '外掛版本: 未知');
+    const emptyPluginDictUs = buildI18nDict('us', { ...metricsR35, pluginVersion: '' }, 'text');
+    assert.strictEqual(stripAnsi(emptyPluginDictUs['plugin-version']), 'Plugin Version: Unknown');
+
+    assert.deepStrictEqual(
+      parseMacPsLine('  1234   1000 Wed Nov 18 09:05:01 2026 /Users/John Doe/.gemini/bin/agy'),
+      { pid: 1234, ppid: 1000, startTime: 'Wed Nov 18 09:05:01 2026', name: '/Users/John Doe/.gemini/bin/agy' }
+    );
+    assert.deepStrictEqual(
+      parseMacPsLine('  987    500 Wed Nov  4 09:05:01 2026 agy'),
+      { pid: 987, ppid: 500, startTime: 'Wed Nov  4 09:05:01 2026', name: 'agy' }
+    );
+    assert.strictEqual(parseMacPsLine('bad line'), null);
+
+    // Linux /proc/<pid>/stat with space & parens in comm name
+    const procFieldsAfterComm = Array.from({ length: 20 }, (_, i) => (i === 1 ? '4321' : (i === 19 ? '99887766' : '0'))).join(' ');
+    assert.deepStrictEqual(
+      parseLinuxProcStat(`54321 (agy (worker)) ${procFieldsAfterComm}`),
+      { pid: 54321, ppid: 4321, name: 'agy (worker)', startTime: '99887766' }
+    );
+    assert.strictEqual(parseLinuxProcStat('malformed'), null);
+
+    // Win32 CIM process chain JSON (single object vs array & UTF-8 BOM)
+    const winSingle = parseWinProcessChainJson('\uFEFF{"pid":300,"ppid":200,"name":"agy.exe","start":"2026-11-18T01:00:00.000Z","cmd":"\\"C:\\\\Agy\\\\agy.exe\\" --model flash"}');
+    assert.strictEqual(winSingle.length, 1);
+    assert.strictEqual(winSingle[0].pid, 300);
+    assert.strictEqual(winSingle[0].name, 'agy.exe');
+    assert.deepStrictEqual(parseWinProcessChainJson('invalid json'), []);
+
+    // D. resolveAgySessionAsync across darwin, linux (/proc & ps fallback), win32 & live OS self-walk
+    // D1. Darwin: sh(500) -> node(400) -> agy --hub(300, skipped) -> main agy(200)
+    const darwinSession = await resolveAgySessionAsync({
+      platform: 'darwin',
+      ppid: 500,
+      execFn: async (_cmd, opts) => {
+        const flagIdx = opts.execArgs.indexOf('-p');
+        const pid = opts.execArgs[flagIdx + 1];
+        const query = opts.execArgs[2];
+        if (query.startsWith('pid=')) {
+          if (pid === '500') return { ok: true, stdout: '500 400 Wed Nov 18 09:00:00 2026 zsh\n' };
+          if (pid === '400') return { ok: true, stdout: '400 300 Wed Nov 18 08:59:59 2026 node\n' };
+          if (pid === '300') return { ok: true, stdout: '300 200 Wed Nov 18 08:59:50 2026 agy\n' };
+          if (pid === '200') return { ok: true, stdout: '200 1 Wed Nov 18 08:59:00 2026 /Users/John Doe/.gemini/bin/agy\n' };
+        }
+        if (query === 'args=') {
+          if (pid === '300') return { ok: true, stdout: 'agy --hub\n' };
+          if (pid === '200') return { ok: true, stdout: '/Users/John Doe/.gemini/bin/agy\n' };
+        }
+        return { ok: false, stdout: '' };
+      }
+    });
+    assert.strictEqual(darwinSession.found, true);
+    assert.strictEqual(darwinSession.pid, 200);
+    assert.strictEqual(darwinSession.nonInteractive, false);
+    assert.strictEqual(darwinSession.sessionKey, '200:Wed Nov 18 08:59:00 2026');
+
+    // D2. Linux /proc traversal + agy -p detection + ps fallback
+    const linuxStat500 = `500 (sh) S ${Array.from({ length: 19 }, (_, i) => (i === 0 ? '400' : (i === 18 ? '111' : '0'))).join(' ')}`;
+    const linuxStat400 = `400 (agy) S ${Array.from({ length: 19 }, (_, i) => (i === 0 ? '1' : (i === 18 ? '222333' : '0'))).join(' ')}`;
+    const linuxNonInteractive = await resolveAgySessionAsync({
+      platform: 'linux',
+      ppid: 500,
+      readFileFn: async (p) => {
+        if (p === '/proc/500/stat') return linuxStat500;
+        if (p === '/proc/400/stat') return linuxStat400;
+        if (p === '/proc/400/cmdline') return '/usr/bin/agy\0-p\0hello world\0';
+        throw new Error('ENOENT');
+      }
+    });
+    assert.strictEqual(linuxNonInteractive.found, true);
+    assert.strictEqual(linuxNonInteractive.pid, 400);
+    assert.strictEqual(linuxNonInteractive.nonInteractive, true);
+    assert.strictEqual(linuxNonInteractive.sessionKey, '400:222333');
+
+    // Linux /proc traversal when agy is invoked via symlink (comm is target binary name, cmdline[0] is /usr/local/bin/agy)
+    const linuxStat450 = `450 (antigravity-cli) S ${Array.from({ length: 19 }, (_, i) => (i === 0 ? '1' : (i === 18 ? '555666' : '0'))).join(' ')}`;
+    const linuxSymlinkInteractive = await resolveAgySessionAsync({
+      platform: 'linux',
+      ppid: 450,
+      readFileFn: async (p) => {
+        if (p === '/proc/450/stat') return linuxStat450;
+        if (p === '/proc/450/cmdline') return '/usr/local/bin/agy\0--model\0flash\0';
+        throw new Error('ENOENT');
+      }
+    });
+    assert.strictEqual(linuxSymlinkInteractive.found, true);
+    assert.strictEqual(linuxSymlinkInteractive.pid, 450);
+    assert.strictEqual(linuxSymlinkInteractive.nonInteractive, false);
+    assert.strictEqual(linuxSymlinkInteractive.sessionKey, '450:555666');
+
+    const linuxPsFallback = await resolveAgySessionAsync({
+      platform: 'linux',
+      ppid: 500,
+      readFileFn: async () => { throw new Error('ENOENT'); },
+      execFn: async (_cmd, opts) => {
+        const pid = opts.execArgs[opts.execArgs.indexOf('-p') + 1];
+        if (opts.execArgs[2].startsWith('pid=')) {
+          if (pid === '500') return { ok: true, stdout: '500 1 Wed Nov 18 09:00:00 2026 agy\n' };
+        }
+        if (opts.execArgs[2] === 'args=' && pid === '500') {
+          return { ok: true, stdout: 'agy\n' };
+        }
+        return { ok: false, stdout: '' };
+      }
+    });
+    assert.strictEqual(linuxPsFallback.found, true);
+    assert.strictEqual(linuxPsFallback.pid, 500);
+    assert.strictEqual(linuxPsFallback.nonInteractive, false);
+
+    // D3. Win32 traversal
+    const winChainPayload = JSON.stringify([
+      { pid: 900, ppid: 800, name: 'cmd.exe', start: '2026-11-18T01:00:01Z', cmd: 'cmd.exe /c node statusline-quota.mjs' },
+      { pid: 800, ppid: 700, name: 'agy.exe', start: '2026-11-18T01:00:00Z', cmd: '"C:\\Program Files\\Agy\\agy.exe" --hub' },
+      { pid: 700, ppid: 600, name: 'agy.exe', start: '2026-11-18T00:59:00Z', cmd: '"C:\\Program Files\\Agy\\agy.exe"' }
+    ]);
+    const winSession = await resolveAgySessionAsync({
+      platform: 'win32',
+      ppid: 900,
+      execFn: async () => ({ ok: true, stdout: winChainPayload })
+    });
+    assert.strictEqual(winSession.found, true);
+    assert.strictEqual(winSession.pid, 700);
+    assert.strictEqual(winSession.nonInteractive, false);
+    assert.strictEqual(winSession.sessionKey, '700:2026-11-18T00:59:00Z');
+
+    // D4. Live real-OS process-tree self-walk must never throw
+    const liveSelfWalk = await resolveAgySessionAsync();
+    assert.strictEqual(typeof liveSelfWalk.found, 'boolean');
+
+    // E. checkPluginUpdateAsync state machine & manifest resolution
+    const sandboxR35 = mkdtempSync(join(os.tmpdir(), 'statusline-r35-'));
+    let releaseServer = null;
+    try {
+      const fakeHomeR35 = join(sandboxR35, 'home');
+      const pluginDirR35 = join(fakeHomeR35, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+      const cachePathR35 = join(fakeHomeR35, '.gemini', 'tmp', 'plugin_update_cache.json');
+      mkdirSync(pluginDirR35, { recursive: true });
+      writeFileSync(join(pluginDirR35, 'plugin.json'), '\uFEFF' + JSON.stringify({ name: 'antigravity-cli-statusline', version: 'v1.11.4' }), 'utf8');
+
+      // E1. resolveInstalledPluginVersionAsync prefers pluginDir/plugin.json and strips BOM/v
+      const resolvedInstalled = await resolveInstalledPluginVersionAsync({ homeDir: fakeHomeR35 });
+      assert.strictEqual(resolvedInstalled.version, '1.11.4');
+      assert.strictEqual(resolvedInstalled.tag, 'v1.11.4');
+
+      // E1b. Unrelated package.json (name !== 'antigravity-cli-statusline') must be ignored
+      const unrelatedDirR35 = join(sandboxR35, 'unrelated-pkg');
+      mkdirSync(unrelatedDirR35, { recursive: true });
+      writeFileSync(join(unrelatedDirR35, 'package.json'), JSON.stringify({ name: 'user-home-dotfiles', version: '0.1.0' }), 'utf8');
+      const resolvedUnrelated = await resolveInstalledPluginVersionAsync({
+        pluginDir: unrelatedDirR35,
+        allowScriptRelativeFallback: false,
+        fallbackVersion: null
+      });
+      assert.strictEqual(resolvedUnrelated.version, '', 'Unrelated package.json must be ignored');
+      assert.strictEqual(resolvedUnrelated.tag, '');
+
+      // E1c. Marketplace numeric dir, .agents/plugins dir, unrelated unnamed plugin dir & highest SemVer resolution
+      const mpHome = join(sandboxR35, 'marketplace-home');
+      const numericDir = join(mpHome, '.gemini', 'config', 'plugins', '-1870732469773246571');
+      const otherPluginDir = join(mpHome, '.gemini', 'config', 'plugins', '999999999');
+      const otherNamedPluginDir = join(mpHome, '.gemini', 'config', 'plugins', 'some-other-plugin');
+      mkdirSync(numericDir, { recursive: true });
+      mkdirSync(otherPluginDir, { recursive: true });
+      mkdirSync(otherNamedPluginDir, { recursive: true });
+      writeFileSync(join(otherPluginDir, 'plugin.json'), JSON.stringify({ version: '9.9.9' }), 'utf8');
+      writeFileSync(join(otherNamedPluginDir, 'plugin.json'), JSON.stringify({ name: 'other-plugin', version: '8.8.8' }), 'utf8');
+      writeFileSync(join(numericDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
+
+      const resolvedNumericOnly = await resolveInstalledPluginVersionAsync({
+        homeDir: mpHome,
+        allowScriptRelativeFallback: false,
+        fallbackVersion: null
+      });
+      assert.strictEqual(resolvedNumericOnly.version, '1.11.0', 'Must resolve Marketplace numeric dir with matching name');
+
+      const standardMpDir = join(mpHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+      mkdirSync(standardMpDir, { recursive: true });
+      writeFileSync(join(standardMpDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.4' }), 'utf8');
+      const resolvedCoexist = await resolveInstalledPluginVersionAsync({
+        homeDir: mpHome,
+        allowScriptRelativeFallback: false,
+        fallbackVersion: null
+      });
+      assert.strictEqual(resolvedCoexist.version, '1.11.4', 'Higher SemVer standard plugin dir must beat legacy numeric dir');
+
+      const agentsOnlyHome = join(sandboxR35, 'agents-home');
+      const agentsPluginDir = join(agentsOnlyHome, '.agents', 'plugins', 'antigravity-cli-statusline');
+      mkdirSync(agentsPluginDir, { recursive: true });
+      writeFileSync(join(agentsPluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.2' }), 'utf8');
+      const resolvedAgents = await resolveInstalledPluginVersionAsync({
+        homeDir: agentsOnlyHome,
+        allowScriptRelativeFallback: false,
+        fallbackVersion: null
+      });
+      assert.strictEqual(resolvedAgents.version, '1.11.2', 'Must resolve .agents/plugins/antigravity-cli-statusline');
+
+      // E2. When disabled (plugin-version not in ui.footer.items), never checks GitHub or writes cache
+      let fetchCalls = 0;
+      const disabledRes = await checkPluginUpdateAsync({
+        enabled: false,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1001, startTime: 't1', nonInteractive: false, sessionKey: '1001:t1' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' }; }
+      });
+      assert.strictEqual(disabledRes.checked, false);
+      assert.strictEqual(disabledRes.updateAvailable, false);
+      assert.strictEqual(fetchCalls, 0);
+      assert.strictEqual(existsSync(cachePathR35), false, 'Cache must not be written when plugin-version is disabled');
+
+      // E3. agy -p non-interactive session must skip query & cache write
+      const nonInterRes = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1000, startTime: 't0', nonInteractive: true, sessionKey: '1000:t0' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' }; }
+      });
+      assert.strictEqual(nonInterRes.skippedNonInteractive, true);
+      assert.strictEqual(nonInterRes.checked, false);
+      assert.strictEqual(fetchCalls, 0);
+      assert.strictEqual(existsSync(cachePathR35), false);
+
+      // E4. First open ever & offline failure: records failed marker, does not retry in same session, no error shown
+      const offlineFirstOpen = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1001, startTime: 't1', nonInteractive: false, sessionKey: '1001:t1' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: false, error: 'offline' }; }
+      });
+      assert.strictEqual(offlineFirstOpen.checked, true);
+      assert.strictEqual(offlineFirstOpen.updateAvailable, false);
+      assert.strictEqual(fetchCalls, 1);
+      const cacheAfterOfflineFirst = JSON.parse(readFileSync(cachePathR35, 'utf8'));
+      assert.strictEqual(cacheAfterOfflineFirst.lastSessionKey, '1001:t1');
+      assert.strictEqual(cacheAfterOfflineFirst.lastSessionStatus, 'failed');
+
+      const offlineSameSessionRetry = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1001, startTime: 't1', nonInteractive: false, sessionKey: '1001:t1' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' }; }
+      });
+      assert.strictEqual(offlineSameSessionRetry.checked, false, 'Must NOT retry GitHub within the same agy session after failure');
+      assert.strictEqual(fetchCalls, 1);
+
+      // E5. Restart interactive agy (new PID/startTime): fetches 1.12.0, writes ok cache, detects updateAvailable
+      const onlineRestart = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1002, startTime: 't2', nonInteractive: false, sessionKey: '1002:t2' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' }; }
+      });
+      assert.strictEqual(onlineRestart.checked, true);
+      assert.strictEqual(onlineRestart.updateAvailable, true);
+      assert.strictEqual(onlineRestart.latestTag, 'v1.12.0');
+      assert.strictEqual(fetchCalls, 2);
+
+      // Same session second render does NOT fetch again
+      const sameSessionSecondRender = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1002, startTime: 't2', nonInteractive: false, sessionKey: '1002:t2' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: true, latestVersion: '1.13.0', latestTag: 'v1.13.0' }; }
+      });
+      assert.strictEqual(sameSessionSecondRender.checked, false);
+      assert.strictEqual(sameSessionSecondRender.updateAvailable, true);
+      assert.strictEqual(fetchCalls, 2);
+
+      // E6. New restart while OFFLINE: queries once, fails, writes failed marker, keeps cached 1.12.0 and still shows updateAvailable
+      const offlineWithCacheRestart = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1003, startTime: 't3', nonInteractive: false, sessionKey: '1003:t3' },
+        fetchReleaseFn: async () => { fetchCalls++; throw new Error('network down'); }
+      });
+      assert.strictEqual(offlineWithCacheRestart.checked, true);
+      assert.strictEqual(offlineWithCacheRestart.updateAvailable, true, 'Must preserve cached latestVersion 1.12.0 when offline');
+      assert.strictEqual(offlineWithCacheRestart.latestVersion, '1.12.0');
+      assert.strictEqual(fetchCalls, 3);
+      const cacheAfterOfflineWithPrev = JSON.parse(readFileSync(cachePathR35, 'utf8'));
+      assert.strictEqual(cacheAfterOfflineWithPrev.lastSessionKey, '1003:t3');
+      assert.strictEqual(cacheAfterOfflineWithPrev.lastSessionStatus, 'failed');
+      assert.strictEqual(cacheAfterOfflineWithPrev.latestVersion, '1.12.0');
+
+      // Same failed session third restart still won't retry
+      await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1003, startTime: 't3', nonInteractive: false, sessionKey: '1003:t3' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: true, latestVersion: '9.9.9', latestTag: 'v9.9.9' }; }
+      });
+      assert.strictEqual(fetchCalls, 3);
+
+      // E7. Simulate ! agy plugin install updating plugin.json to 1.12.0 -> version catches up, updateAvailable immediately false
+      writeFileSync(join(pluginDirR35, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.12.0' }), 'utf8');
+      const afterInstallUpdate = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: cachePathR35,
+        session: { found: true, pid: 1003, startTime: 't3', nonInteractive: false, sessionKey: '1003:t3' },
+        fetchReleaseFn: async () => { fetchCalls++; return { ok: true, latestVersion: '9.9.9', latestTag: 'v9.9.9' }; }
+      });
+      assert.strictEqual(afterInstallUpdate.installedTag, 'v1.12.0');
+      assert.strictEqual(afterInstallUpdate.updateAvailable, false);
+      assert.strictEqual(fetchCalls, 3);
+
+      // E7b. Concurrent calls for the same brand-new sessionKey must only fetch ONCE and never clobber 'ok'
+      const concurrentCachePath = join(fakeHomeR35, '.gemini', 'tmp', 'plugin_update_cache_concurrent.json');
+      writeFileSync(join(pluginDirR35, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.4' }), 'utf8');
+      let concurrentFetches = 0;
+      const [concA, concB] = await Promise.all([
+        checkPluginUpdateAsync({
+          enabled: true,
+          homeDir: fakeHomeR35,
+          cachePath: concurrentCachePath,
+          session: { found: true, pid: 1099, startTime: 't99', nonInteractive: false, sessionKey: '1099:t99' },
+          fetchReleaseFn: async () => {
+            concurrentFetches++;
+            await new Promise(r => setTimeout(r, 40));
+            return { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' };
+          }
+        }),
+        checkPluginUpdateAsync({
+          enabled: true,
+          homeDir: fakeHomeR35,
+          cachePath: concurrentCachePath,
+          session: { found: true, pid: 1099, startTime: 't99', nonInteractive: false, sessionKey: '1099:t99' },
+          fetchReleaseFn: async () => {
+            concurrentFetches++;
+            return { ok: false, error: 'should_not_run' };
+          }
+        })
+      ]);
+      assert.strictEqual(concurrentFetches, 1, 'Concurrent startup calls for the same sessionKey must only issue 1 fetch');
+      assert.strictEqual(concA.updateAvailable, true);
+      assert.strictEqual(concB.checked, false);
+      const concurrentSaved = JSON.parse(readFileSync(concurrentCachePath, 'utf8'));
+      assert.strictEqual(concurrentSaved.lastSessionStatus, 'ok');
+      assert.strictEqual(concurrentSaved.latestVersion, '1.12.0');
+
+      // E7c. Total budget clamping when session lookup consumes significant time
+      const budgetCachePath = join(fakeHomeR35, '.gemini', 'tmp', 'plugin_update_cache_budget.json');
+      let observedFetchTimeout = 0;
+      await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: fakeHomeR35,
+        cachePath: budgetCachePath,
+        platform: 'darwin',
+        ppid: 4242,
+        env: {},
+        execFn: async (_cmd, opts) => {
+          const query = opts.execArgs[2];
+          if (query.startsWith('pid=')) {
+            await new Promise(r => setTimeout(r, 1300));
+            return { ok: true, stdout: '4242 1 Wed Nov 18 09:00:00 2026 agy\n' };
+          }
+          if (query === 'args=') return { ok: true, stdout: 'agy\n' };
+          return { ok: false, stdout: '' };
+        },
+        fetchReleaseFn: async (_url, tMs) => {
+          observedFetchTimeout = tMs;
+          return { ok: true, latestVersion: '1.11.4', latestTag: 'v1.11.4' };
+        }
+      });
+      assert.ok(observedFetchTimeout >= 400 && observedFetchTimeout <= 1050, `Expected clamped timeoutMs within [400, 1050], got ${observedFetchTimeout}`);
+
+      // E8. formatPluginUpdateNoticeLines across all 4 locales
+      for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
+        const notice = formatPluginUpdateNoticeLines(lang, 'v1.11.0', 'v1.11.4');
+        assert.strictEqual(notice.length, 2, `[${lang}] Notice must be fixed at 2 lines`);
+        const p1 = stripAnsi(notice[0]);
+        const p2 = stripAnsi(notice[1]);
+        assert.ok(p1.includes('v1.11.0') && p1.includes('v1.11.4'), `[${lang}] Line 1 must include version diff: ${p1}`);
+        assert.strictEqual(p2, `! agy plugin install ${PLUGIN_REPO_URL}`, `[${lang}] Line 2 must be exact install command`);
+      }
+
+      // E9. fetchLatestPluginReleaseAsync invalid URL / loopback HTTP (with graceful EPERM handling)
+      assert.strictEqual((await fetchLatestPluginReleaseAsync('not-a-url')).error, 'invalid_url');
+      assert.strictEqual((await fetchLatestPluginReleaseAsync('ftp://example.com')).error, 'unsupported_protocol');
+
+      let serverPort = null;
+      let releaseServerHits = 0;
+      let tagPageHits = 0;
+      try {
+        releaseServer = http.createServer((req, res) => {
+          releaseServerHits++;
+          if (req.url === '/redirect') {
+            res.writeHead(302, { Location: '/latest' });
+            res.end();
+          } else if (req.url === '/tag-redirect') {
+            res.writeHead(302, { Location: '/AndyAWD/antigravity-cli-statusline/releases/tag/v1.12.0' });
+            res.end();
+          } else if (req.url === '/bad-tag-redirect') {
+            res.writeHead(302, { Location: '/AndyAWD/antigravity-cli-statusline/releases/tag/nightly' });
+            res.end();
+          } else if (req.url.startsWith('/AndyAWD/antigravity-cli-statusline/releases/tag/')) {
+            tagPageHits++;
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end('<html>should not be downloaded</html>');
+          } else if (req.url === '/latest') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ tag_name: 'v1.12.0' }));
+          } else if (req.url === '/err500') {
+            res.writeHead(500);
+            res.end('fail');
+          } else {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ tag_name: 'bad-tag' }));
+          }
+        });
+        await new Promise((resolve, reject) => {
+          releaseServer.once('error', reject);
+          releaseServer.listen(0, '127.0.0.1', () => {
+            serverPort = releaseServer.address().port;
+            resolve();
+          });
+        });
+      } catch (bindErr) {
+        if (bindErr && (bindErr.code === 'EPERM' || bindErr.code === 'EACCES')) {
+          console.log('⚠️ Test R35 HTTP loopback bind blocked by sandbox (EPERM); continuing with pre-seeded cache E2E verification.');
+          serverPort = null;
+        } else {
+          throw bindErr;
+        }
+      }
+
+      if (serverPort) {
+        const fetched200 = await fetchLatestPluginReleaseAsync(`http://127.0.0.1:${serverPort}/latest`, 1000);
+        assert.deepStrictEqual(fetched200, { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' });
+        const fetched302 = await fetchLatestPluginReleaseAsync(`http://127.0.0.1:${serverPort}/redirect`, 1000);
+        assert.deepStrictEqual(fetched302, { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' });
+        const fetchedTagRedirect = await fetchLatestPluginReleaseAsync(`http://127.0.0.1:${serverPort}/tag-redirect`, 1000);
+        assert.deepStrictEqual(fetchedTagRedirect, { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' });
+        const fetchedBadTagRedirect = await fetchLatestPluginReleaseAsync(`http://127.0.0.1:${serverPort}/bad-tag-redirect`, 1000);
+        assert.strictEqual(fetchedBadTagRedirect.ok, false);
+        assert.strictEqual(fetchedBadTagRedirect.error, 'invalid_tag');
+        assert.strictEqual(tagPageHits, 0, 'Must extract tag directly from 302 Location without downloading HTML release page');
+        const fetched500 = await fetchLatestPluginReleaseAsync(`http://127.0.0.1:${serverPort}/err500`, 1000);
+        assert.strictEqual(fetched500.ok, false);
+        assert.strictEqual(fetched500.error, 'http_500');
+        const fetchedBadTag = await fetchLatestPluginReleaseAsync(`http://127.0.0.1:${serverPort}/badtag`, 1000);
+        assert.strictEqual(fetchedBadTag.ok, false);
+        assert.strictEqual(fetchedBadTag.error, 'invalid_tag');
+      }
+
+      // F. Full subprocess E2E with runStatusline
+      const e2eHome = join(sandboxR35, 'e2e-home');
+      const e2ePluginDir = join(e2eHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+      const e2eCachePath = join(e2eHome, '.gemini', 'tmp', 'plugin_update_cache.json');
+      mkdirSync(join(e2eHome, '.gemini', 'tmp'), { recursive: true });
+      mkdirSync(e2ePluginDir, { recursive: true });
+      writeFileSync(join(e2eHome, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ models: {} }), 'utf8');
+      writeFileSync(join(e2ePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
+
+      // F1. Without plugin-version in ui.footer.items -> never fetches release or writes update cache
+      writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
+        ui: { language: 'zh-tw', footer: { items: ['cli-version'] } }
+      }), 'utf8');
+      const hitsBeforeDisabled = releaseServerHits;
+      const e2eDisabled = await runStatusline(
+        { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+        e2eHome,
+        SCRIPT_PATH,
+        {
+          STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 2001, startTime: 's1', nonInteractive: false }),
+          ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
+        }
+      );
+      assert.strictEqual(e2eDisabled.code, 0);
+      assert.strictEqual(stripAnsi(e2eDisabled.stdout).trim(), 'Agy CLI 版本: v1.5.10');
+      assert.strictEqual(existsSync(e2eCachePath), false, 'Update cache must stay absent when plugin-version is not enabled');
+      assert.strictEqual(releaseServerHits, hitsBeforeDisabled);
+
+      // F2. Non-interactive agy -p -> skipped even when plugin-version is enabled
+      writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
+        ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version'] } }
+      }), 'utf8');
+      const e2eNonInter = await runStatusline(
+        { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+        e2eHome,
+        SCRIPT_PATH,
+        {
+          STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 2002, startTime: 's2', nonInteractive: true }),
+          ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
+        }
+      );
+      assert.strictEqual(e2eNonInter.code, 0);
+      assert.strictEqual(stripAnsi(e2eNonInter.stdout).trim(), 'Agy CLI 版本: v1.5.10 │ 外掛版本: v1.11.0');
+      assert.strictEqual(existsSync(e2eCachePath), false);
+      assert.strictEqual(releaseServerHits, hitsBeforeDisabled);
+
+      // F3. Interactive agy first open with plugin-version enabled across all 4 locales
+      if (!serverPort) {
+        // Pre-seed cache with same session key when sandbox blocks loopback HTTP
+        writeFileSync(e2eCachePath, JSON.stringify({
+          latestVersion: '1.12.0',
+          latestTag: 'v1.12.0',
+          lastSessionKey: '2003:s3',
+          lastSessionStatus: 'ok'
+        }), 'utf8');
+      }
+      const hitsBeforeInteractive = releaseServerHits;
+      const e2eLocaleExpectations = {
+        'zh-tw': { metricLine: 'Agy CLI 版本: v1.5.10 │ 外掛版本: v1.11.0', noticeSub: '外掛有新版本可用（目前 v1.11.0 → 最新 v1.12.0）' },
+        'zh-cn': { metricLine: 'Agy CLI 版本: v1.5.10 │ 插件版本: v1.11.0', noticeSub: '插件有新版本可用（当前 v1.11.0 → 最新 v1.12.0）' },
+        'us': { metricLine: 'Agy CLI Version: v1.5.10 │ Plugin Version: v1.11.0', noticeSub: 'Plugin update available (current v1.11.0 → latest v1.12.0)' },
+        'jp': { metricLine: 'Agy CLI バージョン: v1.5.10 │ プラグイン版: v1.11.0', noticeSub: 'プラグインの新バージョンが利用可能です（現在 v1.11.0 → 最新 v1.12.0）' }
+      };
+      for (const [loc, exp] of Object.entries(e2eLocaleExpectations)) {
+        writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
+          ui: { language: loc, footer: { items: ['cli-version', 'plugin-version'] } }
+        }), 'utf8');
+        const resLoc = await runStatusline(
+          { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+          e2eHome,
+          SCRIPT_PATH,
+          {
+            STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 2003, startTime: 's3', nonInteractive: false }),
+            ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
+          }
+        );
+        assert.strictEqual(resLoc.code, 0);
+        const lines = stripAnsi(resLoc.stdout).trimEnd().split(/\r?\n/);
+        assert.strictEqual(lines.length, 3, `[${loc}] Expected 1 metric line + 2 bottom notice lines, got: ${JSON.stringify(lines)}`);
+        assert.strictEqual(lines[0], exp.metricLine);
+        assert.ok(lines[1].includes(exp.noticeSub), `[${loc}] Unexpected notice line: ${lines[1]}`);
+        assert.strictEqual(lines[2], `! agy plugin install ${PLUGIN_REPO_URL}`);
+      }
+      if (serverPort) {
+        assert.strictEqual(releaseServerHits - hitsBeforeInteractive, 1, 'Live local HTTP server must be hit ONLY ONCE across 4 renders in the same agy session');
+      }
+
+      // F4. Simulate running ! agy plugin install updating plugin.json to 1.12.0 -> version updates & bottom notice disappears
+      writeFileSync(join(e2ePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.12.0' }), 'utf8');
+      writeFileSync(join(e2eHome, '.gemini', 'settings.json'), JSON.stringify({
+        ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version'] } }
+      }), 'utf8');
+      const e2eAfterUpgrade = await runStatusline(
+        { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+        e2eHome,
+        SCRIPT_PATH,
+        {
+          STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 2003, startTime: 's3', nonInteractive: false }),
+          ...(serverPort ? { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` } : {})
+        }
+      );
+      assert.strictEqual(e2eAfterUpgrade.code, 0);
+      const linesAfterUpgrade = stripAnsi(e2eAfterUpgrade.stdout).trimEnd().split(/\r?\n/);
+      assert.deepStrictEqual(linesAfterUpgrade, ['Agy CLI 版本: v1.5.10 │ 外掛版本: v1.12.0']);
+
+      // F5. Real OS process-tree E2E without STATUSLINE_AGY_SESSION_JSON when invoked inside an active interactive agy session
+      if (liveSelfWalk.found && !liveSelfWalk.nonInteractive && serverPort) {
+        const realTreeHome = join(sandboxR35, 'real-tree-home');
+        const realTreePluginDir = join(realTreeHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+        const realTreeCachePath = join(realTreeHome, '.gemini', 'tmp', 'plugin_update_cache.json');
+        mkdirSync(join(realTreeHome, '.gemini', 'tmp'), { recursive: true });
+        mkdirSync(realTreePluginDir, { recursive: true });
+        writeFileSync(join(realTreeHome, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ models: {} }), 'utf8');
+        writeFileSync(join(realTreePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
+        writeFileSync(join(realTreeHome, '.gemini', 'settings.json'), JSON.stringify({
+          ui: { language: 'zh-tw', footer: { items: ['cli-version', 'plugin-version'] } }
+        }), 'utf8');
+
+        const hitsBeforeReal = releaseServerHits;
+        const realRun1 = await runStatusline(
+          { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+          realTreeHome,
+          SCRIPT_PATH,
+          { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` }
+        );
+        const realRun2 = await runStatusline(
+          { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+          realTreeHome,
+          SCRIPT_PATH,
+          { STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${serverPort}/latest` }
+        );
+        assert.strictEqual(realRun1.code, 0);
+        assert.strictEqual(realRun2.code, 0);
+        assert.strictEqual(releaseServerHits - hitsBeforeReal, 1, 'Real OS agy process-tree walk must hit release server ONLY ONCE across two renders');
+        const realCache = JSON.parse(readFileSync(realTreeCachePath, 'utf8'));
+        assert.strictEqual(realCache.lastSessionKey, liveSelfWalk.sessionKey);
+        assert.strictEqual(realCache.lastSessionStatus, 'ok');
+        const realLines1 = stripAnsi(realRun1.stdout).trimEnd().split(/\r?\n/);
+        assert.strictEqual(realLines1.length, 3);
+        assert.strictEqual(realLines1[2], `! agy plugin install ${PLUGIN_REPO_URL}`);
+      }
+
+      console.log("✅ Test R35 passed! (cli-version rename, plugin-version, process-tree tracking & GitHub update check verified)");
+    } finally {
+      if (releaseServer) {
+        try { await new Promise(resolve => releaseServer.close(resolve)); } catch (_) {}
+      }
+      try { rmSync(sandboxR35, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}
+    }
   } catch (err) {
-    console.error("Test R34 execution failed:", err);
+    console.error("Test R35 execution failed:", err);
     testsPassed = false;
   }
 
