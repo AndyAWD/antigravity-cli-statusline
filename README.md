@@ -6,7 +6,7 @@ English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [�
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-An Antigravity plugin that customizes the Antigravity Command-Line Interface (CLI) statusline (footer) — select from 38 real-time indicators, switch between Text (`text`) and Emoji (`emoji`) label styles, arrange them in any order, display capacity bar graphs in merged or separate modes, and apply automatic or manual line wrapping across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
+An Antigravity plugin for both **Antigravity CLI (`agy`)** and **Antigravity App (2.0, `v2.34.0+`)** — monitor 38 real-time indicators (model, 5-hour/7-day/Argon quotas, context token breakdown, Git status, agent state), switch between Text (`text`) and Emoji (`emoji`) label styles, arrange items and line breaks visually with drag-and-drop in Antigravity App or via the 7-step CLI wizard, across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
 
 Comprehensive support across the three core platforms of Google Antigravity (AGY): Antigravity Command-Line Interface (CLI) (`agy`), Antigravity Integrated Development Environment (IDE), and Antigravity 2.0 Desktop Application.
 
@@ -33,8 +33,9 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ### Activation Behavior
 
-- **First-time Enablement**: When enabling the statusline for the first time, run `/statusline <command>` (printed by `configure-statusline.mjs`) inside `agy` to activate it immediately, or restart `agy` CLI (exit and reopen) to load the statusline hook.
-- **Hot Reload**: Once enabled, subsequent changes to indicator ordering, label style (`text` / `emoji`), or display language take effect immediately without restarting the CLI.
+- **First-Open Enablement (CLI)**: When enabling the CLI statusline for the first time, run `/statusline <command>` (printed by `configure-statusline.mjs`) inside `agy` to activate it immediately, or restart `agy` CLI (exit and reopen) to load the statusline hook.
+- **Hot Reload (CLI)**: Once enabled, subsequent changes to indicator ordering, label style (`text` / `emoji`), or display language take effect immediately without restarting the CLI.
+- **Antigravity App (2.0, `v2.34.0+`)**: Works out of the box via Model Context Protocol (MCP) Apps (`ui://statusline/app.html`) with **zero `npm install`** required. Open **Statusline** from **Overview > Plugins > Statusline**, the sidebar **`+`** menu (`aux_pane`), or the left navigation bar (`global`). On first run it automatically inherits your existing CLI `settings.json` layout, and lets you save to the 2.0 panel only or sync back to CLI `settings.json` with optional hook deployment.
 
 ## Key Features
 
@@ -45,6 +46,7 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`#57caff` Blue `100–75%`, `#5cdb6d` Green `74–50%`, `#ffd427` Yellow `49–25%`, `#ff7daf` Pink `24–0%`) alongside model-family brand colors.
 6. **Three-Layer Config Sync & OS Safeguards**: Synchronizes CLI-specific, global, and workspace `settings.json` plus `trusted_hooks.json`, while handling macOS/Linux NVM path resolution and Windows UTF-8 Byte Order Mark (BOM) prevention.
 7. **First-Open Update Check & Manual Hook Sync**: When `plugin-update` (`#38`) is enabled in `ui.footer.items`, checks GitHub Releases once per interactive `agy` CLI launch (skipping `agy -p`), auto-hides while trimming leading/trailing blank lines when up to date, falls back cleanly to cached release info if offline, and renders a localized 2-line update notice (or concise `🆕 vX → vY` in `emoji` style) at its configured position when outdated—completely decoupled from `plugin-version` (`#37`), which renders the statusline version only without disrupting single-line layouts. Hook sync stays manual via `/antigravity-cli-statusline:agy-cli-statusline`, and `diagnose-statusline.mjs` inspects plugin-vs-hook version alignment.
+8. **Native Antigravity 2.0 Visual Panel (MCP Apps)**: Provides an interactive side-panel and full-page dashboard with in-place row-based drag-and-drop layout editing, a 5-category 38-metric drawer with live value previews, collapsible context `tokenBreakdown` stacked bar and usage summary, 1-second live countdowns, legacy order import/export, and dual save buttons (**Apply to 2.0 Panel Only** vs. **Sync to 2.0 + CLI**).
 
 ## Plugin Management
 
@@ -77,47 +79,47 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```text
 antigravity-cli-statusline/
 ├── plugin.json                                     # Antigravity plugin manifest
+├── mcp_config.json                                 # MCP server configuration for Antigravity 2.0
+├── hooks.json                                      # Lifecycle hooks (SessionStart/PreInvocation/PostInvocation/Stop)
 ├── package.json                                    # Package metadata & npm scripts
 ├── LICENSE                                         # MIT License
 ├── CONTRIBUTING.md                                 # 3-language contributor guide
 ├── README.md / README.zh-TW.md / README.zh-CN.md / README.ja.md
+├── assets/
+│   └── logo.svg                                    # Plugin icon for Antigravity App
 ├── docs/
 │   ├── ARCHITECTURE_HANDOVER.md                    # 4-layer architecture & extension guide
 │   ├── images/                                     # Screenshots & generated demo SVGs
 │   └── workshop/                                   # Workshop slides & assets
+├── src/app/                                        # Antigravity 2.0 MCP App frontend source (esbuild)
+├── scripts/
+│   ├── build-app.mjs                               # Bundles src/app/ into scripts/mcp/statusline-app.html
+│   ├── hooks/record-session.mjs                    # Lifecycle hook writer (isolated in ${PLUGIN_DATA})
+│   ├── mcp/                                        # MCP server, LS telemetry, transcript reader & CLI bridge
+│   └── tests/                                      # Antigravity 2.0 hook, MCP & sync-contract tests
 └── skills/
+    ├── agy-app-statusline/
+    │   └── SKILL.md                                # Antigravity 2.0 visual panel entrypoint
     └── agy-cli-statusline/
-        ├── SKILL.md                                # Skill entrypoint specification
-        ├── references/
-        │   ├── config-files.md                     # Three-layer settings.json & command specs
-        │   ├── pitfalls.md                         # Common pitfalls & guardrails
-        │   ├── step4-table-example.md              # Step 4 three-column table template
-        │   ├── technical-specs.md                  # Visual, quota pool & update specs
-        │   └── windows.md                          # Windows UTF-8 / cmd / path specs
-        ├── resources/
-        │   ├── prompts.json                        # Generated 4-locale UI strings
-        │   └── questions.json                      # Generated 5-category wizard questions
-        └── scripts/
-            ├── configure-statusline.mjs            # Config writer & hook deployer
-            ├── diagnose-statusline.mjs             # Config & SHA-256 sync diagnostics
-            ├── fetch-local-quota.mjs               # Background quota & LS cache collector
-            ├── generate-svg-demos.mjs              # Demo SVG generator
-            ├── statusline-quota.mjs                # CLI statusLine hook entrypoint
-            ├── sync-resources.mjs                  # Generates JSON resources from registry
-            ├── test-counters.mjs                   # Counter & defensive integration tests
-            ├── lib/                                # 4-layer zero-dependency ESM modules
-            │   ├── core/
-            │   ├── collectors/
-            │   ├── metrics/
-            │   └── renderers/
-            └── tests/                              # Unit & integration test suite
+        ├── SKILL.md                                # CLI 7-step wizard entrypoint
+        ├── references/                             # Technical specs, config, Windows & pitfalls docs
+        ├── resources/                              # Generated 4-locale prompts & 5-category questions
+        └── scripts/                                # CLI statusLine hook & 4-layer zero-dep ESM modules
 ```
 
 ## Commands and Skills
 
-Once installed, trigger the configuration workflow using the slash command:
+Once installed, use the command matching your interface:
 
-### Configure Statusline
+### 1. Open Visual Statusline Panel (Antigravity 2.0 App)
+
+```text
+/antigravity-cli-statusline:agy-app-statusline
+```
+
+- **When to Use**: In Antigravity App (`v2.34.0+`) to open the interactive **Statusline** monitor and drag-and-drop layout editor directly in the right auxiliary pane (no `ask_question` prompts). You can also open it anytime from **Overview > Plugins > Statusline** or the left sidebar **Plugins > Statusline** (`global`).
+
+### 2. Configure CLI Statusline (Antigravity CLI)
 
 ```text
 /antigravity-cli-statusline:agy-cli-statusline

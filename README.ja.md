@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-Google Antigravity（AGY）向けのプラグインです。Antigravity コマンドラインインターフェース（CLI）（`agy`）のステータスライン（Statusline / Footer）をカスタマイズし、38種類のリアルタイム指標から自由に選択、テキスト（`text`）または絵文字（Emoji）（`emoji`）ラベル表示スタイルの切り替え、表示順序のカスタマイズ、パーセント容量バーグラフの結合または個別表示モードの切り替え、自動および手動改行メカニズムを備え、4つの言語（`us`、`zh-tw`、`zh-cn`、`jp`）に対応しています。
+**Antigravity CLI（`agy`）** と **Antigravity App（2.0、`v2.34.0+`）** の両方に対応したプラグインです。38種類のリアルタイム指標（モデル、5時間／週間／Argon クォータ、コンテキストトークン内訳、Git 状態、エージェント状態）から自由に選択し、テキスト（`text`）または絵文字（`emoji`）スタイルを切り替え、Antigravity 2.0 サイドバーでのドラッグ＆ドロップ並び替え・改行（または CLI の7ステップウィザード）を4言語（`us`、`zh-tw`、`zh-cn`、`jp`）で利用できます。
 
 Google Antigravity の3大コアプラットフォームを包括的にサポート：Antigravity コマンドラインインターフェース（`agy`）、Antigravity 統合開発環境（IDE）、および Antigravity 2.0 デスクトップアプリケーション。
 
@@ -53,8 +53,9 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ### 有効化の挙動
 
-- **初回有効化**：ステータスラインを初めて有効化する場合は、`agy` 上で `configure-statusline.mjs` が出力する `/statusline <command>` を入力して即座に有効化できます。あるいは `agy` CLI を再起動（一度終了して再度開く）してステータスラインフックを読み込んでください。
-- **ホットリロード**：一度有効化された後は、指標の並び順、ラベルスタイル（`text` / `emoji`）、または表示言語を変更しても、CLI を再起動することなく即座に反映されます。
+- **初回有効化（CLI）**：ステータスラインを初めて有効化する場合は、`agy` 上で `configure-statusline.mjs` が出力する `/statusline <command>` を入力して即座に有効化できます。あるいは `agy` CLI を再起動（一度終了して再度開く）してステータスラインフックを読み込んでください。
+- **ホットリロード（CLI）**：一度有効化された後は、指標の並び順、ラベルスタイル（`text` / `emoji`）、または表示言語を変更しても、CLI を再起動することなく即座に反映されます。
+- **Antigravity App（2.0、`v2.34.0+`）**：Model Context Protocol（MCP）Apps（`ui://statusline/app.html`）により **`npm install` 不要**でそのまま動作します。**Overview > Plugins > Statusline**、サイドバーの **`+`** メニュー（補助ペイン）、または左ナビゲーションバーの **Plugins > Statusline**（フルページ）から開けます。初回起動時に既存の CLI `settings.json` レイアウトを自動継承し、2.0 パネルのみ保存または CLI `settings.json` への同期保存（フック配置含む）を選択できます。
 
 ## 主な機能
 
@@ -65,6 +66,7 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 5. **24ビット4段階カラーコーディング**：4つのしきい値（`100–75%` 青、`74–50%` 緑、`49–25%` 黄、`24–0%` 赤）で色が動的に変化し、各 AI モデルファミリー（Gemini、Claude、GPT）専用のブランドアクセントカラーも表示。
 6. **3層設定同期＆OS セーフガード**：CLI 固有設定、グローバル設定、ワークスペース設定の3層の `settings.json` と `trusted_hooks.json` を同期し、macOS/Linux の NVM パス解決や Windows の UTF-8 Byte Order Mark（BOM）防止を安全に処理。
 7. **初回起動時の更新チェック＆手動フック同期**：`ui.footer.items` で `plugin-update`（`#38`）が有効な場合、対話型 `agy` CLI 起動ごとに 1 回だけ GitHub Releases を確認し（`agy -p` はスキップ）、最新時は自動非表示かつ先頭・末尾の純粋な空白行を自動トリム、オフライン時はキャッシュ済みバージョンで比較して、古い場合は配置位置に2行の更新コマンド案内（絵文字スタイルでは `🆕 vX → vY` のコンパクト表示）を出します（`plugin-version` `#37` はステータスラインのバージョン表示のみを行い、単一行レイアウトを崩しません）。フックの同期は `/antigravity-cli-statusline:agy-cli-statusline` による手動実行を維持し、`diagnose-statusline.mjs` でプラグインとフックのバージョン差異を確認可能。
+8. **Antigravity 2.0 ネイティブビジュアルパネル（MCP Apps）**：行ベースのドラッグ＆ドロップレイアウト編集、5カテゴリ38指標ドロワーとリアルタイム値プレビュー、折りたたみ可能な `tokenBreakdown` 積上げバー・使用量サマリー、1秒カウントダウン、旧版並び順インポート／エクスポート、およびデュアル保存ボタンを提供。
 
 ## プラグイン管理
 
@@ -97,47 +99,47 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```text
 antigravity-cli-statusline/
 ├── plugin.json                                     # Antigravity プラグインマニフェスト
+├── mcp_config.json                                 # Antigravity 2.0 MCP サーバー設定
+├── hooks.json                                      # ライフサイクルフック（SessionStart/PreInvocation/PostInvocation/Stop）
 ├── package.json                                    # パッケージメタデータ・npm スクリプト
 ├── LICENSE                                         # MIT ライセンス
 ├── CONTRIBUTING.md                                 # 3言語コントリビューションガイド
 ├── README.md / README.zh-TW.md / README.zh-CN.md / README.ja.md
+├── assets/
+│   └── logo.svg                                    # Antigravity App プラグインアイコン
 ├── docs/
 │   ├── ARCHITECTURE_HANDOVER.md                    # 4層アーキテクチャ引き継ぎ・拡張ガイド
 │   ├── images/                                     # スクリーンショット・生成デモ SVG
 │   └── workshop/                                   # ワークショップ資料・アセット
+├── src/app/                                        # Antigravity 2.0 MCP App フロントエンドソース（esbuild）
+├── scripts/
+│   ├── build-app.mjs                               # src/app/ を単一ファイル scripts/mcp/statusline-app.html にビルド
+│   ├── hooks/record-session.mjs                    # ライフサイクルフック記録スクリプト（${PLUGIN_DATA} 隔離）
+│   ├── mcp/                                        # MCP サーバー、LS テレメトリ、履歴読取・CLI 連携
+│   └── tests/                                      # Antigravity 2.0 Hook・MCP・同期契約テスト
 └── skills/
+    ├── agy-app-statusline/
+    │   └── SKILL.md                                # Antigravity 2.0 ビジュアルパネル入口
     └── agy-cli-statusline/
-        ├── SKILL.md                                # スキルメイン仕様ファイル
-        ├── references/
-        │   ├── config-files.md                     # 3層 settings.json・コマンド仕様
-        │   ├── pitfalls.md                         # よくある落とし穴とガードレール
-        │   ├── step4-table-example.md              # ステップ4の3列テーブル例
-        │   ├── technical-specs.md                  # 視覚・クォータプール・更新仕様
-        │   └── windows.md                          # Windows UTF-8 / cmd / パス仕様
-        ├── resources/
-        │   ├── prompts.json                        # 自動生成の4言語 UI テンプレート
-        │   └── questions.json                      # 自動生成の5カテゴリ設問データ
-        └── scripts/
-            ├── configure-statusline.mjs            # 設定書き込み・フック配置スクリプト
-            ├── diagnose-statusline.mjs             # 設定・SHA-256 同期診断ツール
-            ├── fetch-local-quota.mjs               # バックグラウンドクォータ・LS キャッシュ取得
-            ├── generate-svg-demos.mjs              # デモ SVG 生成スクリプト
-            ├── statusline-quota.mjs                # CLI statusLine フックエントリポイント
-            ├── sync-resources.mjs                  # レジストリから JSON リソース生成
-            ├── test-counters.mjs                   # カウンタ・防御的結合テスト
-            ├── lib/                                # 4層ゼロ依存 ESM コアモジュール
-            │   ├── core/
-            │   ├── collectors/
-            │   ├── metrics/
-            │   └── renderers/
-            └── tests/                              # 単体・結合テストスイート
+        ├── SKILL.md                                # CLI 7ステップウィザード入口
+        ├── references/                             # 技術仕様・設定・Windows・落とし穴ドキュメント
+        ├── resources/                              # 自動生成の4言語 UI テンプレート・5カテゴリ設問
+        └── scripts/                                # CLI statusLine フック・4層ゼロ依存 ESM モジュール
 ```
 
 ## コマンドとスキル
 
-インストール後、スラッシュコマンドを使用して設定ワークフローを起動します：
+インストール後、ご利用の環境に応じたスラッシュコマンドを実行してください：
 
-### 1. ステータスラインの設定
+### 1. ビジュアルステータスラインパネルを開く（Antigravity 2.0 App）
+
+```text
+/antigravity-cli-statusline:agy-app-statusline
+```
+
+- **使用するタイミング**：Antigravity App（`v2.34.0+`）で右補助ペインに **Statusline** ライブモニター＆ドラッグ＆ドロップ編集パネルを直接開くとき（`ask_question` 対話は不要）。**Overview > Plugins > Statusline** や左サイドバーの **Plugins > Statusline** からもいつでも開けます。
+
+### 2. CLI ステータスラインの設定（Antigravity CLI）
 
 ```text
 /antigravity-cli-statusline:agy-cli-statusline

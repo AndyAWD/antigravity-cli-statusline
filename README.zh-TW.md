@@ -6,7 +6,7 @@
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-一個專為 Google Antigravity（AGY）設計的外掛程式（Plugin），用於客製化 Antigravity 命令列介面（Command-Line Interface）（`agy`）的狀態列（Statusline / Footer）——支援從 38 項即時指標中自由勾選、切換文字（`text`）或繪圖符號（Emoji）（`emoji`）標籤顯示風格、自訂排序、切換百分比長條圖的合併或分開顯示模式，並具備自動與手動換行機制，提供 4 種顯示語系（`zh-tw`、`zh-cn`、`us`、`jp`）。
+一個同時支援 **Antigravity 命令列介面（`agy`）** 與 **Antigravity App（2.0，`v2.34.0+`）** 的外掛程式（Plugin）——支援從 38 項即時指標（模型、5 小時／7 日／Argon 額度、脈絡權杖分解、Git 狀態、代理狀態）中自由挑選、切換文字（`text`）或繪圖符號（`emoji`）標籤風格、在 Antigravity 2.0 側邊欄以滑鼠分列拖曳調序與換行（或於 CLI 使用 7 步驟問卷精靈），並提供 4 種顯示語系（`zh-tw`、`zh-cn`、`us`、`jp`）。
 
 全面支援 Google Antigravity 的三大核心平台：Antigravity 命令列介面（`agy`）、Antigravity 整合開發環境（Integrated Development Environment）以及 Antigravity 2.0 桌面應用程式。
 
@@ -33,8 +33,9 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ### 啟用與生效機制
 
-- **初次啟用**：初次安裝或初次啟用狀態列時，可直接於 `agy` 輸入配置腳本輸出的 `/statusline <command>` 立即啟用；若採用重新載入方式，請重新啟動 `agy` 命令列介面（退出後重新開啟）以載入狀態列掛鉤（Hook）。
-- **熱更新（Hot Reload）生效**：先前已啟用狀態列者，後續調整指標順序、切換標籤顯示風格（`text` / `emoji`）或切換語系時，狀態列會直接熱更新生效，無需重新啟動命令列介面。
+- **初次啟用（CLI）**：初次安裝或初次啟用狀態列時，可直接於 `agy` 輸入配置腳本輸出的 `/statusline <command>` 立即啟用；若採用重新載入方式，請重新啟動 `agy` 命令列介面（退出後重新開啟）以載入狀態列掛鉤（Hook）。
+- **熱更新（Hot Reload，CLI）**：先前已啟用狀態列者，後續調整指標順序、切換標籤顯示風格（`text` / `emoji`）或切換語系時，狀態列會直接熱更新生效，無需重新啟動命令列介面。
+- **Antigravity App（2.0，`v2.34.0+`）**：透過模型上下文協定（Model Context Protocol）應用程式（MCP Apps，`ui://statusline/app.html`）開箱即用，**無需執行 `npm install`**。可於 **Overview > Plugins > Statusline**、側邊欄 **`+`** 選單（輔助面板）或左側導覽列 **Plugins > Statusline**（全頁）開啟；首次執行會自動繼承 CLI `settings.json` 排版，並支援「僅套用至 2.0 面板」或「同步套用至 2.0 ＋ CLI」及選配掛鉤部署。
 
 ## 特色亮點
 
@@ -45,6 +46,7 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 5. **24-bit 四階動態色彩**：依據配額剩餘比例或脈絡消耗程度自動切換 4 個色階（`#57caff` 藍色 `100~75%`、`#5cdb6d` 綠色 `74~50%`、`#ffd427` 黃色 `49~25%`、`#ff7daf` 粉紅色 `24~0%`），並為不同人工智慧模型家族套用專屬品牌識別色。
 6. **三層設定檔同步與系統防護**：自動同步命令列介面專屬、全域與專案三層 `settings.json` 及 `trusted_hooks.json`，內建 macOS/Linux NVM 絕對路徑解析與 Windows UTF-8 位元組順序記號（Byte Order Mark）自動剝除機制。
 7. **初次開啟更新檢查與手動掛鉤同步**：當 `ui.footer.items` 啟用 `plugin-update`（`#38`）時，每次啟動互動式 `agy` 命令列介面會自動檢查一次 GitHub Releases（略過 `agy -p`），無更新自動隱藏並修剪頭尾純空白行，離線時沿用快取版本比對，落後時於設定位置獨立顯示兩行在地化更新指令提醒（繪圖符號模式精簡顯示 `🆕 vX → vY`），且與僅顯示狀態列版本號的 `plugin-version`（`#37`）完全解耦、不影響單行排版。掛鉤程式碼維持由 `/antigravity-cli-statusline:agy-cli-statusline` 手動同步，並可透過 `diagnose-statusline.mjs` 檢查外掛與掛鉤版本差異。
+8. **Antigravity 2.0 原生視覺化面板（MCP Apps）**：提供側邊輔助面板與全頁儀表板，支援就地分列拖曳排版、`5 大分類 38 項指標` 抽屜與即時數值預覽、可收合權杖分類明細（`tokenBreakdown`）堆疊條、1 秒即時倒數、舊版排序語法匯入／匯出，以及雙按鈕獨立或同步儲存。
 
 ## 如何管理與切換外掛程式
 
@@ -77,47 +79,47 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```text
 antigravity-cli-statusline/
 ├── plugin.json                                     # Antigravity 外掛清單
+├── mcp_config.json                                 # Antigravity 2.0 MCP 伺服器設定
+├── hooks.json                                      # 生命週期掛鉤（SessionStart/PreInvocation/PostInvocation/Stop）
 ├── package.json                                    # 套件中繼資料與 npm 腳本
 ├── LICENSE                                         # MIT 授權條款
 ├── CONTRIBUTING.md                                 # 三語系貢獻指南
 ├── README.md / README.zh-TW.md / README.zh-CN.md / README.ja.md
+├── assets/
+│   └── logo.svg                                    # Antigravity App 外掛圖示
 ├── docs/
 │   ├── ARCHITECTURE_HANDOVER.md                    # 四層架構交接與擴充手冊
 │   ├── images/                                     # 實機截圖與動態範例向量圖
 │   └── workshop/                                   # 工作坊簡報與素材
+├── src/app/                                        # Antigravity 2.0 MCP App 前端原始碼（esbuild）
+├── scripts/
+│   ├── build-app.mjs                               # 編譯 src/app/ 為單一檔案 scripts/mcp/statusline-app.html
+│   ├── hooks/record-session.mjs                    # 生命週期掛鉤寫入腳本（隔離於 ${PLUGIN_DATA}）
+│   ├── mcp/                                        # MCP 伺服器、LS 遙測、對話紀錄讀取與 CLI 橋接
+│   └── tests/                                      # Antigravity 2.0 Hook、MCP 與同步契約測試
 └── skills/
+    ├── agy-app-statusline/
+    │   └── SKILL.md                                # Antigravity 2.0 視覺化面板技能入口
     └── agy-cli-statusline/
-        ├── SKILL.md                                # 技能主檔規格
-        ├── references/
-        │   ├── config-files.md                     # 三層 settings.json 與命令規範
-        │   ├── pitfalls.md                         # 常見陷阱與安全護欄
-        │   ├── step4-table-example.md              # 步驟 4 三欄對照表範本
-        │   ├── technical-specs.md                  # 視覺、配額池與更新規格
-        │   └── windows.md                          # Windows UTF-8 / cmd / 路徑規範
-        ├── resources/
-        │   ├── prompts.json                        # 自動生成的四語系對話範本
-        │   └── questions.json                      # 自動生成的五大分類問卷選項
-        └── scripts/
-            ├── configure-statusline.mjs            # 設定檔同步與掛鉤部署腳本
-            ├── diagnose-statusline.mjs             # 設定檔與 SHA-256 同步診斷工具
-            ├── fetch-local-quota.mjs               # 背景配額與語言伺服器快取採集
-            ├── generate-svg-demos.mjs              # 範例向量圖生成腳本
-            ├── statusline-quota.mjs                # CLI statusLine 掛鉤入口腳本
-            ├── sync-resources.mjs                  # 由註冊表生成 JSON 資源檔
-            ├── test-counters.mjs                   # 計數器與防禦性整合測試腳本
-            ├── lib/                                # 四層零相依 ESM 核心模組
-            │   ├── core/
-            │   ├── collectors/
-            │   ├── metrics/
-            │   └── renderers/
-            └── tests/                              # 單元與整合測試套件
+        ├── SKILL.md                                # CLI 七步驟問卷精靈入口
+        ├── references/                             # 技術規格、設定檔、Windows 與陷阱文件
+        ├── resources/                              # 自動生成的四語系對話範本與五大分類問卷
+        └── scripts/                                # CLI statusLine 掛鉤與四層零相依 ESM 模組
 ```
 
 ## 指令功能說明
 
-安裝完成後，可在任何 AGY 介面透過語意對話或輸入對應的斜線指令（Slash Command）觸發：
+安裝完成後，可依目前使用的介面執行對應斜線指令（Slash Command）：
 
-### 狀態列設定技能（Configure Statusline）
+### 1. 開啟視覺化狀態列面板（Antigravity 2.0 App）
+
+```text
+/antigravity-cli-statusline:agy-app-statusline
+```
+
+- **使用情境**：在 Antigravity App（`v2.34.0+`）直接於右側輔助面板開啟 **Statusline** 即時監控與分列拖曳排版介面（不需回答任何 `ask_question` 問卷）；亦可隨時從右上角 **Overview > Plugins > Statusline** 或左側導覽列 **Plugins > Statusline** 開啟。
+
+### 2. 狀態列設定技能（Antigravity CLI）
 
 ```text
 /antigravity-cli-statusline:agy-cli-statusline

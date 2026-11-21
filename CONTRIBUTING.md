@@ -34,6 +34,9 @@ This project uses a 4-layer modular architecture (`core/`, `collectors/`, `metri
 
 ### 4. Modify `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs` (and metric collectors)
 - Add `'[LANG_CODE]'` translations for `"No VC"` (`getGitBranch`), `"Unknown"`, `"None"` / `"N/A"`, `"uncommitted"` / `"no changes"` (`vcsDirtyLabel`), and sandbox status strings (`off` / `on (net)` / `on (no-net)`).
+
+### 5. Update `src/app/i18n.js` & Rebuild Antigravity 2.0 App
+- Add `'[LANG_CODE]'` shell strings to `APP_UI_STRINGS` in `src/app/i18n.js` matching all keys of `APP_UI_STRINGS.us`, then run `npm run build:app`.
 ````
 
 ### 🛠️ Adding a New Statusline Indicator
@@ -54,11 +57,14 @@ Run the resource sync, built-in test suite, plugin validation, and diagnostic sc
 # Regenerate questions.json & prompts.json from registry.mjs
 npm run sync:resources
 
-# Run unit tests (skills/agy-cli-statusline/scripts/tests/*.test.mjs) and counter checks
+# Rebuild Antigravity 2.0 MCP App HTML bundle
+npm run build:app
+
+# Run unit tests (skills/agy-cli-statusline/scripts/tests/*.test.mjs, scripts/tests/*.test.mjs) and counter checks
 npm test
 
-# Validate plugin manifest and SKILL.md
-agy plugin validate .
+# Validate plugin manifest, MCP config, hooks, and SKILL.md
+agy plugin validate --strict .
 
 # Run the cross-platform diagnostic script
 node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
@@ -110,6 +116,9 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs`（及資料採集模組）
 - 補上 `'[LANG_CODE]'` 對應的「無版本控制（No VC）」（`getGitBranch`）、「未知」、「無」、「未提交 / 無變更」（`vcsDirtyLabel`）與沙盒狀態文字（`off` / `on (net)` / `on (no-net)`）。
+
+### 5. 更新 `src/app/i18n.js` 並重新編譯 Antigravity 2.0 面板
+- 於 `src/app/i18n.js` 的 `APP_UI_STRINGS` 補上與 `us` 完全一致鍵值的 `'[LANG_CODE]'` 外殼翻譯，並執行 `npm run build:app`。
 ````
 
 ### 🛠️ 新增狀態列指標指南
@@ -130,11 +139,14 @@ We welcome contributions! If you have ideas for new features, bug fixes, or impr
 # 由 registry.mjs 重新生成 questions.json 與 prompts.json
 npm run sync:resources
 
-# 執行所有單元測試（skills/agy-cli-statusline/scripts/tests/*.test.mjs）與計數器驗證
+# 重新編譯 Antigravity 2.0 MCP App 單一 HTML
+npm run build:app
+
+# 執行所有單元測試（skills/agy-cli-statusline/scripts/tests/*.test.mjs、scripts/tests/*.test.mjs）與計數器驗證
 npm test
 
-# 驗證外掛清單與 SKILL.md
-agy plugin validate .
+# 嚴格驗證外掛清單、MCP、Hooks 與 SKILL.md
+agy plugin validate --strict .
 
 # 執行跨平台環境診斷腳本
 node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
@@ -186,6 +198,9 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 
 ### 4. 修改 `skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs`（及数据采集模块）
 - 补上 `'[LANG_CODE]'` 对应的“无版本控制（No VC）”（`getGitBranch`）、“未知”、“无”、“未提交 / 无变更”（`vcsDirtyLabel`）与沙盒状态文本（`off` / `on (net)` / `on (no-net)`）。
+
+### 5. 更新 `src/app/i18n.js` 并重新编译 Antigravity 2.0 面板
+- 在 `src/app/i18n.js` 的 `APP_UI_STRINGS` 补上与 `us` 完全一致键值的 `'[LANG_CODE]'` 外壳翻译，并运行 `npm run build:app`。
 ````
 
 ### 🛠️ 新增状态栏指标指南
@@ -206,11 +221,14 @@ node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 # 由 registry.mjs 重新生成 questions.json 与 prompts.json
 npm run sync:resources
 
-# 运行所有单元测试（skills/agy-cli-statusline/scripts/tests/*.test.mjs）与计数器验证
+# 重新编译 Antigravity 2.0 MCP App 单一 HTML
+npm run build:app
+
+# 运行所有单元测试（skills/agy-cli-statusline/scripts/tests/*.test.mjs、scripts/tests/*.test.mjs）与计数器验证
 npm test
 
-# 验证插件清单与 SKILL.md
-agy plugin validate .
+# 严格验证插件清单、MCP、Hooks 与 SKILL.md
+agy plugin validate --strict .
 
 # 运行跨平台环境诊断脚本
 node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
