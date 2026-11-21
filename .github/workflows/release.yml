@@ -18,10 +18,10 @@ jobs:
       - name: Prepare Extension Directory
         run: |
           mkdir -p dist/antigravity-cli-statusline
-          cp plugin.json dist/antigravity-cli-statusline/
+          cp plugin.json mcp_config.json hooks.json dist/antigravity-cli-statusline/
           cp README.md README.zh-TW.md README.zh-CN.md README.ja.md LICENSE dist/antigravity-cli-statusline/
-          cp -r skills dist/antigravity-cli-statusline/
-          cp -r docs dist/antigravity-cli-statusline/
+          cp -r assets scripts skills docs dist/antigravity-cli-statusline/
+          rm -rf dist/antigravity-cli-statusline/node_modules
 
       - name: Create Archive
         run: |
