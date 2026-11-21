@@ -1,8 +1,29 @@
 {
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "antigravity-cli-statusline",
+  "displayName": "Statusline",
   "version": "1.12.0",
-  "description": "Customize the Antigravity CLI statusline (footer) with quota, token, context, model, git branch and more across macOS / Linux / Windows.",
-  "author": "andyawd",
+  "description": "Monitor real-time model quota, context token breakdown, Git status, and agent activity in Antigravity App, and visually customize your statusline layout across 4 locales.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Open the Statusline monitor panel to inspect my current quota and context usage",
+    "Customize my statusline indicator order, line breaks, and display language",
+    "Check my current model quota, context token breakdown, and workspace Git status"
+  ],
+  "author": {
+    "name": "andyawd",
+    "url": "https://github.com/AndyAWD"
+  },
+  "homepage": "https://github.com/AndyAWD/antigravity-cli-statusline",
+  "repository": "https://github.com/AndyAWD/antigravity-cli-statusline",
   "license": "MIT",
-  "homepage": "https://github.com/AndyAWD/antigravity-cli-statusline"
+  "keywords": [
+    "statusline",
+    "quota",
+    "context",
+    "tokens",
+    "monitor",
+    "mcp-app",
+    "cli"
+  ]
 }

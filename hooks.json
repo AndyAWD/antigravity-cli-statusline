@@ -1,0 +1,33 @@
+{
+  "statusline-session-tracker": {
+    "enabled": true,
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node ./scripts/hooks/record-session.mjs SessionStart",
+        "timeout": 5
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./scripts/hooks/record-session.mjs PreInvocation",
+        "timeout": 5
+      }
+    ],
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "node ./scripts/hooks/record-session.mjs PostInvocation",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ./scripts/hooks/record-session.mjs Stop",
+        "timeout": 5
+      }
+    ]
+  }
+}

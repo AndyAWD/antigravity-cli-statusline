@@ -12,7 +12,8 @@ description: 設定 Antigravity 命令列介面（Command-Line Interface）（ag
 1. **禁止以 `read_file`、`write_file` 或 `edit_file` 存取 `~/.gemini/` 下的 `settings.json`**：受系統保護邊界限制，步驟 1–7 期間嚴禁直接讀寫設定檔，亦無須讀取 `scripts/*.mjs` 原始碼；所有讀寫與位元組順序記號（Byte Order Mark）清理一律於步驟 5 透過 `configure-statusline.mjs` 完成。
 2. **禁止憑空生成或竄改掛鉤（Hook）腳本**：`statusline-quota.mjs`、`fetch-local-quota.mjs` 與 `hooks/lib/` 僅能透過 `configure-statusline.mjs` 部署，嚴禁自行編寫或修改邏輯。
 3. **動態解析 `<SKILL_DIR>`**：本 `SKILL.md` 所在目錄即為 `<SKILL_DIR>`（如 `~/.gemini/config/plugins/antigravity-cli-statusline/skills/agy-cli-statusline` 或 `skills/agy-cli-statusline`）。讀取 `resources/*.json` 或執行 `scripts/*.mjs` 時必須使用 `<SKILL_DIR>` 完整路徑。
-4. **參考文件**：
+4. **純 CLI 專用保護禁令**：本技能專用於設定 Antigravity 命令列介面（`agy`）底部狀態列，必須完整執行下方步驟 1–7 並由 `configure-statusline.mjs` 寫入設定，**嚴禁**改呼叫 `statusline_dashboard` 或 `statusline_save_config` 等 MCP 工具替代。
+5. **參考文件**：
    - [`references/technical-specs.md`](references/technical-specs.md) — 四階配色、長條圖合併、時間格式、`plugin-version` 更新檢查與四層模組規格
    - [`references/step4-table-example.md`](references/step4-table-example.md) — 步驟 4 全選 37 項三欄 13 列表格完整範例
    - [`references/windows.md`](references/windows.md) — Windows 無位元組順序記號編碼、無雙引號路徑與子行程規範
