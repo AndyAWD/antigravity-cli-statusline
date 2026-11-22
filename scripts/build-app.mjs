@@ -27,7 +27,7 @@ export function computeSrcAppSha256(srcDir = SRC_APP_DIR) {
 
 export async function buildAppHtml() {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-  const pkgVersion = String(pkg.version || '1.12.0');
+  const pkgVersion = String(pkg.version || '1.13.0');
 
   const result = await esbuild.build({
     entryPoints: [path.join(SRC_APP_DIR, 'main.js')],
