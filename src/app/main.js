@@ -3,11 +3,20 @@ import {
   applyDocumentTheme,
   applyHostStyleVariables
 } from '@modelcontextprotocol/ext-apps';
-import { groupRowWithAdjacentMerges, itemsToRows, rowsToItems } from './drag-rows.js';
+import {
+  groupRowWithAdjacentMerges,
+  isDashboardSnapshot,
+  itemsToRows,
+  moveBlockInRows,
+  moveRowInRows,
+  rowsEqual,
+  rowsToItems
+} from './drag-rows.js';
 import { getUiStrings } from './i18n.js';
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.12.0';
 const app = new App({ name: 'Statusline', version: APP_VERSION }, {});
+const MAX_UNDO_HISTORY = 30;
 
 const state = {
   snapshot: null,
@@ -19,6 +28,8 @@ const state = {
   editTimeFormat: 'smart',
   editBarLength: 10,
   editLang: 'zh-tw',
+  editHistory: [],
+  suppressNextClick: false,
   deployHooks: false,
   searchQuery: '',
   inFlight: false,
@@ -190,6 +201,32 @@ function computeDraftOrderExpressions(items = [], itemStyles = {}, labelStyle = 
   };
 }
 
+function cloneEditSnapshot() {
+  return {
+    editRows: state.editRows.map(r => [...r]),
+    editItemStyles: { ...state.editItemStyles },
+    editLabelStyle: state.editLabelStyle,
+    editLang: state.editLang
+  };
+}
+
+function pushEditUndoSnapshot() {
+  state.editHistory.push(cloneEditSnapshot());
+  if (state.editHistory.length > MAX_UNDO_HISTORY) {
+    state.editHistory.shift();
+  }
+}
+
+function undoEdit() {
+  if (!state.editMode || state.editHistory.length === 0) return;
+  const prev = state.editHistory.pop();
+  state.editRows = prev.editRows;
+  state.editItemStyles = prev.editItemStyles;
+  state.editLabelStyle = prev.editLabelStyle;
+  if (prev.editLang) state.editLang = prev.editLang;
+  render();
+}
+
 function syncEditDraftFromSnapshot(snap) {
   state.editRows = itemsToRows(snap.layout.items);
   state.editItemStyles = { ...(snap.layout.itemStyles || {}) };
@@ -197,10 +234,11 @@ function syncEditDraftFromSnapshot(snap) {
   state.editTimeFormat = snap.layout.timeFormat || 'smart';
   state.editBarLength = snap.layout.barLength || 10;
   state.editLang = snap.layout.lang || 'zh-tw';
+  state.editHistory = [];
 }
 
 async function callToolSafe(name, args) {
-  if (state.inFlight && name === 'statusline_dashboard') return null;
+  if (state.inFlight && name === 'statusline_dashboard' && !args?.forceRefresh) return null;
   if (name === 'statusline_dashboard') state.inFlight = true;
   try {
     const res = await app.callServerTool({ name, arguments: args });
@@ -210,7 +248,7 @@ async function callToolSafe(name, args) {
       showToast(errMsg);
       return null;
     }
-    if (res?.structuredContent?.layout) {
+    if (name === 'statusline_dashboard' && isDashboardSnapshot(res?.structuredContent)) {
       state.snapshot = res.structuredContent;
       if (!state.editMode) syncEditDraftFromSnapshot(state.snapshot);
       render();
@@ -258,99 +296,255 @@ function scheduleAutoRefresh() {
   }
 }
 
-function startDrag(ev, payload) {
-  ev.preventDefault();
-  const handle = ev.currentTarget;
-  if (handle && handle.setPointerCapture) {
-    try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
-  }
+function clearDropVisuals() {
+  document.querySelectorAll('.drop-active, .drop-before, .drop-after').forEach((n) => {
+    n.classList.remove('drop-active', 'drop-before', 'drop-after');
+  });
+}
 
-  const ghost = el('div', { className: 'drag-ghost', textContent: payload.label });
-  ghost.style.left = `${ev.clientX + 10}px`;
-  ghost.style.top = `${ev.clientY + 10}px`;
-  document.body.appendChild(ghost);
-  state.dragState = { ...payload, ghost };
+function startDrag(ev, payload) {
+  if (ev.button !== 0) return;
+
+  const captureEl = ev.currentTarget;
+  const pointerId = ev.pointerId;
+  const startX = ev.clientX;
+  const startY = ev.clientY;
+  let lastClientX = startX;
+  let lastClientY = startY;
+  let draggingStarted = false;
+  let ghost = null;
+  let currentDropTarget = null;
+  let scrollRafId = null;
+  const containerEl = document.querySelector('.rows-container');
+
+  const isEffectiveBlockDrop = (candidate) => !rowsEqual(moveBlockInRows(state.editRows, payload, candidate), state.editRows);
+
+  const updateHitTarget = (clientX, clientY) => {
+    clearDropVisuals();
+    currentDropTarget = null;
+
+    const hit = document.elementFromPoint(clientX, clientY);
+    if (!hit) return;
+
+    if (payload.dragKind === 'block') {
+      const chipEl = hit.closest('[data-drop-kind="chip"]');
+      if (chipEl) {
+        if (payload.sourceEl && chipEl === payload.sourceEl) return;
+        const rowIdx = parseInt(chipEl.getAttribute('data-row') || '0', 10);
+        const colIdx = parseInt(chipEl.getAttribute('data-col') || '0', 10);
+        const rect = chipEl.getBoundingClientRect();
+        const position = clientX < (rect.left + rect.width / 2) ? 'before' : 'after';
+        const candidate = { kind: 'chip', rowIdx, colIdx, position };
+        if (isEffectiveBlockDrop(candidate)) {
+          chipEl.classList.add(position === 'before' ? 'drop-before' : 'drop-after');
+          currentDropTarget = candidate;
+        }
+        return;
+      }
+
+      const betweenEl = hit.closest('[data-drop-kind="between-rows"]:not(.drop-slot-between-tail):not(.drop-slot-noop)');
+      if (betweenEl) {
+        const candidate = {
+          kind: 'between-rows',
+          rowIdx: parseInt(betweenEl.getAttribute('data-row') || '0', 10)
+        };
+        if (isEffectiveBlockDrop(candidate)) {
+          betweenEl.classList.add('drop-active');
+          currentDropTarget = candidate;
+        }
+        return;
+      }
+
+      const newRowEl = hit.closest('[data-drop-kind="new-row"]');
+      if (newRowEl) {
+        const candidate = { kind: 'new-row' };
+        if (isEffectiveBlockDrop(candidate)) {
+          newRowEl.classList.add('drop-active');
+          currentDropTarget = candidate;
+        }
+        return;
+      }
+
+      const rowEl = hit.closest('[data-drop-kind="row"]');
+      if (rowEl) {
+        const candidate = {
+          kind: 'row',
+          rowIdx: parseInt(rowEl.getAttribute('data-row') || '0', 10)
+        };
+        if (isEffectiveBlockDrop(candidate)) {
+          rowEl.classList.add('drop-active');
+          currentDropTarget = candidate;
+        }
+      }
+      return;
+    }
+
+    if (payload.dragKind === 'row') {
+      let insertRowIdx = null;
+      const betweenEl = hit.closest('[data-drop-kind="between-rows"]');
+      if (betweenEl) {
+        insertRowIdx = parseInt(betweenEl.getAttribute('data-row') || '0', 10);
+      } else {
+        const rowEl = hit.closest('[data-drop-kind="row"]');
+        if (rowEl) {
+          const rIdx = parseInt(rowEl.getAttribute('data-row') || '0', 10);
+          const rect = rowEl.getBoundingClientRect();
+          insertRowIdx = clientY < (rect.top + rect.height / 2) ? rIdx : rIdx + 1;
+        }
+      }
+
+      if (
+        insertRowIdx !== null &&
+        insertRowIdx !== payload.rowIdx &&
+        insertRowIdx !== payload.rowIdx + 1
+      ) {
+        const targetSlot = document.querySelector(
+          `[data-drop-kind="between-rows"][data-row="${insertRowIdx}"]`
+        );
+        if (targetSlot) targetSlot.classList.add('drop-active');
+        currentDropTarget = { kind: 'row-slot', insertRowIdx };
+      }
+    }
+  };
+
+  const tickAutoScroll = () => {
+    if (!draggingStarted) return;
+    const EDGE_THRESHOLD = 56;
+    const SCROLL_SPEED = 10;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    let deltaY = 0;
+
+    if (lastClientY < EDGE_THRESHOLD) {
+      const ratio = Math.max(0.2, (EDGE_THRESHOLD - lastClientY) / EDGE_THRESHOLD);
+      deltaY = -Math.ceil(SCROLL_SPEED * ratio);
+    } else if (vh > 0 && lastClientY > vh - EDGE_THRESHOLD) {
+      const ratio = Math.max(0.2, (lastClientY - (vh - EDGE_THRESHOLD)) / EDGE_THRESHOLD);
+      deltaY = Math.ceil(SCROLL_SPEED * ratio);
+    }
+
+    if (deltaY !== 0) {
+      window.scrollBy(0, deltaY);
+      updateHitTarget(lastClientX, lastClientY);
+    }
+    scrollRafId = window.requestAnimationFrame(tickAutoScroll);
+  };
+
+  const beginDragSession = (moveEv) => {
+    draggingStarted = true;
+    window.getSelection?.()?.removeAllRanges?.();
+    if (captureEl && captureEl.setPointerCapture) {
+      try { captureEl.setPointerCapture(pointerId); } catch (_) {}
+    }
+
+    if (
+      payload.dragKind === 'row' ||
+      (payload.dragKind === 'block' && payload.from === 'row' && (state.editRows[payload.rowIdx]?.length || 0) <= 1)
+    ) {
+      document.querySelector(
+        `[data-drop-kind="between-rows"][data-row="${payload.rowIdx}"]`
+      )?.classList.add('drop-slot-noop');
+      document.querySelector(
+        `[data-drop-kind="between-rows"][data-row="${payload.rowIdx + 1}"]`
+      )?.classList.add('drop-slot-noop');
+    }
+
+    ghost = el('div', { className: 'drag-ghost', textContent: payload.label });
+    ghost.style.left = `${moveEv.clientX + 12}px`;
+    ghost.style.top = `${moveEv.clientY + 12}px`;
+    document.body.appendChild(ghost);
+
+    payload.sourceEl?.classList.add(payload.dragKind === 'row' ? 'row-dragging' : 'chip-dragging');
+    containerEl?.classList.add(payload.dragKind === 'row' ? 'is-dragging-row' : 'is-dragging-block');
+    state.dragState = { ...payload, ghost };
+    scrollRafId = window.requestAnimationFrame(tickAutoScroll);
+  };
 
   const onMove = (moveEv) => {
-    ghost.style.left = `${moveEv.clientX + 10}px`;
-    ghost.style.top = `${moveEv.clientY + 10}px`;
-    document.querySelectorAll('.drop-active').forEach(n => n.classList.remove('drop-active'));
-    const hit = document.elementFromPoint(moveEv.clientX, moveEv.clientY);
-    const zone = hit?.closest('[data-drop-kind]');
-    if (zone) zone.classList.add('drop-active');
+    lastClientX = moveEv.clientX;
+    lastClientY = moveEv.clientY;
+
+    if (!draggingStarted) {
+      if (Math.hypot(moveEv.clientX - startX, moveEv.clientY - startY) < 4) {
+        return;
+      }
+      beginDragSession(moveEv);
+    }
+
+    if (ghost) {
+      ghost.style.left = `${moveEv.clientX + 12}px`;
+      ghost.style.top = `${moveEv.clientY + 12}px`;
+    }
+    updateHitTarget(moveEv.clientX, moveEv.clientY);
   };
 
   const cleanup = () => {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onCancel);
-    document.querySelectorAll('.drop-active').forEach(n => n.classList.remove('drop-active'));
-    ghost.remove();
+    window.removeEventListener('blur', onBlur);
+    window.removeEventListener('keydown', onKeyDown);
+    if (captureEl && captureEl.releasePointerCapture) {
+      try {
+        if (!captureEl.hasPointerCapture || captureEl.hasPointerCapture(pointerId)) {
+          captureEl.releasePointerCapture(pointerId);
+        }
+      } catch (_) {}
+    }
+    if (scrollRafId !== null) {
+      window.cancelAnimationFrame(scrollRafId);
+      scrollRafId = null;
+    }
+    clearDropVisuals();
+    document.querySelectorAll('.drop-slot-noop').forEach((n) => n.classList.remove('drop-slot-noop'));
+    payload.sourceEl?.classList.remove('chip-dragging', 'row-dragging');
+    containerEl?.classList.remove('is-dragging-block', 'is-dragging-row');
+    if (ghost) ghost.remove();
     state.dragState = null;
   };
 
   const onUp = (upEv) => {
-    const hit = document.elementFromPoint(upEv.clientX, upEv.clientY);
-    const zone = hit?.closest('[data-drop-kind]');
+    const wasDragging = draggingStarted;
+    if (wasDragging) {
+      updateHitTarget(upEv.clientX, upEv.clientY);
+    }
+    const dropToApply = currentDropTarget;
     cleanup();
-    if (zone) {
-      applyDrop(payload, zone);
+
+    if (wasDragging) {
+      state.suppressNextClick = true;
+      setTimeout(() => { state.suppressNextClick = false; }, 50);
+      if (dropToApply) {
+        applyDrop(payload, dropToApply);
+      }
     }
   };
 
   const onCancel = () => cleanup();
+  const onBlur = () => cleanup();
+  const onKeyDown = (kEv) => {
+    if (kEv.key === 'Escape') cleanup();
+  };
 
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp, { once: true });
   window.addEventListener('pointercancel', onCancel, { once: true });
+  window.addEventListener('blur', onBlur, { once: true });
+  window.addEventListener('keydown', onKeyDown);
 }
 
-function applyDrop(payload, zone) {
-  const kind = zone.getAttribute('data-drop-kind');
-  const targetRow = parseInt(zone.getAttribute('data-row') || '0', 10);
-  const targetCol = parseInt(zone.getAttribute('data-col') || '-1', 10);
-  const rows = state.editRows.map(r => [...r]);
-  const id = payload.id;
-  let emptiedSrcRowIdx = -1;
-
-  if (payload.from === 'row') {
-    const srcRow = rows[payload.rowIdx];
-    const hadItems = Boolean(srcRow && srcRow.length > 0);
-    if (srcRow) srcRow.splice(payload.colIdx, 1);
-    if (hadItems && srcRow && srcRow.length === 0) {
-      emptiedSrcRowIdx = payload.rowIdx;
-    }
-  } else if (payload.from === 'drawer') {
-    // 若已在其他列存在則先移除避免重複
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      const idx = r.indexOf(id);
-      if (idx !== -1) {
-        r.splice(idx, 1);
-        if (r.length === 0) emptiedSrcRowIdx = i;
-      }
-    }
+function applyDrop(payload, dropTarget) {
+  let nextRows;
+  if (payload.dragKind === 'row' && dropTarget.kind === 'row-slot') {
+    nextRows = moveRowInRows(state.editRows, payload.rowIdx, dropTarget.insertRowIdx);
+  } else if (payload.dragKind === 'block') {
+    nextRows = moveBlockInRows(state.editRows, payload, dropTarget);
+  } else {
+    return;
   }
 
-  if (kind === 'new-row') {
-    rows.push([id]);
-  } else if (kind === 'between-rows') {
-    rows.splice(targetRow, 0, [id]);
-    if (emptiedSrcRowIdx >= targetRow) emptiedSrcRowIdx++;
-  } else if (kind === 'row' || kind === 'chip') {
-    const dest = rows[targetRow] || (rows[targetRow] = []);
-    if (targetCol >= 0 && targetCol <= dest.length) {
-      dest.splice(targetCol, 0, id);
-    } else {
-      dest.push(id);
-    }
-  }
-
-  if (emptiedSrcRowIdx >= 0 && rows[emptiedSrcRowIdx] && rows[emptiedSrcRowIdx].length === 0 && rows.length > 1) {
-    rows.splice(emptiedSrcRowIdx, 1);
-  }
-
-  state.editRows = rows.length > 0 ? rows : [[]];
+  if (rowsEqual(nextRows, state.editRows)) return;
+  pushEditUndoSnapshot();
+  state.editRows = nextRows;
   render();
 }
 
@@ -383,16 +577,30 @@ function renderMonitorView(root, snap, t) {
     root.appendChild(banner);
   }
 
-  const container = el('div', { className: 'rows-container' });
+  const container = el('div', {
+    className: state.editMode ? 'rows-container is-edit-mode' : 'rows-container'
+  });
 
   if (state.editMode) {
+    container.appendChild(el('div', { className: 'edit-guide-bar' }, [
+      el('span', { className: 'edit-guide-text', textContent: t.editGuide }),
+      el('button', {
+        className: 'btn btn-sm',
+        textContent: `↶ ${t.undo}`,
+        disabled: state.editHistory.length === 0 ? 'disabled' : null,
+        onClick: () => undoEdit()
+      })
+    ]));
+
     rows.forEach((row, rIdx) => {
       container.appendChild(el('div', {
         className: 'drop-slot-between',
         'data-drop-kind': 'between-rows',
-        'data-row': String(rIdx),
-        textContent: t.dropBetweenRows
-      }));
+        'data-row': String(rIdx)
+      }, [
+        el('span', { className: 'drop-label-block', textContent: t.dropBetweenRows }),
+        el('span', { className: 'drop-label-row', textContent: t.dropRowHere })
+      ]));
 
       const rowBox = el('div', {
         className: 'edit-row-box',
@@ -400,38 +608,34 @@ function renderMonitorView(root, snap, t) {
         'data-row': String(rIdx)
       });
 
+      const rowDragHandle = el('div', {
+        className: 'edit-row-drag-handle',
+        title: t.dragRowTip,
+        onPointerdown: (ev) => {
+          if (ev.button !== 0) return;
+          if (ev.target?.closest?.('button, input, select, textarea, a, label')) return;
+          startDrag(ev, {
+            dragKind: 'row',
+            rowIdx: rIdx,
+            sourceEl: rowBox,
+            label: t.rowLabel.replace('{n}', String(rIdx + 1))
+          });
+        }
+      }, [
+        el('span', { className: 'chip-handle', textContent: '⋮⋮' }),
+        el('span', { className: 'edit-row-title', textContent: t.rowLabel.replace('{n}', String(rIdx + 1)) }),
+        el('span', { className: 'edit-row-count', textContent: t.rowItemCount.replace('{count}', String(row.length)) })
+      ]);
+
       const header = el('div', { className: 'edit-row-header' }, [
-        el('span', { textContent: t.rowLabel.replace('{n}', String(rIdx + 1)) }),
+        rowDragHandle,
         el('div', { className: 'topbar-group' }, [
-          rIdx > 0
-            ? el('button', {
-                className: 'btn btn-sm',
-                textContent: `↑ ${t.moveUp}`,
-                onClick: () => {
-                  const copy = [...state.editRows];
-                  [copy[rIdx - 1], copy[rIdx]] = [copy[rIdx], copy[rIdx - 1]];
-                  state.editRows = copy;
-                  render();
-                }
-              })
-            : null,
-          rIdx < rows.length - 1
-            ? el('button', {
-                className: 'btn btn-sm',
-                textContent: `↓ ${t.moveDown}`,
-                onClick: () => {
-                  const copy = [...state.editRows];
-                  [copy[rIdx], copy[rIdx + 1]] = [copy[rIdx + 1], copy[rIdx]];
-                  state.editRows = copy;
-                  render();
-                }
-              })
-            : null,
           rIdx > 0
             ? el('button', {
                 className: 'btn btn-sm',
                 textContent: t.mergeUp,
                 onClick: () => {
+                  pushEditUndoSnapshot();
                   const copy = state.editRows.map(r => [...r]);
                   copy[rIdx - 1].push(...copy[rIdx]);
                   copy.splice(rIdx, 1);
@@ -442,10 +646,11 @@ function renderMonitorView(root, snap, t) {
             : null,
           rows.length > 1
             ? el('button', {
-                className: 'btn btn-sm',
+                className: 'chip-remove-btn',
                 textContent: '×',
                 title: t.removeRow,
                 onClick: () => {
+                  pushEditUndoSnapshot();
                   const copy = state.editRows.map(r => [...r]);
                   copy.splice(rIdx, 1);
                   state.editRows = copy.length ? copy : [[]];
@@ -474,7 +679,14 @@ function renderMonitorView(root, snap, t) {
 
           const renderedInfo = snap.renderedItems?.text?.[id];
           const metricDef = snap.registry.metrics.find(m => m.id === id);
-          const shortTitle = renderedInfo?.label || metricDef?.descriptions?.[state.editLang] || id;
+          const isBarMetric = snap.registry.adjacentPairs.some(p => p.bar === id);
+          const sameLangAsSnap = state.editLang === snap.layout?.lang;
+          let shortTitle;
+          if (sameLangAsSnap && renderedInfo?.label) {
+            shortTitle = isBarMetric ? `${renderedInfo.label} ${t.barSuffix}` : renderedInfo.label;
+          } else {
+            shortTitle = metricDef?.descriptions?.[state.editLang] || metricDef?.descriptions?.us || id;
+          }
           const liveVal = renderedInfo?.valueText || renderedInfo?.plainText || '';
 
           const chip = el('div', {
@@ -482,64 +694,70 @@ function renderMonitorView(root, snap, t) {
             'data-drop-kind': 'chip',
             'data-row': String(rIdx),
             'data-col': String(cIdx),
-            title: id
-          }, [
-            el('span', {
-              className: 'chip-handle',
-              textContent: '⋮⋮',
-              onPointerdown: (ev) => startDrag(ev, { from: 'row', id, rowIdx: rIdx, colIdx: cIdx, label: `${emoji} ${shortTitle}` })
-            }),
-            el('span', { textContent: `${emoji} ${shortTitle}` }),
-            liveVal ? el('span', { className: 'chip-val-preview', textContent: liveVal }) : null,
-            cIdx > 0
-              ? el('button', {
-                  className: 'btn btn-sm',
-                  textContent: '←',
-                  title: t.moveLeft,
-                  onClick: () => {
-                    const r = [...state.editRows[rIdx]];
-                    [r[cIdx - 1], r[cIdx]] = [r[cIdx], r[cIdx - 1]];
-                    state.editRows[rIdx] = r;
-                    render();
-                  }
-                })
-              : null,
-            cIdx < row.length - 1
-              ? el('button', {
-                  className: 'btn btn-sm',
-                  textContent: '→',
-                  title: t.moveRight,
-                  onClick: () => {
-                    const r = [...state.editRows[rIdx]];
-                    [r[cIdx], r[cIdx + 1]] = [r[cIdx + 1], r[cIdx]];
-                    state.editRows[rIdx] = r;
-                    render();
-                  }
-                })
-              : null,
+            title: liveVal ? `${id} · ${liveVal}` : id
+          });
+
+          chip.addEventListener('pointerdown', (ev) => {
+            if (ev.button !== 0) return;
+            if (ev.target?.closest?.('button, input, select, textarea, a, label')) return;
+            startDrag(ev, {
+              dragKind: 'block',
+              from: 'row',
+              id,
+              rowIdx: rIdx,
+              colIdx: cIdx,
+              sourceEl: chip,
+              label: `${emoji} ${shortTitle}`
+            });
+          });
+
+          chip.appendChild(el('span', { className: 'chip-handle', textContent: '⋮⋮' }));
+          chip.appendChild(el('span', { className: 'chip-title', textContent: `${emoji} ${shortTitle}` }));
+          chip.appendChild(el('span', { className: 'style-seg' }, [
             el('button', {
-              className: 'btn btn-sm',
-              textContent: effectiveStyle === 'emoji' ? t.styleEmoji : t.styleText,
+              className: `style-seg-btn ${effectiveStyle === 'text' ? 'is-active' : ''}`,
+              textContent: t.styleTextShort,
+              title: t.styleSwitchToText,
               onClick: () => {
-                state.editItemStyles[id] = effectiveStyle === 'emoji' ? 'text' : 'emoji';
+                if (effectiveStyle === 'text') return;
+                pushEditUndoSnapshot();
+                state.editItemStyles[id] = 'text';
                 render();
               }
             }),
             el('button', {
-              className: 'btn btn-sm',
-              textContent: '×',
+              className: `style-seg-btn ${effectiveStyle === 'emoji' ? 'is-active' : ''}`,
+              textContent: '😊',
+              title: t.styleSwitchToEmoji,
               onClick: () => {
-                state.editRows[rIdx].splice(cIdx, 1);
-                if (state.editRows[rIdx].length === 0 && state.editRows.length > 1) {
-                  state.editRows.splice(rIdx, 1);
-                }
+                if (effectiveStyle === 'emoji') return;
+                pushEditUndoSnapshot();
+                state.editItemStyles[id] = 'emoji';
                 render();
               }
             })
-          ]);
+          ]));
+          chip.appendChild(el('button', {
+            className: 'chip-remove-btn',
+            textContent: '×',
+            title: t.removeBlock,
+            onClick: () => {
+              pushEditUndoSnapshot();
+              state.editRows[rIdx].splice(cIdx, 1);
+              if (state.editRows[rIdx].length === 0 && state.editRows.length > 1) {
+                state.editRows.splice(rIdx, 1);
+              }
+              render();
+            }
+          }));
+
           chipsWrap.appendChild(chip);
           if (isPaired) {
-            chipsWrap.appendChild(el('span', { textContent: '🔗', title: 'Adjacent bar merge' }));
+            chipsWrap.appendChild(el('span', {
+              className: 'chip-merge-link',
+              textContent: '🔗',
+              title: t.mergePairTip
+            }));
           }
         });
       }
@@ -548,6 +766,14 @@ function renderMonitorView(root, snap, t) {
       rowBox.appendChild(chipsWrap);
       container.appendChild(rowBox);
     });
+
+    container.appendChild(el('div', {
+      className: 'drop-slot-between drop-slot-between-tail',
+      'data-drop-kind': 'between-rows',
+      'data-row': String(rows.length)
+    }, [
+      el('span', { className: 'drop-label-row', textContent: t.dropRowHere })
+    ]));
 
     container.appendChild(el('div', {
       className: 'drop-new-row',
@@ -560,6 +786,7 @@ function renderMonitorView(root, snap, t) {
         className: 'btn btn-sm',
         textContent: t.addEmptyRow,
         onClick: () => {
+          pushEditUndoSnapshot();
           state.editRows.push([]);
           render();
         }
@@ -703,39 +930,57 @@ function renderDrawerCategories(catsContainer, snap, t) {
     for (const m of catMetrics) {
       const desc = m.descriptions?.[state.editLang] || m.descriptions?.us || m.id;
       const active = usedIds.has(m.id);
-      const itemWrap = el('div', { className: `drawer-item ${active ? 'is-active' : ''}` }, [
-        el('span', {
-          className: 'chip-handle',
-          textContent: '⋮⋮',
-          title: t.dragHandleTip,
-          onPointerdown: (ev) => {
-            if (ev.button === 0) {
-              startDrag(ev, { from: 'drawer', id: m.id, label: `${m.emoji} ${desc}` });
+      const toggleMetric = () => {
+        pushEditUndoSnapshot();
+        if (active) {
+          const nextRows = [];
+          for (const r of state.editRows) {
+            const had = r.length > 0;
+            const filtered = r.filter(x => x !== m.id);
+            if (!had || filtered.length > 0) {
+              nextRows.push(filtered);
             }
           }
-        }),
-        el('button', {
-          className: 'btn btn-sm',
-          textContent: `${m.emoji} ${desc}`,
-          title: m.id,
-          onClick: () => {
-            if (active) {
-              const nextRows = [];
-              for (const r of state.editRows) {
-                const had = r.length > 0;
-                const filtered = r.filter(x => x !== m.id);
-                if (!had || filtered.length > 0) {
-                  nextRows.push(filtered);
-                }
-              }
-              state.editRows = nextRows.length > 0 ? nextRows : [[]];
-            } else {
-              if (state.editRows.length === 0) state.editRows.push([]);
-              state.editRows[state.editRows.length - 1].push(m.id);
-            }
-            render();
+          state.editRows = nextRows.length > 0 ? nextRows : [[]];
+        } else {
+          if (state.editRows.length === 0) state.editRows.push([]);
+          state.editRows[state.editRows.length - 1].push(m.id);
+        }
+        render();
+      };
+
+      const itemWrap = el('div', {
+        className: `drawer-item ${active ? 'is-active' : ''}`,
+        role: 'button',
+        tabindex: '0',
+        title: `${m.id} · ${t.dragHandleTip}`,
+        onPointerdown: (ev) => {
+          if (ev.button !== 0) return;
+          startDrag(ev, {
+            dragKind: 'block',
+            from: 'drawer',
+            id: m.id,
+            sourceEl: itemWrap,
+            label: `${m.emoji} ${desc}`
+          });
+        },
+        onClick: () => {
+          if (state.suppressNextClick) {
+            state.suppressNextClick = false;
+            return;
           }
-        })
+          toggleMetric();
+        },
+        onKeydown: (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            toggleMetric();
+          }
+        }
+      }, [
+        el('span', { className: 'chip-handle', textContent: '⋮⋮' }),
+        el('span', { className: 'drawer-item-label', textContent: `${m.emoji} ${desc}` }),
+        el('span', { className: 'drawer-item-badge', textContent: active ? '✓' : '＋' })
       ]);
       grid.appendChild(itemWrap);
     }
@@ -764,6 +1009,7 @@ function renderEditorDrawer(root, snap, t) {
       className: 'btn btn-sm',
       textContent: t.presetCore,
       onClick: () => {
+        pushEditUndoSnapshot();
         state.editRows = [
           ['model-name', 'quota', 'quota-bar', 'quota-reset-countdown'],
           ['context-used', 'context-used-bar', 'token-count'],
@@ -776,6 +1022,7 @@ function renderEditorDrawer(root, snap, t) {
       className: 'btn btn-sm',
       textContent: t.presetFull,
       onClick: () => {
+        pushEditUndoSnapshot();
         const all = snap.registry.metrics.map(m => m.id);
         state.editRows = [all.slice(0, 8), all.slice(8, 18), all.slice(18, 28), all.slice(28)];
         render();
@@ -786,7 +1033,7 @@ function renderEditorDrawer(root, snap, t) {
   renderDrawerCategories(catsContainer, snap, t);
   drawer.appendChild(catsContainer);
 
-  // 進階參數與舊版排序匯入/匯出
+  // 進階參數與舊版排序匯入/匯出（預設收合以保持排版聚焦）
   const importInput = el('input', {
     className: 'input-ctrl',
     placeholder: t.importPlaceholder,
@@ -798,7 +1045,11 @@ function renderEditorDrawer(root, snap, t) {
     el('select', {
       className: 'select-ctrl',
       value: state.editLabelStyle,
-      onChange: (e) => { state.editLabelStyle = e.target.value; render(); }
+      onChange: (e) => {
+        pushEditUndoSnapshot();
+        state.editLabelStyle = e.target.value;
+        render();
+      }
     }, [
       el('option', { value: 'text', textContent: t.styleText }),
       el('option', { value: 'emoji', textContent: t.styleEmoji })
@@ -826,11 +1077,12 @@ function renderEditorDrawer(root, snap, t) {
         const res = await saveConfigAction('reset-from-cli');
         if (!res?.structuredContent?.ok) return;
         state.editMode = false;
-        await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+        state.editHistory = [];
+        const dashRes = await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+        if (!dashRes) render();
       }
     })
   ]);
-  drawer.appendChild(advRow);
 
   const impExpRow = el('div', { className: 'topbar-group' }, [
     importInput,
@@ -841,6 +1093,7 @@ function renderEditorDrawer(root, snap, t) {
         const res = await saveConfigAction('parse-order-expression', { orderExpression: importInput.value });
         const parsed = res?.structuredContent?.parsed;
         if (parsed?.items?.length) {
+          pushEditUndoSnapshot();
           state.editRows = itemsToRows(parsed.items);
           state.editItemStyles = { ...(parsed.itemStyles || {}) };
           render();
@@ -864,7 +1117,13 @@ function renderEditorDrawer(root, snap, t) {
       }
     })
   ]);
-  drawer.appendChild(impExpRow);
+
+  const advDetails = el('details', { className: 'adv-details' }, [
+    el('summary', { textContent: t.advancedSectionTitle }),
+    advRow,
+    impExpRow
+  ]);
+  drawer.appendChild(advDetails);
   root.appendChild(drawer);
 
   // 底部固定雙按鈕儲存列
@@ -894,8 +1153,10 @@ function renderEditorDrawer(root, snap, t) {
           const res = await saveConfigAction('save-panel');
           if (!res?.structuredContent?.ok) return;
           state.editMode = false;
+          state.editHistory = [];
           showToast(t.savedPanelToast);
-          await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+          const dashRes = await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+          if (!dashRes) render();
         }
       }),
       el('button', {
@@ -905,9 +1166,11 @@ function renderEditorDrawer(root, snap, t) {
           const res = await saveConfigAction('save-both', { deployHooks: state.deployHooks });
           if (!res?.structuredContent?.ok) return;
           state.editMode = false;
+          state.editHistory = [];
           const partial = res.structuredContent.cliSyncResult?.results?.some(r => !r.updated);
           showToast(partial ? t.cliSyncPartialWarn : t.savedBothToast);
-          await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+          const dashRes = await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+          if (!dashRes) render();
         }
       })
     ])
@@ -995,11 +1258,16 @@ function render() {
     className: 'select-ctrl',
     value: activeLang,
     onChange: async (e) => {
-      state.editLang = e.target.value;
+      const nextLang = e.target.value;
       if (!state.editMode) {
+        state.editLang = nextLang;
         await saveConfigAction('save-panel');
         await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
       } else {
+        if (nextLang !== state.editLang) {
+          pushEditUndoSnapshot();
+          state.editLang = nextLang;
+        }
         render();
       }
     }
@@ -1034,7 +1302,7 @@ function render() {
     ]),
     el('div', { className: 'topbar-group' }, [
       langSelect,
-      state.tab === 'monitor'
+      state.tab === 'monitor' && !state.editMode
         ? el('button', {
             className: 'btn btn-sm',
             textContent: snap.panelPrefs?.viewDensity === 'strip' ? t.densityCards : t.densityStrip,
@@ -1046,15 +1314,17 @@ function render() {
           })
         : null,
       state.tab === 'monitor'
-        ? el('button', {
-            className: `btn btn-sm ${state.editMode ? 'btn-active' : ''}`,
-            textContent: state.editMode ? t.doneEdit : `✏️ ${t.editLayout}`,
-            onClick: () => {
-              state.editMode = !state.editMode;
-              if (state.editMode) syncEditDraftFromSnapshot(snap);
-              render();
-            }
-          })
+        ? (state.editMode
+            ? el('span', { className: 'edit-mode-pill', textContent: `✏️ ${t.editingBadge}` })
+            : el('button', {
+                className: 'btn btn-sm',
+                textContent: `✏️ ${t.editLayout}`,
+                onClick: () => {
+                  state.editMode = true;
+                  syncEditDraftFromSnapshot(snap);
+                  render();
+                }
+              }))
         : null,
       el('button', {
         className: 'btn btn-sm',
@@ -1089,7 +1359,7 @@ function startLocalCountdownTicker() {
 // 嚴格依循官方生命週期：先註冊全部 handler 再 connect()
 app.ontoolinput = () => {};
 app.ontoolresult = (result) => {
-  if (result?.structuredContent?.layout) {
+  if (isDashboardSnapshot(result?.structuredContent)) {
     state.snapshot = result.structuredContent;
     if (!state.editMode) syncEditDraftFromSnapshot(state.snapshot);
     scheduleAutoRefresh();
@@ -1137,6 +1407,20 @@ async function boot() {
       root.textContent = `Statusline App failed to connect: ${err?.message || 'unknown error'}`;
     }
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', (ev) => {
+    if (!state.editMode || state.tab !== 'monitor') return;
+    const tag = ev.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if ((ev.metaKey || ev.ctrlKey) && !ev.shiftKey && String(ev.key || '').toLowerCase() === 'z') {
+      if (state.editHistory.length > 0) {
+        ev.preventDefault();
+        undoEdit();
+      }
+    }
+  });
 }
 
 render();
