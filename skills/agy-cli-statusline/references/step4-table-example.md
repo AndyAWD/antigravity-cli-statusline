@@ -17,7 +17,7 @@
 | **2** | 🪪 使用中代理 (`agent-profile`) | **16** | ⏱️ Argon 倒數 (`quota-argon-countdown`) | **30** | 🚀 Agy CLI 版本 (`cli-version`) |
 | **3** | ⚡ 代理狀態 (`agent-state`) | **17** | ⏰ Argon 時間 (`quota-argon-reset-time`) | **31** | 💬 對話 ID (`conversation-id`) |
 | **4** | ⚙️ 運行模式 (`mode`) | **18** | 💎 訂閱方案 (`plan-tier`) | **32** | 🛡️ 沙盒狀態 (`sandbox-status`) |
-| **5** | 🧭 協調器 (`active-model`) | **19** | 📧 帳號信箱 (`account-email`) | **33** | 🔔 工具確認框 (`tool-confirmation`) |
+| **5** | 🪄 協調器 (`active-model`) | **19** | 📧 帳號信箱 (`account-email`) | **33** | 🔔 工具確認框 (`tool-confirmation`) |
 | **6** | 🔋 五小時額度 (`quota`) | **20** | 🧠 脈絡比例 (`context-used`) | **34** | 📥 待處理輸入 (`pending-input`) |
 | **7** | 🔋 五小時長條圖 (`quota-bar`) | **21** | 🧠 脈絡長條圖 (`context-used-bar`) | **35** | 🔄 背景任務數 (`background-tasks`) |
 | **8** | ⏳ 五小時倒數 (`quota-reset-countdown`) | **22** | 💰 權杖數量 (`token-count`) | **36** | 👥 活躍子代理 (`subagents`) |

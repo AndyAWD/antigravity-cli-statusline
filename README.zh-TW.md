@@ -40,7 +40,7 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## 特色亮點
 
 1. **跨平台相容**：支援 Antigravity 命令列介面終端機、整合開發環境側邊欄對話方塊（Dialog Box）以及 Antigravity 2.0 桌面應用程式，涵蓋 Windows、macOS 與 Linux 作業系統。
-2. **40 項即時指標、4 種語系與雙標籤顯示風格**：涵蓋人工智慧（Artificial Intelligence）模型狀態（含 Orchestrator 模式下即時追蹤 `[規劃]` 規劃模型與 `[工作]` 工作模型之實際底層模型）、應用程式介面（Application Programming Interface）配額（含五小時、每週與 Gemini 4 Argon 專屬配額，並具備四層動態配額池歸屬解析與 60 秒過期寬限期即時倒數重算）、脈絡（Context）與權杖（Token）消耗、互動佇列、Git 版本控制狀態及系統資源，支援繁體中文（`zh-tw`）、簡體中文（`zh-cn`）、英文（`us`）與日文（`jp`），並可自由切換**文字標籤（`text`）**或**繪圖符號標籤（`emoji`，無冒號精簡排版）**顯示風格（`ui.footer.labelStyle`）。
+2. **40 項即時指標、4 種語系與雙標籤顯示風格**：涵蓋人工智慧（Artificial Intelligence）模型狀態（含 Orchestrator 模式下即時追蹤 `規劃` 與 `工作` 角色之實際底層模型）、應用程式介面（Application Programming Interface）配額（含五小時、每週與 Gemini 4 Argon 專屬配額，並具備四層動態配額池歸屬解析與 60 秒過期寬限期即時倒數重算）、脈絡（Context）與權杖（Token）消耗、互動佇列、Git 版本控制狀態及系統資源，支援繁體中文（`zh-tw`）、簡體中文（`zh-cn`）、英文（`us`）與日文（`jp`），並可自由切換**文字標籤（`text`）**或**繪圖符號標籤（`emoji`，無冒號精簡排版）**顯示風格（`ui.footer.labelStyle`）。
 3. **彈性百分比長條圖（支援合併與分開顯示）**：針對五小時額度、每週額度、Gemini 4 Argon 額度、脈絡用量與權杖數提供預設 10 格視覺長條圖（`[████████░░]`）；當數值與長條圖相鄰時自動合併為單一標籤，未相鄰時則各自以獨立標籤顯示。
 4. **自訂排序與雙軌換行機制**：支援以數字序號或英文識別碼（Identifier）排序、使用 `n` 強制換行、使用 `n,n` 建立空白分隔行，並依終端機寬度自動智慧折行。
 5. **24-bit 四階動態色彩**：依據配額剩餘比例或脈絡消耗程度自動切換 4 個色階（`#57caff` 藍色 `100~75%`、`#5cdb6d` 綠色 `74~50%`、`#ffd427` 黃色 `49~25%`、`#ff7daf` 粉紅色 `24~0%`），並為不同人工智慧模型家族套用專屬品牌識別色。
@@ -146,7 +146,7 @@ antigravity-cli-statusline/
 - `2.` 🪪 **使用中代理（`agent-profile`）**：目前載入的 Agent Profile 名稱
 - `3.` ⚡ **代理當前狀態（`agent-state`）**：`閒置 / 思考中 / 執行中 / 呼叫工具 / 初始化`
 - `4.` ⚙️ **目前運行模式（`mode`）**：`default / code-only / plan / interactive / accept-edits`
-- `5.` 🧭 **協調器當前實際執行的底層模型（`active-model`）**：使用 Orchestrator 時即時顯示實際執行的底層模型與 `[規劃]`／`[工作]` 角色徽章；非 Orchestrator 模式一律以紅色顯示 `關閉`
+- `5.` 🪄 **協調器當前實際執行的底層模型（`active-model`）**：使用 Orchestrator 時即時顯示實際執行的底層模型與角色分工（文字樣式為 `協調規劃:`／`協調工作:`，繪圖符號為 `🪄 規劃 →`／`🪄 工作 →`）；非 Orchestrator 模式一律以紅色顯示 `關閉`
 
 **2. 額度、計費與帳號（14 項）**
 - `6.` 🔋 **帳號五小時可用額度百分比（`quota`）**：五小時應用程式介面可用額度百分比，搭配四階配色
