@@ -120,6 +120,32 @@ export function isOrchestratorModelName(rawName, cache = null) {
   return false;
 }
 
+/**
+ * 解析 Orchestrator 外層包裝模型的人類可讀顯示名稱（如 MODEL_PLACEHOLDER_M537 -> Orchestrator (Neon)）。
+ * 若傳入為具體底層模型或具名 Worker，回傳空字串。
+ * @param {unknown} rawModel
+ * @param {object|null} [cache=null]
+ * @returns {string}
+ */
+export function resolveOrchestratorWrapperDisplayName(rawModel, cache = null) {
+  if (typeof rawModel !== 'string') return '';
+  const trimmed = rawModel.trim();
+  if (!trimmed || !isOrchestratorModelName(trimmed, cache)) return '';
+
+  const entry = lookupModelLimitEntry(trimmed, cache);
+  if (entry && !entry.ambiguous && typeof entry.displayName === 'string' && entry.displayName.trim()) {
+    return entry.displayName.trim();
+  }
+
+  if (/\s/.test(trimmed) || /[()]/.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^MODEL_/i.test(trimmed) || trimmed.includes('_')) {
+    return trimmed;
+  }
+  return formatRuntimeModelDisplayName(trimmed, null);
+}
+
 function isKnownSingleModelRef(rawName, cache = null) {
   if (typeof rawName !== 'string' || !rawName.trim()) return false;
   if (isOrchestratorModelName(rawName, cache) || isOrchestratorWorkerModel(rawName, cache)) return false;

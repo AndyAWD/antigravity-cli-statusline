@@ -25,7 +25,11 @@ import {
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/context.mjs';
 import { fetchLatestPluginReleaseAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/plugin-update.mjs';
 import { extractMetricsAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs';
-import { readAppSelectedModelAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/runtime-model.mjs';
+import {
+  isOrchestratorModelName,
+  readAppSelectedModelAsync,
+  resolveOrchestratorWrapperDisplayName
+} from '../../skills/agy-cli-statusline/scripts/lib/collectors/runtime-model.mjs';
 import {
   resolveInstalledAppVersionAsync,
   resolveInstalledCliVersionAsync
@@ -506,8 +510,31 @@ export class StatuslineService {
       ? validateCliLayoutInput(panelPrefs.layout)
       : cliLayout;
 
+    const isAppProduct = (activeSession.product || 'antigravity') === 'antigravity';
+    const isCurrentAppSession = isAppProduct && (
+      isAutoFollow ||
+      !latestId ||
+      activeSession.conversationId === latestId
+    );
+    const effectiveAppSelectedModel = isCurrentAppSession ? appSelectedModel : '';
+    let effectiveSettings = cliSettings;
+    if (isAppProduct && cliSettings && typeof cliSettings === 'object' && 'model' in cliSettings) {
+      const { model: _ignoredCliModel, ...restCliSettings } = cliSettings;
+      effectiveSettings = restCliSettings;
+    }
+
     const { cache, runtimeTelemetry, telemetryStatus } = lsResult;
-    const fallbackModel = runtimeTelemetry?.modelDisplayName ||
+    const appOrchWrapperName = resolveOrchestratorWrapperDisplayName(effectiveAppSelectedModel, cache);
+    const hookOrchWrapperName = (!effectiveAppSelectedModel || isOrchestratorModelName(effectiveAppSelectedModel, cache))
+      ? resolveOrchestratorWrapperDisplayName(activeSession.modelName, cache)
+      : '';
+    const wrapperDisplayName = appOrchWrapperName || hookOrchWrapperName;
+    const wrapperModelId = appOrchWrapperName
+      ? effectiveAppSelectedModel
+      : (hookOrchWrapperName ? activeSession.modelName : '');
+
+    const fallbackModel = wrapperDisplayName ||
+      runtimeTelemetry?.modelDisplayName ||
       activeSession.modelName ||
       'Gemini';
 
@@ -518,7 +545,7 @@ export class StatuslineService {
     const meta = {
       conversation_id: activeSession.conversationId || '',
       model: {
-        id: runtimeTelemetry?.model || fallbackModel,
+        id: wrapperModelId || runtimeTelemetry?.model || fallbackModel,
         display_name: fallbackModel
       },
       agent_state: derivedState,
@@ -551,19 +578,6 @@ export class StatuslineService {
     const skipFreshMemory = !forceRefresh && activeItemsSet.has('memory-usage') && (nowMs - this._memoryCache.at) < MEMORY_CACHE_TTL_MS;
     const probeItemsSet = new Set(activeItemsSet);
     if (skipFreshMemory) probeItemsSet.delete('memory-usage');
-
-    const isAppProduct = (activeSession.product || 'antigravity') === 'antigravity';
-    const isCurrentAppSession = isAppProduct && (
-      isAutoFollow ||
-      !latestId ||
-      activeSession.conversationId === latestId
-    );
-    const effectiveAppSelectedModel = isCurrentAppSession ? appSelectedModel : '';
-    let effectiveSettings = cliSettings;
-    if (isAppProduct && cliSettings && typeof cliSettings === 'object' && 'model' in cliSettings) {
-      const { model: _ignoredCliModel, ...restCliSettings } = cliSettings;
-      effectiveSettings = restCliSettings;
-    }
 
     const metrics = await extractMetricsAsync(
       meta,
