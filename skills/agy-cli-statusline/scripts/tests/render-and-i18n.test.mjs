@@ -334,13 +334,16 @@ async function main() {
       pluginUpdateLatestTag: 'v1.12.0',
       conversationIdShort: 'c4a861dd',
       agentProfileName: 'Default',
-      mode: 'Interactive'
+      mode: 'Interactive',
+      isOrchestrator: true,
+      activeModelName: 'Gemini 4 Carbon (High)',
+      activeModelRole: 'planner'
     };
 
     for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
       const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
       const allKeys = Object.keys(EMOJI_MAP);
-      assert.strictEqual(allKeys.length, 44, 'EMOJI_MAP must contain 39 metrics + 5 merged bar keys (44 total)');
+      assert.strictEqual(allKeys.length, 45, 'EMOJI_MAP must contain 40 metrics + 5 merged bar keys (45 total)');
 
       for (const key of allKeys) {
         const rendered = stripAnsi(emojiDict[key]);

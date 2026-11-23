@@ -6,7 +6,7 @@ English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [�
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-An Antigravity plugin for both **Antigravity CLI (`agy`)** and **Antigravity App (2.0, `v2.34.0+`)** — monitor 39 real-time indicators (model, 5-hour/7-day/Argon quotas, context token breakdown, Git status, agent state, CLI & 2.0 versions), switch between Text (`text`) and Emoji (`emoji`) label styles, arrange items and line breaks visually with drag-and-drop in Antigravity App or via the 7-step CLI wizard, across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
+An Antigravity plugin for both **Antigravity CLI (`agy`)** and **Antigravity App (2.0, `v2.34.0+`)** — monitor 40 real-time indicators (model, Orchestrator active model, 5-hour/7-day/Argon quotas, context token breakdown, Git status, agent state, CLI & 2.0 versions), switch between Text (`text`) and Emoji (`emoji`) label styles, arrange items and line breaks visually with drag-and-drop in Antigravity App or via the 7-step CLI wizard, across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
 
 Comprehensive support across the three core platforms of Google Antigravity (AGY): Antigravity Command-Line Interface (CLI) (`agy`), Antigravity Integrated Development Environment (IDE), and Antigravity 2.0 Desktop Application.
 
@@ -40,13 +40,13 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## Key Features
 
 1. **Multi-Platform Compatibility**: Supports Antigravity CLI terminal, Antigravity IDE sidebar chat, and Antigravity 2.0 Desktop Application across Windows, macOS, and Linux.
-2. **39 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 39 metrics across model status, API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools with 4-tier dynamic quota pool resolution and live countdown recalculation within a 60s expiry grace period), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
+2. **40 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 40 metrics across model status (including live Orchestrator Planner `[Think]` vs. Executor `[Fast]` underlying model tracking), API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools with 4-tier dynamic quota pool resolution and live countdown recalculation within a 60s expiry grace period), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
 3. **Flexible Bar Graphs (Merged or Separate)**: Renders 10-block visual progress bars (`[████████░░]`) for 5-hour quota, weekly quota, Gemini 4 Argon quota, context usage, and session tokens. Automatically merges labels when placed adjacent to numeric counterparts, or displays them with independent labels when separated.
 4. **Custom Sorting & Dual Line-Wrapping**: Supports 1-based index sorting, `n` manual line breaks, `n,n` blank-line section separators, and terminal-width-aware automatic wrapping.
 5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`#57caff` Blue `100–75%`, `#5cdb6d` Green `74–50%`, `#ffd427` Yellow `49–25%`, `#ff7daf` Pink `24–0%`) alongside model-family brand colors.
 6. **Three-Layer Config Sync & OS Safeguards**: Synchronizes CLI-specific, global, and workspace `settings.json` plus `trusted_hooks.json`, while handling macOS/Linux NVM path resolution and Windows UTF-8 Byte Order Mark (BOM) prevention.
-7. **First-Open Update Check & Manual Hook Sync**: When `plugin-update` (`#38`) is enabled in `ui.footer.items`, checks GitHub Releases once per interactive `agy` CLI launch (skipping `agy -p`), auto-hides while trimming leading/trailing blank lines when up to date, falls back cleanly to cached release info if offline, and renders a localized 2-line update notice (or concise `🆕 vX → vY` in `emoji` style) at its configured position when outdated—completely decoupled from `plugin-version` (`#37`), which renders the statusline version only without disrupting single-line layouts. Hook sync stays manual via `/antigravity-cli-statusline:agy-cli-statusline`, and `diagnose-statusline.mjs` inspects plugin-vs-hook version alignment.
-8. **Native Antigravity 2.0 Visual Panel (MCP Apps)**: Provides an interactive side-panel and full-page dashboard with in-place row-based drag-and-drop layout editing, a 5-category 39-metric drawer with live value previews, collapsible context `tokenBreakdown` stacked bar and usage summary, 1-second live countdowns, legacy order import/export, and dual save buttons (**Apply to 2.0 Panel Only** vs. **Sync to 2.0 + CLI**).
+7. **First-Open Update Check & Manual Hook Sync**: When `plugin-update` (`#39`) is enabled in `ui.footer.items`, checks GitHub Releases once per interactive `agy` CLI launch (skipping `agy -p`), auto-hides while trimming leading/trailing blank lines when up to date, falls back cleanly to cached release info if offline, and renders a localized 2-line update notice (or concise `🆕 vX → vY` in `emoji` style) at its configured position when outdated—completely decoupled from `plugin-version` (`#38`), which renders the statusline version only without disrupting single-line layouts. Hook sync stays manual via `/antigravity-cli-statusline:agy-cli-statusline`, and `diagnose-statusline.mjs` inspects plugin-vs-hook version alignment.
+8. **Native Antigravity 2.0 Visual Panel (MCP Apps)**: Provides an interactive side-panel and full-page dashboard with in-place row-based drag-and-drop layout editing, a 5-category 40-metric drawer with live value previews, collapsible context `tokenBreakdown` stacked bar and usage summary, 1-second live countdowns, legacy order import/export, and dual save buttons (**Apply to 2.0 Panel Only** vs. **Sync to 2.0 + CLI**).
 
 ## Plugin Management
 
@@ -137,58 +137,59 @@ Once installed, use the command matching your interface:
 
 ## Indicators, Sorting & Line Wrapping
 
-### Available Indicators (1–39)
+### Available Indicators (1–40)
 
 The numbers below correspond to the 1-based option indices across the 5 categories in Step 3 (`resources/questions.json`), along with each indicator's Emoji prefix used in `emoji` mode:
 
-**1. Model & Agent (4 items)**
+**1. Model & Agent (5 items)**
 - `1.` 🤖 **Current AI model name (`model-name`)** — the model serving the current conversation
 - `2.` 🪪 **Active agent profile (`agent-profile`)** — the loaded Agent Profile name
 - `3.` ⚡ **Agent state (`agent-state`)** — `idle / thinking / working / tool_use / initializing`
 - `4.` ⚙️ **Current running mode (`mode`)** — `default / code-only / plan / interactive / accept-edits`
+- `5.` 🧭 **Active underlying model under Orchestrator (`active-model`)** — shows the live routed model and `[Think]` / `[Fast]` role when using Orchestrator; auto-hides for single-model sessions
 
 **2. Quota, Billing & Account (14 items)**
-- `5.` 🔋 **5-hour available quota (`quota`)** — 5-hour API remaining percentage, four-tier color-coded
-- `6.` 🔋 **5-hour available quota bar graph (`quota-bar`)** — 10-block 5-hour quota bar (`[████████░░]`)
-- `7.` ⏳ **5-hour quota reset countdown (`quota-reset-countdown`)** — time remaining until 5-hour quota refresh
-- `8.` 🕒 **5-hour reset time (`quota-reset-time`)** — local timezone reset timestamp (`HH:mm` same day, `yyyy/MM/dd HH:mm` across days)
-- `9.` 📅 **Weekly available quota (`quota-weekly`)** — weekly API remaining percentage, four-tier color-coded
-- `10.` 📅 **Weekly available quota bar graph (`quota-weekly-bar`)** — 10-block weekly quota bar (`[███████░░░]`)
-- `11.` ⏲️ **Weekly quota reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
-- `12.` 🗓️ **Weekly reset time (`quota-weekly-reset-time`)** — weekly local reset timestamp (e.g., `2026/10/18 16:00`)
-- `13.` ✨ **Gemini 4 Argon available quota (`quota-argon`)** — Gemini 4 Argon dedicated quota percentage, four-tier color-coded
-- `14.` ✨ **Gemini 4 Argon quota bar graph (`quota-argon-bar`)** — 10-block Argon quota bar (`[█████░░░░░]`)
-- `15.` ⏱️ **Gemini 4 Argon quota reset countdown (`quota-argon-countdown`)** — time remaining until Argon quota refresh
-- `16.` ⏰ **Gemini 4 Argon reset time (`quota-argon-reset-time`)** — Argon local reset timestamp (e.g., `2026/10/30 23:57`)
-- `17.` 💎 **Subscription plan tier (`plan-tier`)** — current subscription plan level
-- `18.` 📧 **Account email (`account-email`)** — logged-in account email address
+- `6.` 🔋 **5-hour available quota (`quota`)** — 5-hour API remaining percentage, four-tier color-coded
+- `7.` 🔋 **5-hour available quota bar graph (`quota-bar`)** — 10-block 5-hour quota bar (`[████████░░]`)
+- `8.` ⏳ **5-hour quota reset countdown (`quota-reset-countdown`)** — time remaining until 5-hour quota refresh
+- `9.` 🕒 **5-hour reset time (`quota-reset-time`)** — local timezone reset timestamp (`HH:mm` same day, `yyyy/MM/dd HH:mm` across days)
+- `10.` 📅 **Weekly available quota (`quota-weekly`)** — weekly API remaining percentage, four-tier color-coded
+- `11.` 📅 **Weekly available quota bar graph (`quota-weekly-bar`)** — 10-block weekly quota bar (`[███████░░░]`)
+- `12.` ⏲️ **Weekly quota reset countdown (`quota-weekly-countdown`)** — time remaining until weekly refresh
+- `13.` 🗓️ **Weekly reset time (`quota-weekly-reset-time`)** — weekly local reset timestamp (e.g., `2026/10/18 16:00`)
+- `14.` ✨ **Gemini 4 Argon available quota (`quota-argon`)** — Gemini 4 Argon dedicated quota percentage, four-tier color-coded
+- `15.` ✨ **Gemini 4 Argon quota bar graph (`quota-argon-bar`)** — 10-block Argon quota bar (`[█████░░░░░]`)
+- `16.` ⏱️ **Gemini 4 Argon quota reset countdown (`quota-argon-countdown`)** — time remaining until Argon quota refresh
+- `17.` ⏰ **Gemini 4 Argon reset time (`quota-argon-reset-time`)** — Argon local reset timestamp (e.g., `2026/10/30 23:57`)
+- `18.` 💎 **Subscription plan tier (`plan-tier`)** — current subscription plan level
+- `19.` 📧 **Account email (`account-email`)** — logged-in account email address
 
 **3. Context & Tokens (4 items)**
-- `19.` 🧠 **Context used percentage (`context-used`)** — percentage of context window consumed
-- `20.` 🧠 **Context used bar graph (`context-used-bar`)** — 10-block context consumed bar (`[█░░░░░░░░░]`)
-- `21.` 💰 **Exact token count (`token-count`)** — token usage in the current session
-- `22.` 💰 **Token count bar graph (`token-count-bar`)** — 10-block token consumed bar (`[█░░░░░░░░░]`)
+- `20.` 🧠 **Context used percentage (`context-used`)** — percentage of context window consumed
+- `21.` 🧠 **Context used bar graph (`context-used-bar`)** — 10-block context consumed bar (`[█░░░░░░░░░]`)
+- `22.` 💰 **Exact token count (`token-count`)** — token usage in the current session
+- `23.` 💰 **Token count bar graph (`token-count-bar`)** — 10-block token consumed bar (`[█░░░░░░░░░]`)
 
 **4. Workspace & VCS (5 items)**
-- `23.` 📁 **Workspace short path (`project-path`)** — current workspace directory basename
-- `24.` 📍 **Workspace full path (`project-full-path`)** — absolute workspace directory path
-- `25.` 🔀 **Current Git branch (`git-branch`)** — active branch name
-- `26.` 🔍 **VCS uncommitted status (`vcs-dirty`)** — `uncommitted / no changes`
-- `27.` 🗃️ **VCS type (`vcs-type`)** — `git / jj / fig`
+- `24.` 📁 **Workspace short path (`project-path`)** — current workspace directory basename
+- `25.` 📍 **Workspace full path (`project-full-path`)** — absolute workspace directory path
+- `26.` 🔀 **Current Git branch (`git-branch`)** — active branch name
+- `27.` 🔍 **VCS uncommitted status (`vcs-dirty`)** — `uncommitted / no changes`
+- `28.` 🗃️ **VCS type (`vcs-type`)** — `git / jj / fig`
 
 **5. System Status & Background Tasks (12 items)**
-- `28.` 💾 **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
-- `29.` 🚀 **Antigravity CLI version (`cli-version`)** — installed `agy` CLI version string (`Agy CLI Version:` in text mode; works in both CLI and Antigravity 2.0)
-- `30.` 💬 **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
-- `31.` 🛡️ **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
-- `32.` 🔔 **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
-- `33.` 📥 **Pending user inputs (`pending-input`)** — queued user inputs waiting to run
-- `34.` 🔄 **Running background tasks (`background-tasks`)** — active background task count
-- `35.` 👥 **Active subagents (`subagents`)** — running subagent count
-- `36.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
-- `37.` 🧩 **Statusline version (`plugin-version`)** — displays installed `antigravity-cli-statusline` version only (`Statusline Version:` in text mode; does not trigger update checks or reminders)
-- `38.` 🆕 **Statusline update reminder (`plugin-update`)** — checks GitHub Releases once per interactive `agy` launch (skipping `agy -p`), auto-hides when up to date, and renders a 2-line update command at its configured position when behind
-- `39.` 💻 **Antigravity 2.0 App version (`app-version`)** — installed Antigravity 2.0 desktop app version (`Agy 2.0 Version:` in text mode; works in both CLI and Antigravity 2.0)
+- `29.` 💾 **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
+- `30.` 🚀 **Antigravity CLI version (`cli-version`)** — installed `agy` CLI version string (`Agy CLI Version:` in text mode; works in both CLI and Antigravity 2.0)
+- `31.` 💬 **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
+- `32.` 🛡️ **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
+- `33.` 🔔 **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
+- `34.` 📥 **Pending user inputs (`pending-input`)** — queued user inputs waiting to run
+- `35.` 🔄 **Running background tasks (`background-tasks`)** — active background task count
+- `36.` 👥 **Active subagents (`subagents`)** — running subagent count
+- `37.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
+- `38.` 🧩 **Statusline version (`plugin-version`)** — displays installed `antigravity-cli-statusline` version only (`Statusline Version:` in text mode; does not trigger update checks or reminders)
+- `39.` 🆕 **Statusline update reminder (`plugin-update`)** — checks GitHub Releases once per interactive `agy` launch (skipping `agy -p`), auto-hides when up to date, and renders a 2-line update command at its configured position when behind
+- `40.` 💻 **Antigravity 2.0 App version (`app-version`)** — installed Antigravity 2.0 desktop app version (`Agy 2.0 Version:` in text mode; works in both CLI and Antigravity 2.0)
 
 ### Sorting Rules & Style Configuration
 
@@ -197,9 +198,9 @@ In Step 4 of the skill workflow, enter a comma-separated list of indicator indic
 - **Style Prefixes**:
   - **Text label style (`text`, default)**: Plain numbers (e.g., `1`), `t` prefix (e.g., `t1`), or plain English IDs (`quota`, `t:quota`) format as localized text labels with colons (e.g., `5-hr Available: 88%`).
   - **Emoji icon style (`emoji`)**: Use an `e` prefix (e.g., `e1`, `e:quota`, case-insensitive) to replace text labels with the indicator's Emoji icon and a single space (e.g., `🔋 88%`), while keeping status values localized.
-  - **Mix & Match**: Items can be styled independently (e.g., `e1, 18, e17, 31`), unformatted items default to text style.
+  - **Mix & Match**: Items can be styled independently (e.g., `e1, 19, e18, 32`), unformatted items default to text style.
 - **Percentage Bar Graph Merging & Separation**:
-  - For the five indicator pairs (`quota` `5`+`6`, `quota-weekly` `9`+`10`, `quota-argon` `13`+`14`, `context-used` `19`+`20`, `token-count` `21`+`22`), placing a numeric indicator **adjacent** to its corresponding bar graph (e.g., `5,6`) with matching styles automatically merges them under a single label and progress bar.
+  - For the five indicator pairs (`quota` `6`+`7`, `quota-weekly` `10`+`11`, `quota-argon` `14`+`15`, `context-used` `20`+`21`, `token-count` `22`+`23`), placing a numeric indicator **adjacent** to its corresponding bar graph (e.g., `6,7`) with matching styles automatically merges them under a single label and progress bar.
   - When **separated** (by other indicators or newlines) or when styles conflict (one `text`, one `emoji`), each renders individually with its own label.
   - Default bar length is 10 blocks (`[████████░░]`, configurable via `ui.footer.barLength`), and reset time format is configurable via `ui.footer.timeFormat`.
 - **Line Wrapping & Spacing**:
@@ -212,7 +213,7 @@ In Step 4 of the skill workflow, enter a comma-separated list of indicator indic
 
 - **Numeric Version**:
   ```text
-  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29,37,n,n,e38
+  e1,e19,e18,e32,n,e2,3,36,37,34,35,33,n,n,20,21,22,23,n,6,7,8,9,n,10,11,12,13,n,14,15,16,17,n,n,27,28,e26,n,e24,25,n,e4,e31,e29,30,38,n,n,e39
   ```
 
 - **Identifier Version**:
@@ -247,7 +248,7 @@ When a newer GitHub Release is available, `e:plugin-update` appends two standalo
 agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
-*(In Text style `38` / `plugin-update`, the first line renders as `⚠️ Statusline update available (current v1.12.0 → latest v1.13.0). Run to update:`.)*
+*(In Text style `39` / `plugin-update`, the first line renders as `⚠️ Statusline update available (current v1.12.0 → latest v1.13.0). Run to update:`.)*
 
 ## Contributing
 

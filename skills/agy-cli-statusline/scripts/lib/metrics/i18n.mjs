@@ -4,9 +4,11 @@ import { formatVersionTag } from '../core/semver.mjs';
 import {
   BLUE,
   BOLD,
+  GRAY,
   RESET,
   WHITE,
   YELLOW,
+  getActiveModelRoleColor,
   getAgentStateColor,
   getColorByCount,
   getModeColor,
@@ -35,6 +37,41 @@ export function formatAgentState(state, normLang) {
   };
   if (map[key] && map[key][normLang]) return map[key][normLang];
   return state;
+}
+
+/**
+ * 格式化 Orchestrator 實際執行模型與思考／快速角色徽章（非 Orchestrator 模式回傳空字串自動隱藏）。
+ * @param {object} m
+ * @param {string} normLang
+ * @returns {string}
+ */
+export function formatActiveModelDisplay(m, normLang) {
+  const modelName = typeof m?.activeModelName === 'string' ? m.activeModelName.trim() : '';
+  const isOrchestrator = Boolean(m?.isOrchestrator) || Boolean(modelName);
+  if (!isOrchestrator) return '';
+
+  const role = typeof m?.activeModelRole === 'string' ? m.activeModelRole.trim().toLowerCase() : '';
+  const labels = {
+    'zh-tw': { prefix: '實際模型:', planner: '[思考]', executor: '[快速]', pending: '待命' },
+    'zh-cn': { prefix: '实际模型:', planner: '[思考]', executor: '[快速]', pending: '待命' },
+    'us': { prefix: 'Active Model:', planner: '[Think]', executor: '[Fast]', pending: 'Pending' },
+    'jp': { prefix: '実行モデル:', planner: '[思考]', executor: '[高速]', pending: '待機中' }
+  };
+  const t = labels[normLang] || labels['zh-tw'];
+
+  if (!modelName) {
+    return `${WHITE}${t.prefix}${RESET} ${GRAY}${BOLD}${t.pending}${RESET}`;
+  }
+
+  const modelColor = getModelColor(modelName);
+  const modelPart = `${modelColor}${BOLD}${modelName}${RESET}`;
+  if (role === 'planner' || role === 'executor') {
+    const roleTag = t[role];
+    const roleColor = getActiveModelRoleColor(role);
+    return `${WHITE}${t.prefix}${RESET} ${roleColor}${BOLD}${roleTag}${RESET} ${modelPart}`;
+  }
+
+  return `${WHITE}${t.prefix}${RESET} ${modelPart}`;
 }
 
 /**
@@ -69,9 +106,11 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   const argonCountdown = m.argonCountdownVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
   const argonResetTime = m.argonResetTimeVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
   const argonBar = m.argonQuotaBarVal ?? '[██████████]';
+  const activeModelText = formatActiveModelDisplay(m, normLang);
   const dicts = {
     'zh-tw': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}五小時可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}脈絡用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}記憶體:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
@@ -118,6 +157,7 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'zh-cn': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}五小时可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}内存:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
@@ -164,6 +204,7 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'us': {
       'model-name': `${WHITE}Model:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}5-hr Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}Context Used:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}RAM:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
@@ -210,6 +251,7 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'jp': {
       'model-name': `${WHITE}モデル:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}五時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}コンテキスト使用:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}メモリ:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,

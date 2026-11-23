@@ -263,11 +263,11 @@ const WIZARD_META = {
     localeLocked: '已鎖定顯示語系：繁體中文 (zh-tw)',
     header: '選擇要顯示的狀態列指標（五大分類分頁精靈 1/5 ~ 5/5）：',
     pagers: [
-      '⎿ 分頁進度：[ 第 1 / 5 頁 ] · 已選取 4 項指標',
-      '⎿ 分頁進度：[ 第 2 / 5 頁 ] · 累計選取 18 項指標',
-      '⎿ 分頁進度：[ 第 3 / 5 頁 ] · 累計選取 22 項指標',
-      '⎿ 分頁進度：[ 第 4 / 5 頁 ] · 累計選取 27 項指標',
-      '★ 全部五大分類共 39 項指標已全數選取完成！'
+      '⎿ 分頁進度：[ 第 1 / 5 頁 ] · 已選取 5 項指標',
+      '⎿ 分頁進度：[ 第 2 / 5 頁 ] · 累計選取 19 項指標',
+      '⎿ 分頁進度：[ 第 3 / 5 頁 ] · 累計選取 23 項指標',
+      '⎿ 分頁進度：[ 第 4 / 5 頁 ] · 累計選取 28 項指標',
+      '★ 全部五大分類共 40 項指標已全數選取完成！'
     ],
     navHints: [
       'Space 勾選/取消 · Enter 進入下一分頁 (2/5 額度計費) · 終端機分頁免滾動零截斷',
@@ -281,11 +281,11 @@ const WIZARD_META = {
     localeLocked: '已锁定显示语言：简体中文 (zh-cn)',
     header: '选择要显示的状态栏指标（五大分类分页向导 1/5 ~ 5/5）：',
     pagers: [
-      '⎿ 分页进度：[ 第 1 / 5 页 ] · 已选取 4 项指标',
-      '⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 18 项指标',
-      '⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 22 项指标',
-      '⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 27 项指标',
-      '★ 全部五大分类共 39 项指标已全数选取完成！'
+      '⎿ 分页进度：[ 第 1 / 5 页 ] · 已选取 5 项指标',
+      '⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 19 项指标',
+      '⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 23 项指标',
+      '⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 28 项指标',
+      '★ 全部五大分类共 40 项指标已全数选取完成！'
     ],
     navHints: [
       'Space 勾选/取消 · Enter 进入下一分页 (2/5 额度计费) · 终端分页免滚动零截断',
@@ -299,11 +299,11 @@ const WIZARD_META = {
     localeLocked: '表示言語を固定：日本語 (jp)',
     header: '表示する指標を選択（5 大分類ウィザード 1/5 ~ 5/5）：',
     pagers: [
-      '⎿ ページ進捗：[ 第 1 / 5 ページ ] · 4 項目を選択中',
-      '⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 18 項目を選択中',
-      '⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 22 項目を選択中',
-      '⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 27 項目を選択中',
-      '★ 全 5 カテゴリ 39 指標の一括選択が完了しました！'
+      '⎿ ページ進捗：[ 第 1 / 5 ページ ] · 5 項目を選択中',
+      '⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 19 項目を選択中',
+      '⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 23 項目を選択中',
+      '⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 28 項目を選択中',
+      '★ 全 5 カテゴリ 40 指標の一括選択が完了しました！'
     ],
     navHints: [
       'Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要',
@@ -317,11 +317,11 @@ const WIZARD_META = {
     localeLocked: 'Locked display locale: English (us)',
     header: 'Select statusline indicators (Category Wizard 1/5 ~ 5/5):',
     pagers: [
-      '⎿ Wizard pager: [ Page 1 / 5 ] · 4 metrics selected',
-      '⎿ Wizard pager: [ Page 2 / 5 ] · 18 metrics selected cumulatively',
-      '⎿ Wizard pager: [ Page 3 / 5 ] · 22 metrics selected cumulatively',
-      '⎿ Wizard pager: [ Page 4 / 5 ] · 27 metrics selected cumulatively',
-      '★ All 39 indicators across 5 categories successfully selected!'
+      '⎿ Wizard pager: [ Page 1 / 5 ] · 5 metrics selected',
+      '⎿ Wizard pager: [ Page 2 / 5 ] · 19 metrics selected cumulatively',
+      '⎿ Wizard pager: [ Page 3 / 5 ] · 23 metrics selected cumulatively',
+      '⎿ Wizard pager: [ Page 4 / 5 ] · 28 metrics selected cumulatively',
+      '★ All 40 indicators across 5 categories successfully selected!'
     ],
     navHints: [
       'Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation',
@@ -529,14 +529,14 @@ ${optionLines}
   const termContentF6 = isZhTw
     ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 39 項）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 40 項）</text>
   <text x="290" y="156" fill="#8b949e">— 於 Write-in 輸入自訂順序（e: 為 Emoji，n 為換行，n,n 為空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 長條 (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版控類型 (vcs-type) │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 倒數 (cd)     │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 記憶體量 (memory)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 狀態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時間 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 訂閱方案 (plan)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 對話 ID (conv-id)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 長條 (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 記憶體量 (memory)   │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 倒數 (cd)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 狀態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 時間 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 對話 ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 訂閱方案 (plan)     │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ 沙盒狀態 (sandbox)  │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -552,14 +552,14 @@ ${optionLines}
     : (isZhCn
       ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 39 项）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 40 项）</text>
   <text x="290" y="156" fill="#8b949e">— 于 Write-in 输入自定义顺序（e: 为 Emoji，n 为换行，n,n 为空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版控类型 (vcs-type) │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 内存用量 (memory)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 对话 ID (conv-id)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 内存用量 (memory)   │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 对话 ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ 沙箱状态 (sandbox)  │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -575,14 +575,14 @@ ${optionLines}
       : (isJp
         ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 39 項目）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 40 項目）</text>
   <text x="280" y="156" fill="#8b949e">— 下の Write-in に並び順を入力（e: で絵文字、n で改行、n,n で空行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版管理種別 (vcs)    │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 メモリ (memory)     │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 プラン (plan)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 会話番号 (conv-id)  │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 メモリ (memory)     │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 会話番号 (conv-id)  │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 プラン (plan)       │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ サンド (sandbox)    │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -597,14 +597,14 @@ ${optionLines}
   <text x="24" y="422" fill="#6e7681">指定された順序とスタイルに基づき、11 列の高密度ステータスラインを自動構築</text>`
         : `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 39)</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 40)</text>
   <text x="330" y="156" fill="#8b949e">— Enter custom order below (e: for Emoji, n for newline):</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ VCS Type (vcs-type) │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 Memory (memory)     │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 Plan Tier (plan)    │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 Conv ID (conv-id)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 Memory (memory)     │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 Conv ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 Plan Tier (plan)    │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ Sandbox (sandbox)   │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>

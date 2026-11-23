@@ -7,9 +7,10 @@ import { formatTokens, normalizeLanguage, safeGetCount, sanitizeConversationId }
 import { resolveInstalledPluginVersionAsync } from '../core/plugin-manifest.mjs';
 import { runCmdDetailedAsync, withTimeout } from '../core/process-utils.mjs';
 import { formatVersionTag } from '../core/semver.mjs';
-import { resolveProjectPath } from '../core/settings.mjs';
+import { getSettingsAsync, resolveProjectPath } from '../core/settings.mjs';
 import { RESET, getColorByPercentage, renderBarGraph } from '../renderers/ansi.mjs';
 import { resolveArgonQuota } from './quota.mjs';
+import { resolveActiveRuntimeModelAsync } from './runtime-model.mjs';
 import { formatAbsoluteResetTime, formatResetTime } from './time-format.mjs';
 import { resolveInstalledAppVersionAsync, resolveInstalledCliVersionAsync } from './versions.mjs';
 
@@ -287,6 +288,26 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   };
   const shouldProbeCliVersion = !options?.cliVersion && !rawMetaCliVersion && hasFooterItem('cli-version') && options?.skipVersionProbes !== true;
   const shouldProbeAppVersion = !options?.appVersion && !rawMetaAppVersion && hasFooterItem('app-version') && options?.skipVersionProbes !== true;
+  const shouldProbeActiveModel = hasFooterItem('active-model');
+  const activeModelPromise = !shouldProbeActiveModel
+    ? Promise.resolve({ isOrchestrator: false, modelName: '', rawModel: '', role: 'none', source: '' })
+    : (async () => {
+        const resolvedSettings = (options?.settings && typeof options.settings === 'object')
+          ? options.settings
+          : await getSettingsAsync(meta, { homeDir: options?.homeDir || os.homedir() }).catch(() => ({}));
+        return resolveActiveRuntimeModelAsync({
+          meta,
+          fallbackModel,
+          settings: resolvedSettings,
+          cache,
+          homeDir: options?.homeDir || os.homedir(),
+          pluginDataDir: options?.pluginDataDir || '',
+          ...(options?.env !== undefined ? { env: options.env } : {}),
+          hookSession: options?.hookSession || null,
+          runtimeTelemetry: options?.runtimeTelemetry || null,
+          transcriptSummary: options?.transcriptSummary || null
+        });
+      })();
 
   // 併行執行非同步探測（含逾時保護避免系統休眠喚醒時被 CLI SIGKILL）
   const [
@@ -298,7 +319,8 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     subagentsCount,
     artifactsCount,
     probedCliVersion,
-    probedAppVersion
+    probedAppVersion,
+    activeModelInfo
   ] = await Promise.all([
     // 1. Git 分支
     !hasFooterItem('git-branch')
@@ -438,7 +460,10 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     // 9. Antigravity 2.0 應用程式版本號（僅在啟用 app-version 時以純檔案探測）
     !shouldProbeAppVersion
       ? Promise.resolve({ tag: '' })
-      : withTimeout(resolveInstalledAppVersionAsync(versionProbeOpts), 800, { tag: '' })
+      : withTimeout(resolveInstalledAppVersionAsync(versionProbeOpts), 800, { tag: '' }),
+
+    // 10. Orchestrator 實際執行模型（僅在啟用 active-model 時探測）
+    withTimeout(activeModelPromise, 400, { isOrchestrator: false, modelName: '', rawModel: '', role: 'none', source: '' })
   ]);
 
   const memUsage = `${rssMem}MB`;
@@ -505,6 +530,11 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     tokenColor,
     quotaPct, weeklyPct, argonPct, usedPctNum: contextInfo.usedPctNum,
     totalInput: contextInfo.totalInput, effectiveTokenMax, rssMem,
+    isOrchestrator: Boolean(activeModelInfo?.isOrchestrator),
+    activeModelName: activeModelInfo?.modelName || '',
+    activeModelRaw: activeModelInfo?.rawModel || '',
+    activeModelRole: activeModelInfo?.role || 'none',
+    activeModelSource: activeModelInfo?.source || '',
     pluginUpdateAvailable: Boolean(options?.pluginUpdateAvailable),
     pluginUpdateCurrentTag: options?.pluginUpdateCurrentTag || pluginVersion,
     pluginUpdateLatestTag: options?.pluginUpdateLatestTag || ''

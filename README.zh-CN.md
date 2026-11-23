@@ -6,7 +6,7 @@
 [![授权条款: MIT](https://img.shields.io/badge/授权条款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-一个同时支持 **Antigravity 命令行界面（`agy`）** 与 **Antigravity App（2.0，`v2.34.0+`）** 的插件（Plugin）——支持从 39 项实时指标（模型、5 小时／7 日／Argon 额度、上下文令牌分解、Git 状态、代理状态、CLI 与 2.0 版本号）中自由挑选、切换文字（`text`）或表情符号（`emoji`）标签风格、在 Antigravity 2.0 侧边栏以鼠标分列拖拽调序与换行（或于 CLI 使用 7 步骤问卷向导），并提供 4 种显示语言（`zh-cn`、`zh-tw`、`us`、`jp`）。
+一个同时支持 **Antigravity 命令行界面（`agy`）** 与 **Antigravity App（2.0，`v2.34.0+`）** 的插件（Plugin）——支持从 40 项实时指标（模型、Orchestrator 实际执行模型、5 小时／7 日／Argon 额度、上下文令牌分解、Git 状态、代理状态、CLI 与 2.0 版本号）中自由挑选、切换文字（`text`）或表情符号（`emoji`）标签风格、在 Antigravity 2.0 侧边栏以鼠标分列拖拽调序与换行（或于 CLI 使用 7 步骤问卷向导），并提供 4 种显示语言（`zh-cn`、`zh-tw`、`us`、`jp`）。
 
 全面支持 Google Antigravity 的三大核心平台：Antigravity 命令行界面（`agy`）、Antigravity 集成开发环境（Integrated Development Environment）以及 Antigravity 2.0 桌面应用程序。
 
@@ -40,13 +40,13 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## 特色亮点
 
 1. **跨平台兼容**：支持 Antigravity 命令行界面终端、集成开发环境侧边栏对话框（Dialog Box）以及 Antigravity 2.0 桌面应用程序，覆盖 Windows、macOS 与 Linux 操作系统。
-2. **39 项实时指标、4 种语言与双标签显示风格**：涵盖人工智能（Artificial Intelligence）模型状态、应用程序接口（Application Programming Interface）配额（含五小时、每周与 Gemini 4 Argon 专属配额，并具备四层动态配额池归属解析与 60 秒过期宽限期实时倒计时重算）、上下文（Context）与令牌（Token）消耗、交互队列、Git 版本控制状态及系统资源，支持简体中文（`zh-cn`）、繁体中文（`zh-tw`）、英文（`us`）与日文（`jp`），并可自由切换**文字标签（`text`）**或**表情符号标签（`emoji`，无冒号精简排版）**显示风格（`ui.footer.labelStyle`）。
+2. **40 项实时指标、4 种语言与双标签显示风格**：涵盖人工智能（Artificial Intelligence）模型状态（含 Orchestrator 模式下实时追踪 `[思考]` 规划模型与 `[快速]` 执行模型之实际底层模型）、应用程序接口（Application Programming Interface）配额（含五小时、每周与 Gemini 4 Argon 专属配额，并具备四层动态配额池归属解析与 60 秒过期宽限期实时倒计时重算）、上下文（Context）与令牌（Token）消耗、交互队列、Git 版本控制状态及系统资源，支持简体中文（`zh-cn`）、繁体中文（`zh-tw`）、英文（`us`）与日文（`jp`），并可自由切换**文字标签（`text`）**或**表情符号标签（`emoji`，无冒号精简排版）**显示风格（`ui.footer.labelStyle`）。
 3. **灵活百分比长条图（支持合并与分开显示）**：针对五小时额度、每周额度、Gemini 4 Argon 额度、上下文用量与令牌数提供默认 10 格视觉长条图（`[████████░░]`）；当数值与长条图相邻时自动合并为单一标签，未相邻时则各自以独立标签显示。
 4. **自定义排序与双轨换行机制**：支持以数字序号或英文标识码（Identifier）排序、使用 `n` 强制换行、使用 `n,n` 创建空白分隔行，并依终端宽度自动智能折行。
 5. **24-bit 四阶动态色彩**：依据配额剩余比例或上下文消耗程度自动切换 4 个色阶（`#57caff` 蓝色 `100~75%`、`#5cdb6d` 绿色 `74~50%`、`#ffd427` 黄色 `49~25%`、`#ff7daf` 粉红色 `24~0%`），并为不同人工智能模型家族应用专属品牌识别色。
 6. **三层配置文件同步与系统防护**：自动同步命令行界面专属、全局与项目三层 `settings.json` 及 `trusted_hooks.json`，内置 macOS/Linux NVM 绝对路径解析与 Windows UTF-8 字节顺序标记（Byte Order Mark）自动剥除机制。
-7. **首次打开更新检查与手动挂钩同步**：当 `ui.footer.items` 启用 `plugin-update`（`#38`）时，每次启动交互式 `agy` 命令行界面会自动检查一次 GitHub Releases（跳过 `agy -p`），无更新自动隐藏并修剪首尾空白行，离线时沿用缓存版本比对，落后时在配置位置独立显示两行本地化更新命令提醒（表情符号模式精简显示 `🆕 vX → vY`），且与仅显示状态栏版本号的 `plugin-version`（`#37`）完全解耦、不打乱单行排版。挂钩代码保持由 `/antigravity-cli-statusline:agy-cli-statusline` 手动同步，并可通过 `diagnose-statusline.mjs` 检查插件与挂钩版本差异。
-8. **Antigravity 2.0 原生可视化面板（MCP Apps）**：提供侧边辅助面板与全页仪表板，支持就地分列拖拽排版、`5 大分类 39 项指标` 抽屉与实时数值预览、可折叠令牌分类明细（`tokenBreakdown`）堆叠条、1 秒实时倒计时、旧版排序语法导入／导出，以及双按钮独立或同步保存。
+7. **首次打开更新检查与手动挂钩同步**：当 `ui.footer.items` 启用 `plugin-update`（`#39`）时，每次启动交互式 `agy` 命令行界面会自动检查一次 GitHub Releases（跳过 `agy -p`），无更新自动隐藏并修剪首尾空白行，离线时沿用缓存版本比对，落后时在配置位置独立显示两行本地化更新命令提醒（表情符号模式精简显示 `🆕 vX → vY`），且与仅显示状态栏版本号的 `plugin-version`（`#38`）完全解耦、不打乱单行排版。挂钩代码保持由 `/antigravity-cli-statusline:agy-cli-statusline` 手动同步，并可通过 `diagnose-statusline.mjs` 检查插件与挂钩版本差异。
+8. **Antigravity 2.0 原生可视化面板（MCP Apps）**：提供侧边辅助面板与全页仪表板，支持就地分列拖拽排版、`5 大分类 40 项指标` 抽屉与实时数值预览、可折叠令牌分类明细（`tokenBreakdown`）堆叠条、1 秒实时倒计时、旧版排序语法导入／导出，以及双按钮独立或同步保存。
 
 ## 如何管理与切换插件
 
@@ -137,58 +137,59 @@ antigravity-cli-statusline/
 
 ## 指标、排序与换行
 
-### 可显示的指标（1–39）
+### 可显示的指标（1–40）
 
 以下编号对应技能步骤 3 问卷（`resources/questions.json`）中五大分类分页选项序号（从 1 起算），以及各指标在 `emoji` 模式下对应的表情符号：
 
-**1. 模型与代理（4 项）**
+**1. 模型与代理（5 项）**
 - `1.` 🤖 **当前使用的人工智能模型名称（`model-name`）**：实时显示对话正在使用的模型
 - `2.` 🪪 **使用中代理（`agent-profile`）**：当前加载的 Agent Profile 名称
 - `3.` ⚡ **代理当前状态（`agent-state`）**：`闲置 / 思考中 / 执行中 / 调用工具 / 初始化`
 - `4.` ⚙️ **当前运行模式（`mode`）**：`default / code-only / plan / interactive / accept-edits`
+- `5.` 🧭 **编排器当前实际执行的底层模型（`active-model`）**：使用 Orchestrator 时实时显示实际执行的底层模型与 `[思考]`／`[快速]` 角色徽章；非 Orchestrator 模式自动隐藏
 
 **2. 额度、计费与账号（14 项）**
-- `5.` 🔋 **账号五小时可用额度百分比（`quota`）**：五小时应用程序接口可用额度百分比，搭配四阶配色
-- `6.` 🔋 **五小时可用额度长条图（`quota-bar`）**：10 格五小时可用额度长条图（`[████████░░]`）
-- `7.` ⏳ **账号五小时额度重置时间倒计时（`quota-reset-countdown`）**：距离五小时额度重置的剩余时间
-- `8.` 🕒 **五小时重置时间（`quota-reset-time`）**：本机时区绝对重置时间（默认同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）
-- `9.` 📅 **账号每周可用额度百分比（`quota-weekly`）**：每周应用程序接口可用额度百分比，搭配四阶配色
-- `10.` 📅 **每周可用额度长条图（`quota-weekly-bar`）**：10 格每周可用额度长条图（`[███████░░░]`）
-- `11.` ⏲️ **账号每周额度重置时间倒计时（`quota-weekly-countdown`）**：距离每周额度重置的剩余时间
-- `12.` 🗓️ **每周重置时间（`quota-weekly-reset-time`）**：每周额度重置的本机绝对时间（如 `2026/10/18 16:00`）
-- `13.` ✨ **Gemini 4 Argon 可用额度百分比（`quota-argon`）**：Gemini 4 Argon 专属配额百分比，搭配四阶配色
-- `14.` ✨ **Gemini 4 Argon 可用额度长条图（`quota-argon-bar`）**：10 格 Argon 可用额度长条图（`[█████░░░░░]`）
-- `15.` ⏱️ **Gemini 4 Argon 额度重置时间倒计时（`quota-argon-countdown`）**：距离 Argon 额度重置的剩余时间
-- `16.` ⏰ **Gemini 4 Argon 重置时间（`quota-argon-reset-time`）**：Argon 额度重置的本机绝对时间（如 `2026/10/30 23:57`）
-- `17.` 💎 **当前订阅计划等级（`plan-tier`）**：当前账号的订阅等级
-- `18.` 📧 **账号电子邮件（`account-email`）**：当前登录的账号邮箱
+- `6.` 🔋 **账号五小时可用额度百分比（`quota`）**：五小时应用程序接口可用额度百分比，搭配四阶配色
+- `7.` 🔋 **五小时可用额度长条图（`quota-bar`）**：10 格五小时可用额度长条图（`[████████░░]`）
+- `8.` ⏳ **账号五小时额度重置时间倒计时（`quota-reset-countdown`）**：距离五小时额度重置的剩余时间
+- `9.` 🕒 **五小时重置时间（`quota-reset-time`）**：本机时区绝对重置时间（默认同日 `HH:mm`、跨日 `yyyy/MM/dd HH:mm`）
+- `10.` 📅 **账号每周可用额度百分比（`quota-weekly`）**：每周应用程序接口可用额度百分比，搭配四阶配色
+- `11.` 📅 **每周可用额度长条图（`quota-weekly-bar`）**：10 格每周可用额度长条图（`[███████░░░]`）
+- `12.` ⏲️ **账号每周额度重置时间倒计时（`quota-weekly-countdown`）**：距离每周额度重置的剩余时间
+- `13.` 🗓️ **每周重置时间（`quota-weekly-reset-time`）**：每周额度重置的本机绝对时间（如 `2026/10/18 16:00`）
+- `14.` ✨ **Gemini 4 Argon 可用额度百分比（`quota-argon`）**：Gemini 4 Argon 专属配额百分比，搭配四阶配色
+- `15.` ✨ **Gemini 4 Argon 可用额度长条图（`quota-argon-bar`）**：10 格 Argon 可用额度长条图（`[█████░░░░░]`）
+- `16.` ⏱️ **Gemini 4 Argon 额度重置时间倒计时（`quota-argon-countdown`）**：距离 Argon 额度重置的剩余时间
+- `17.` ⏰ **Gemini 4 Argon 重置时间（`quota-argon-reset-time`）**：Argon 额度重置的本机绝对时间（如 `2026/10/30 23:57`）
+- `18.` 💎 **当前订阅计划等级（`plan-tier`）**：当前账号的订阅等级
+- `19.` 📧 **账号电子邮件（`account-email`）**：当前登录的账号邮箱
 
 **3. 上下文与令牌（4 项）**
-- `19.` 🧠 **当前对话已消耗的上下文用量比例（`context-used`）**：上下文窗口已消耗百分比
-- `20.` 🧠 **上下文用量长条图（`context-used-bar`）**：10 格上下文消耗长条图（`[█░░░░░░░░░]`）
-- `21.` 💰 **当前会话（Session）消耗的精确令牌数量（`token-count`）**：当前对话累计令牌数
-- `22.` 💰 **令牌数长条图（`token-count-bar`）**：10 格令牌消耗长条图（`[█░░░░░░░░░]`）
+- `20.` 🧠 **当前对话已消耗的上下文用量比例（`context-used`）**：上下文窗口已消耗百分比
+- `21.` 🧠 **上下文用量长条图（`context-used-bar`）**：10 格上下文消耗长条图（`[█░░░░░░░░░]`）
+- `22.` 💰 **当前会话（Session）消耗的精确令牌数量（`token-count`）**：当前对话累计令牌数
+- `23.` 💰 **令牌数长条图（`token-count-bar`）**：10 格令牌消耗长条图（`[█░░░░░░░░░]`）
 
 **4. 工作区与版本控制（5 项）**
-- `23.` 📁 **当前工作区项目短路径（`project-path`）**：工作区文件夹名称
-- `24.` 📍 **当前工作区项目完整路径（`project-full-path`）**：工作区绝对路径
-- `25.` 🔀 **当前工作区项目的 Git 分支（`git-branch`）**：当前所在的 Git 分支名称
-- `26.` 🔍 **工作区是否有未提交变更（`vcs-dirty`）**：`未提交 / 无变更`
-- `27.` 🗃️ **版本控制类型（`vcs-type`）**：`git / jj / fig`
+- `24.` 📁 **当前工作区项目短路径（`project-path`）**：工作区文件夹名称
+- `25.` 📍 **当前工作区项目完整路径（`project-full-path`）**：工作区绝对路径
+- `26.` 🔀 **当前工作区项目的 Git 分支（`git-branch`）**：当前所在的 Git 分支名称
+- `27.` 🔍 **工作区是否有未提交变更（`vcs-dirty`）**：`未提交 / 无变更`
+- `28.` 🗃️ **版本控制类型（`vcs-type`）**：`git / jj / fig`
 
 **5. 系统状态与后台任务（12 项）**
-- `28.` 💾 **命令行界面进程所消耗的随机存取内存量（`memory-usage`）**：`agy` 进程占用的内存大小
-- `29.` 🚀 **Antigravity 命令行界面版本号（`cli-version`）**：已安装的 `agy` 命令行界面版本（文字模式标签为 `Agy CLI 版本:`；在 CLI 与 2.0 均会自动检测显示）
-- `30.` 💬 **当前对话标识码前 8 位（`conversation-id`）**：供调试定位使用
-- `31.` 🛡️ **沙箱模式状态（`sandbox-status`）**：`off / on (net) / on (no-net)`
-- `32.` 🔔 **是否有等你响应的工具确认对话框（`tool-confirmation`）**：提示是否有工具正在等待用户确认
-- `33.` 📥 **队列中待处理的用户输入数（`pending-input`）**：排队等待执行的用户输入数量
-- `34.` 🔄 **进行中的后台任务数（`background-tasks`）**：运行中的后台进程数量
-- `35.` 👥 **活跃子代理数（`subagents`）**：运行中的子代理数量
-- `36.` 📄 **本次对话人工智能累计产出的文件数量（`artifacts`）**：本次对话产出的 Artifacts 数量
-- `37.` 🧩 **状态栏版本号（`plugin-version`）**：仅显示已安装的 `antigravity-cli-statusline` 版本号（文字模式标签为 `状态栏版本:`；不触发更新检查或提醒）
-- `38.` 🆕 **状态栏新版本更新提醒（`plugin-update`）**：在每次启动交互式 `agy` 时检查一次 GitHub Releases（跳过 `agy -p`），无更新自动隐藏，有新版时在排定位置显示两行更新提醒
-- `39.` 💻 **Antigravity 2.0 应用程序版本号（`app-version`）**：已安装的 Antigravity 2.0 桌面应用程序版本号（文字模式标签为 `Agy 2.0 版本:`；在 CLI 与 2.0 均会自动检测显示）
+- `29.` 💾 **命令行界面进程所消耗的随机存取内存量（`memory-usage`）**：`agy` 进程占用的内存大小
+- `30.` 🚀 **Antigravity 命令行界面版本号（`cli-version`）**：已安装的 `agy` 命令行界面版本（文字模式标签为 `Agy CLI 版本:`；在 CLI 与 2.0 均会自动检测显示）
+- `31.` 💬 **当前对话标识码前 8 位（`conversation-id`）**：供调试定位使用
+- `32.` 🛡️ **沙箱模式状态（`sandbox-status`）**：`off / on (net) / on (no-net)`
+- `33.` 🔔 **是否有等你响应的工具确认对话框（`tool-confirmation`）**：提示是否有工具正在等待用户确认
+- `34.` 📥 **队列中待处理的用户输入数（`pending-input`）**：排队等待执行的用户输入数量
+- `35.` 🔄 **进行中的后台任务数（`background-tasks`）**：运行中的后台进程数量
+- `36.` 👥 **活跃子代理数（`subagents`）**：运行中的子代理数量
+- `37.` 📄 **本次对话人工智能累计产出的文件数量（`artifacts`）**：本次对话产出的 Artifacts 数量
+- `38.` 🧩 **状态栏版本号（`plugin-version`）**：仅显示已安装的 `antigravity-cli-statusline` 版本号（文字模式标签为 `状态栏版本:`；不触发更新检查或提醒）
+- `39.` 🆕 **状态栏新版本更新提醒（`plugin-update`）**：在每次启动交互式 `agy` 时检查一次 GitHub Releases（跳过 `agy -p`），无更新自动隐藏，有新版时在排定位置显示两行更新提醒
+- `40.` 💻 **Antigravity 2.0 应用程序版本号（`app-version`）**：已安装的 Antigravity 2.0 桌面应用程序版本号（文字模式标签为 `Agy 2.0 版本:`；在 CLI 与 2.0 均会自动检测显示）
 
 ### 排序规则与样式设置
 
@@ -197,9 +198,9 @@ antigravity-cli-statusline/
 - **样式前缀设置**：
   - **文字标签样式（`text`，默认）**：纯数字序号（如 `1`）、`t` 前缀（如 `t1`）或纯英文标识码（如 `quota`、`t:quota`），显示为所选语言的文字标签搭配冒号（例如 `五小时可用: 88%`）。
   - **表情符号样式（`emoji`）**：使用 `e` 前缀（如 `e1`、`e:quota`，大小写不分），将文字标签替换为表情符号加单一空格（例如 `🔋 88%`），状态值仍保持多语言显示。
-  - **个别混搭**：各指标可独立指定样式（例如 `e1, 18, e17, 31`），未指定者默认文字样式。
+  - **个别混搭**：各指标可独立指定样式（例如 `e1, 19, e18, 32`），未指定者默认文字样式。
 - **百分比长条图合并与分开机制**：
-  - 针对五组指标配对（`quota` `5`+`6`、`quota-weekly` `9`+`10`、`quota-argon` `13`+`14`、`context-used` `19`+`20`、`token-count` `21`+`22`），当数值指标与长条图**相邻排列**（如 `5,6`）且样式一致时，自动合并为单一标签与进度条。
+  - 针对五组指标配对（`quota` `6`+`7`、`quota-weekly` `10`+`11`、`quota-argon` `14`+`15`、`context-used` `20`+`21`、`token-count` `22`+`23`），当数值指标与长条图**相邻排列**（如 `6,7`）且样式一致时，自动合并为单一标签与进度条。
   - 若两者**未相邻**（中间隔有其他指标或换行）或样式冲突（一为 `text`、一为 `emoji`）时，则各自以独立标签分开显示。
   - 长条图默认长度为 10 格（`[████████░░]`，可通过 `ui.footer.barLength` 自定义），绝对重置时间格式可通过 `ui.footer.timeFormat` 设置。
 - **换行与分区间隔**：
@@ -212,7 +213,7 @@ antigravity-cli-statusline/
 
 - **数字序号版本**：
   ```text
-  e1,e18,e17,e31,n,e2,3,35,36,33,34,32,n,n,19,20,21,22,n,5,6,7,8,n,9,10,11,12,n,13,14,15,16,n,n,26,27,e25,n,e23,24,n,e4,e30,e28,29,37,38
+  e1,e19,e18,e32,n,e2,3,36,37,34,35,33,n,n,20,21,22,23,n,6,7,8,9,n,10,11,12,13,n,14,15,16,17,n,n,27,28,e26,n,e24,25,n,e4,e31,e29,30,38,39
   ```
 
 - **英文标识码版本**：
@@ -240,14 +241,14 @@ Argon 可用: 59% [█████░░░░░] │ Argon 倒数: 6d 1h │ A
 ⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI 版本: v1.5.10 │ 状态栏版本: v1.13.0
 ```
 
-当启用 `plugin-update`（`#38`）且检测到较新的 GitHub Release 时，会在配置的位置独立显示两行更新提醒（在终端执行 `agy plugin install` 后版本即追平并自动消除提醒；如需同步 `~/.gemini/antigravity-cli/hooks/` 挂钩脚本请重跑 `/antigravity-cli-statusline:agy-cli-statusline`，或运行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 检查版本号差异）：
+当启用 `plugin-update`（`#39`）且检测到较新的 GitHub Release 时，会在配置的位置独立显示两行更新提醒（在终端执行 `agy plugin install` 后版本即追平并自动消除提醒；如需同步 `~/.gemini/antigravity-cli/hooks/` 挂钩脚本请重跑 `/antigravity-cli-statusline:agy-cli-statusline`，或运行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 检查版本号差异）：
 
 ```text
 ⚠️ 状态栏有新版本可用（当前 v1.12.0 → 最新 v1.13.0），请执行以下命令更新：
 agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
-采用表情符号样式（`e38` / `e:plugin-update`）时，第一行会精简显示为 `🆕 v1.12.0 → v1.13.0` 并搭配第二行独立更新命令；若版本已是最新则自动隐藏并修剪首尾纯空白行。
+采用表情符号样式（`e39` / `e:plugin-update`）时，第一行会精简显示为 `🆕 v1.12.0 → v1.13.0` 并搭配第二行独立更新命令；若版本已是最新则自动隐藏并修剪首尾纯空白行。
 
 ## 贡献指南
 

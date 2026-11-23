@@ -194,8 +194,9 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🪪 使用中のエージェント（agent-profile）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] ⚡ エージェント状態（agent-state）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ 現在の実行モード（mode）</text>
-  <text x="44" y="318" fill="#8b949e">⎿ ページ進捗：[ 第 1 / 5 ページ ] · 4 項目を選択中</text>
-  <text x="24" y="340" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 Orchestrator実行中の実モデル（active-model）</text>
+  <text x="44" y="336" fill="#8b949e">⎿ ページ進捗：[ 第 1 / 5 ページ ] · 5 項目を選択中</text>
+  <text x="24" y="358" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
   <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
@@ -232,7 +233,7 @@
   <text x="44" y="424" fill="#39c5cf">[✓] ⏰ Gemini 4 Argon リセット時刻（quota-argon-reset-time）</text>
   <text x="44" y="442" fill="#39c5cf">[✓] 💎 現在のサブスクリプションプラン（plan-tier）</text>
   <text x="44" y="460" fill="#39c5cf">[✓] 📧 アカウントのメールアドレス（account-email）</text>
-  <text x="44" y="498" fill="#8b949e">⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 18 項目を選択中</text>
+  <text x="44" y="498" fill="#8b949e">⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 19 項目を選択中</text>
   <text x="24" y="520" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (3/5 コンテキスト) · スクロール不要</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -260,7 +261,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🧠 コンテキスト使用バーグラフ（context-used-bar）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] 💰 現在のセッションの正確なトークン数（token-count）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 💰 トークン数バーグラフ（token-count-bar）</text>
-  <text x="44" y="318" fill="#8b949e">⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 22 項目を選択中</text>
+  <text x="44" y="318" fill="#8b949e">⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 23 項目を選択中</text>
   <text x="24" y="340" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (4/5 ワークスペース) · スクロール不要</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -289,7 +290,7 @@
   <text x="44" y="262" fill="#39c5cf">[✓] 🔀 現在のGitブランチ（git-branch）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 🔍 ワークスペースの未コミット変更（vcs-dirty）</text>
   <text x="44" y="298" fill="#39c5cf">[✓] 🗃️ バージョン管理タイプ（vcs-type）</text>
-  <text x="44" y="336" fill="#8b949e">⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 27 項目を選択中</text>
+  <text x="44" y="336" fill="#8b949e">⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 28 項目を選択中</text>
   <text x="24" y="358" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (5/5 システム) · スクロール不要</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -325,7 +326,7 @@
   <text x="44" y="388" fill="#39c5cf">[✓] 🧩 ステータスラインバージョン（plugin-version）</text>
   <text x="44" y="406" fill="#39c5cf">[✓] 🆕 ステータスライン更新通知（plugin-update）</text>
   <text x="44" y="424" fill="#39c5cf">[✓] 💻 Antigravity 2.0 アプリバージョン（app-version）</text>
-  <text x="44" y="462" fill="#5cdb6d">★ 全 5 カテゴリ 39 指標の一括選択が完了しました！</text>
+  <text x="44" y="462" fill="#5cdb6d">★ 全 5 カテゴリ 40 指標の一括選択が完了しました！</text>
   <text x="24" y="484" fill="#6e7681">Space 選択/解除 · Enter 決定してカスタム並べ替えへ (Write-in)</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -343,14 +344,14 @@
 <g class="f f6">
   <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 39 項目）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 40 項目）</text>
   <text x="280" y="156" fill="#8b949e">— 下の Write-in に並び順を入力（e: で絵文字、n で改行、n,n で空行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版管理種別 (vcs)    │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 メモリ (memory)     │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 プラン (plan)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 会話番号 (conv-id)  │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 メモリ (memory)     │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 会話番号 (conv-id)  │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 プラン (plan)       │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ サンド (sandbox)    │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>

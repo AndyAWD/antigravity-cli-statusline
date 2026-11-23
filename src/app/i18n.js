@@ -1,6 +1,6 @@
 /**
  * Antigravity 2.0 面板外殼四語系字典（與 registry.mjs SUPPORTED_LOCALES 嚴格一致）。
- * 38+ 項指標名稱、描述與數值全由後端 registry / i18n.mjs 動態提供，此檔僅負責外殼按鈕與標籤。
+ * 40+ 項指標名稱、描述與數值全由後端 registry / i18n.mjs 動態提供，此檔僅負責外殼按鈕與標籤。
  */
 
 export const APP_UI_STRINGS = {

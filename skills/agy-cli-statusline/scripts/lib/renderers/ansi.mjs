@@ -129,6 +129,19 @@ export function getModeColor(mode) {
 }
 
 /**
+ * 依 Orchestrator 執行期模型角色取得徽章顏色。
+ * @param {string} role
+ * @returns {string}
+ */
+export function getActiveModelRoleColor(role) {
+  const r = (role || '').toLowerCase();
+  if (r === 'planner') return YELLOW;
+  if (r === 'executor') return GREEN;
+  if (r === 'pending') return GRAY;
+  return BLUE;
+}
+
+/**
  * 移除字串中所有 ANSI 控制與著色序列。
  * @param {string} str
  * @returns {string}

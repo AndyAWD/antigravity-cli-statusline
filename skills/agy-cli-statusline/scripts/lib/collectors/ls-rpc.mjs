@@ -307,7 +307,9 @@ export async function fetchPaginatedTrajectoryMetadataAsync({
       extracted.maxContextTokens > 0 ||
       extracted.estimatedTokensUsed > 0 ||
       extracted.usage ||
-      extracted.tokenBreakdown.length > 0
+      extracted.tokenBreakdown.length > 0 ||
+      extracted.modelDisplayName ||
+      extracted.model
     ) {
       latestTelemetry = mergeRuntimeTelemetry(latestTelemetry, extracted);
     }

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { isOrchestratorModelName } from '../../skills/agy-cli-statusline/scripts/lib/collectors/runtime-model.mjs';
 
 const TAIL_BYTES = 64 * 1024;
 const UUID_DIR_RE = /^[0-9a-f-]{8,}$/i;
@@ -38,6 +39,9 @@ export async function readTranscriptSummaryAsync(transcriptPath) {
     lastToolName: '',
     lastToolSummary: '',
     lastError: '',
+    lastModel: '',
+    lastModelHasThinking: false,
+    lastModelTimestampMs: 0,
     mtimeMs: 0
   };
   if (!transcriptPath || typeof transcriptPath !== 'string') return empty;
@@ -67,6 +71,9 @@ export async function readTranscriptSummaryAsync(transcriptPath) {
     let lastToolName = '';
     let lastToolSummary = '';
     let lastError = '';
+    let lastModel = '';
+    let lastModelHasThinking = false;
+    let lastModelTimestampMs = 0;
     let pendingToolResults = 0;
     let derivedAgentState = 'idle';
 
@@ -99,6 +106,12 @@ export async function readTranscriptSummaryAsync(transcriptPath) {
       }
 
       if (step.type === 'PLANNER_RESPONSE') {
+        if (!lastModel && typeof step.model === 'string' && step.model.trim() && !isOrchestratorModelName(step.model)) {
+          lastModel = step.model.trim();
+          lastModelHasThinking = Boolean(typeof step.thinking === 'string' && step.thinking.trim());
+          const ts = typeof step.created_at === 'string' && step.created_at.trim() ? new Date(step.created_at).getTime() : 0;
+          lastModelTimestampMs = (Number.isFinite(ts) && ts > 0) ? ts : Math.round(stat.mtimeMs || 0);
+        }
         const calls = Array.isArray(step.tool_calls) ? step.tool_calls : [];
         if (calls.length > 0) {
           const newestCall = calls[calls.length - 1];
@@ -128,6 +141,9 @@ export async function readTranscriptSummaryAsync(transcriptPath) {
       lastToolName,
       lastToolSummary,
       lastError,
+      lastModel,
+      lastModelHasThinking,
+      lastModelTimestampMs,
       mtimeMs: stat.mtimeMs
     };
   } catch (_) {

@@ -19,6 +19,8 @@ test('readTranscriptSummaryAsync parses tail, ignores torn final line, and infer
         step_index: 1,
         type: 'PLANNER_RESPONSE',
         status: 'DONE',
+        model: 'gemini-4-hydrogen-high',
+        created_at: '2026-11-23T13:12:00Z',
         tool_calls: [{ name: 'run_command', args: { toolSummary: '"Run tests"' } }]
       }),
       '{"broken_torn_line": '
@@ -31,6 +33,8 @@ test('readTranscriptSummaryAsync parses tail, ignores torn final line, and infer
     assert.equal(summary.derivedAgentState, 'tool_use');
     assert.equal(summary.lastToolName, 'run_command');
     assert.equal(summary.lastToolSummary, 'Run tests');
+    assert.equal(summary.lastModel, 'gemini-4-hydrogen-high');
+    assert.equal(summary.lastModelHasThinking, false);
 
     fs.appendFileSync(trPath, '\n' + JSON.stringify({ step_index: 2, type: 'PLANNER_RESPONSE', status: 'DONE', tool_calls: [] }) + '\n', 'utf8');
     const idleSummary = await readTranscriptSummaryAsync(trPath);

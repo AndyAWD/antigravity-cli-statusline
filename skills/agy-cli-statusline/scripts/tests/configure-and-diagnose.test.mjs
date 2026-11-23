@@ -624,14 +624,15 @@ async function testCase8QuestionsJsonMetricIds() {
     'quota-argon-reset-time',
     'plugin-version',
     'plugin-update',
-    'app-version'
+    'app-version',
+    'active-model'
   ];
 
   for (const lang of languages) {
     const langData = questionsData[lang];
     assert.ok(langData, `${lang} 語系資料必須存在`);
     assert.ok(Array.isArray(langData.options), `${lang}.options 必須為陣列`);
-    assert.strictEqual(langData.options.length, 39, `${lang}.options 必須包含全部 39 個指標選項`);
+    assert.strictEqual(langData.options.length, 40, `${lang}.options 必須包含全部 40 個指標選項`);
 
     const extractedIds = langData.options.map(item => {
       const match = item.match(/[\(（]([^）\)]+)[\)）]$/);
@@ -639,7 +640,7 @@ async function testCase8QuestionsJsonMetricIds() {
     });
 
     const uniqueIds = new Set(extractedIds);
-    assert.strictEqual(uniqueIds.size, 39, `${lang} 的所有指標識別碼必須不重複`);
+    assert.strictEqual(uniqueIds.size, 40, `${lang} 的所有指標識別碼必須不重複`);
 
     for (const newId of expectedNewIds) {
       assert.ok(uniqueIds.has(newId), `${lang} 必須包含新指標 ID: "${newId}"`);
@@ -784,7 +785,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
   const questionsData = JSON.parse(fs.readFileSync(questionsPath, 'utf8'));
 
   const expectedCategories = [
-    { id: 'model-and-agent', count: 4 },
+    { id: 'model-and-agent', count: 5 },
     { id: 'quota-and-billing', count: 14 },
     { id: 'context-and-tokens', count: 4 },
     { id: 'workspace-and-vcs', count: 5 },
@@ -808,7 +809,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
       totalOptions += cat.options.length;
       catOptionsFlat.push(...cat.options);
     }
-    assert.strictEqual(totalOptions, 39, `${lang} 分類中的指標總和必須剛好為 39 項`);
+    assert.strictEqual(totalOptions, 40, `${lang} 分類中的指標總和必須剛好為 40 項`);
     assert.deepStrictEqual(catOptionsFlat, langData.options, `${lang} 平坦 options 必須與 5 大分類彙整選項完全一致`);
 
     // 驗證雙括號清理需求：各選項中僅允許末尾唯一的英文識別碼括號，不得含有額外說明括號
@@ -895,9 +896,9 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
     'context-used': 'emoji'
   });
 
-  // 7. 全域 1-39 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 25 代表 git-branch、37 代表 plugin-version、38 代表 plugin-update、39 代表 app-version，且未勾選之 36 不可誤入）
+  // 7. 全域 1-40 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 26 代表 git-branch、38 代表 plugin-version、39 代表 plugin-update、40 代表 app-version，且未勾選之 37 不可誤入）
   const subsetIds = ['model-name', 'git-branch', 'plugin-version', 'plugin-update', 'app-version'];
-  const resGlobalFallback = parseOrderAndStyles('1, e25, 36, e37, e38, e39', subsetIds);
+  const resGlobalFallback = parseOrderAndStyles('1, e26, 37, e38, e39, e40', subsetIds);
   assert.deepStrictEqual(resGlobalFallback.items, ['model-name', 'git-branch', 'plugin-version', 'plugin-update', 'app-version']);
   assert.deepStrictEqual(resGlobalFallback.itemStyles, {
     'git-branch': 'emoji',

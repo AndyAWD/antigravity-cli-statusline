@@ -214,7 +214,7 @@ test('parse-order-expression resolves non-active metrics & save-both preserves C
     const parsedRes = await svc.saveConfig({
       action: 'parse-order-expression',
       layout: { items: ['model-name'] },
-      orderExpression: 'e:quota-argon, 15, n, model-name'
+      orderExpression: 'e:quota-argon, 16, n, model-name'
     });
     assert.deepEqual(parsedRes.parsed.items, ['quota-argon', 'quota-argon-countdown', 'n', 'model-name']);
     assert.equal(parsedRes.parsed.itemStyles['quota-argon'], 'emoji');
@@ -690,6 +690,85 @@ test('StatuslineService resolves and caches both cli-version and app-version in 
     assert.equal(appCalls, 2);
     assert.equal(res3.snapshot.renderedItems.text['cli-version'].plainText, 'Agy CLI Version: Unknown');
     assert.equal(res3.snapshot.renderedItems.text['app-version'].plainText, 'Agy 2.0 Version: v2.35.0');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('StatuslineService renders active-model for Orchestrator sessions and hides for single-model sessions', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-svc-orch-'));
+  try {
+    const pluginData = path.join(tmpHome, 'plugin_data');
+    const cliDir = path.join(tmpHome, '.gemini', 'antigravity-cli');
+    fs.mkdirSync(pluginData, { recursive: true });
+    fs.mkdirSync(cliDir, { recursive: true });
+
+    const convId = 'conv-svc-orch';
+    fs.writeFileSync(path.join(cliDir, 'settings.json'), JSON.stringify({
+      orchestrator: {
+        planner: 'gemini-4-carbon-high',
+        executor: 'gemini-4-hydrogen-high'
+      },
+      ui: {
+        language: 'zh-tw',
+        footer: { items: ['model-name', 'active-model'] }
+      }
+    }), 'utf8');
+
+    fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      latestConversationId: convId,
+      sessions: {
+        [convId]: {
+          conversationId: convId,
+          modelName: 'Orchestrator (Carbon)',
+          agentState: 'working',
+          updatedAt: Date.now()
+        }
+      }
+    }), 'utf8');
+
+    let runtimeModelName = 'Gemini 4 Hydrogen (High)';
+    let runtimeModelSlug = 'gemini-4-hydrogen-high';
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: pluginData,
+      fetchReleaseFn: async () => ({ ok: false }),
+      resolveCliVersionFn: async () => ({ version: '1.5.15', tag: 'v1.5.15', installed: true, source: 'mock' }),
+      resolveAppVersionFn: async () => ({ version: '2.34.0', tag: 'v2.34.0', installed: true, source: 'mock' }),
+      collectLsTelemetryFn: async () => ({
+        cache: null,
+        runtimeTelemetry: runtimeModelName
+          ? { maxContextTokens: 512000, estimatedTokensUsed: 1000, modelDisplayName: runtimeModelName, model: runtimeModelSlug, tokenBreakdown: [] }
+          : null,
+        telemetryStatus: { lsConnected: true, lsEnvSource: 'env', source: 'live', warning: '' }
+      })
+    });
+
+    const resOrch = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw' });
+    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].plainText, '實際模型: [快速] Gemini 4 Hydrogen (High)');
+    assert.equal(resOrch.snapshot.renderedItems.emoji['active-model'].plainText, '🧭 [快速] Gemini 4 Hydrogen (High)');
+
+    // 切換為一般模型時，active-model 自動隱藏（plainText 為空字串）
+    fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      latestConversationId: convId,
+      sessions: {
+        [convId]: {
+          conversationId: convId,
+          modelName: 'Gemini 4 Neon (High)',
+          agentState: 'idle',
+          updatedAt: Date.now() + 1000
+        }
+      }
+    }), 'utf8');
+    runtimeModelName = 'Gemini 4 Neon (High)';
+    runtimeModelSlug = 'gemini-4-neon-high';
+
+    const resSingle = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resSingle.snapshot.renderedItems.text['active-model'].plainText, '');
+    assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].plainText, '');
   } finally {
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }

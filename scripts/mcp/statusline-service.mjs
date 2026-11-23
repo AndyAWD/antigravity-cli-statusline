@@ -509,6 +509,12 @@ export class StatuslineService {
       contextInfo,
       weeklyInfo,
       {
+        homeDir: this.homeDir,
+        pluginDataDir: this.pluginDataDir,
+        settings: cliSettings,
+        hookSession: activeSession,
+        runtimeTelemetry,
+        transcriptSummary,
         timeFormat: activeLayout.timeFormat,
         barLength: activeLayout.barLength,
         argonInfo,

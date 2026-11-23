@@ -194,8 +194,9 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🪪 使用中代理（agent-profile）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] ⚡ 代理当前状态（agent-state）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ 当前运行模式（mode）</text>
-  <text x="44" y="318" fill="#8b949e">⎿ 分页进度：[ 第 1 / 5 页 ] · 已选取 4 项指标</text>
-  <text x="24" y="340" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (2/5 额度计费) · 终端分页免滚动零截断</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 编排器当前实际执行的底层模型（active-model）</text>
+  <text x="44" y="336" fill="#8b949e">⎿ 分页进度：[ 第 1 / 5 页 ] · 已选取 5 项指标</text>
+  <text x="24" y="358" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (2/5 额度计费) · 终端分页免滚动零截断</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
   <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
@@ -232,7 +233,7 @@
   <text x="44" y="424" fill="#39c5cf">[✓] ⏰ Gemini 4 Argon 重置时间（quota-argon-reset-time）</text>
   <text x="44" y="442" fill="#39c5cf">[✓] 💎 当前订阅计划等级（plan-tier）</text>
   <text x="44" y="460" fill="#39c5cf">[✓] 📧 账号电子邮件（account-email）</text>
-  <text x="44" y="498" fill="#8b949e">⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 18 项指标</text>
+  <text x="44" y="498" fill="#8b949e">⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 19 项指标</text>
   <text x="24" y="520" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (3/5 上下文令牌) · 终端分页免滚动零截断</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -260,7 +261,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🧠 上下文用量长条图（context-used-bar）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] 💰 当前会话消耗的精确令牌数量（token-count）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 💰 令牌数长条图（token-count-bar）</text>
-  <text x="44" y="318" fill="#8b949e">⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 22 项指标</text>
+  <text x="44" y="318" fill="#8b949e">⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 23 项指标</text>
   <text x="24" y="340" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (4/5 工作区) · 终端分页免滚动零截断</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -289,7 +290,7 @@
   <text x="44" y="262" fill="#39c5cf">[✓] 🔀 当前工作区项目的 Git 分支（git-branch）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 🔍 工作区是否有未提交变更（vcs-dirty）</text>
   <text x="44" y="298" fill="#39c5cf">[✓] 🗃️ 版本控制类型（vcs-type）</text>
-  <text x="44" y="336" fill="#8b949e">⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 27 项指标</text>
+  <text x="44" y="336" fill="#8b949e">⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 28 项指标</text>
   <text x="24" y="358" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (5/5 系统任务) · 终端分页免滚动零截断</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -325,7 +326,7 @@
   <text x="44" y="388" fill="#39c5cf">[✓] 🧩 状态栏版本号（plugin-version）</text>
   <text x="44" y="406" fill="#39c5cf">[✓] 🆕 状态栏新版本更新提醒（plugin-update）</text>
   <text x="44" y="424" fill="#39c5cf">[✓] 💻 Antigravity 2.0 应用程序版本号（app-version）</text>
-  <text x="44" y="462" fill="#5cdb6d">★ 全部五大分类共 39 项指标已全数选取完成！</text>
+  <text x="44" y="462" fill="#5cdb6d">★ 全部五大分类共 40 项指标已全数选取完成！</text>
   <text x="24" y="484" fill="#6e7681">Space 勾选/取消 · Enter 确认并前往手动排序 (Write-in) · 零截断勾选完毕</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -343,14 +344,14 @@
 <g class="f f6">
   <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 39 项）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 40 项）</text>
   <text x="290" y="156" fill="#8b949e">— 于 Write-in 输入自定义顺序（e: 为 Emoji，n 为换行，n,n 为空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ 版控类型 (vcs-type) │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 内存用量 (memory)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 对话 ID (conv-id)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 内存用量 (memory)   │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 对话 ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ 沙箱状态 (sandbox)  │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>

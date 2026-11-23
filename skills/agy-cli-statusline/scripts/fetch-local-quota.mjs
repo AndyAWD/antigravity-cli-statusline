@@ -329,16 +329,22 @@ export function parseShortTermBuckets(summaryResponse) {
 export function persistRuntimeContextToCtxFile(ctxCachePath, runtimeContext) {
   if (!ctxCachePath || !runtimeContext) return;
   const hasMaxCtx = typeof runtimeContext.maxContextTokens === 'number' && runtimeContext.maxContextTokens > 0;
+  const hasRuntimeModel = Boolean(
+    (typeof runtimeContext.modelDisplayName === 'string' && runtimeContext.modelDisplayName.trim()) ||
+    (typeof runtimeContext.model === 'string' && runtimeContext.model.trim())
+  );
   const hasOffset = typeof runtimeContext.nextOffset === 'number' && runtimeContext.nextOffset > 0;
-  if (!hasMaxCtx && !hasOffset) return;
+  if (!hasMaxCtx && !hasRuntimeModel && !hasOffset) return;
 
   const existing = readJsonSafeSync(ctxCachePath) || {};
   const merged = { ...existing };
   if (hasMaxCtx) {
     merged.runtime_max_context_tokens = runtimeContext.maxContextTokens;
-    merged.runtime_model_display_name = runtimeContext.modelDisplayName || '';
-    merged.runtime_model_enum = runtimeContext.model || '';
-    merged.runtime_model_key = normalizeModelName(runtimeContext.modelDisplayName || runtimeContext.model || '');
+  }
+  if (hasMaxCtx || hasRuntimeModel) {
+    merged.runtime_model_display_name = runtimeContext.modelDisplayName || merged.runtime_model_display_name || '';
+    merged.runtime_model_enum = runtimeContext.model || merged.runtime_model_enum || '';
+    merged.runtime_model_key = normalizeModelName(runtimeContext.modelDisplayName || runtimeContext.model || '') || merged.runtime_model_key || '';
   }
   if (hasOffset && runtimeContext.nextOffset >= Number(existing.generator_metadata_offset || 0)) {
     merged.generator_metadata_offset = runtimeContext.nextOffset;
@@ -360,7 +366,7 @@ async function fetchTrajectoryGeneratorContextAsync(port, csrfToken, host, prefe
   });
 
   const best = paged.telemetry || { maxContextTokens: 0, modelDisplayName: '', model: '' };
-  if (best.maxContextTokens <= 0 && paged.nextOffset === startOffset) {
+  if (best.maxContextTokens <= 0 && !best.modelDisplayName && !best.model && paged.nextOffset === startOffset) {
     return null;
   }
   return {

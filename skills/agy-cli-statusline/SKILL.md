@@ -1,6 +1,6 @@
 ---
 name: agy-cli-statusline
-description: 設定 Antigravity 命令列介面（Command-Line Interface）（agy）狀態列（Statusline / Footer）之 39 項即時指標（含獨立的 Agy CLI／Agy 2.0／狀態列版本顯示與 GitHub Release 更新提醒）、標籤樣式（text / emoji）、排序與多語系（zh-tw / zh-cn / us / jp），並透過跨平台 configure-statusline.mjs 部署掛鉤與同步設定。適用於客製化頁尾、切換圖示或文字標籤、顯示額度 / 脈絡 / 權杖 / Git / 代理 / 版本與更新提醒指標、切換語系、跨機啟用，或以 /antigravity-cli-statusline:agy-cli-statusline 觸發時（支援 macOS、Linux、Windows）。
+description: 設定 Antigravity 命令列介面（Command-Line Interface）（agy）狀態列（Statusline / Footer）之 40 項即時指標（含 Orchestrator 實際執行模型、獨立的 Agy CLI／Agy 2.0／狀態列版本顯示與 GitHub Release 更新提醒）、標籤樣式（text / emoji）、排序與多語系（zh-tw / zh-cn / us / jp），並透過跨平台 configure-statusline.mjs 部署掛鉤與同步設定。適用於客製化頁尾、切換圖示或文字標籤、顯示額度 / 脈絡 / 權杖 / Git / 代理 / 版本與更新提醒指標、切換語系、跨機啟用，或以 /antigravity-cli-statusline:agy-cli-statusline 觸發時（支援 macOS、Linux、Windows）。
 ---
 
 # Antigravity 狀態列設定技能
@@ -15,9 +15,9 @@ description: 設定 Antigravity 命令列介面（Command-Line Interface）（ag
 4. **純 CLI 專用保護禁令**：本技能專用於設定 Antigravity 命令列介面（`agy`）底部狀態列，必須完整執行下方步驟 1–7 並由 `configure-statusline.mjs` 寫入設定，**嚴禁**改呼叫 `statusline_dashboard` 或 `statusline_save_config` 等 MCP 工具替代。
 5. **參考文件**：
    - [`references/technical-specs.md`](references/technical-specs.md) — 四階配色、長條圖合併、時間格式、`plugin-version` 更新檢查與四層模組規格
-   - [`references/step4-table-example.md`](references/step4-table-example.md) — 步驟 4 全選 39 項三欄 13 列表格完整範例
+   - [`references/step4-table-example.md`](references/step4-table-example.md) — 步驟 4 全選 40 項三欄 14 列表格完整範例
    - [`references/windows.md`](references/windows.md) — Windows 無位元組順序記號編碼、無雙引號路徑與子行程規範
-   - [`references/config-files.md`](references/config-files.md) — 三層設定檔、`statusLine` 格式與 39 項指標識別碼清單
+   - [`references/config-files.md`](references/config-files.md) — 三層設定檔、`statusLine` 格式與 40 項指標識別碼清單
    - [`references/pitfalls.md`](references/pitfalls.md) — 常見陷阱對照表
 
 ## 🎯 設定檔與技術摘要
@@ -56,8 +56,8 @@ description: 設定 Antigravity 命令列介面（Command-Line Interface）（ag
 
 ### 步驟 3：第二階段問卷（讀取 `questions.json`、五大分類分頁勾選）
 
-1. 讀取 `<SKILL_DIR>/resources/questions.json`，依 `<lang>` 取得 `categories`（共 5 個分類、39 項指標；為符合終端機高度限制 Issue #1262 分頁，`#1–#38` 編號不變、`#39` `app-version` 位於第 5 分類最末）：
-   - `model-and-agent`（4 項）、`quota-and-billing`（14 項）、`context-and-tokens`（4 項）、`workspace-and-vcs`（5 項）、`system-and-tasks`（12 項）。
+1. 讀取 `<SKILL_DIR>/resources/questions.json`，依 `<lang>` 取得 `categories`（共 5 個分類、40 項指標；為符合終端機高度限制 Issue #1262 分頁，`active-model` 位於第 1 分類最末）：
+   - `model-and-agent`（5 項）、`quota-and-billing`（14 項）、`context-and-tokens`（4 項）、`workspace-and-vcs`（5 項）、`system-and-tasks`（12 項）。
 2. 在**單次 `ask_question` 呼叫**的 `questions` 陣列依序傳入 5 個分類題目物件（各題設 `"is_multi_select": true`，CLI 渲染為 `Question 1/5:`–`5/5:`），將回傳勾選項合併為陣列 `selected`。
 
 ### 步驟 4：第三階段問卷（手動排序、樣式前綴與最終篩選）
@@ -65,12 +65,12 @@ description: 設定 Antigravity 命令列介面（Command-Line Interface）（ag
 > [!CAUTION]
 > **防截斷鐵則（Issue #1262）**：CLI 底層介面會重複渲染 `ask_question.question` 兩次，多行 `question` 或單欄長清單會把上方內容頂出視窗遭裁切。必須遵守：
 > 1. **禁止輸出單欄每項一行的長清單**。
-> 2. **在同一回合呼叫 `ask_question` 前，先於對話輸出「單行填寫規則標題 ＋ 三欄 Markdown 表格」**（最多 13 列），並**必須在同一回合內立即呼叫 `ask_question`，嚴禁只輸出表格就結束回合**。
+> 2. **在同一回合呼叫 `ask_question` 前，先於對話輸出「單行填寫規則標題 ＋ 三欄 Markdown 表格」**（最多 14 列），並**必須在同一回合內立即呼叫 `ask_question`，嚴禁只輸出表格就結束回合**。
 > 3. **`ask_question.question` 嚴格限為單純 1 行短句**（禁止含 `\n`）。
 
 1. **輸出單行標題 ＋ 直向優先三欄表格**：
    - 從 `<SKILL_DIR>/resources/prompts.json` 讀取 `step4_table.<lang>.title`（將總數佔位符替換為實際選取數 $N$）與 `step4_table.<lang>.header`。
-   - 將 `selected` 依序編號 `1`–$N$，每欄列數 $R = \lceil N / 3 \rceil$（39 項時 $R = 13$ 列），採**直向優先（Column-major：左欄 `1`–$R$、中欄 $R+1$–$2R$、右欄 $2R+1$–$N$）**輸出，每格簡化為 `🤖 簡稱 (\`metric-id\`)`（完整 39 項範本見 [`references/step4-table-example.md`](references/step4-table-example.md)）。
+   - 將 `selected` 依序編號 `1`–$N$，每欄列數 $R = \lceil N / 3 \rceil$（40 項時 $R = 14$ 列），採**直向優先（Column-major：左欄 `1`–$R$、中欄 $R+1$–$2R$、右欄 $2R+1$–$N$）**輸出，每格簡化為 `🤖 簡稱 (\`metric-id\`)`（完整 40 項範本見 [`references/step4-table-example.md`](references/step4-table-example.md)）。
    - 表格下方可附帶一句鎖定語系的簡短備援提示（如「若未跳出選單，請直接輸入排序或告知繼續」），避免偶發未觸發選單時使用者卡住。
 2. **同一回合立即呼叫單行 `ask_question`（不可省略或延後到下一回合）**：
    - 從 `<SKILL_DIR>/resources/prompts.json` 讀取 `step4_order_question.<lang>` 直接傳入 `ask_question`。
