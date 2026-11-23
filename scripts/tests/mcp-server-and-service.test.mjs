@@ -634,3 +634,63 @@ test('MCP resources/read enforces strict CSP and save-both enforces workspacePat
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }
 });
+
+test('StatuslineService resolves and caches both cli-version and app-version in Antigravity 2.0 snapshots', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-svc-versions-'));
+  try {
+    const pluginData = path.join(tmpHome, 'plugin_data');
+    fs.mkdirSync(pluginData, { recursive: true });
+
+    let cliCalls = 0;
+    let appCalls = 0;
+    let cliVer = 'v1.5.15';
+    let appVer = 'v2.34.0';
+
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: pluginData,
+      fetchReleaseFn: async () => ({ ok: false }),
+      collectLsTelemetryFn: async () => ({
+        cache: null,
+        runtimeTelemetry: null,
+        telemetryStatus: { lsConnected: false, lsEnvSource: 'none', source: 'public_only', warning: '' }
+      }),
+      resolveCliVersionFn: async () => {
+        cliCalls++;
+        return { version: cliVer.replace(/^v/, ''), tag: cliVer, installed: Boolean(cliVer), source: 'mock' };
+      },
+      resolveAppVersionFn: async () => {
+        appCalls++;
+        return { version: appVer.replace(/^v/, ''), tag: appVer, installed: Boolean(appVer), source: 'mock' };
+      }
+    });
+
+    // 1. Both installed -> both rendered in text & emoji modes in Antigravity 2.0 panel
+    const res1 = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw' });
+    assert.equal(cliCalls, 1);
+    assert.equal(appCalls, 1);
+    assert.equal(res1.snapshot.renderedItems.text['cli-version'].plainText, 'Agy CLI 版本: v1.5.15');
+    assert.equal(res1.snapshot.renderedItems.text['app-version'].plainText, 'Agy 2.0 版本: v2.34.0');
+    assert.equal(res1.snapshot.renderedItems.emoji['cli-version'].plainText, '🚀 v1.5.15');
+    assert.equal(res1.snapshot.renderedItems.emoji['app-version'].plainText, '💻 v2.34.0');
+
+    // 2. Non-forced refresh reuses 60s version cache
+    const res2 = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw' });
+    assert.equal(cliCalls, 1, 'Cached cli-version should not re-probe within TTL');
+    assert.equal(appCalls, 1, 'Cached app-version should not re-probe within TTL');
+    assert.equal(res2.snapshot.renderedItems.text['cli-version'].plainText, 'Agy CLI 版本: v1.5.15');
+    assert.equal(res2.snapshot.renderedItems.text['app-version'].plainText, 'Agy 2.0 版本: v2.34.0');
+
+    // 3. forceRefresh bypasses cache & uninstalled version falls back to Unknown/未知
+    cliVer = '';
+    appVer = 'v2.35.0';
+    const res3 = await svc.getDashboardSnapshot({ hostLocale: 'us', forceRefresh: true });
+    assert.equal(cliCalls, 2);
+    assert.equal(appCalls, 2);
+    assert.equal(res3.snapshot.renderedItems.text['cli-version'].plainText, 'Agy CLI Version: Unknown');
+    assert.equal(res3.snapshot.renderedItems.text['app-version'].plainText, 'Agy 2.0 Version: v2.35.0');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});

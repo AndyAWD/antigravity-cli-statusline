@@ -77,7 +77,8 @@
           "👥 活躍子代理數（subagents）",
           "📄 本次對話人工智慧累計產出的檔案數量（artifacts）",
           "🧩 狀態列版本號（plugin-version）",
-          "🆕 狀態列新版本更新提醒（plugin-update）"
+          "🆕 狀態列新版本更新提醒（plugin-update）",
+          "💻 Antigravity 2.0 應用程式版本號（app-version）"
         ]
       }
     ],
@@ -119,7 +120,8 @@
       "👥 活躍子代理數（subagents）",
       "📄 本次對話人工智慧累計產出的檔案數量（artifacts）",
       "🧩 狀態列版本號（plugin-version）",
-      "🆕 狀態列新版本更新提醒（plugin-update）"
+      "🆕 狀態列新版本更新提醒（plugin-update）",
+      "💻 Antigravity 2.0 應用程式版本號（app-version）"
     ]
   },
   "zh-cn": {
@@ -200,7 +202,8 @@
           "👥 活跃子代理数（subagents）",
           "📄 本次对话人工智能累计产出的文件数量（artifacts）",
           "🧩 状态栏版本号（plugin-version）",
-          "🆕 状态栏新版本更新提醒（plugin-update）"
+          "🆕 状态栏新版本更新提醒（plugin-update）",
+          "💻 Antigravity 2.0 应用程序版本号（app-version）"
         ]
       }
     ],
@@ -242,7 +245,8 @@
       "👥 活跃子代理数（subagents）",
       "📄 本次对话人工智能累计产出的文件数量（artifacts）",
       "🧩 状态栏版本号（plugin-version）",
-      "🆕 状态栏新版本更新提醒（plugin-update）"
+      "🆕 状态栏新版本更新提醒（plugin-update）",
+      "💻 Antigravity 2.0 应用程序版本号（app-version）"
     ]
   },
   "us": {
@@ -323,7 +327,8 @@
           "👥 Active subagents (subagents)",
           "📄 Total artifacts generated in this session (artifacts)",
           "🧩 Statusline version (plugin-version)",
-          "🆕 Statusline update reminder (plugin-update)"
+          "🆕 Statusline update reminder (plugin-update)",
+          "💻 Antigravity 2.0 App version (app-version)"
         ]
       }
     ],
@@ -365,7 +370,8 @@
       "👥 Active subagents (subagents)",
       "📄 Total artifacts generated in this session (artifacts)",
       "🧩 Statusline version (plugin-version)",
-      "🆕 Statusline update reminder (plugin-update)"
+      "🆕 Statusline update reminder (plugin-update)",
+      "💻 Antigravity 2.0 App version (app-version)"
     ]
   },
   "jp": {
@@ -446,7 +452,8 @@
           "👥 アクティブなサブエージェント数（subagents）",
           "📄 今回のセッションで生成されたアーティファクト数（artifacts）",
           "🧩 ステータスラインバージョン（plugin-version）",
-          "🆕 ステータスライン更新通知（plugin-update）"
+          "🆕 ステータスライン更新通知（plugin-update）",
+          "💻 Antigravity 2.0 アプリバージョン（app-version）"
         ]
       }
     ],
@@ -488,7 +495,8 @@
       "👥 アクティブなサブエージェント数（subagents）",
       "📄 今回のセッションで生成されたアーティファクト数（artifacts）",
       "🧩 ステータスラインバージョン（plugin-version）",
-      "🆕 ステータスライン更新通知（plugin-update）"
+      "🆕 ステータスライン更新通知（plugin-update）",
+      "💻 Antigravity 2.0 アプリバージョン（app-version）"
     ]
   }
 }

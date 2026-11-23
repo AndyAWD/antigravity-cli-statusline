@@ -6,7 +6,7 @@ English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [�
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-An Antigravity plugin for both **Antigravity CLI (`agy`)** and **Antigravity App (2.0, `v2.34.0+`)** — monitor 38 real-time indicators (model, 5-hour/7-day/Argon quotas, context token breakdown, Git status, agent state), switch between Text (`text`) and Emoji (`emoji`) label styles, arrange items and line breaks visually with drag-and-drop in Antigravity App or via the 7-step CLI wizard, across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
+An Antigravity plugin for both **Antigravity CLI (`agy`)** and **Antigravity App (2.0, `v2.34.0+`)** — monitor 39 real-time indicators (model, 5-hour/7-day/Argon quotas, context token breakdown, Git status, agent state, CLI & 2.0 versions), switch between Text (`text`) and Emoji (`emoji`) label styles, arrange items and line breaks visually with drag-and-drop in Antigravity App or via the 7-step CLI wizard, across 4 languages (`us`, `zh-tw`, `zh-cn`, `jp`).
 
 Comprehensive support across the three core platforms of Google Antigravity (AGY): Antigravity Command-Line Interface (CLI) (`agy`), Antigravity Integrated Development Environment (IDE), and Antigravity 2.0 Desktop Application.
 
@@ -40,13 +40,13 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## Key Features
 
 1. **Multi-Platform Compatibility**: Supports Antigravity CLI terminal, Antigravity IDE sidebar chat, and Antigravity 2.0 Desktop Application across Windows, macOS, and Linux.
-2. **38 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 38 metrics across model status, API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools with 4-tier dynamic quota pool resolution and live countdown recalculation within a 60s expiry grace period), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
+2. **39 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 39 metrics across model status, API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools with 4-tier dynamic quota pool resolution and live countdown recalculation within a 60s expiry grace period), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
 3. **Flexible Bar Graphs (Merged or Separate)**: Renders 10-block visual progress bars (`[████████░░]`) for 5-hour quota, weekly quota, Gemini 4 Argon quota, context usage, and session tokens. Automatically merges labels when placed adjacent to numeric counterparts, or displays them with independent labels when separated.
 4. **Custom Sorting & Dual Line-Wrapping**: Supports 1-based index sorting, `n` manual line breaks, `n,n` blank-line section separators, and terminal-width-aware automatic wrapping.
 5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`#57caff` Blue `100–75%`, `#5cdb6d` Green `74–50%`, `#ffd427` Yellow `49–25%`, `#ff7daf` Pink `24–0%`) alongside model-family brand colors.
 6. **Three-Layer Config Sync & OS Safeguards**: Synchronizes CLI-specific, global, and workspace `settings.json` plus `trusted_hooks.json`, while handling macOS/Linux NVM path resolution and Windows UTF-8 Byte Order Mark (BOM) prevention.
 7. **First-Open Update Check & Manual Hook Sync**: When `plugin-update` (`#38`) is enabled in `ui.footer.items`, checks GitHub Releases once per interactive `agy` CLI launch (skipping `agy -p`), auto-hides while trimming leading/trailing blank lines when up to date, falls back cleanly to cached release info if offline, and renders a localized 2-line update notice (or concise `🆕 vX → vY` in `emoji` style) at its configured position when outdated—completely decoupled from `plugin-version` (`#37`), which renders the statusline version only without disrupting single-line layouts. Hook sync stays manual via `/antigravity-cli-statusline:agy-cli-statusline`, and `diagnose-statusline.mjs` inspects plugin-vs-hook version alignment.
-8. **Native Antigravity 2.0 Visual Panel (MCP Apps)**: Provides an interactive side-panel and full-page dashboard with in-place row-based drag-and-drop layout editing, a 5-category 38-metric drawer with live value previews, collapsible context `tokenBreakdown` stacked bar and usage summary, 1-second live countdowns, legacy order import/export, and dual save buttons (**Apply to 2.0 Panel Only** vs. **Sync to 2.0 + CLI**).
+8. **Native Antigravity 2.0 Visual Panel (MCP Apps)**: Provides an interactive side-panel and full-page dashboard with in-place row-based drag-and-drop layout editing, a 5-category 39-metric drawer with live value previews, collapsible context `tokenBreakdown` stacked bar and usage summary, 1-second live countdowns, legacy order import/export, and dual save buttons (**Apply to 2.0 Panel Only** vs. **Sync to 2.0 + CLI**).
 
 ## Plugin Management
 
@@ -137,7 +137,7 @@ Once installed, use the command matching your interface:
 
 ## Indicators, Sorting & Line Wrapping
 
-### Available Indicators (1–38)
+### Available Indicators (1–39)
 
 The numbers below correspond to the 1-based option indices across the 5 categories in Step 3 (`resources/questions.json`), along with each indicator's Emoji prefix used in `emoji` mode:
 
@@ -176,9 +176,9 @@ The numbers below correspond to the 1-based option indices across the 5 categori
 - `26.` 🔍 **VCS uncommitted status (`vcs-dirty`)** — `uncommitted / no changes`
 - `27.` 🗃️ **VCS type (`vcs-type`)** — `git / jj / fig`
 
-**5. System Status & Background Tasks (11 items)**
+**5. System Status & Background Tasks (12 items)**
 - `28.` 💾 **CLI RAM usage (`memory-usage`)** — RSS memory consumed by the `agy` process
-- `29.` 🚀 **Antigravity CLI version (`cli-version`)** — current CLI version string (`Agy CLI Version:` in text mode)
+- `29.` 🚀 **Antigravity CLI version (`cli-version`)** — installed `agy` CLI version string (`Agy CLI Version:` in text mode; works in both CLI and Antigravity 2.0)
 - `30.` 💬 **Conversation ID (`conversation-id`)** — first 8 characters of conversation ID for debugging
 - `31.` 🛡️ **Sandbox status (`sandbox-status`)** — `off / on (net) / on (no-net)`
 - `32.` 🔔 **Pending tool confirmation (`tool-confirmation`)** — whether a tool confirmation dialog is awaiting response
@@ -188,6 +188,7 @@ The numbers below correspond to the 1-based option indices across the 5 categori
 - `36.` 📄 **Total artifacts (`artifacts`)** — cumulative files/outputs produced in this session
 - `37.` 🧩 **Statusline version (`plugin-version`)** — displays installed `antigravity-cli-statusline` version only (`Statusline Version:` in text mode; does not trigger update checks or reminders)
 - `38.` 🆕 **Statusline update reminder (`plugin-update`)** — checks GitHub Releases once per interactive `agy` launch (skipping `agy -p`), auto-hides when up to date, and renders a 2-line update command at its configured position when behind
+- `39.` 💻 **Antigravity 2.0 App version (`app-version`)** — installed Antigravity 2.0 desktop app version (`Agy 2.0 Version:` in text mode; works in both CLI and Antigravity 2.0)
 
 ### Sorting Rules & Style Configuration
 

@@ -26,6 +26,10 @@ import {
 import { fetchLatestPluginReleaseAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/plugin-update.mjs';
 import { extractMetricsAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs';
 import {
+  resolveInstalledAppVersionAsync,
+  resolveInstalledCliVersionAsync
+} from '../../skills/agy-cli-statusline/scripts/lib/collectors/versions.mjs';
+import {
   resolveArgonQuota,
   resolveModelQuota,
   resolveWeeklyQuota
@@ -69,6 +73,7 @@ const DEFAULT_APP_ITEMS = [
 
 const UPDATE_CACHE_TTL_MS = 60 * 60 * 1000;
 const MEMORY_CACHE_TTL_MS = 15 * 1000;
+const VERSION_CACHE_TTL_MS = 60 * 1000;
 
 function resolveDefaultPluginRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -185,8 +190,35 @@ export class StatuslineService {
       path.join(this.homeDir, '.gemini', 'antigravity', 'plugin_data', 'antigravity-cli-statusline');
     this.collectLsTelemetryFn = options.collectLsTelemetryFn || collectLsTelemetryAsync;
     this.fetchReleaseFn = options.fetchReleaseFn || fetchLatestPluginReleaseAsync;
+    this.resolveCliVersionFn = options.resolveCliVersionFn || resolveInstalledCliVersionAsync;
+    this.resolveAppVersionFn = options.resolveAppVersionFn || resolveInstalledAppVersionAsync;
+    this.env = options.env;
     this.execFn = options.execFn;
     this._memoryCache = { at: 0, value: 0 };
+    this._versionCache = { at: 0, cliVersion: '', appVersion: '' };
+  }
+
+  async _resolveInstalledVersionsAsync(forceRefresh = false) {
+    const nowMs = Date.now();
+    if (!forceRefresh && this._versionCache.at > 0 && (nowMs - this._versionCache.at) < VERSION_CACHE_TTL_MS) {
+      return {
+        cliVersion: this._versionCache.cliVersion,
+        appVersion: this._versionCache.appVersion
+      };
+    }
+    const probeOpts = {
+      homeDir: this.homeDir,
+      ...(this.env !== undefined ? { env: this.env } : {}),
+      ...(this.execFn ? { execFn: this.execFn } : {})
+    };
+    const [cliRes, appRes] = await Promise.all([
+      Promise.resolve(this.resolveCliVersionFn(probeOpts)).catch(() => ({ tag: '' })),
+      Promise.resolve(this.resolveAppVersionFn(probeOpts)).catch(() => ({ tag: '' }))
+    ]);
+    const cliVersion = cliRes?.tag || '';
+    const appVersion = appRes?.tag || '';
+    this._versionCache = { at: nowMs, cliVersion, appVersion };
+    return { cliVersion, appVersion };
   }
 
   async _readPanelPreferencesAsync() {
@@ -246,11 +278,12 @@ export class StatuslineService {
     checkUpdate = false,
     hostLocale = ''
   } = {}) {
-    const [panelPrefs, hookSessionsData, brainSessions, installedPlugin] = await Promise.all([
+    const [panelPrefs, hookSessionsData, brainSessions, installedPlugin, installedVersions] = await Promise.all([
       this._readPanelPreferencesAsync(),
       readJsonSafeAsync(path.join(this.pluginDataDir, 'sessions.json')),
       discoverRecentBrainSessionsAsync(this.homeDir, 15),
-      resolveInstalledPluginVersionAsync({ pluginDir: this.pluginRootDir, homeDir: this.homeDir })
+      resolveInstalledPluginVersionAsync({ pluginDir: this.pluginRootDir, homeDir: this.homeDir }),
+      this._resolveInstalledVersionsAsync(forceRefresh)
     ]);
 
     // 合併 Hook 對話與磁碟 brain/ 掃描對話
@@ -481,6 +514,9 @@ export class StatuslineService {
         argonInfo,
         footerItems: probeItemsSet,
         workspacePath: projectPath,
+        cliVersion: installedVersions.cliVersion,
+        appVersion: installedVersions.appVersion,
+        skipVersionProbes: true,
         pluginVersion: installedPlugin.tag || `v${installedPlugin.version}`,
         pluginUpdateAvailable: updateInfo.updateAvailable,
         pluginUpdateCurrentTag: updateInfo.installedTag,

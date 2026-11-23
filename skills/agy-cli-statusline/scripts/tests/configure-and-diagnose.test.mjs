@@ -623,14 +623,15 @@ async function testCase8QuestionsJsonMetricIds() {
     'quota-argon-countdown',
     'quota-argon-reset-time',
     'plugin-version',
-    'plugin-update'
+    'plugin-update',
+    'app-version'
   ];
 
   for (const lang of languages) {
     const langData = questionsData[lang];
     assert.ok(langData, `${lang} 語系資料必須存在`);
     assert.ok(Array.isArray(langData.options), `${lang}.options 必須為陣列`);
-    assert.strictEqual(langData.options.length, 38, `${lang}.options 必須包含全部 38 個指標選項`);
+    assert.strictEqual(langData.options.length, 39, `${lang}.options 必須包含全部 39 個指標選項`);
 
     const extractedIds = langData.options.map(item => {
       const match = item.match(/[\(（]([^）\)]+)[\)）]$/);
@@ -638,7 +639,7 @@ async function testCase8QuestionsJsonMetricIds() {
     });
 
     const uniqueIds = new Set(extractedIds);
-    assert.strictEqual(uniqueIds.size, 38, `${lang} 的所有指標識別碼必須不重複`);
+    assert.strictEqual(uniqueIds.size, 39, `${lang} 的所有指標識別碼必須不重複`);
 
     for (const newId of expectedNewIds) {
       assert.ok(uniqueIds.has(newId), `${lang} 必須包含新指標 ID: "${newId}"`);
@@ -787,7 +788,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
     { id: 'quota-and-billing', count: 14 },
     { id: 'context-and-tokens', count: 4 },
     { id: 'workspace-and-vcs', count: 5 },
-    { id: 'system-and-tasks', count: 11 }
+    { id: 'system-and-tasks', count: 12 }
   ];
 
   for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
@@ -807,7 +808,7 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
       totalOptions += cat.options.length;
       catOptionsFlat.push(...cat.options);
     }
-    assert.strictEqual(totalOptions, 38, `${lang} 分類中的指標總和必須剛好為 38 項`);
+    assert.strictEqual(totalOptions, 39, `${lang} 分類中的指標總和必須剛好為 39 項`);
     assert.deepStrictEqual(catOptionsFlat, langData.options, `${lang} 平坦 options 必須與 5 大分類彙整選項完全一致`);
 
     // 驗證雙括號清理需求：各選項中僅允許末尾唯一的英文識別碼括號，不得含有額外說明括號
@@ -894,14 +895,15 @@ async function testCase10FiveCategoryTabsAndParenthesisDefense() {
     'context-used': 'emoji'
   });
 
-  // 7. 全域 1-38 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 25 代表 git-branch、37 代表 plugin-version、38 代表 plugin-update，且未勾選之 36 不可誤入）
-  const subsetIds = ['model-name', 'git-branch', 'plugin-version', 'plugin-update']; // length = 4, git-branch 在 38 項中為第 25 項、plugin-version 為第 37 項、plugin-update 為第 38 項
-  const resGlobalFallback = parseOrderAndStyles('1, e25, 36, e37, e38', subsetIds);
-  assert.deepStrictEqual(resGlobalFallback.items, ['model-name', 'git-branch', 'plugin-version', 'plugin-update']);
+  // 7. 全域 1-39 指標序號回退（當 selectedIds 僅為子集，使用者輸入全域序號 25 代表 git-branch、37 代表 plugin-version、38 代表 plugin-update、39 代表 app-version，且未勾選之 36 不可誤入）
+  const subsetIds = ['model-name', 'git-branch', 'plugin-version', 'plugin-update', 'app-version'];
+  const resGlobalFallback = parseOrderAndStyles('1, e25, 36, e37, e38, e39', subsetIds);
+  assert.deepStrictEqual(resGlobalFallback.items, ['model-name', 'git-branch', 'plugin-version', 'plugin-update', 'app-version']);
   assert.deepStrictEqual(resGlobalFallback.itemStyles, {
     'git-branch': 'emoji',
     'plugin-version': 'emoji',
-    'plugin-update': 'emoji'
+    'plugin-update': 'emoji',
+    'app-version': 'emoji'
   });
 
   // 8. 貼上帶點號或完整選項文字的強健性（包含多行貼上、帶前綴貼上、尾隨標點）

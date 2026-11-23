@@ -105,7 +105,7 @@ function ansiToTspans(ansiLine) {
 // quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,
 // vcs-dirty,vcs-type,e:git-branch,n,
 // e:project-path,project-full-path,n,
-// e:mode,e:conversation-id,e:memory-usage,cli-version,plugin-version,plugin-update]
+// e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,plugin-update]
 // =============================================================================
 const USER_SORTED_ITEMS = [
   'model-name', 'account-email', 'plan-tier', 'sandbox-status', 'n',
@@ -116,7 +116,7 @@ const USER_SORTED_ITEMS = [
   'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'n', 'n',
   'vcs-dirty', 'vcs-type', 'git-branch', 'n',
   'project-path', 'project-full-path', 'n',
-  'mode', 'conversation-id', 'memory-usage', 'cli-version', 'plugin-version', 'plugin-update'
+  'mode', 'conversation-id', 'memory-usage', 'cli-version', 'app-version', 'plugin-version', 'plugin-update'
 ];
 
 const USER_ITEM_STYLES = {
@@ -178,6 +178,7 @@ function getScenarios(lang) {
     vcsType: 'git',
     gitBranch: 'main',
     cliVersion: 'v1.5.10',
+    appVersion: 'v2.34.0',
     pluginVersion: 'v1.13.0',
     conversationIdShort: '557d1ccd',
     sandboxEnabled: false,
@@ -266,7 +267,7 @@ const WIZARD_META = {
       '⎿ 分頁進度：[ 第 2 / 5 頁 ] · 累計選取 18 項指標',
       '⎿ 分頁進度：[ 第 3 / 5 頁 ] · 累計選取 22 項指標',
       '⎿ 分頁進度：[ 第 4 / 5 頁 ] · 累計選取 27 項指標',
-      '★ 全部五大分類共 38 項指標已全數選取完成！'
+      '★ 全部五大分類共 39 項指標已全數選取完成！'
     ],
     navHints: [
       'Space 勾選/取消 · Enter 進入下一分頁 (2/5 額度計費) · 終端機分頁免滾動零截斷',
@@ -284,7 +285,7 @@ const WIZARD_META = {
       '⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 18 项指标',
       '⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 22 项指标',
       '⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 27 项指标',
-      '★ 全部五大分类共 38 项指标已全数选取完成！'
+      '★ 全部五大分类共 39 项指标已全数选取完成！'
     ],
     navHints: [
       'Space 勾选/取消 · Enter 进入下一分页 (2/5 额度计费) · 终端分页免滚动零截断',
@@ -302,7 +303,7 @@ const WIZARD_META = {
       '⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 18 項目を選択中',
       '⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 22 項目を選択中',
       '⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 27 項目を選択中',
-      '★ 全 5 カテゴリ 38 指標の一括選択が完了しました！'
+      '★ 全 5 カテゴリ 39 指標の一括選択が完了しました！'
     ],
     navHints: [
       'Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要',
@@ -320,7 +321,7 @@ const WIZARD_META = {
       '⎿ Wizard pager: [ Page 2 / 5 ] · 18 metrics selected cumulatively',
       '⎿ Wizard pager: [ Page 3 / 5 ] · 22 metrics selected cumulatively',
       '⎿ Wizard pager: [ Page 4 / 5 ] · 27 metrics selected cumulatively',
-      '★ All 38 indicators across 5 categories successfully selected!'
+      '★ All 39 indicators across 5 categories successfully selected!'
     ],
     navHints: [
       'Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation',
@@ -528,7 +529,7 @@ ${optionLines}
   const termContentF6 = isZhTw
     ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 38 項）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 39 項）</text>
   <text x="290" y="156" fill="#8b949e">— 於 Write-in 輸入自訂順序（e: 為 Emoji，n 為換行，n,n 為空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
@@ -551,7 +552,7 @@ ${optionLines}
     : (isZhCn
       ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 38 项）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 39 项）</text>
   <text x="290" y="156" fill="#8b949e">— 于 Write-in 输入自定义顺序（e: 为 Emoji，n 为换行，n,n 为空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
@@ -574,7 +575,7 @@ ${optionLines}
       : (isJp
         ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 38 項目）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 39 項目）</text>
   <text x="280" y="156" fill="#8b949e">— 下の Write-in に並び順を入力（e: で絵文字、n で改行、n,n で空行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
@@ -596,7 +597,7 @@ ${optionLines}
   <text x="24" y="422" fill="#6e7681">指定された順序とスタイルに基づき、11 列の高密度ステータスラインを自動構築</text>`
         : `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 38)</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 39)</text>
   <text x="330" y="156" fill="#8b949e">— Enter custom order below (e: for Emoji, n for newline):</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>

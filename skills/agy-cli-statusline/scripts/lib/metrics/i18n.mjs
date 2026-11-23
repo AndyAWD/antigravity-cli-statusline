@@ -53,6 +53,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   const normGlobalStyle = normalizeLabelStyle(labelStyle);
   const normLang = normalizeLanguage(lang);
   const unknownStr = (normLang === 'zh-tw' || normLang === 'zh-cn') ? '未知' : (normLang === 'jp' ? '不明' : 'Unknown');
+  const cliVersionVal = m.cliVersion || unknownStr;
+  const appVersionVal = m.appVersion || unknownStr;
   const pluginVersionVal = m.pluginVersion || unknownStr;
   const pluginUpdateCurrentTag = m.pluginUpdateCurrentTag || m.pluginVersion || '';
   const pluginUpdateLatestTag = m.pluginUpdateLatestTag || m.pluginLatestVersion || '';
@@ -106,7 +108,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版控狀態:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版控類型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙盒狀態:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 版本: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}狀態列版本: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}對話編號: ${BOLD}${m.conversationIdShort}${RESET}`,
@@ -151,7 +154,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版控状态:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版控类型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙箱状态:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 版本: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}状态栏版本: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}对话编号: ${BOLD}${m.conversationIdShort}${RESET}`,
@@ -196,7 +200,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}VCS Status:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}VCS: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}Sandbox:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI Version: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI Version: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 Version: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}Statusline Version: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}Conv: ${BOLD}${m.conversationIdShort}${RESET}`,
@@ -241,7 +246,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版管理状態:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版管理種別: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}サンドボックス:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI バージョン: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI バージョン: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 バージョン: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}ステータスライン版: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}会話番号: ${BOLD}${m.conversationIdShort}${RESET}`,
