@@ -5,7 +5,19 @@ import { readJsonSafeAsync } from '../core/fs-utils.mjs';
 import { normalizeModelName, sanitizeConversationId } from '../core/normalize.mjs';
 
 const TRANSCRIPT_TAIL_BYTES = 64 * 1024;
-const EFFORT_SUFFIX_RE = /-(low|medium|high|max|minimal)$/i;
+const TRANSCRIPT_FALLBACK_TAIL_BYTES = 256 * 1024;
+const EFFORT_SUFFIX_RE = /-(low|medium|high|xhigh|max|minimal)$/i;
+const EFFORT_DISPLAY_MAP = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'XHigh',
+  max: 'Max',
+  minimal: 'Minimal'
+};
+const WORKER_SLUG_RE = /-worker\b/i;
+const CONCRETE_ORCH_SUFFIX_RE = /^\s*(?!orchestrator\b).+\(\s*orchestrator\s*\)\s*$/i;
+const TRAILING_ORCH_SUFFIX_RE = /\s*\(\s*orchestrator\s*\)\s*$/i;
 
 const TOKEN_DISPLAY_MAP = {
   gemini: 'Gemini',
@@ -31,17 +43,92 @@ const TOKEN_DISPLAY_MAP = {
   thinking: 'Thinking'
 };
 
-const EXECUTOR_KEYWORDS = ['hydrogen', 'flash', 'lite', 'fast', 'mini', 'haiku', 'nano'];
+const EXECUTOR_KEYWORDS = ['hydrogen', 'flash', 'lite', 'fast', 'mini', 'haiku', 'nano', 'worker'];
 const PLANNER_KEYWORDS = ['carbon', 'argon', 'neon', 'pro', 'opus', 'sonnet', 'thinking', 'reason'];
+
+function lookupModelLimitEntry(rawName, cache = null) {
+  if (typeof rawName !== 'string' || !rawName.trim()) return null;
+  if (!cache?.modelLimits || typeof cache.modelLimits !== 'object') return null;
+  const norm = normalizeModelName(rawName);
+  if (!norm) return null;
+  const direct = cache.modelLimits[norm];
+  if (direct && typeof direct === 'object') return direct;
+  for (const entry of Object.values(cache.modelLimits)) {
+    if (!entry || typeof entry !== 'object') continue;
+    for (const field of [entry.model, entry.slug, entry.displayName]) {
+      if (typeof field === 'string' && field.trim() && normalizeModelName(field) === norm) {
+        return entry;
+      }
+    }
+  }
+  return null;
+}
+
+function stripConcreteOrchestratorSuffix(rawName) {
+  if (typeof rawName !== 'string') return '';
+  const trimmed = rawName.trim();
+  if (!trimmed || !CONCRETE_ORCH_SUFFIX_RE.test(trimmed)) return trimmed;
+  return trimmed.replace(TRAILING_ORCH_SUFFIX_RE, '').trim();
+}
+
+/**
+ * 判斷模型識別碼是否為 Orchestrator 實際派工用的具名 Worker 執行模型（如 gemini-flash-worker-agy / MODEL_PLACEHOLDER_M669）。
+ * @param {unknown} rawName
+ * @param {object|null} [cache=null]
+ * @returns {boolean}
+ */
+export function isOrchestratorWorkerModel(rawName, cache = null) {
+  if (typeof rawName !== 'string' || !rawName.trim()) return false;
+  const trimmed = rawName.trim();
+  if (WORKER_SLUG_RE.test(trimmed) || CONCRETE_ORCH_SUFFIX_RE.test(trimmed)) {
+    return true;
+  }
+  const entry = lookupModelLimitEntry(trimmed, cache);
+  if (entry) {
+    const slug = typeof entry.slug === 'string' ? entry.slug.trim() : '';
+    const display = typeof entry.displayName === 'string' ? entry.displayName.trim() : '';
+    if ((slug && WORKER_SLUG_RE.test(slug)) || (display && CONCRETE_ORCH_SUFFIX_RE.test(display))) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * 判斷模型名稱是否屬於 Orchestrator 外層包裝名稱（而非具體執行的底層模型）。
+ * 支援選用傳入 cache 以反查 MODEL_PLACEHOLDER_* 內部代號，並排除具名 Worker 執行模型。
  * @param {unknown} rawName
+ * @param {object|null} [cache=null]
  * @returns {boolean}
  */
-export function isOrchestratorModelName(rawName) {
+export function isOrchestratorModelName(rawName, cache = null) {
   if (typeof rawName !== 'string' || !rawName.trim()) return false;
-  return rawName.toLowerCase().includes('orchestrator');
+  if (isOrchestratorWorkerModel(rawName, cache)) return false;
+  if (rawName.toLowerCase().includes('orchestrator')) return true;
+
+  const entry = lookupModelLimitEntry(rawName, cache);
+  if (entry) {
+    const display = typeof entry.displayName === 'string' ? entry.displayName.trim() : '';
+    const slug = typeof entry.slug === 'string' ? entry.slug.trim() : '';
+    if (
+      (display && display.toLowerCase().includes('orchestrator')) ||
+      (slug && slug.toLowerCase().includes('orchestrator'))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isKnownSingleModelRef(rawName, cache = null) {
+  if (typeof rawName !== 'string' || !rawName.trim()) return false;
+  if (isOrchestratorModelName(rawName, cache) || isOrchestratorWorkerModel(rawName, cache)) return false;
+  const trimmed = rawName.trim();
+  if (/^MODEL_/i.test(trimmed)) {
+    const entry = lookupModelLimitEntry(trimmed, cache);
+    return Boolean(entry && (entry.displayName || entry.slug));
+  }
+  return true;
 }
 
 function extractModelRefCandidates(ref) {
@@ -69,25 +156,69 @@ function extractModelRefCandidates(ref) {
 }
 
 /**
+ * 唯讀解析 Antigravity 2.0 狀態檔（antigravity_state.pbtxt）的目前選定模型代號。
+ * @param {string} [homeDir=os.homedir()]
+ * @returns {Promise<string>}
+ */
+export async function readAppSelectedModelAsync(homeDir = os.homedir()) {
+  if (!homeDir || typeof homeDir !== 'string') return '';
+  const pbtxtPath = join(homeDir, '.gemini', 'antigravity', 'antigravity_state.pbtxt');
+  try {
+    const raw = await fs.readFile(pbtxtPath, 'utf8');
+    const match = raw.match(/^\s*last_selected_agent_model:\s*([^\s#]+)/m);
+    if (!match || !match[1]) return '';
+    return match[1].replace(/^["']|["']$/g, '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+/**
  * 判斷當前對話是否處於 Orchestrator 動態路由模式。
  * @param {object} [meta]
  * @param {object} [settings={}]
  * @param {object|null} [hookSession=null]
  * @param {string} [fallbackModel='']
+ * @param {{ cache?: object|null, appSelectedModel?: string, hasTranscriptOrchestratorSignal?: boolean }} [options={}]
  * @returns {boolean}
  */
-export function isOrchestratorSession(meta = {}, settings = {}, hookSession = null, fallbackModel = '') {
+export function isOrchestratorSession(meta = {}, settings = {}, hookSession = null, fallbackModel = '', options = {}) {
+  const {
+    cache = null,
+    appSelectedModel = '',
+    hasTranscriptOrchestratorSignal = false
+  } = options || {};
+
   const candidates = [
     ...extractModelRefCandidates(meta?.model),
     ...extractModelRefCandidates(hookSession?.modelName),
     ...extractModelRefCandidates(fallbackModel),
     ...extractModelRefCandidates(settings?.model)
   ];
-  if (candidates.some(c => isOrchestratorModelName(c))) {
+  if (candidates.some(c => isOrchestratorModelName(c, cache) || isOrchestratorWorkerModel(c, cache))) {
+    return true;
+  }
+  if (typeof appSelectedModel === 'string' && appSelectedModel.trim() && isOrchestratorModelName(appSelectedModel, cache)) {
     return true;
   }
   if (meta?.orchestrator && typeof meta.orchestrator === 'object') {
     return true;
+  }
+  if (hasTranscriptOrchestratorSignal === true) {
+    const explicitlySingleByApp = isKnownSingleModelRef(appSelectedModel, cache);
+    const explicitlySingleBySettings = isKnownSingleModelRef(
+      typeof settings?.model === 'string' ? settings.model : '',
+      cache
+    );
+    const metaRefs = extractModelRefCandidates(meta?.model);
+    const explicitlySingleByCliMeta =
+      !appSelectedModel &&
+      !hookSession &&
+      metaRefs.length > 0 &&
+      !metaRefs.some(c => isOrchestratorModelName(c, cache) || isOrchestratorWorkerModel(c, cache));
+    if (!explicitlySingleByApp && !explicitlySingleBySettings && !explicitlySingleByCliMeta) {
+      return true;
+    }
   }
   return false;
 }
@@ -111,20 +242,20 @@ export function formatRuntimeModelDisplayName(rawModel, cache = null) {
   const trimmed = rawModel.trim();
   if (!trimmed) return '';
 
-  // 1. 優先透過 cache.modelLimits 反查官方 displayName（排除模糊與外層 Orchestrator 名稱）
+  // 1. 優先透過 cache.modelLimits 反查官方 displayName（保留具名 Worker 並去除外層 (Orchestrator) 尾綴）
   if (cache?.modelLimits && typeof cache.modelLimits === 'object') {
-    const norm = normalizeModelName(trimmed);
-    const entry = norm ? cache.modelLimits[norm] : null;
+    const entry = lookupModelLimitEntry(trimmed, cache);
     if (entry && !entry.ambiguous && typeof entry.displayName === 'string' && entry.displayName.trim()) {
-      if (!isOrchestratorModelName(entry.displayName)) {
-        return entry.displayName.trim();
+      const cleanedDisplay = stripConcreteOrchestratorSuffix(entry.displayName);
+      if (cleanedDisplay && !isOrchestratorModelName(cleanedDisplay, cache)) {
+        return cleanedDisplay;
       }
     }
   }
 
-  // 2. 若已包含空白或括號，視為人類可讀名稱
+  // 2. 若已包含空白或括號，視為人類可讀名稱（若為具名 Worker 尾綴則清理後回傳）
   if (/\s/.test(trimmed) || /[()]/.test(trimmed)) {
-    return trimmed;
+    return stripConcreteOrchestratorSuffix(trimmed);
   }
 
   // 3. 避免誤轉內部位元佔位符（如 MODEL_PLACEHOLDER_M401）
@@ -139,7 +270,7 @@ export function formatRuntimeModelDisplayName(rawModel, cache = null) {
     const effortMatch = trimmed.match(EFFORT_SUFFIX_RE);
     if (effortMatch) {
       const eff = effortMatch[1].toLowerCase();
-      effortLabel = eff.charAt(0).toUpperCase() + eff.slice(1);
+      effortLabel = EFFORT_DISPLAY_MAP[eff] || (eff.charAt(0).toUpperCase() + eff.slice(1));
       baseSlug = trimmed.slice(0, -effortMatch[0].length);
     }
 
@@ -165,7 +296,7 @@ function buildModelRoleKeys(ref, cache = null) {
   const rawList = extractModelRefCandidates(ref);
 
   for (const raw of rawList) {
-    if (isOrchestratorModelName(raw)) continue;
+    if (isOrchestratorModelName(raw, cache)) continue;
     const norm = normalizeModelName(raw);
     if (!norm) continue;
     exact.add(norm);
@@ -175,7 +306,7 @@ function buildModelRoleKeys(ref, cache = null) {
     const limitEntry = cache?.modelLimits?.[norm];
     if (limitEntry && typeof limitEntry === 'object') {
       for (const field of [limitEntry.slug, limitEntry.model, limitEntry.displayName]) {
-        if (typeof field !== 'string' || !field.trim() || isOrchestratorModelName(field)) continue;
+        if (typeof field !== 'string' || !field.trim() || isOrchestratorModelName(field, cache)) continue;
         const fNorm = normalizeModelName(field);
         if (fNorm) {
           exact.add(fNorm);
@@ -204,7 +335,7 @@ function setsIntersect(a, b) {
  * @returns {'planner'|'executor'|'unknown'}
  */
 export function classifyOrchestratorModelRole(rawModel, settings = {}, cache = null, extraHints = {}) {
-  if (!rawModel || typeof rawModel !== 'string' || isOrchestratorModelName(rawModel)) {
+  if (!rawModel || typeof rawModel !== 'string' || isOrchestratorModelName(rawModel, cache)) {
     return 'unknown';
   }
 
@@ -231,7 +362,8 @@ export function classifyOrchestratorModelRole(rawModel, settings = {}, cache = n
 
   // 第 2 層：模型名稱關鍵字退讓（使用單字邊界分詞，避免 gemini 誤中 mini 等子字串）
   const keywordTokens = new Set();
-  for (const text of [rawModel, ...(cache?.modelLimits?.[normalizeModelName(rawModel)] ? [cache.modelLimits[normalizeModelName(rawModel)].slug, cache.modelLimits[normalizeModelName(rawModel)].displayName] : [])]) {
+  const limitEntry = lookupModelLimitEntry(rawModel, cache);
+  for (const text of [rawModel, ...(limitEntry ? [limitEntry.slug, limitEntry.displayName] : [])]) {
     if (typeof text !== 'string' || !text) continue;
     for (const tok of text.toLowerCase().split(/[^a-z0-9]+/)) {
       if (tok) keywordTokens.add(tok);
@@ -261,12 +393,47 @@ function parseTimestampMs(rawTs) {
   return 0;
 }
 
+async function scanTranscriptTailAsync(fh, size, mtimeMs, tailBytes, cache = null) {
+  const start = Math.max(0, size - tailBytes);
+  const len = size - start;
+  const buf = Buffer.alloc(len);
+  await fh.read(buf, 0, len, start);
+
+  let raw = buf.toString('utf8');
+  if (start > 0) {
+    const firstNl = raw.indexOf('\n');
+    if (firstNl !== -1) raw = raw.slice(firstNl + 1);
+  }
+
+  const lines = raw.split(/\r?\n/).filter(l => l.trim().length > 0);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    let step;
+    try {
+      step = JSON.parse(lines[i]);
+    } catch (_) {
+      continue; // 略過寫入中的殘缺末行
+    }
+    if (!step || typeof step !== 'object') continue;
+    if (step.type !== 'PLANNER_RESPONSE' && step.source !== 'MODEL') continue;
+    if (typeof step.model !== 'string' || !step.model.trim()) continue;
+    const model = step.model.trim();
+    if (isOrchestratorModelName(model, cache)) continue;
+
+    const timestampMs = parseTimestampMs(step.created_at) || Math.round(mtimeMs || 0);
+    const hasThinking = Boolean(typeof step.thinking === 'string' && step.thinking.trim());
+    return { exists: true, model, hasThinking, timestampMs };
+  }
+
+  return { exists: true, model: '', hasThinking: false, timestampMs: Math.round(mtimeMs || 0) };
+}
+
 /**
- * 僅讀取 transcript.jsonl 尾端 64 KB，取得最新非 Orchestrator 包裝的模型識別碼與思考旗標。
+ * 讀取 transcript.jsonl 尾端（預設 64 KB，未命中時擴大至 256 KB），取得最新非 Orchestrator 包裝的模型識別碼與思考旗標。
  * @param {string} transcriptPath
+ * @param {object|null} [cache=null]
  * @returns {Promise<{ exists: boolean, model: string, hasThinking: boolean, timestampMs: number }>}
  */
-export async function readLatestTranscriptModelAsync(transcriptPath) {
+export async function readLatestTranscriptModelAsync(transcriptPath, cache = null) {
   const empty = { exists: false, model: '', hasThinking: false, timestampMs: 0 };
   if (!transcriptPath || typeof transcriptPath !== 'string') return empty;
 
@@ -275,40 +442,16 @@ export async function readLatestTranscriptModelAsync(transcriptPath) {
     const stat = await fs.stat(transcriptPath);
     if (!stat.isFile()) return empty;
     const size = stat.size;
-    const start = Math.max(0, size - TRANSCRIPT_TAIL_BYTES);
-    const len = size - start;
     fh = await fs.open(transcriptPath, 'r');
-    const buf = Buffer.alloc(len);
-    await fh.read(buf, 0, len, start);
+
+    let result = await scanTranscriptTailAsync(fh, size, stat.mtimeMs, TRANSCRIPT_TAIL_BYTES, cache);
+    if (!result.model && size > TRANSCRIPT_TAIL_BYTES) {
+      result = await scanTranscriptTailAsync(fh, size, stat.mtimeMs, TRANSCRIPT_FALLBACK_TAIL_BYTES, cache);
+    }
+
     await fh.close();
     fh = null;
-
-    let raw = buf.toString('utf8');
-    if (start > 0) {
-      const firstNl = raw.indexOf('\n');
-      if (firstNl !== -1) raw = raw.slice(firstNl + 1);
-    }
-
-    const lines = raw.split(/\r?\n/).filter(l => l.trim().length > 0);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      let step;
-      try {
-        step = JSON.parse(lines[i]);
-      } catch (_) {
-        continue; // 略過寫入中的殘缺末行
-      }
-      if (!step || typeof step !== 'object') continue;
-      if (step.type !== 'PLANNER_RESPONSE' && step.source !== 'MODEL') continue;
-      if (typeof step.model !== 'string' || !step.model.trim()) continue;
-      const model = step.model.trim();
-      if (isOrchestratorModelName(model)) continue;
-
-      const timestampMs = parseTimestampMs(step.created_at) || Math.round(stat.mtimeMs || 0);
-      const hasThinking = Boolean(typeof step.thinking === 'string' && step.thinking.trim());
-      return { exists: true, model, hasThinking, timestampMs };
-    }
-
-    return { exists: true, model: '', hasThinking: false, timestampMs: Math.round(stat.mtimeMs || 0) };
+    return result;
   } catch (_) {
     if (fh) {
       try { await fh.close(); } catch (_) {}
@@ -317,7 +460,7 @@ export async function readLatestTranscriptModelAsync(transcriptPath) {
   }
 }
 
-function extractNativeMetaActiveModel(meta) {
+function extractNativeMetaActiveModel(meta, cache = null) {
   const candidates = [
     meta?.model?.active_model,
     meta?.model?.routed_model,
@@ -328,12 +471,12 @@ function extractNativeMetaActiveModel(meta) {
     meta?.routing_model
   ];
   for (const cand of candidates) {
-    if (typeof cand === 'string' && cand.trim() && !isOrchestratorModelName(cand)) {
+    if (typeof cand === 'string' && cand.trim() && !isOrchestratorModelName(cand, cache)) {
       return cand.trim();
     }
     if (cand && typeof cand === 'object' && !Array.isArray(cand)) {
       for (const c of extractModelRefCandidates(cand)) {
-        if (!isOrchestratorModelName(c)) return c;
+        if (!isOrchestratorModelName(c, cache)) return c;
       }
     }
   }
@@ -351,12 +494,21 @@ function resolveTranscriptCandidatePaths({ meta, hookSession, conversationId, ho
       paths.push(trimmed);
     }
   };
+  const pushWithCompactSibling = (p) => {
+    if (typeof p !== 'string' || !p.trim()) return;
+    const trimmed = p.trim();
+    push(trimmed);
+    if (/(?:^|[\\/])transcript_full\.jsonl$/i.test(trimmed)) {
+      push(trimmed.replace(/transcript_full\.jsonl$/i, 'transcript.jsonl'));
+    }
+  };
 
-  push(meta?.transcript_path);
-  push(hookSession?.transcriptPath);
+  pushWithCompactSibling(meta?.transcript_path);
+  pushWithCompactSibling(hookSession?.transcriptPath);
   if (conversationId) {
     for (const product of ['antigravity-cli', 'antigravity', 'antigravity-ide']) {
       push(join(homeDir, '.gemini', product, 'brain', conversationId, '.system_generated', 'logs', 'transcript.jsonl'));
+      push(join(homeDir, '.gemini', product, 'brain', conversationId, '.system_generated', 'logs', 'transcript_full.jsonl'));
     }
   }
   return paths;
@@ -377,39 +529,74 @@ export async function resolveActiveRuntimeModelAsync({
   env = process.env,
   hookSession = null,
   runtimeTelemetry = null,
-  transcriptSummary = null
+  transcriptSummary = null,
+  appSelectedModel = ''
 } = {}) {
   const convId = sanitizeConversationId(meta?.conversation_id || hookSession?.conversationId || '');
   const metaRefs = extractModelRefCandidates(meta?.model);
   const metaExplicitlyNonOrchestrator =
     !hookSession &&
     !runtimeTelemetry &&
+    !appSelectedModel &&
     metaRefs.length > 0 &&
-    !metaRefs.some(c => isOrchestratorModelName(c)) &&
+    !metaRefs.some(c => isOrchestratorModelName(c, cache) || isOrchestratorWorkerModel(c, cache)) &&
     !(meta?.orchestrator && typeof meta.orchestrator === 'object');
 
-  // 若尚未取得 hookSession 且對話 ID 有效，先嘗試從 sessions.json 載入（可能同時攜帶 Orchestrator 標記與最新 PreInvocation modelName）；
+  // 若尚未取得 hookSession 且對話 ID 有效，先嘗試從 sessions.json 載入（支援 CLI 與 2.0 各自獨立的 plugin_data 目錄）；
   // 若原生 CLI meta.model 已明確切換為非 Orchestrator 模型，則不回頭採信可能過時的 sessions.json。
   let resolvedHookSession = hookSession;
   if (!resolvedHookSession && convId && !metaExplicitlyNonOrchestrator) {
-    const resolvedPluginDataDir =
-      pluginDataDir ||
-      (typeof env?.PLUGIN_DATA === 'string' && env.PLUGIN_DATA.trim()) ||
-      join(homeDir, '.gemini', 'antigravity', 'plugin_data', 'antigravity-cli-statusline');
-    const sessionsJson = await readJsonSafeAsync(join(resolvedPluginDataDir, 'sessions.json'));
-    const entry = sessionsJson?.sessions?.[convId];
-    if (entry && typeof entry === 'object') {
-      resolvedHookSession = entry;
+    const candidateSessionFiles = [];
+    const seenFiles = new Set();
+    const pushSessionFile = (dir) => {
+      if (typeof dir !== 'string' || !dir.trim()) return;
+      const p = join(dir.trim(), 'sessions.json');
+      if (!seenFiles.has(p)) {
+        seenFiles.add(p);
+        candidateSessionFiles.push(p);
+      }
+    };
+
+    if (typeof pluginDataDir === 'string' && pluginDataDir.trim()) {
+      pushSessionFile(pluginDataDir);
+    } else {
+      if (typeof env?.PLUGIN_DATA === 'string' && env.PLUGIN_DATA.trim()) {
+        pushSessionFile(env.PLUGIN_DATA);
+      }
+      pushSessionFile(join(homeDir, '.gemini', 'antigravity-cli', 'plugin_data', 'antigravity-cli-statusline'));
+      pushSessionFile(join(homeDir, '.gemini', 'antigravity', 'plugin_data', 'antigravity-cli-statusline'));
+    }
+
+    const loaded = await Promise.all(candidateSessionFiles.map(p => readJsonSafeAsync(p)));
+    let bestEntry = null;
+    let bestUpdatedAt = -1;
+    for (const sessionsJson of loaded) {
+      const entry = sessionsJson?.sessions?.[convId];
+      if (entry && typeof entry === 'object') {
+        const ts = Number(entry.updatedAt || 0) || parseTimestampMs(entry.lastHookAt);
+        if (!bestEntry || ts > bestUpdatedAt) {
+          bestEntry = entry;
+          bestUpdatedAt = ts;
+        }
+      }
+    }
+    if (bestEntry) {
+      resolvedHookSession = bestEntry;
     }
   }
 
-  const orchestratorActive = isOrchestratorSession(meta, settings, resolvedHookSession, fallbackModel);
+  const hasTranscriptOrchestratorSignal = Boolean(transcriptSummary?.hasOrchestratorSignal);
+  const orchestratorActive = isOrchestratorSession(meta, settings, resolvedHookSession, fallbackModel, {
+    cache,
+    appSelectedModel,
+    hasTranscriptOrchestratorSignal
+  });
   if (!orchestratorActive) {
     return { isOrchestrator: false, modelName: '', rawModel: '', role: 'none', source: '' };
   }
 
   // 1. 原生 meta 擴充欄位（零 I/O）
-  const nativeModel = extractNativeMetaActiveModel(meta);
+  const nativeModel = extractNativeMetaActiveModel(meta, cache);
   if (nativeModel) {
     return {
       isOrchestrator: true,
@@ -421,21 +608,22 @@ export async function resolveActiveRuntimeModelAsync({
   }
 
   // 2. Hook PreInvocation / PostInvocation 快取模型
-  const hookRawModel = (typeof resolvedHookSession?.modelName === 'string' && !isOrchestratorModelName(resolvedHookSession.modelName))
+  const hookRawModel = (typeof resolvedHookSession?.modelName === 'string' && !isOrchestratorModelName(resolvedHookSession.modelName, cache))
     ? resolvedHookSession.modelName.trim()
     : '';
   const hookTs = Number(resolvedHookSession?.updatedAt || 0) || parseTimestampMs(resolvedHookSession?.lastHookAt);
 
-  // 3. transcript.jsonl 最新 PLANNER_RESPONSE.model（若外部已讀取則直接重用）
+  // 3. transcript.jsonl 最新 PLANNER_RESPONSE.model（若外部已讀取且含有效底層模型則直接重用；空字串時退讓讀取精簡版）
   let trModel = '';
   let trHasThinking = false;
   let trTs = 0;
-  if (transcriptSummary && typeof transcriptSummary === 'object' && typeof transcriptSummary.lastModel === 'string') {
-    if (transcriptSummary.lastModel.trim() && !isOrchestratorModelName(transcriptSummary.lastModel)) {
-      trModel = transcriptSummary.lastModel.trim();
-      trHasThinking = Boolean(transcriptSummary.lastModelHasThinking);
-      trTs = Number(transcriptSummary.lastModelTimestampMs || transcriptSummary.mtimeMs || 0);
-    }
+  const summaryModel = (transcriptSummary && typeof transcriptSummary === 'object' && typeof transcriptSummary.lastModel === 'string')
+    ? transcriptSummary.lastModel.trim()
+    : '';
+  if (summaryModel && !isOrchestratorModelName(summaryModel, cache)) {
+    trModel = summaryModel;
+    trHasThinking = Boolean(transcriptSummary.lastModelHasThinking);
+    trTs = Number(transcriptSummary.lastModelTimestampMs || transcriptSummary.mtimeMs || 0);
   } else {
     const candidatePaths = resolveTranscriptCandidatePaths({
       meta,
@@ -444,14 +632,13 @@ export async function resolveActiveRuntimeModelAsync({
       homeDir
     });
     for (const p of candidatePaths) {
-      const tr = await readLatestTranscriptModelAsync(p);
+      const tr = await readLatestTranscriptModelAsync(p, cache);
       if (tr.exists && tr.model) {
         trModel = tr.model;
         trHasThinking = tr.hasThinking;
         trTs = tr.timestampMs;
         break;
       }
-      if (tr.exists) break;
     }
   }
 
@@ -497,7 +684,7 @@ export async function resolveActiveRuntimeModelAsync({
   let lsRawModel = '';
   let thinkingOutputTokens = Number(runtimeTelemetry?.usage?.thinkingOutputTokens || 0) || 0;
   for (const cand of [runtimeTelemetry?.modelDisplayName, runtimeTelemetry?.model]) {
-    if (typeof cand === 'string' && cand.trim() && !isOrchestratorModelName(cand)) {
+    if (typeof cand === 'string' && cand.trim() && !isOrchestratorModelName(cand, cache)) {
       lsRawModel = cand.trim();
       break;
     }
@@ -506,7 +693,7 @@ export async function resolveActiveRuntimeModelAsync({
     const cliCtx = await readJsonSafeAsync(join(homeDir, '.gemini', 'tmp', `ctx_${convId}.json`));
     if (cliCtx && typeof cliCtx === 'object') {
       for (const cand of [cliCtx.runtime_model_display_name, cliCtx.runtime_model_enum]) {
-        if (typeof cand === 'string' && cand.trim() && !isOrchestratorModelName(cand)) {
+        if (typeof cand === 'string' && cand.trim() && !isOrchestratorModelName(cand, cache)) {
           lsRawModel = cand.trim();
           break;
         }

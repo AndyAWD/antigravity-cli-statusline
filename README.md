@@ -40,7 +40,7 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ## Key Features
 
 1. **Multi-Platform Compatibility**: Supports Antigravity CLI terminal, Antigravity IDE sidebar chat, and Antigravity 2.0 Desktop Application across Windows, macOS, and Linux.
-2. **40 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 40 metrics across model status (including live Orchestrator Planner `[Think]` vs. Executor `[Fast]` underlying model tracking), API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools with 4-tier dynamic quota pool resolution and live countdown recalculation within a 60s expiry grace period), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
+2. **40 Real-Time Indicators, 4 Locales & Dual Label Styles**: Provides 40 metrics across model status (including live Orchestrator Planner `[Plan]` vs. Executor `[Work]` underlying model tracking), API quotas (including 5-hour, weekly, and Gemini 4 Argon dedicated quota pools with 4-tier dynamic quota pool resolution and live countdown recalculation within a 60s expiry grace period), context/token consumption, interactive queues, Git/VCS state, and system telemetry in English (`us`), Traditional Chinese (`zh-tw`), Simplified Chinese (`zh-cn`), and Japanese (`jp`), with selectable **Text (`text`)** or **Emoji (`emoji`, no-colon compact)** label styles (`ui.footer.labelStyle`).
 3. **Flexible Bar Graphs (Merged or Separate)**: Renders 10-block visual progress bars (`[████████░░]`) for 5-hour quota, weekly quota, Gemini 4 Argon quota, context usage, and session tokens. Automatically merges labels when placed adjacent to numeric counterparts, or displays them with independent labels when separated.
 4. **Custom Sorting & Dual Line-Wrapping**: Supports 1-based index sorting, `n` manual line breaks, `n,n` blank-line section separators, and terminal-width-aware automatic wrapping.
 5. **24-Bit Four-Tier Color Coding**: Shifts colors across 4 thresholds (`#57caff` Blue `100–75%`, `#5cdb6d` Green `74–50%`, `#ffd427` Yellow `49–25%`, `#ff7daf` Pink `24–0%`) alongside model-family brand colors.
@@ -146,7 +146,7 @@ The numbers below correspond to the 1-based option indices across the 5 categori
 - `2.` 🪪 **Active agent profile (`agent-profile`)** — the loaded Agent Profile name
 - `3.` ⚡ **Agent state (`agent-state`)** — `idle / thinking / working / tool_use / initializing`
 - `4.` ⚙️ **Current running mode (`mode`)** — `default / code-only / plan / interactive / accept-edits`
-- `5.` 🧭 **Active underlying model under Orchestrator (`active-model`)** — shows the live routed model and `[Think]` / `[Fast]` role when using Orchestrator; auto-hides for single-model sessions
+- `5.` 🧭 **Active underlying model under Orchestrator (`active-model`)** — shows the live routed model and `[Plan]` / `[Work]` role when using Orchestrator, or `off` in red for single-model sessions
 
 **2. Quota, Billing & Account (14 items)**
 - `6.` 🔋 **5-hour available quota (`quota`)** — 5-hour API remaining percentage, four-tier color-coded

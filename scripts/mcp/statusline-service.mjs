@@ -25,6 +25,7 @@ import {
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/context.mjs';
 import { fetchLatestPluginReleaseAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/plugin-update.mjs';
 import { extractMetricsAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs';
+import { readAppSelectedModelAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/runtime-model.mjs';
 import {
   resolveInstalledAppVersionAsync,
   resolveInstalledCliVersionAsync
@@ -300,12 +301,33 @@ export class StatuslineService {
     checkUpdate = false,
     hostLocale = ''
   } = {}) {
-    const [panelPrefs, hookSessionsData, brainSessions, installedPlugin, installedVersions] = await Promise.all([
+    const appSessionsPath = path.join(this.pluginDataDir, 'sessions.json');
+    const cliSessionsPath = path.join(
+      this.homeDir,
+      '.gemini',
+      'antigravity-cli',
+      'plugin_data',
+      'antigravity-cli-statusline',
+      'sessions.json'
+    );
+    const shouldLoadCliSessions = path.resolve(cliSessionsPath) !== path.resolve(appSessionsPath);
+
+    const [
+      panelPrefs,
+      hookSessionsData,
+      cliHookSessionsData,
+      brainSessions,
+      installedPlugin,
+      installedVersions,
+      appSelectedModel
+    ] = await Promise.all([
       this._readPanelPreferencesAsync(),
-      readJsonSafeAsync(path.join(this.pluginDataDir, 'sessions.json')),
+      readJsonSafeAsync(appSessionsPath),
+      shouldLoadCliSessions ? readJsonSafeAsync(cliSessionsPath) : Promise.resolve(null),
       discoverRecentBrainSessionsAsync(this.homeDir, 15),
       resolveInstalledPluginVersionAsync({ pluginDir: this.pluginRootDir, homeDir: this.homeDir }),
-      this._resolveInstalledVersionsAsync(forceRefresh)
+      this._resolveInstalledVersionsAsync(forceRefresh),
+      readAppSelectedModelAsync(this.homeDir)
     ]);
 
     // 合併 Hook 對話與磁碟 brain/ 掃描對話
@@ -327,9 +349,18 @@ export class StatuslineService {
         source: 'brain'
       });
     }
-    const hookMap = (hookSessionsData?.sessions && typeof hookSessionsData.sessions === 'object')
-      ? hookSessionsData.sessions
-      : {};
+    const hookMap = {};
+    for (const sourceData of [cliHookSessionsData, hookSessionsData]) {
+      const rawMap = sourceData?.sessions;
+      if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) continue;
+      for (const [id, hs] of Object.entries(rawMap)) {
+        if (!hs || typeof hs !== 'object') continue;
+        const prevHs = hookMap[id];
+        if (!prevHs || Number(hs.updatedAt || 0) >= Number(prevHs.updatedAt || 0)) {
+          hookMap[id] = hs;
+        }
+      }
+    }
     await Promise.all(Object.entries(hookMap).map(async ([id, hs]) => {
       if (!hs || typeof hs !== 'object') return;
       const prev = sessionMap.get(id) || {};
@@ -521,6 +552,19 @@ export class StatuslineService {
     const probeItemsSet = new Set(activeItemsSet);
     if (skipFreshMemory) probeItemsSet.delete('memory-usage');
 
+    const isAppProduct = (activeSession.product || 'antigravity') === 'antigravity';
+    const isCurrentAppSession = isAppProduct && (
+      isAutoFollow ||
+      !latestId ||
+      activeSession.conversationId === latestId
+    );
+    const effectiveAppSelectedModel = isCurrentAppSession ? appSelectedModel : '';
+    let effectiveSettings = cliSettings;
+    if (isAppProduct && cliSettings && typeof cliSettings === 'object' && 'model' in cliSettings) {
+      const { model: _ignoredCliModel, ...restCliSettings } = cliSettings;
+      effectiveSettings = restCliSettings;
+    }
+
     const metrics = await extractMetricsAsync(
       meta,
       activeLayout.lang,
@@ -533,10 +577,11 @@ export class StatuslineService {
       {
         homeDir: this.homeDir,
         pluginDataDir: this.pluginDataDir,
-        settings: cliSettings,
+        settings: effectiveSettings,
         hookSession: activeSession,
         runtimeTelemetry,
         transcriptSummary,
+        appSelectedModel: effectiveAppSelectedModel,
         timeFormat: activeLayout.timeFormat,
         barLength: activeLayout.barLength,
         argonInfo,

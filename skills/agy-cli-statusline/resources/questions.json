@@ -16,7 +16,7 @@
           "🪪 使用中代理（agent-profile）",
           "⚡ 代理當前狀態（agent-state）",
           "⚙️ 目前運行模式（mode）",
-          "🧭 編排器當前實際執行的底層模型（active-model）"
+          "🧭 協調器當前實際執行的底層模型（active-model）"
         ]
       },
       {
@@ -88,7 +88,7 @@
       "🪪 使用中代理（agent-profile）",
       "⚡ 代理當前狀態（agent-state）",
       "⚙️ 目前運行模式（mode）",
-      "🧭 編排器當前實際執行的底層模型（active-model）",
+      "🧭 協調器當前實際執行的底層模型（active-model）",
       "🔋 帳號五小時可用額度百分比（quota）",
       "🔋 五小時可用額度長條圖（quota-bar）",
       "⏳ 帳號五小時額度重置時間倒數（quota-reset-countdown）",
@@ -143,7 +143,7 @@
           "🪪 使用中代理（agent-profile）",
           "⚡ 代理当前状态（agent-state）",
           "⚙️ 当前运行模式（mode）",
-          "🧭 编排器当前实际执行的底层模型（active-model）"
+          "🧭 协调器当前实际执行的底层模型（active-model）"
         ]
       },
       {
@@ -215,7 +215,7 @@
       "🪪 使用中代理（agent-profile）",
       "⚡ 代理当前状态（agent-state）",
       "⚙️ 当前运行模式（mode）",
-      "🧭 编排器当前实际执行的底层模型（active-model）",
+      "🧭 协调器当前实际执行的底层模型（active-model）",
       "🔋 账号五小时可用额度百分比（quota）",
       "🔋 五小时可用额度长条图（quota-bar）",
       "⏳ 账号五小时额度重置时间倒计时（quota-reset-countdown）",

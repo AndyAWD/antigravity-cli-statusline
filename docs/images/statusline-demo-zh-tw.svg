@@ -194,7 +194,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🪪 使用中代理（agent-profile）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] ⚡ 代理當前狀態（agent-state）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ 目前運行模式（mode）</text>
-  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 編排器當前實際執行的底層模型（active-model）</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 協調器當前實際執行的底層模型（active-model）</text>
   <text x="44" y="336" fill="#8b949e">⎿ 分頁進度：[ 第 1 / 5 頁 ] · 已選取 5 項指標</text>
   <text x="24" y="358" fill="#6e7681">Space 勾選/取消 · Enter 進入下一分頁 (2/5 額度計費) · 終端機分頁免滾動零截斷</text>
 

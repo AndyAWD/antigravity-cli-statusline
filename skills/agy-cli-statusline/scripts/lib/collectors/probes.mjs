@@ -305,7 +305,8 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
           ...(options?.env !== undefined ? { env: options.env } : {}),
           hookSession: options?.hookSession || null,
           runtimeTelemetry: options?.runtimeTelemetry || null,
-          transcriptSummary: options?.transcriptSummary || null
+          transcriptSummary: options?.transcriptSummary || null,
+          appSelectedModel: options?.appSelectedModel || ''
         });
       })();
 

@@ -44,6 +44,56 @@ test('readTranscriptSummaryAsync parses tail, ignores torn final line, and infer
   }
 });
 
+test('readTranscriptSummaryAsync falls back from oversized transcript_full.jsonl to compact transcript.jsonl and detects Orchestrator signal', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-tr-full-'));
+  try {
+    const fullPath = path.join(dir, 'transcript_full.jsonl');
+    const compactPath = path.join(dir, 'transcript.jsonl');
+    const hugePadding = 'y'.repeat(80 * 1024);
+
+    fs.writeFileSync(fullPath, [
+      JSON.stringify({
+        step_index: 1,
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        model: 'gemini-4-neon-high',
+        created_at: '2026-11-23T14:00:00Z',
+        tool_calls: [{ name: 'exit_plan_mode', args: {} }]
+      }),
+      JSON.stringify({
+        step_index: 2,
+        type: 'GENERIC',
+        status: 'DONE',
+        content: hugePadding
+      })
+    ].join('\n'), 'utf8');
+
+    fs.writeFileSync(compactPath, [
+      JSON.stringify({
+        step_index: 1,
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        model: 'gemini-4-neon-high',
+        created_at: '2026-11-23T14:00:00Z',
+        tool_calls: [{ name: 'exit_plan_mode', args: {} }]
+      }),
+      JSON.stringify({
+        step_index: 2,
+        type: 'GENERIC',
+        status: 'DONE',
+        content: 'truncated'
+      })
+    ].join('\n'), 'utf8');
+
+    const summary = await readTranscriptSummaryAsync(fullPath);
+    assert.equal(summary.exists, true);
+    assert.equal(summary.lastModel, 'gemini-4-neon-high');
+    assert.equal(summary.hasOrchestratorSignal, true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('countArtifactsInDirAsync and discoverRecentBrainSessionsAsync work across products', async () => {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-brain-test-'));
   try {

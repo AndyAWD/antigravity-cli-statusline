@@ -5,6 +5,7 @@ import {
   BLUE,
   BOLD,
   GRAY,
+  RED,
   RESET,
   WHITE,
   YELLOW,
@@ -40,7 +41,7 @@ export function formatAgentState(state, normLang) {
 }
 
 /**
- * 格式化 Orchestrator 實際執行模型與思考／快速角色徽章（非 Orchestrator 模式回傳空字串自動隱藏）。
+ * 格式化 Orchestrator 實際執行模型與規劃／工作角色徽章（非 Orchestrator 模式一律以紅色顯示關閉）。
  * @param {object} m
  * @param {string} normLang
  * @returns {string}
@@ -48,16 +49,18 @@ export function formatAgentState(state, normLang) {
 export function formatActiveModelDisplay(m, normLang) {
   const modelName = typeof m?.activeModelName === 'string' ? m.activeModelName.trim() : '';
   const isOrchestrator = Boolean(m?.isOrchestrator) || Boolean(modelName);
-  if (!isOrchestrator) return '';
-
   const role = typeof m?.activeModelRole === 'string' ? m.activeModelRole.trim().toLowerCase() : '';
   const labels = {
-    'zh-tw': { prefix: '實際模型:', planner: '[思考]', executor: '[快速]', pending: '待命' },
-    'zh-cn': { prefix: '实际模型:', planner: '[思考]', executor: '[快速]', pending: '待命' },
-    'us': { prefix: 'Active Model:', planner: '[Think]', executor: '[Fast]', pending: 'Pending' },
-    'jp': { prefix: '実行モデル:', planner: '[思考]', executor: '[高速]', pending: '待機中' }
+    'zh-tw': { prefix: '協調器:', planner: '[規劃]', executor: '[工作]', pending: '待命', off: '關閉' },
+    'zh-cn': { prefix: '协调器:', planner: '[规划]', executor: '[工作]', pending: '待命', off: '关闭' },
+    'us': { prefix: 'Orchestrator:', planner: '[Plan]', executor: '[Work]', pending: 'Pending', off: 'off' },
+    'jp': { prefix: 'Orchestrator:', planner: '[計画]', executor: '[作業]', pending: '待機中', off: 'オフ' }
   };
   const t = labels[normLang] || labels['zh-tw'];
+
+  if (!isOrchestrator) {
+    return `${WHITE}${t.prefix}${RESET} ${RED}${BOLD}${t.off}${RESET}`;
+  }
 
   if (!modelName) {
     return `${WHITE}${t.prefix}${RESET} ${GRAY}${BOLD}${t.pending}${RESET}`;

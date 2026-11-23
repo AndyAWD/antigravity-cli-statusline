@@ -165,8 +165,8 @@ async function main() {
     const needsContext = footerItems.some(
       item => typeof item === 'string' && (item.startsWith('context-used') || item.startsWith('token-count'))
     );
-    const needsActiveModel = footerItemsSet.has('active-model') && isOrchestratorSession(meta, settings, null, fallbackModel);
-    const needsCache = needsQuotaOrAccount || needsContext || needsActiveModel;
+    const wantsActiveModel = footerItemsSet.has('active-model');
+    const needsCache = needsQuotaOrAccount || needsContext || wantsActiveModel;
     if (footerItemsSet.has('account-email') && !cachedAccount.email && !(meta?.email || meta?.account?.email)) {
       cachedAccount = await manageAccountMetaCacheAsync(meta);
     }
@@ -269,6 +269,7 @@ async function main() {
     );
 
     const prevPollAttemptAt = cache?.lastPollAttemptAt || 0;
+    const needsActiveModel = wantsActiveModel && isOrchestratorSession(meta, settings, null, fallbackModel, { cache });
     const shouldUpdateForQuota = needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale || hasExpiredActiveQuota);
     const shouldUpdateForContext = needsContext && (missingModelLimits || stateOrTokensChanged || isCacheStale);
     const shouldUpdateForActiveModel = needsActiveModel && (stateOrTokensChanged || isCacheStale || (currentState !== '' && currentState !== 'idle'));

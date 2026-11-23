@@ -695,7 +695,7 @@ test('StatuslineService resolves and caches both cli-version and app-version in 
   }
 });
 
-test('StatuslineService renders active-model for Orchestrator sessions and hides for single-model sessions', async () => {
+test('StatuslineService renders active-model for Orchestrator sessions and red off for single-model sessions', async () => {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-svc-orch-'));
   try {
     const pluginData = path.join(tmpHome, 'plugin_data');
@@ -747,10 +747,10 @@ test('StatuslineService renders active-model for Orchestrator sessions and hides
     });
 
     const resOrch = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw' });
-    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].plainText, '實際模型: [快速] Gemini 4 Hydrogen (High)');
-    assert.equal(resOrch.snapshot.renderedItems.emoji['active-model'].plainText, '🧭 [快速] Gemini 4 Hydrogen (High)');
+    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].plainText, '協調器: [工作] Gemini 4 Hydrogen (High)');
+    assert.equal(resOrch.snapshot.renderedItems.emoji['active-model'].plainText, '🧭 [工作] Gemini 4 Hydrogen (High)');
 
-    // 切換為一般模型時，active-model 自動隱藏（plainText 為空字串）
+    // 切換為一般模型時，active-model 一律以紅色顯示關閉
     fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
       version: 1,
       latestConversationId: convId,
@@ -767,8 +767,113 @@ test('StatuslineService renders active-model for Orchestrator sessions and hides
     runtimeModelSlug = 'gemini-4-neon-high';
 
     const resSingle = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw', forceRefresh: true });
-    assert.equal(resSingle.snapshot.renderedItems.text['active-model'].plainText, '');
-    assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].plainText, '');
+    assert.equal(resSingle.snapshot.renderedItems.text['active-model'].plainText, '協調器: 關閉');
+    assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].plainText, '🧭 關閉');
+    assert.equal(resSingle.snapshot.renderedItems.text['active-model'].valueSegments[0].color, '#ff7daf');
+    assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].segments.at(-1).color, '#ff7daf');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('StatuslineService detects 2.0 Orchestrator via antigravity_state.pbtxt and merges CLI sessions.json', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-svc-pbtxt-'));
+  try {
+    const pluginData = path.join(tmpHome, 'plugin_data');
+    const cliDir = path.join(tmpHome, '.gemini', 'antigravity-cli');
+    const cliPluginData = path.join(cliDir, 'plugin_data', 'antigravity-cli-statusline');
+    const appStateDir = path.join(tmpHome, '.gemini', 'antigravity');
+    fs.mkdirSync(pluginData, { recursive: true });
+    fs.mkdirSync(cliPluginData, { recursive: true });
+    fs.mkdirSync(appStateDir, { recursive: true });
+
+    const appConvId = 'app-conv-1';
+    const cliConvId = 'cli-conv-1';
+    const cliWorkspace = path.join(tmpHome, 'proj-cli');
+    fs.mkdirSync(cliWorkspace, { recursive: true });
+
+    // CLI settings 設為單一模型（不應汙染 2.0 對話的 Orchestrator 判定）
+    fs.writeFileSync(path.join(cliDir, 'settings.json'), JSON.stringify({
+      model: 'Gemini 4 Hydrogen (Low)',
+      orchestrator: { planner: 'Gemini 4 Neon (XHigh)' },
+      ui: {
+        language: 'zh-tw',
+        footer: { items: ['model-name', 'active-model'] }
+      }
+    }), 'utf8');
+
+    fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      latestConversationId: appConvId,
+      sessions: {
+        [appConvId]: {
+          conversationId: appConvId,
+          modelName: 'gemini-4-neon-high',
+          agentState: 'working',
+          updatedAt: 2000
+        }
+      }
+    }), 'utf8');
+
+    // CLI 自己的 sessions.json 記錄更晚時間戳的 CLI 對話
+    fs.writeFileSync(path.join(cliPluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      latestConversationId: cliConvId,
+      sessions: {
+        [cliConvId]: {
+          conversationId: cliConvId,
+          workspacePaths: [cliWorkspace],
+          cwd: cliWorkspace,
+          transcriptPath: path.join(cliDir, 'brain', cliConvId, '.system_generated', 'logs', 'transcript_full.jsonl'),
+          modelName: 'gemini-4-hydrogen-low',
+          agentState: 'idle',
+          updatedAt: 5000
+        }
+      }
+    }), 'utf8');
+
+    const pbtxtPath = path.join(appStateDir, 'antigravity_state.pbtxt');
+    fs.writeFileSync(pbtxtPath, 'last_selected_agent_model: MODEL_PLACEHOLDER_M537\n', 'utf8');
+
+    const cache = {
+      modelLimits: {
+        modelplaceholderm537: { slug: 'gemini-pro-orchestrator-neon', model: 'MODEL_PLACEHOLDER_M537', displayName: 'Orchestrator (Neon)' },
+        modelplaceholderm532: { slug: 'gemini-4-neon-high', model: 'MODEL_PLACEHOLDER_M532', displayName: 'Gemini 4 Neon (High)' },
+        modelplaceholderm525: { slug: 'gemini-4-hydrogen-high', model: 'MODEL_PLACEHOLDER_M525', displayName: 'Gemini 4 Hydrogen (High)' }
+      }
+    };
+
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: pluginData,
+      fetchReleaseFn: async () => ({ ok: false }),
+      resolveCliVersionFn: async () => ({ version: '1.5.15', tag: 'v1.5.15', installed: true, source: 'mock' }),
+      resolveAppVersionFn: async () => ({ version: '2.34.0', tag: 'v2.34.0', installed: true, source: 'mock' }),
+      collectLsTelemetryFn: async ({ conversationId }) => ({
+        cache,
+        runtimeTelemetry: conversationId === appConvId
+          ? { maxContextTokens: 512000, estimatedTokensUsed: 1200, modelDisplayName: 'Gemini 4 Neon (High)', model: 'MODEL_PLACEHOLDER_M532', tokenBreakdown: [] }
+          : null,
+        telemetryStatus: { lsConnected: true, lsEnvSource: 'env', source: 'live', warning: '' }
+      })
+    });
+
+    // 1. Auto-follow 維持選取 2.0 對話，並透過 antigravity_state.pbtxt 正確顯示協調器與規劃角色
+    const resAuto = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw' });
+    assert.equal(resAuto.snapshot.session.conversationId, appConvId);
+    assert.equal(resAuto.snapshot.renderedItems.text['active-model'].plainText, '協調器: [規劃] Gemini 4 Neon (High)');
+
+    // 2. 切回單一模型代號後顯示紅色關閉
+    fs.writeFileSync(pbtxtPath, 'last_selected_agent_model: MODEL_PLACEHOLDER_M525\n', 'utf8');
+    const resOff = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resOff.snapshot.renderedItems.text['active-model'].plainText, '協調器: 關閉');
+
+    // 3. 明確切換檢視 CLI 對話時，可從合併後的 CLI sessions.json 拿到工作區與模型
+    const resCli = await svc.getDashboardSnapshot({ conversationId: cliConvId, hostLocale: 'zh-tw' });
+    assert.equal(resCli.snapshot.session.product, 'antigravity-cli');
+    assert.equal(resCli.snapshot.session.projectPath, cliWorkspace);
+    assert.equal(resCli.snapshot.renderedItems.text['model-name'].plainText, '模型: gemini-4-hydrogen-low');
   } finally {
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }

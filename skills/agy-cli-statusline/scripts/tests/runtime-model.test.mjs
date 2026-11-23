@@ -8,6 +8,8 @@ import {
   formatRuntimeModelDisplayName,
   isOrchestratorModelName,
   isOrchestratorSession,
+  isOrchestratorWorkerModel,
+  readAppSelectedModelAsync,
   readLatestTranscriptModelAsync,
   resolveActiveRuntimeModelAsync
 } from '../lib/collectors/runtime-model.mjs';
@@ -246,7 +248,7 @@ test('resolveActiveRuntimeModelAsync arbitrates meta > fresh PreInvocation hook 
   }
 });
 
-test('active-model renders across all 4 locales (text & emoji) and auto-hides when not Orchestrator', () => {
+test('active-model renders across all 4 locales (text & emoji) and shows red off when not Orchestrator', () => {
   const baseMetrics = {
     fallbackModel: 'Orchestrator (Carbon)',
     quotaColor: '',
@@ -295,10 +297,10 @@ test('active-model renders across all 4 locales (text & emoji) and auto-hides wh
   };
 
   const expectedPlanner = {
-    'zh-tw': { text: '實際模型: [思考] Gemini 4 Carbon (High)', emoji: '🧭 [思考] Gemini 4 Carbon (High)' },
-    'zh-cn': { text: '实际模型: [思考] Gemini 4 Carbon (High)', emoji: '🧭 [思考] Gemini 4 Carbon (High)' },
-    'us': { text: 'Active Model: [Think] Gemini 4 Carbon (High)', emoji: '🧭 [Think] Gemini 4 Carbon (High)' },
-    'jp': { text: '実行モデル: [思考] Gemini 4 Carbon (High)', emoji: '🧭 [思考] Gemini 4 Carbon (High)' }
+    'zh-tw': { text: '協調器: [規劃] Gemini 4 Carbon (High)', emoji: '🧭 [規劃] Gemini 4 Carbon (High)' },
+    'zh-cn': { text: '协调器: [规划] Gemini 4 Carbon (High)', emoji: '🧭 [规划] Gemini 4 Carbon (High)' },
+    'us': { text: 'Orchestrator: [Plan] Gemini 4 Carbon (High)', emoji: '🧭 [Plan] Gemini 4 Carbon (High)' },
+    'jp': { text: 'Orchestrator: [計画] Gemini 4 Carbon (High)', emoji: '🧭 [計画] Gemini 4 Carbon (High)' }
   };
 
   for (const [loc, exp] of Object.entries(expectedPlanner)) {
@@ -307,18 +309,31 @@ test('active-model renders across all 4 locales (text & emoji) and auto-hides wh
   }
 
   const executorMetrics = { ...baseMetrics, activeModelName: 'Gemini 4 Hydrogen (High)', activeModelRole: 'executor' };
-  assert.equal(stripAnsi(buildI18nDict('zh-tw', executorMetrics, 'text')['active-model']), '實際模型: [快速] Gemini 4 Hydrogen (High)');
-  assert.equal(stripAnsi(buildI18nDict('us', executorMetrics, 'emoji')['active-model']), '🧭 [Fast] Gemini 4 Hydrogen (High)');
+  assert.equal(stripAnsi(buildI18nDict('zh-tw', executorMetrics, 'text')['active-model']), '協調器: [工作] Gemini 4 Hydrogen (High)');
+  assert.equal(stripAnsi(buildI18nDict('us', executorMetrics, 'emoji')['active-model']), '🧭 [Work] Gemini 4 Hydrogen (High)');
+  assert.equal(stripAnsi(buildI18nDict('jp', executorMetrics, 'emoji')['active-model']), '🧭 [作業] Gemini 4 Hydrogen (High)');
 
   const pendingMetrics = { ...baseMetrics, activeModelName: '', activeModelRole: 'pending' };
-  assert.equal(stripAnsi(buildI18nDict('zh-tw', pendingMetrics, 'text')['active-model']), '實際模型: 待命');
+  assert.equal(stripAnsi(buildI18nDict('zh-tw', pendingMetrics, 'text')['active-model']), '協調器: 待命');
 
   const nonOrchMetrics = { ...baseMetrics, isOrchestrator: false, activeModelName: '', activeModelRole: 'none' };
-  assert.equal(buildI18nDict('zh-tw', nonOrchMetrics, 'text')['active-model'], '');
-  assert.equal(buildI18nDict('zh-tw', nonOrchMetrics, 'emoji')['active-model'], '');
+  const expectedOff = {
+    'zh-tw': { text: '協調器: 關閉', emoji: '🧭 關閉' },
+    'zh-cn': { text: '协调器: 关闭', emoji: '🧭 关闭' },
+    'us': { text: 'Orchestrator: off', emoji: '🧭 off' },
+    'jp': { text: 'Orchestrator: オフ', emoji: '🧭 オフ' }
+  };
+  for (const [loc, exp] of Object.entries(expectedOff)) {
+    const textRaw = buildI18nDict(loc, nonOrchMetrics, 'text')['active-model'];
+    const emojiRaw = buildI18nDict(loc, nonOrchMetrics, 'emoji')['active-model'];
+    assert.equal(stripAnsi(textRaw), exp.text);
+    assert.equal(stripAnsi(emojiRaw), exp.emoji);
+    assert.equal(textRaw.includes('\x1b[38;2;255;125;175m'), true);
+    assert.equal(emojiRaw.includes('\x1b[38;2;255;125;175m'), true);
+  }
 });
 
-test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and hides it otherwise', async () => {
+test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and red off otherwise', async () => {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'statusline-e2e-orch-'));
   try {
     const fakeHome = path.join(sandbox, 'home');
@@ -362,10 +377,10 @@ test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and h
     assert.equal(orchRes.code, 0);
     assert.equal(
       stripAnsi(orchRes.stdout).trim(),
-      '模型: Orchestrator (Carbon) │ 🧭 [快速] Gemini 4 Hydrogen (High)'
+      '模型: Orchestrator (Carbon) │ 🧭 [工作] Gemini 4 Hydrogen (High)'
     );
 
-    // 切換為一般模型時，active-model 應自動隱藏且不留下多餘分隔線
+    // 切換為一般模型時，active-model 一律以紅色顯示關閉
     const normalRes = await runStatusline({
       conversation_id: convId,
       model: { display_name: 'Gemini 4 Neon (High)' },
@@ -373,7 +388,8 @@ test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and h
       terminal_width: 160
     }, fakeHome);
     assert.equal(normalRes.code, 0);
-    assert.equal(stripAnsi(normalRes.stdout).trim(), '模型: Gemini 4 Neon (High)');
+    assert.equal(stripAnsi(normalRes.stdout).trim(), '模型: Gemini 4 Neon (High) │ 🧭 關閉');
+    assert.equal(normalRes.stdout.includes('\x1b[38;2;255;125;175m'), true);
 
     // 確認 probes-and-gating：當 footerItems 不含 active-model 時不探測
     const gated = await extractMetricsAsync(
@@ -391,5 +407,171 @@ test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and h
     assert.equal(gated.activeModelName, '');
   } finally {
     fs.rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
+test('resolves MODEL_PLACEHOLDER wrappers and preserves worker executor models across cache and transcript', async () => {
+  const cache = {
+    modelLimits: {
+      modelplaceholderm537: {
+        slug: 'gemini-pro-orchestrator-neon',
+        model: 'MODEL_PLACEHOLDER_M537',
+        displayName: 'Orchestrator (Neon)'
+      },
+      modelplaceholderm668: {
+        slug: 'gemini-pro-orchestrator-g1-pro',
+        model: 'MODEL_PLACEHOLDER_M668',
+        displayName: 'Orchestrator (Argon)'
+      },
+      modelplaceholderm669: {
+        slug: 'gemini-flash-worker-agy',
+        model: 'MODEL_PLACEHOLDER_M669',
+        displayName: 'Gemini 4 Hydrogen (Orchestrator)'
+      },
+      modelplaceholderm525: {
+        slug: 'gemini-4-hydrogen-high',
+        model: 'MODEL_PLACEHOLDER_M525',
+        displayName: 'Gemini 4 Hydrogen (High)'
+      }
+    }
+  };
+
+  // 外層 Orchestrator placeholder 透過 modelLimits 正確辨識，但不將 worker 誤判為外層包裝
+  assert.equal(isOrchestratorModelName('MODEL_PLACEHOLDER_M537', cache), true);
+  assert.equal(isOrchestratorModelName('MODEL_PLACEHOLDER_M668', cache), true);
+  assert.equal(isOrchestratorModelName('MODEL_PLACEHOLDER_M525', cache), false);
+  assert.equal(isOrchestratorWorkerModel('gemini-flash-worker-agy'), true);
+  assert.equal(isOrchestratorWorkerModel('MODEL_PLACEHOLDER_M669', cache), true);
+  assert.equal(isOrchestratorWorkerModel('Gemini 4 Hydrogen (Orchestrator)'), true);
+  assert.equal(isOrchestratorModelName('gemini-flash-worker-agy', cache), false);
+  assert.equal(isOrchestratorModelName('MODEL_PLACEHOLDER_M669', cache), false);
+  assert.equal(isOrchestratorModelName('Gemini 4 Hydrogen (Orchestrator)', cache), false);
+
+  // formatRuntimeModelDisplayName 剝離具名 Worker 的 (Orchestrator) 尾綴並保留執行者歸類
+  assert.equal(formatRuntimeModelDisplayName('MODEL_PLACEHOLDER_M669', cache), 'Gemini 4 Hydrogen');
+  assert.equal(formatRuntimeModelDisplayName('gemini-flash-worker-agy', cache), 'Gemini 4 Hydrogen');
+  assert.equal(formatRuntimeModelDisplayName('Gemini 4 Hydrogen (Orchestrator)'), 'Gemini 4 Hydrogen');
+  assert.equal(classifyOrchestratorModelRole('gemini-flash-worker-agy', {}, cache), 'executor');
+  assert.equal(classifyOrchestratorModelRole('MODEL_PLACEHOLDER_M669', {}, cache), 'executor');
+
+  assert.equal(isOrchestratorSession({ model: { id: 'MODEL_PLACEHOLDER_M537' } }, {}, null, '', { cache }), true);
+
+  const workerRes = await resolveActiveRuntimeModelAsync({
+    meta: { conversation_id: 'conv-worker-1', model: { id: 'MODEL_PLACEHOLDER_M537' } },
+    runtimeTelemetry: { modelDisplayName: 'Gemini 4 Hydrogen (Orchestrator)', model: 'MODEL_PLACEHOLDER_M669' },
+    cache
+  });
+  assert.equal(workerRes.isOrchestrator, true);
+  assert.equal(workerRes.modelName, 'Gemini 4 Hydrogen');
+  assert.equal(workerRes.role, 'executor');
+  assert.equal(workerRes.source, 'ls_cache');
+});
+
+test('loads CLI sessions.json without PLUGIN_DATA, falls back from oversized transcript_full.jsonl, and reads antigravity_state.pbtxt', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-rt-fixes-'));
+  try {
+    const convId = 'conv-cli-fallback';
+    const cliDataDir = path.join(tmpHome, '.gemini', 'antigravity-cli', 'plugin_data', 'antigravity-cli-statusline');
+    const logsDir = path.join(tmpHome, '.gemini', 'antigravity-cli', 'brain', convId, '.system_generated', 'logs');
+    const stateDir = path.join(tmpHome, '.gemini', 'antigravity');
+    fs.mkdirSync(cliDataDir, { recursive: true });
+    fs.mkdirSync(logsDir, { recursive: true });
+    fs.mkdirSync(stateDir, { recursive: true });
+
+    // 1. CLI 獨立 sessions.json（未傳入 pluginDataDir 與 env.PLUGIN_DATA 時也能讀到）
+    fs.writeFileSync(path.join(cliDataDir, 'sessions.json'), JSON.stringify({
+      version: 1,
+      sessions: {
+        [convId]: {
+          conversationId: convId,
+          modelName: 'gemini-4-neon-xhigh',
+          updatedAt: Date.parse('2026-11-23T14:00:00Z')
+        }
+      }
+    }), 'utf8');
+
+    const cliHookRes = await resolveActiveRuntimeModelAsync({
+      meta: { conversation_id: convId, model: { display_name: 'Orchestrator (Neon)' } },
+      homeDir: tmpHome,
+      env: {}
+    });
+    assert.equal(cliHookRes.isOrchestrator, true);
+    assert.equal(cliHookRes.source, 'hook');
+    assert.equal(cliHookRes.modelName, 'Gemini 4 Neon (XHigh)');
+    assert.equal(cliHookRes.role, 'planner');
+
+    // 2. transcript_full.jsonl 尾端超過 64 KB 全為大型工具輸出時，退讓讀取同目錄精簡版 transcript.jsonl
+    const fullPath = path.join(logsDir, 'transcript_full.jsonl');
+    const compactPath = path.join(logsDir, 'transcript.jsonl');
+    const hugePadding = 'x'.repeat(80 * 1024);
+    fs.writeFileSync(fullPath, [
+      JSON.stringify({ step_index: 1, source: 'MODEL', type: 'PLANNER_RESPONSE', model: 'gemini-4-hydrogen-high', created_at: '2026-11-23T14:05:00Z' }),
+      JSON.stringify({ step_index: 2, source: 'MODEL', type: 'GENERIC', content: hugePadding })
+    ].join('\n'), 'utf8');
+    fs.writeFileSync(compactPath, [
+      JSON.stringify({ step_index: 1, source: 'MODEL', type: 'PLANNER_RESPONSE', model: 'gemini-4-hydrogen-high', created_at: '2026-11-23T14:05:00Z' }),
+      JSON.stringify({ step_index: 2, source: 'MODEL', type: 'GENERIC', content: 'truncated' })
+    ].join('\n'), 'utf8');
+
+    const trFallbackRes = await resolveActiveRuntimeModelAsync({
+      meta: {
+        conversation_id: convId,
+        model: { display_name: 'Orchestrator (Neon)' },
+        transcript_path: fullPath
+      },
+      pluginDataDir: path.join(tmpHome, 'empty-plugin-data'),
+      homeDir: tmpHome
+    });
+    assert.equal(trFallbackRes.isOrchestrator, true);
+    assert.equal(trFallbackRes.source, 'transcript');
+    assert.equal(trFallbackRes.modelName, 'Gemini 4 Hydrogen (High)');
+    assert.equal(trFallbackRes.role, 'executor');
+
+    // 僅存在超大 transcript_full.jsonl（> 64 KB、<= 256 KB）而無精簡版時，readLatestTranscriptModelAsync 亦能擴大視窗讀到
+    fs.unlinkSync(compactPath);
+    const expandedRead = await readLatestTranscriptModelAsync(fullPath);
+    assert.equal(expandedRead.exists, true);
+    assert.equal(expandedRead.model, 'gemini-4-hydrogen-high');
+
+    // 3. antigravity_state.pbtxt 讀取與 appSelectedModel 辨識
+    const cache = {
+      modelLimits: {
+        modelplaceholderm537: { slug: 'gemini-pro-orchestrator-neon', model: 'MODEL_PLACEHOLDER_M537', displayName: 'Orchestrator (Neon)' },
+        modelplaceholderm525: { slug: 'gemini-4-hydrogen-high', model: 'MODEL_PLACEHOLDER_M525', displayName: 'Gemini 4 Hydrogen (High)' }
+      }
+    };
+    const pbtxtPath = path.join(stateDir, 'antigravity_state.pbtxt');
+    fs.writeFileSync(pbtxtPath, 'last_selected_agent_model: MODEL_PLACEHOLDER_M537\n', 'utf8');
+    const selectedOrch = await readAppSelectedModelAsync(tmpHome);
+    assert.equal(selectedOrch, 'MODEL_PLACEHOLDER_M537');
+
+    const appOrchRes = await resolveActiveRuntimeModelAsync({
+      meta: { conversation_id: 'conv-app-1', model: { id: 'MODEL_PLACEHOLDER_M532', display_name: 'Gemini 4 Neon (High)' } },
+      runtimeTelemetry: { modelDisplayName: 'Gemini 4 Neon (High)', model: 'MODEL_PLACEHOLDER_M532' },
+      appSelectedModel: selectedOrch,
+      cache,
+      homeDir: tmpHome,
+      pluginDataDir: path.join(tmpHome, 'empty-plugin-data')
+    });
+    assert.equal(appOrchRes.isOrchestrator, true);
+    assert.equal(appOrchRes.modelName, 'Gemini 4 Neon (High)');
+    assert.equal(appOrchRes.role, 'planner');
+
+    fs.writeFileSync(pbtxtPath, 'last_selected_agent_model: MODEL_PLACEHOLDER_M525\n', 'utf8');
+    const selectedSingle = await readAppSelectedModelAsync(tmpHome);
+    assert.equal(selectedSingle, 'MODEL_PLACEHOLDER_M525');
+    const appSingleRes = await resolveActiveRuntimeModelAsync({
+      meta: { conversation_id: 'conv-app-1', model: { id: 'MODEL_PLACEHOLDER_M525', display_name: 'Gemini 4 Hydrogen (High)' } },
+      runtimeTelemetry: { modelDisplayName: 'Gemini 4 Hydrogen (High)', model: 'MODEL_PLACEHOLDER_M525' },
+      appSelectedModel: selectedSingle,
+      transcriptSummary: { exists: true, lastModel: 'gemini-4-hydrogen-high', hasOrchestratorSignal: true },
+      cache,
+      homeDir: tmpHome,
+      pluginDataDir: path.join(tmpHome, 'empty-plugin-data')
+    });
+    assert.equal(appSingleRes.isOrchestrator, false);
+    assert.equal(appSingleRes.role, 'none');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
   }
 });

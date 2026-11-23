@@ -194,7 +194,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🪪 使用中代理（agent-profile）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] ⚡ 代理当前状态（agent-state）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ 当前运行模式（mode）</text>
-  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 编排器当前实际执行的底层模型（active-model）</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 协调器当前实际执行的底层模型（active-model）</text>
   <text x="44" y="336" fill="#8b949e">⎿ 分页进度：[ 第 1 / 5 页 ] · 已选取 5 项指标</text>
   <text x="24" y="358" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (2/5 额度计费) · 终端分页免滚动零截断</text>
 

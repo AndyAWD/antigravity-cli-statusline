@@ -105,8 +105,8 @@ export const METRICS = [
     category: 'model-and-agent',
     emoji: '🧭',
     descriptions: {
-      'zh-tw': '編排器當前實際執行的底層模型',
-      'zh-cn': '编排器当前实际执行的底层模型',
+      'zh-tw': '協調器當前實際執行的底層模型',
+      'zh-cn': '协调器当前实际执行的底层模型',
       'us': 'Active underlying model under Orchestrator',
       'jp': 'Orchestrator実行中の実モデル'
     }
