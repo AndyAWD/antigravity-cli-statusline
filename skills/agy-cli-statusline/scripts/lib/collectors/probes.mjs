@@ -6,10 +6,13 @@ import { readJsonSafeAsync } from '../core/fs-utils.mjs';
 import { formatTokens, normalizeLanguage, safeGetCount, sanitizeConversationId } from '../core/normalize.mjs';
 import { resolveInstalledPluginVersionAsync } from '../core/plugin-manifest.mjs';
 import { runCmdDetailedAsync, withTimeout } from '../core/process-utils.mjs';
-import { resolveProjectPath } from '../core/settings.mjs';
+import { formatVersionTag } from '../core/semver.mjs';
+import { getSettingsAsync, resolveProjectPath } from '../core/settings.mjs';
 import { RESET, getColorByPercentage, renderBarGraph } from '../renderers/ansi.mjs';
 import { resolveArgonQuota } from './quota.mjs';
+import { resolveActiveRuntimeModelAsync } from './runtime-model.mjs';
 import { formatAbsoluteResetTime, formatResetTime } from './time-format.mjs';
+import { resolveInstalledAppVersionAsync, resolveInstalledCliVersionAsync } from './versions.mjs';
 
 function getGitFallbackPaths() {
   if (process.platform === 'win32') {
@@ -272,6 +275,41 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
       }
     : meta;
 
+  const rawMetaCliVersion = typeof meta?.version === 'string' ? meta.version.trim().replace(/^v/i, '') : (meta?.version ? String(meta.version).trim().replace(/^v/i, '') : '');
+  const rawMetaAppVersion = typeof meta?.app_version === 'string' ? meta.app_version.trim().replace(/^v/i, '') : (meta?.app_version ? String(meta.app_version).trim().replace(/^v/i, '') : '');
+  const versionProbeOpts = {
+    homeDir: options?.homeDir || os.homedir(),
+    ...(options?.platform ? { platform: options.platform } : {}),
+    ...(options?.env !== undefined ? { env: options.env } : {}),
+    ...(options?.cliPaths ? { cliPaths: options.cliPaths } : {}),
+    ...(options?.appPaths ? { appPaths: options.appPaths } : {}),
+    ...(options?.skipPathLookup !== undefined ? { skipPathLookup: options.skipPathLookup } : {}),
+    execFn
+  };
+  const shouldProbeCliVersion = !options?.cliVersion && !rawMetaCliVersion && hasFooterItem('cli-version') && options?.skipVersionProbes !== true;
+  const shouldProbeAppVersion = !options?.appVersion && !rawMetaAppVersion && hasFooterItem('app-version') && options?.skipVersionProbes !== true;
+  const shouldProbeActiveModel = hasFooterItem('active-model');
+  const activeModelPromise = !shouldProbeActiveModel
+    ? Promise.resolve({ isOrchestrator: false, modelName: '', rawModel: '', role: 'none', source: '' })
+    : (async () => {
+        const resolvedSettings = (options?.settings && typeof options.settings === 'object')
+          ? options.settings
+          : await getSettingsAsync(meta, { homeDir: options?.homeDir || os.homedir() }).catch(() => ({}));
+        return resolveActiveRuntimeModelAsync({
+          meta,
+          fallbackModel,
+          settings: resolvedSettings,
+          cache,
+          homeDir: options?.homeDir || os.homedir(),
+          pluginDataDir: options?.pluginDataDir || '',
+          ...(options?.env !== undefined ? { env: options.env } : {}),
+          hookSession: options?.hookSession || null,
+          runtimeTelemetry: options?.runtimeTelemetry || null,
+          transcriptSummary: options?.transcriptSummary || null,
+          appSelectedModel: options?.appSelectedModel || ''
+        });
+      })();
+
   // 併行執行非同步探測（含逾時保護避免系統休眠喚醒時被 CLI SIGKILL）
   const [
     gitBranch,
@@ -280,7 +318,10 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     pendingInputCount,
     backgroundTasksCount,
     subagentsCount,
-    artifactsCount
+    artifactsCount,
+    probedCliVersion,
+    probedAppVersion,
+    activeModelInfo
   ] = await Promise.all([
     // 1. Git 分支
     !hasFooterItem('git-branch')
@@ -410,7 +451,20 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
             }
             return 0;
           }
-        )
+        ),
+
+    // 8. Antigravity CLI 版本號（僅在缺少 meta.version 且啟用 cli-version 時探測）
+    !shouldProbeCliVersion
+      ? Promise.resolve({ tag: '' })
+      : withTimeout(resolveInstalledCliVersionAsync(versionProbeOpts), 800, { tag: '' }),
+
+    // 9. Antigravity 2.0 應用程式版本號（僅在啟用 app-version 時以純檔案探測）
+    !shouldProbeAppVersion
+      ? Promise.resolve({ tag: '' })
+      : withTimeout(resolveInstalledAppVersionAsync(versionProbeOpts), 800, { tag: '' }),
+
+    // 10. Orchestrator 實際執行模型（僅在啟用 active-model 時探測）
+    withTimeout(activeModelPromise, 400, { isOrchestrator: false, modelName: '', rawModel: '', role: 'none', source: '' })
   ]);
 
   const memUsage = `${rssMem}MB`;
@@ -438,8 +492,12 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   else if (meta?.agent?.id) agentProfileName = meta.agent.id;
   else if (meta?.agent?.profile) agentProfileName = meta.agent.profile;
 
-  const rawCliVersion = typeof meta?.version === 'string' ? meta.version.trim().replace(/^v/i, '') : (meta?.version ? String(meta.version) : '');
-  const cliVersion = rawCliVersion ? `v${rawCliVersion}` : unknownStr;
+  const cliVersion = options?.cliVersion
+    ? formatVersionTag(options.cliVersion) || String(options.cliVersion)
+    : (rawMetaCliVersion ? `v${rawMetaCliVersion}` : (probedCliVersion?.tag || unknownStr));
+  const appVersion = options?.appVersion
+    ? formatVersionTag(options.appVersion) || String(options.appVersion)
+    : (rawMetaAppVersion ? `v${rawMetaAppVersion}` : (probedAppVersion?.tag || unknownStr));
   let pluginVersion = options?.pluginVersion || '';
   if (!pluginVersion && hasFooterItem('plugin-version') && options?.skipPluginVersionResolve !== true) {
     const resolvedPlugin = await resolveInstalledPluginVersionAsync({
@@ -466,13 +524,18 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail,
     agentState, toolConfirmPending, pendingInputCount, backgroundTasksCount, subagentsCount,
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
-    sandboxAllowNet, sandboxStatusVal, cliVersion, pluginVersion, conversationIdShort, agentProfileName,
+    sandboxAllowNet, sandboxStatusVal, cliVersion, appVersion, pluginVersion, conversationIdShort, agentProfileName,
     weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode,
     quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal,
     argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal,
     tokenColor,
     quotaPct, weeklyPct, argonPct, usedPctNum: contextInfo.usedPctNum,
     totalInput: contextInfo.totalInput, effectiveTokenMax, rssMem,
+    isOrchestrator: Boolean(activeModelInfo?.isOrchestrator),
+    activeModelName: activeModelInfo?.modelName || '',
+    activeModelRaw: activeModelInfo?.rawModel || '',
+    activeModelRole: activeModelInfo?.role || 'none',
+    activeModelSource: activeModelInfo?.source || '',
     pluginUpdateAvailable: Boolean(options?.pluginUpdateAvailable),
     pluginUpdateCurrentTag: options?.pluginUpdateCurrentTag || pluginVersion,
     pluginUpdateLatestTag: options?.pluginUpdateLatestTag || ''

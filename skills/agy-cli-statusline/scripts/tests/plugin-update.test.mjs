@@ -479,32 +479,33 @@ async function main() {
       const concurrentCachePath = join(fakeHomeR35, '.gemini', 'tmp', 'plugin_update_cache_concurrent.json');
       writeFileSync(join(pluginDirR35, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.4' }), 'utf8');
       let concurrentFetches = 0;
+      const concurrentFetchFn = async () => {
+        concurrentFetches++;
+        await new Promise(r => setTimeout(r, 40));
+        return { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' };
+      };
       const [concA, concB] = await Promise.all([
         checkPluginUpdateAsync({
           enabled: true,
           homeDir: fakeHomeR35,
           cachePath: concurrentCachePath,
           session: { found: true, pid: 1099, startTime: 't99', nonInteractive: false, sessionKey: '1099:t99' },
-          fetchReleaseFn: async () => {
-            concurrentFetches++;
-            await new Promise(r => setTimeout(r, 40));
-            return { ok: true, latestVersion: '1.12.0', latestTag: 'v1.12.0' };
-          }
+          fetchReleaseFn: concurrentFetchFn
         }),
         checkPluginUpdateAsync({
           enabled: true,
           homeDir: fakeHomeR35,
           cachePath: concurrentCachePath,
           session: { found: true, pid: 1099, startTime: 't99', nonInteractive: false, sessionKey: '1099:t99' },
-          fetchReleaseFn: async () => {
-            concurrentFetches++;
-            return { ok: false, error: 'should_not_run' };
-          }
+          fetchReleaseFn: concurrentFetchFn
         })
       ]);
       assert.strictEqual(concurrentFetches, 1, 'Concurrent startup calls for the same sessionKey must only issue 1 fetch');
-      assert.strictEqual(concA.updateAvailable, true);
-      assert.strictEqual(concB.checked, false);
+      const checkedCallers = [concA, concB].filter(r => r.checked);
+      const skippedCallers = [concA, concB].filter(r => !r.checked);
+      assert.strictEqual(checkedCallers.length, 1);
+      assert.strictEqual(skippedCallers.length, 1);
+      assert.strictEqual(checkedCallers[0].updateAvailable, true);
       const concurrentSaved = JSON.parse(readFileSync(concurrentCachePath, 'utf8'));
       assert.strictEqual(concurrentSaved.lastSessionStatus, 'ok');
       assert.strictEqual(concurrentSaved.latestVersion, '1.12.0');

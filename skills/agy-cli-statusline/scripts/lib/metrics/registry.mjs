@@ -1,7 +1,7 @@
 /**
  * 單一真實來源（Single Source of Truth）：
- * 統一定義 4 種支援語系、5 大分類頁籤、38 項標準狀態列指標、5 組相鄰合併長條圖、
- * 43 個 Emoji 圖示對應表，以及安裝精靈各步驟之跨語系靜態提示範本。
+ * 統一定義 4 種支援語系、5 大分類頁籤、40 項標準狀態列指標、5 組相鄰合併長條圖、
+ * 45 個 Emoji 圖示對應表，以及安裝精靈各步驟之跨語系靜態提示範本。
  */
 
 export const SUPPORTED_LOCALES = ['zh-tw', 'zh-cn', 'us', 'jp'];
@@ -55,7 +55,7 @@ export const METRIC_CATEGORIES = [
 ];
 
 export const METRICS = [
-  // 1. 模型與代理（4 項）
+  // 1. 模型與代理（5 項）
   {
     id: 'model-name',
     category: 'model-and-agent',
@@ -98,6 +98,17 @@ export const METRICS = [
       'zh-cn': '当前运行模式',
       'us': 'Current running mode',
       'jp': '現在の実行モード'
+    }
+  },
+  {
+    id: 'active-model',
+    category: 'model-and-agent',
+    emoji: '🪄',
+    descriptions: {
+      'zh-tw': '協調器當前實際執行的底層模型',
+      'zh-cn': '协调器当前实际执行的底层模型',
+      'us': 'Active underlying model under Orchestrator',
+      'jp': 'Orchestrator実行中の実モデル'
     }
   },
 
@@ -360,7 +371,7 @@ export const METRICS = [
     }
   },
 
-  // 5. 系統狀態與背景任務（11 項）
+  // 5. 系統狀態與背景任務（12 項）
   {
     id: 'memory-usage',
     category: 'system-and-tasks',
@@ -480,6 +491,17 @@ export const METRICS = [
       'zh-cn': '状态栏新版本更新提醒',
       'us': 'Statusline update reminder',
       'jp': 'ステータスライン更新通知'
+    }
+  },
+  {
+    id: 'app-version',
+    category: 'system-and-tasks',
+    emoji: '💻',
+    descriptions: {
+      'zh-tw': 'Antigravity 2.0 應用程式版本號',
+      'zh-cn': 'Antigravity 2.0 应用程序版本号',
+      'us': 'Antigravity 2.0 App version',
+      'jp': 'Antigravity 2.0 アプリバージョン'
     }
   }
 ];

@@ -41,19 +41,19 @@ for (const lang of languages) {
 
   // 4. Wizard options checkmarks [✓]
   const checkmarks = (svg.match(/\[✓\]/g) || []).length;
-  assert.strictEqual(checkmarks, 38, `${lang}: SVG must visibly render all 38 options checked across 5 categories, got ${checkmarks}`);
+  assert.strictEqual(checkmarks, 40, `${lang}: SVG must visibly render all 40 options checked across 5 categories, got ${checkmarks}`);
 
   // 5. Monospace column spacing & anti-collision: checkmark for Node.js must be at x="370"
   assert.ok(svg.includes('<text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>'), `${lang}: Node.js checkmark must be at x=370 to prevent text overlap`);
   assert.ok(svg.includes('<text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>'), `${lang}: Node.js text must be at x=390`);
 
-  // 6. Metric 14 in Frame 6 reference table must be labeled Argon (not quota-bar) and 29 must be Agy CLI
-  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │'), `${lang}: Reference table must include metric 14`);
-  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">29</tspan> │'), `${lang}: Reference table must include metric 29`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 額度 (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 额度 (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon 残量 (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon Quota (quota)'), `${lang}: Metric 14 must not mislabel Argon as quota`);
+  // 6. Metric 15 in Frame 6 reference table must be labeled Argon (not quota-bar) and 30 must be Agy CLI
+  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │'), `${lang}: Reference table must include metric 15`);
+  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">30</tspan> │'), `${lang}: Reference table must include metric 30`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 額度 (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 额度 (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 残量 (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
+  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon Quota (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
 
   // 7. Frame 7 cursor position must not be floating in empty space at x=650 or overlapping text
   assert.ok(!svg.includes('<rect class="cur" x="650" y="255"'), `${lang}: Frame 7 cursor must not be floating at x=650`);
@@ -80,10 +80,12 @@ for (const lang of languages) {
   // 12. Bottom-right model in default footer must be Gemini 3.8 Flash (Low)
   assert.ok(svg.includes('<text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>'), `${lang}: Bottom-right model must be Gemini 3.8 Flash (Low)`);
 
-  // 13. Statusline telemetry must render new Agy CLI Version and Statusline Version labels
+  // 13. Statusline telemetry must render Agy CLI Version, Agy 2.0 Version, and Statusline Version labels
   const expectedCliVersionLabel = lang === 'us' ? 'Agy CLI Version:' : (lang === 'jp' ? 'Agy CLI バージョン:' : 'Agy CLI 版本:');
+  const expectedAppVersionLabel = lang === 'us' ? 'Agy 2.0 Version:' : (lang === 'jp' ? 'Agy 2.0 バージョン:' : 'Agy 2.0 版本:');
   const expectedPluginVersionLabel = lang === 'zh-tw' ? '狀態列版本:' : (lang === 'zh-cn' ? '状态栏版本:' : (lang === 'jp' ? 'ステータスライン版:' : 'Statusline Version:'));
   assert.ok(svg.includes(expectedCliVersionLabel), `${lang}: Statusline must include ${expectedCliVersionLabel}`);
+  assert.ok(svg.includes(expectedAppVersionLabel), `${lang}: Statusline must include ${expectedAppVersionLabel}`);
   assert.ok(svg.includes(expectedPluginVersionLabel), `${lang}: Statusline must include ${expectedPluginVersionLabel}`);
   assert.ok(svg.includes(expectedPluginTag), `${lang}: Statusline must include plugin version ${expectedPluginTag}`);
 

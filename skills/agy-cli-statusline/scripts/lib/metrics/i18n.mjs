@@ -4,9 +4,12 @@ import { formatVersionTag } from '../core/semver.mjs';
 import {
   BLUE,
   BOLD,
+  GRAY,
+  RED,
   RESET,
   WHITE,
   YELLOW,
+  getActiveModelRoleColor,
   getAgentStateColor,
   getColorByCount,
   getModeColor,
@@ -38,6 +41,54 @@ export function formatAgentState(state, normLang) {
 }
 
 /**
+ * 格式化 Orchestrator 實際執行模型與規劃／工作角色（文字採動態標籤整合角色，Emoji 採箭頭分隔；非 Orchestrator 一律紅色顯示關閉）。
+ * @param {object} m
+ * @param {string} normLang
+ * @param {'text'|'emoji'} [style='text']
+ * @returns {string}
+ */
+export function formatActiveModelDisplay(m, normLang, style = 'text') {
+  const modelName = typeof m?.activeModelName === 'string' ? m.activeModelName.trim() : '';
+  const isOrchestrator = Boolean(m?.isOrchestrator) || Boolean(modelName);
+  const role = typeof m?.activeModelRole === 'string' ? m.activeModelRole.trim().toLowerCase() : '';
+  const labels = {
+    'zh-tw': { prefix: '協調器:', rolePrefix: '協調', planner: '規劃', executor: '工作', pending: '待命', off: '關閉' },
+    'zh-cn': { prefix: '协调器:', rolePrefix: '协调', planner: '规划', executor: '工作', pending: '待命', off: '关闭' },
+    'us': { prefix: 'Orchestrator:', rolePrefix: 'Orchestrator ', planner: 'Plan', executor: 'Work', pending: 'Pending', off: 'off' },
+    'jp': { prefix: 'Orchestrator:', rolePrefix: 'Orchestrator ', planner: '計画', executor: '作業', pending: '待機中', off: 'オフ' }
+  };
+  const t = labels[normLang] || labels['zh-tw'];
+  const isEmoji = style === 'emoji';
+  const emojiPrefix = `${WHITE}${EMOJI_MAP['active-model'] || '🪄'}${RESET}`;
+
+  if (!isOrchestrator) {
+    return isEmoji
+      ? `${emojiPrefix} ${RED}${BOLD}${t.off}${RESET}`
+      : `${WHITE}${t.prefix}${RESET} ${RED}${BOLD}${t.off}${RESET}`;
+  }
+
+  if (!modelName) {
+    return isEmoji
+      ? `${emojiPrefix} ${GRAY}${BOLD}${t.pending}${RESET}`
+      : `${WHITE}${t.prefix}${RESET} ${GRAY}${BOLD}${t.pending}${RESET}`;
+  }
+
+  const modelColor = getModelColor(modelName);
+  const modelPart = `${modelColor}${BOLD}${modelName}${RESET}`;
+  if (role === 'planner' || role === 'executor') {
+    const roleWord = t[role];
+    const roleColor = getActiveModelRoleColor(role);
+    return isEmoji
+      ? `${emojiPrefix} ${roleColor}${BOLD}${roleWord}${RESET} ${GRAY}→${RESET} ${modelPart}`
+      : `${WHITE}${t.rolePrefix}${roleColor}${BOLD}${roleWord}${RESET}${WHITE}:${RESET} ${modelPart}`;
+  }
+
+  return isEmoji
+    ? `${emojiPrefix} ${modelPart}`
+    : `${WHITE}${t.prefix}${RESET} ${modelPart}`;
+}
+
+/**
  * 依語系、全球標籤樣式及個別指標樣式覆寫產生所有狀態列指標的著色文案字典。
  * @param {string} lang
  * @param {object} m
@@ -53,6 +104,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   const normGlobalStyle = normalizeLabelStyle(labelStyle);
   const normLang = normalizeLanguage(lang);
   const unknownStr = (normLang === 'zh-tw' || normLang === 'zh-cn') ? '未知' : (normLang === 'jp' ? '不明' : 'Unknown');
+  const cliVersionVal = m.cliVersion || unknownStr;
+  const appVersionVal = m.appVersion || unknownStr;
   const pluginVersionVal = m.pluginVersion || unknownStr;
   const pluginUpdateCurrentTag = m.pluginUpdateCurrentTag || m.pluginVersion || '';
   const pluginUpdateLatestTag = m.pluginUpdateLatestTag || m.pluginLatestVersion || '';
@@ -67,9 +120,11 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
   const argonCountdown = m.argonCountdownVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
   const argonResetTime = m.argonResetTimeVal ?? (normLang === 'zh-tw' ? '無' : (normLang === 'zh-cn' ? '无' : (normLang === 'jp' ? 'なし' : 'N/A')));
   const argonBar = m.argonQuotaBarVal ?? '[██████████]';
+  const activeModelText = formatActiveModelDisplay(m, normLang);
   const dicts = {
     'zh-tw': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}五小時可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}脈絡用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}記憶體:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
@@ -106,7 +161,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版控狀態:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版控類型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙盒狀態:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 版本: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}狀態列版本: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}對話編號: ${BOLD}${m.conversationIdShort}${RESET}`,
@@ -115,6 +171,7 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'zh-cn': {
       'model-name': `${WHITE}模型:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}五小时可用:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}上下文用量:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}内存:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
@@ -151,7 +208,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版控状态:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版控类型: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}沙箱状态:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI 版本: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 版本: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}状态栏版本: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}对话编号: ${BOLD}${m.conversationIdShort}${RESET}`,
@@ -160,6 +218,7 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'us': {
       'model-name': `${WHITE}Model:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}5-hr Available:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}Context Used:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}RAM:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
@@ -196,7 +255,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}VCS Status:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}VCS: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}Sandbox:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI Version: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI Version: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 Version: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}Statusline Version: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}Conv: ${BOLD}${m.conversationIdShort}${RESET}`,
@@ -205,6 +265,7 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
     },
     'jp': {
       'model-name': `${WHITE}モデル:${RESET} ${getModelColor(m.fallbackModel)}${BOLD}${m.fallbackModel}${RESET}`,
+      'active-model': activeModelText,
       'quota': `${WHITE}五時間残量:${RESET} ${m.quotaColor}${BOLD}${m.quotaVal}${RESET}`,
       'context-used': `${WHITE}コンテキスト使用:${RESET} ${m.contextColor}${BOLD}${m.usedPct}${RESET}`,
       'memory-usage': `${WHITE}メモリ:${RESET} ${BLUE}${BOLD}${m.memUsage}${RESET}`,
@@ -241,7 +302,8 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
       'vcs-dirty': `${WHITE}版管理状態:${RESET} ${getVcsDirtyColor(m.vcsDirtyFlag)}${BOLD}${m.vcsDirtyLabel}${RESET}`,
       'vcs-type': `${WHITE}版管理種別: ${BOLD}${m.vcsType}${RESET}`,
       'sandbox-status': `${WHITE}サンドボックス:${RESET} ${getSandboxColor(m.sandboxEnabled, m.sandboxAllowNet)}${BOLD}${m.sandboxStatusVal}${RESET}`,
-      'cli-version': `${WHITE}Agy CLI バージョン: ${BOLD}${m.cliVersion}${RESET}`,
+      'cli-version': `${WHITE}Agy CLI バージョン: ${BOLD}${cliVersionVal}${RESET}`,
+      'app-version': `${WHITE}Agy 2.0 バージョン: ${BOLD}${appVersionVal}${RESET}`,
       'plugin-version': `${WHITE}ステータスライン版: ${BOLD}${pluginVersionVal}${RESET}`,
       'plugin-update': pluginUpdateText,
       'conversation-id': `${WHITE}会話番号: ${BOLD}${m.conversationIdShort}${RESET}`,
@@ -253,6 +315,10 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
 
   const emojiDict = {};
   for (const [key, val] of Object.entries(baseDict)) {
+    if (key === 'active-model') {
+      emojiDict[key] = formatActiveModelDisplay(m, normLang, 'emoji');
+      continue;
+    }
     if (key === 'plugin-update') {
       if (pluginUpdateLines.length >= 2) {
         const cur = formatVersionTag(pluginUpdateCurrentTag) || String(pluginUpdateCurrentTag || '');

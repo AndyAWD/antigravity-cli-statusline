@@ -194,8 +194,9 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🪪 Active agent profile (agent-profile)</text>
   <text x="44" y="262" fill="#39c5cf">[✓] ⚡ Agent state (agent-state)</text>
   <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ Current running mode (mode)</text>
-  <text x="44" y="318" fill="#8b949e">⎿ Wizard pager: [ Page 1 / 5 ] · 4 metrics selected</text>
-  <text x="24" y="340" fill="#6e7681">Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🪄 Active underlying model under Orchestrator (active-model)</text>
+  <text x="44" y="336" fill="#8b949e">⎿ Wizard pager: [ Page 1 / 5 ] · 5 metrics selected</text>
+  <text x="24" y="358" fill="#6e7681">Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
   <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
@@ -232,7 +233,7 @@
   <text x="44" y="424" fill="#39c5cf">[✓] ⏰ Gemini 4 Argon reset time (quota-argon-reset-time)</text>
   <text x="44" y="442" fill="#39c5cf">[✓] 💎 Current subscription plan tier (plan-tier)</text>
   <text x="44" y="460" fill="#39c5cf">[✓] 📧 Account email (account-email)</text>
-  <text x="44" y="498" fill="#8b949e">⎿ Wizard pager: [ Page 2 / 5 ] · 18 metrics selected cumulatively</text>
+  <text x="44" y="498" fill="#8b949e">⎿ Wizard pager: [ Page 2 / 5 ] · 19 metrics selected cumulatively</text>
   <text x="24" y="520" fill="#6e7681">Space Toggle · Enter Next category (3/5 Context) · Eliminates scroll truncation</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -260,7 +261,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🧠 Context used bar graph (context-used-bar)</text>
   <text x="44" y="262" fill="#39c5cf">[✓] 💰 Exact token count for current session (token-count)</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 💰 Token count bar graph (token-count-bar)</text>
-  <text x="44" y="318" fill="#8b949e">⎿ Wizard pager: [ Page 3 / 5 ] · 22 metrics selected cumulatively</text>
+  <text x="44" y="318" fill="#8b949e">⎿ Wizard pager: [ Page 3 / 5 ] · 23 metrics selected cumulatively</text>
   <text x="24" y="340" fill="#6e7681">Space Toggle · Enter Next category (4/5 Workspace) · Eliminates scroll truncation</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -289,7 +290,7 @@
   <text x="44" y="262" fill="#39c5cf">[✓] 🔀 Current Git branch (git-branch)</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 🔍 Workspace dirty status (vcs-dirty)</text>
   <text x="44" y="298" fill="#39c5cf">[✓] 🗃️ VCS type (vcs-type)</text>
-  <text x="44" y="336" fill="#8b949e">⎿ Wizard pager: [ Page 4 / 5 ] · 27 metrics selected cumulatively</text>
+  <text x="44" y="336" fill="#8b949e">⎿ Wizard pager: [ Page 4 / 5 ] · 28 metrics selected cumulatively</text>
   <text x="24" y="358" fill="#6e7681">Space Toggle · Enter Next category (5/5 System) · Eliminates scroll truncation</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -324,8 +325,9 @@
   <text x="44" y="370" fill="#39c5cf">[✓] 📄 Total artifacts generated in this session (artifacts)</text>
   <text x="44" y="388" fill="#39c5cf">[✓] 🧩 Statusline version (plugin-version)</text>
   <text x="44" y="406" fill="#39c5cf">[✓] 🆕 Statusline update reminder (plugin-update)</text>
-  <text x="44" y="444" fill="#5cdb6d">★ All 38 indicators across 5 categories successfully selected!</text>
-  <text x="24" y="466" fill="#6e7681">Space Toggle · Enter Confirm &amp; proceed to custom order (Write-in)</text>
+  <text x="44" y="424" fill="#39c5cf">[✓] 💻 Antigravity 2.0 App version (app-version)</text>
+  <text x="44" y="462" fill="#5cdb6d">★ All 40 indicators across 5 categories successfully selected!</text>
+  <text x="24" y="484" fill="#6e7681">Space Toggle · Enter Confirm &amp; proceed to custom order (Write-in)</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
   <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
@@ -342,14 +344,14 @@
 <g class="f f6">
   <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 38)</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 40)</text>
   <text x="330" y="156" fill="#8b949e">— Enter custom order below (e: for Emoji, n for newline):</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">14</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 🗃️ VCS Type (vcs-type) │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 💾 Memory (memory)     │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">17</tspan> │ 💎 Plan Tier (plan)    │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 💬 Conv ID (conv-id)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 Memory (memory)     │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 Conv ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 Plan Tier (plan)    │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ Sandbox (sandbox)   │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -405,7 +407,7 @@
   <text x="24" y="484"> </text>
   <text x="24" y="503"><tspan fill="#ffffff">VCS Status:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">✓ no changes</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">VCS: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
   <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Project Path: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
-  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Statusline Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.12.0</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy 2.0 Version: </tspan><tspan fill="#ffffff" font-weight="700">v2.34.0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Statusline Version: </tspan><tspan fill="#ffffff" font-weight="700">v2.0.0</tspan></text>
 
   <!-- Caption -->
   <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑧ Config Deployment &amp; Hot Reload · Sync 3-tier settings.json &amp; activate 11-row statusline</text>
@@ -445,7 +447,7 @@
   <text x="24" y="484"> </text>
   <text x="24" y="503"><tspan fill="#ffffff">VCS Status:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">✘ uncommitted (+3)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">VCS: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
   <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Project Path: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
-  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Statusline Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.12.0</tspan></text>
+  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI Version: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy 2.0 Version: </tspan><tspan fill="#ffffff" font-weight="700">v2.34.0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Statusline Version: </tspan><tspan fill="#ffffff" font-weight="700">v2.0.0</tspan></text>
 
   <!-- Caption -->
   <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑨ Live Telemetry Statusline in Action · Real-time tracking of bars, tokens, and subagents</text>

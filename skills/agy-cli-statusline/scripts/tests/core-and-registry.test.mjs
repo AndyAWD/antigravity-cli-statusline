@@ -126,9 +126,9 @@ async function main() {
     console.log(`✅ Audit #6 passed! Version is consistently ${HOOK_VERSION}.`);
 
     // ----------------------------------------------------
-    // 2. Registry Zero-Drift：questions.json / prompts.json / 38 指標 / 無多餘括號 / 43 鍵 EMOJI_MAP
+    // 2. Registry Zero-Drift：questions.json / prompts.json / 40 指標 / 無多餘括號 / 45 鍵 EMOJI_MAP
     // ----------------------------------------------------
-    console.log('\n[Test 2] Verifying registry zero-drift (questions.json, prompts.json, 38 metrics, parentheses, 43 EMOJI_MAP keys)...');
+    console.log('\n[Test 2] Verifying registry zero-drift (questions.json, prompts.json, 40 metrics, parentheses, 45 EMOJI_MAP keys)...');
     const questionsPath = path.join(SKILL_DIR, 'resources', 'questions.json');
     const promptsPath = path.join(SKILL_DIR, 'resources', 'prompts.json');
 
@@ -158,9 +158,9 @@ async function main() {
       assert.ok(builtPrompts.step4_order_question[locale], `prompts.json step4_order_question must include locale ${locale}`);
     }
 
-    // 驗證 38 項標準指標與 ALL_STANDARD_METRIC_IDS、無額外括號
-    assert.strictEqual(METRICS.length, 38, 'METRICS must contain 38 standard metrics');
-    assert.strictEqual(ALL_STANDARD_METRIC_IDS.length, 38, 'ALL_STANDARD_METRIC_IDS must contain 38 metric IDs');
+    // 驗證 40 項標準指標與 ALL_STANDARD_METRIC_IDS、無額外括號
+    assert.strictEqual(METRICS.length, 40, 'METRICS must contain 40 standard metrics');
+    assert.strictEqual(ALL_STANDARD_METRIC_IDS.length, 40, 'ALL_STANDARD_METRIC_IDS must contain 40 metric IDs');
     assert.deepStrictEqual(
       METRICS.map(m => m.id),
       ALL_STANDARD_METRIC_IDS,
@@ -171,7 +171,7 @@ async function main() {
     for (const locale of SUPPORTED_LOCALES) {
       const localeData = builtQuestions[locale];
       assert.ok(localeData, `questions.json must contain locale ${locale}`);
-      assert.strictEqual(localeData.options.length, 38, `${locale} options must have 38 items`);
+      assert.strictEqual(localeData.options.length, 40, `${locale} options must have 40 items`);
 
       const extractedIds = [];
       for (const opt of localeData.options) {
@@ -190,10 +190,10 @@ async function main() {
       );
     }
 
-    // 驗證 EMOJI_MAP 43 個鍵（38 項標準指標 + 5 組 ADJACENT_PAIRS 合併鍵）
+    // 驗證 EMOJI_MAP 45 個鍵（40 項標準指標 + 5 組 ADJACENT_PAIRS 合併鍵）
     const emojiKeys = Object.keys(EMOJI_MAP);
     assert.strictEqual(ADJACENT_PAIRS.length, 5, 'ADJACENT_PAIRS must contain 5 pairs');
-    assert.strictEqual(emojiKeys.length, 43, `EMOJI_MAP must contain 43 keys, got ${emojiKeys.length}`);
+    assert.strictEqual(emojiKeys.length, 45, `EMOJI_MAP must contain 45 keys, got ${emojiKeys.length}`);
     for (const id of ALL_STANDARD_METRIC_IDS) {
       assert.ok(typeof EMOJI_MAP[id] === 'string' && EMOJI_MAP[id].length > 0, `EMOJI_MAP must include non-empty emoji for ${id}`);
     }

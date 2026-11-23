@@ -1,6 +1,6 @@
 # 架構交接與維護指南（Architecture Handover）
 
-本文件為 `antigravity-cli-statusline` 專案之系統交接與擴充操作手冊，供後續人工智慧（Artificial Intelligence）代理與開發者直接依循維護。本專案僅使用 Antigravity 命令列介面（Command-Line Interface）（`agy`）進行開發與外掛驗證（已移除根目錄 `CLAUDE.md`）。
+本文件為 `antigravity-cli-statusline` 專案之系統交接與擴充操作手冊，供後續人工智慧（Artificial Intelligence）代理與開發者直接依循維護。本專案同時支援 **Antigravity 命令列介面（Command-Line Interface）（`agy`）** 與 **Antigravity 2.0 桌面應用程式（`v2.34.0+`，MCP Apps + 生命週期 Hooks）**（已移除根目錄 `CLAUDE.md`）。
 
 ---
 
@@ -10,35 +10,55 @@
 
 ```text
 antigravity-cli-statusline/
-├── package.json                                  # 套件中繼資料與 npm 腳本定義
+├── package.json                                  # 套件中繼資料、devDependencies 與 npm 腳本定義
 ├── plugin.json                                   # Antigravity 外掛清單（版本需與程式同步）
+├── mcp_config.json                               # Antigravity 2.0 MCP 伺服器設定
+├── hooks.json                                    # 生命週期掛鉤（SessionStart/PreInvocation/PostInvocation/Stop）
 ├── CONTRIBUTING.md                               # 三語系貢獻指南（us / zh-tw / zh-cn）
 ├── README.md / README.zh-TW.md / README.zh-CN.md / README.ja.md
+├── assets/
+│   └── logo.svg                                  # Antigravity App 外掛圖示
 ├── docs/
 │   ├── ARCHITECTURE_HANDOVER.md                  # 本檔：架構交接、擴充配方與釋出規範
 │   ├── images/                                   # 截圖與自動生成之狀態列範例向量圖
 │   └── workshop/                                 # 工作坊簡報（index.html、STYLE.md 等）
-└── skills/agy-cli-statusline/
-    ├── SKILL.md                                  # 技能主檔（YAML name: agy-cli-statusline，< 24 KB）
-    ├── references/                               # 技術規格、設定檔、Windows、表格與陷阱文件
-    ├── resources/
-    │   ├── questions.json                        # 由 sync-resources.mjs 自動生成（嚴禁手改）
-    │   └── prompts.json                          # 四語系靜態對話範本（嚴禁手改）
-    └── scripts/
-        ├── statusline-quota.mjs                  # CLI statusLine.command 唯一掛鉤入口
-        ├── fetch-local-quota.mjs                 # 背景配額與語言伺服器資料抓取腳本
-        ├── configure-statusline.mjs              # 設定三層 settings.json 並遞迴部署 hooks/lib/
-        ├── diagnose-statusline.mjs               # 三層設定、外掛與掛鉤 SHA-256 同步診斷工具
-        ├── sync-resources.mjs                    # 由 registry.mjs 生成 questions.json 與 prompts.json
-        ├── generate-svg-demos.mjs                # 產出 docs/images/statusline-demo*.svg
-        ├── test-counters.mjs                     # 計數器與防禦性整合測試腳本
-        ├── tests/*.test.mjs                      # 模組化單元與整合測試套件
-        └── lib/                                  # 四層核心程式庫（純 Node.js 原生模組，零外部相依）
-            ├── core/
-            ├── collectors/
-            ├── metrics/
-            └── renderers/
+├── src/app/                                      # Antigravity 2.0 MCP Apps 前端原始碼（esbuild 預編譯）
+├── scripts/
+│   ├── build-app.mjs                             # 編譯 src/app/ 為 scripts/mcp/statusline-app.html（含 source-sha256 與 app-version）
+│   ├── hooks/record-session.mjs                  # 2.0 生命週期掛鉤記錄腳本（隔離於 ${PLUGIN_DATA}）
+│   ├── mcp/                                      # MCP 伺服器、LS 遙測、對話紀錄讀取與 CLI 橋接
+│   └── tests/                                    # 2.0 Hook、MCP 與同步契約測試
+└── skills/
+    ├── agy-app-statusline/
+    │   └── SKILL.md                              # Antigravity 2.0 面板技能入口（無 ask_question）
+    └── agy-cli-statusline/
+        ├── SKILL.md                              # CLI 技能主檔（YAML name: agy-cli-statusline，< 24 KB）
+        ├── references/                           # 技術規格、設定檔、Windows、表格與陷阱文件
+        ├── resources/
+        │   ├── questions.json                    # 由 sync-resources.mjs 自動生成（嚴禁手改）
+        │   └── prompts.json                      # 四語系靜態對話範本（嚴禁手改）
+        └── scripts/
+            ├── statusline-quota.mjs              # CLI statusLine.command 唯一掛鉤入口
+            ├── fetch-local-quota.mjs             # 背景配額與語言伺服器資料抓取腳本
+            ├── configure-statusline.mjs          # 設定三層 settings.json 並遞迴部署 hooks/lib/
+            ├── diagnose-statusline.mjs           # 三層設定、外掛與掛鉤 SHA-256 同步診斷工具
+            ├── sync-resources.mjs                # 由 registry.mjs 生成 questions.json 與 prompts.json
+            ├── generate-svg-demos.mjs            # 產出 docs/images/statusline-demo*.svg
+            ├── test-counters.mjs                 # 計數器與防禦性整合測試腳本
+            ├── tests/*.test.mjs                  # 模組化單元與整合測試套件
+            └── lib/                              # 四層核心程式庫（純 Node.js 原生模組，零外部相依）
+                ├── core/
+                ├── collectors/
+                ├── metrics/
+                └── renderers/
 ```
+
+### 1.3 Antigravity 2.0（MCP Apps + 生命週期 Hooks）隔離與同步契約
+
+- **CLI 零動刀邊界**：2.0 後端（`scripts/mcp/*`）僅唯讀匯入 `skills/agy-cli-statusline/scripts/` 的無副作用匯出函式，絕不修改 CLI 核心腳本或寫入／刪除 `~/.gemini/tmp/*`；未設定 `PLUGIN_DATA` 時退讓至 `~/.gemini/plugin-data/antigravity-cli-statusline/`。
+- **能力探測與防護**：`scripts/mcp/server.mjs` 於 `initialize` 檢查 `capabilities.extensions["io.modelcontextprotocol/ui"]`，非 UI 用戶端（如 CLI）隱藏 `statusline_save_config`；2.0 寫入必須通過 `uiSessionToken` 驗證。
+- **CLI R27 相容契約**：`scripts/mcp/cli-settings-bridge.mjs` 同步寫回 CLI `settings.json` 時，若全域 `labelStyle === 'emoji'` 且全數為 Emoji，會刪除 `ui.footer.itemStyles`；若為混搭樣式，則將 `labelStyle` 設為 `'text'` 並將 Emoji 項目具象化寫入 `itemStyles`。
+- **預編譯單一 HTML**：`npm run build:app` 使用 `esbuild` 將 `src/app/` 打包為無 BOM 且小於 1 MiB 的 `scripts/mcp/statusline-app.html`，並嵌入 `source-sha256` 與 `app-version` 註解，由 `scripts/tests/sync-contract.test.mjs` 把關。
 
 ### 1.2 `scripts/lib/` 四層職責切分
 
@@ -70,7 +90,7 @@ antigravity-cli-statusline/
 2. **`lib/core/normalize.mjs`**：於 `normalizeLanguage()` 補上該語系代碼及常見地區別名的正規化規則（由 `statusline-quota.mjs` 與 `configure-statusline.mjs` 共用）。
 3. **`lib/metrics/i18n.mjs`**：於 `buildI18nDict`、`formatAgentState(state, normLang)` 內部 `map`（代理狀態文字）及 `formatPluginUpdateNoticeLines` 補齊新語系全部鍵值與更新提醒翻譯。
 4. **`lib/collectors/probes.mjs`（及採集器退讓標籤）**：補齊「無版本控制（No VC）」、「未知」、「無」、「未提交 / 無變更」與沙盒狀態文字的在地化分支。
-5. **重新生成資源與驗證**：執行 `npm run sync:resources` 自動更新 `resources/questions.json` 與 `resources/prompts.json`（無須修改 `SKILL.md` 中的靜態文字），再執行 `npm test` 與更新 `CONTRIBUTING.md`。
+5. **重新生成資源與驗證**：同步更新 [`src/app/i18n.js`](../src/app/i18n.js) 外殼翻譯，執行 `npm run sync:resources` 與 `npm run build:app`，再執行 `npm test` 與更新 `CONTRIBUTING.md`。
 
 ### 2.3 新增狀態列渲染樣式（例如 `agy-dino` 動態風格）
 
@@ -111,7 +131,7 @@ antigravity-cli-statusline/
 2. [`plugin.json`](../plugin.json) — `version` 欄位
 3. [`skills/agy-cli-statusline/scripts/lib/core/constants.mjs`](../skills/agy-cli-statusline/scripts/lib/core/constants.mjs) — `HOOK_VERSION` 常數
 4. 4 份多語系說明文件 — [`README.md`](../README.md)、[`README.zh-TW.md`](../README.zh-TW.md)、[`README.zh-CN.md`](../README.zh-CN.md)、[`README.ja.md`](../README.ja.md) 中的版本徽章與範例輸出
-5. 執行 `npm run sync:resources` 與 `npm run build:svg`（若有調整問卷或展示項目）
+5. 執行 `npm run sync:resources`、`npm run build:app` 與 `npm run build:svg`（若有調整問卷、面板前端或展示項目）
 
 ---
 
@@ -121,15 +141,18 @@ antigravity-cli-statusline/
 # 1. 由 registry.mjs 重新生成 questions.json 與 prompts.json
 npm run sync:resources
 
-# 2. 重新生成四語系狀態列展示 SVG 圖檔
+# 2. 預編譯 Antigravity 2.0 MCP App 單一 HTML（scripts/mcp/statusline-app.html）
+npm run build:app
+
+# 3. 重新生成四語系狀態列展示 SVG 圖檔
 npm run build:svg
 
-# 3. 執行全部單元測試、整合測試與計數器防禦測試
+# 4. 執行全部單元測試、整合測試、2.0 契約測試與計數器防禦測試
 npm test
 
-# 4. 驗證外掛清單與 SKILL.md 格式（確認 0 warning）
-agy plugin validate .
+# 5. 嚴格驗證外掛清單、MCP、Hooks 與 SKILL.md 格式（確認 0 error / 0 warning）
+agy plugin validate --strict .
 
-# 5. 檢查本機三層 settings.json、掛鉤檔案完整性與版本同步狀態
+# 6. 檢查本機三層 settings.json、掛鉤檔案完整性與版本同步狀態
 node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs
 ```

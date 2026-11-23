@@ -327,19 +327,23 @@ async function main() {
       sandboxAllowNet: true,
       sandboxStatusVal: '啟用（聯網）',
       cliVersion: 'v1.2.3',
+      appVersion: 'v2.34.0',
       pluginVersion: 'v1.11.4',
       pluginUpdateAvailable: true,
       pluginUpdateCurrentTag: 'v1.11.0',
       pluginUpdateLatestTag: 'v1.12.0',
       conversationIdShort: 'c4a861dd',
       agentProfileName: 'Default',
-      mode: 'Interactive'
+      mode: 'Interactive',
+      isOrchestrator: true,
+      activeModelName: 'Gemini 4 Carbon (High)',
+      activeModelRole: 'planner'
     };
 
     for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
       const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
       const allKeys = Object.keys(EMOJI_MAP);
-      assert.strictEqual(allKeys.length, 43, 'EMOJI_MAP must contain 38 metrics + 5 merged bar keys (43 total)');
+      assert.strictEqual(allKeys.length, 45, 'EMOJI_MAP must contain 40 metrics + 5 merged bar keys (45 total)');
 
       for (const key of allKeys) {
         const rendered = stripAnsi(emojiDict[key]);

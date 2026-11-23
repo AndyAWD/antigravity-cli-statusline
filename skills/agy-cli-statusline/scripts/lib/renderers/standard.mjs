@@ -1,4 +1,4 @@
-import { normalizeLabelStyle } from '../core/normalize.mjs';
+import { groupAdjacentItems } from '../metrics/layout-utils.mjs';
 import { ADJACENT_PAIRS } from '../metrics/registry.mjs';
 import { GRAY, RESET, getDisplayWidth, stripAnsi } from './ansi.mjs';
 import { registerRenderer } from './index.mjs';
@@ -17,42 +17,7 @@ export function preprocessAdjacentItems(items, itemStyles = undefined, defaultSt
     defaultStyle = itemStyles;
     itemStyles = undefined;
   }
-  const pairs = ADJACENT_PAIRS;
-
-  const hasItemStyles = itemStyles !== undefined && itemStyles !== null && typeof itemStyles === 'object' && !Array.isArray(itemStyles);
-  function getItemEffectiveStyle(item) {
-    if (itemStyles && itemStyles[item]) {
-      return normalizeLabelStyle(itemStyles[item]);
-    }
-    if (hasItemStyles) {
-      return 'text'; // 未設定者一律強制以文字為預設
-    }
-    return normalizeLabelStyle(defaultStyle || 'text');
-  }
-
-  const result = [];
-  for (let i = 0; i < items.length; i++) {
-    const cur = items[i];
-    const next = items[i + 1];
-
-    if (next) {
-      const match = pairs.find(p =>
-        (cur === p.val && next === p.bar) || (cur === p.bar && next === p.val)
-      );
-      if (match) {
-        const curStyle = getItemEffectiveStyle(cur);
-        const nextStyle = getItemEffectiveStyle(next);
-        if (curStyle === nextStyle) {
-          result.push(match.merged);
-          i++;
-          continue;
-        }
-        // 若樣式衝突（一為 text、一為 emoji）則不合併，拆開為兩個獨立區塊顯示
-      }
-    }
-    result.push(cur);
-  }
-  return result;
+  return groupAdjacentItems(items, itemStyles, defaultStyle, ADJACENT_PAIRS, { strictR27: true }).map(g => g.key);
 }
 
 /**

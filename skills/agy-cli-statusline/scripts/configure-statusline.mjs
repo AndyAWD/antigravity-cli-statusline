@@ -4,11 +4,10 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { HOOK_VERSION, PLUGIN_PACKAGE_NAME } from './lib/core/constants.mjs';
 import {
-  readJsonWithBOMDefenseSync,
-  writeContentAndVerifyNoBOMSync,
-  writeJsonAndVerifyNoBOMSync,
-  sha256String,
-  listMjsFilesRecursiveSync,
+  deployCliHooksFromPluginSync as coreDeployCliHooksSync,
+  updateSingleSettingsAtomicSync
+} from './lib/core/cli-deploy.mjs';
+import {
   isDirectExecution as coreIsDirectExecution
 } from './lib/core/fs-utils.mjs';
 import {
@@ -18,7 +17,6 @@ import {
   cleanupLegacyWindowsShBridge
 } from './lib/core/safe-cleanup.mjs';
 import { normalizeLanguage, normalizeLabelStyle } from './lib/core/normalize.mjs';
-import { readPluginManifestFromDirSync } from './lib/core/plugin-manifest.mjs';
 import { getStatusLineCommand } from './lib/core/settings.mjs';
 import { ALL_STANDARD_METRIC_IDS } from './lib/metrics/registry.mjs';
 
@@ -32,23 +30,6 @@ export {
   getStatusLineCommand,
   ALL_STANDARD_METRIC_IDS
 };
-
-// ==========================================
-// 路徑範圍防禦輔助函式 (Path Containment Helper)
-// ==========================================
-
-/**
- * 檢查目標路徑是否嚴格位於指定父目錄內部（防止路徑穿越或誤刪目錄本身）。
- * @param {string} targetPath
- * @param {string} parentDir
- * @returns {boolean}
- */
-function isPathWithinDir(targetPath, parentDir) {
-  const resolvedParent = path.resolve(parentDir);
-  const resolvedTarget = path.resolve(targetPath);
-  const rel = path.relative(resolvedParent, resolvedTarget);
-  return Boolean(rel) && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
-}
 
 // ==========================================
 // 排序與樣式解析 (Order & Style Parsing)
@@ -378,122 +359,28 @@ function parseCliConfiguration(argv) {
 }
 
 /**
- * 解析目前部署來源所屬的外掛版號（優先讀取清單，缺失時回退至內嵌或核心常數版號）。
- * @param {string} statuslineQuotaContent
- * @returns {string}
- */
-function resolveDeployedPluginVersion(statuslineQuotaContent) {
-  const pluginRootDir = path.resolve(sourceDir, '..', '..', '..');
-  const manifestInfo = readPluginManifestFromDirSync(pluginRootDir, false);
-  if (manifestInfo?.version) {
-    return manifestInfo.version;
-  }
-
-  const hookVerMatch = statuslineQuotaContent.match(/export\s+const\s+HOOK_VERSION\s*=\s*['"]([^'"]+)['"]/);
-  if (hookVerMatch) {
-    return hookVerMatch[1].trim().replace(/^v/i, '');
-  }
-
-  return HOOK_VERSION ? String(HOOK_VERSION).trim().replace(/^v/i, '') : '';
-}
-
-/**
- * 安全清理 hooks/lib/ 中已不再存在於來源 lib/ 的過時 .mjs 檔案。
- * 僅操作位於 hooks/lib/ 實質目錄範圍內的路徑。
- * @param {string} hooksLibDir
- * @param {Set<string>} expectedLibSet
- */
-function cleanupObsoleteHookLibFiles(hooksLibDir, expectedLibSet) {
-  let hooksLibIsRealDir = false;
-  try {
-    const stats = fs.lstatSync(hooksLibDir);
-    hooksLibIsRealDir = !stats.isSymbolicLink() && stats.isDirectory();
-  } catch (_) {}
-
-  if (!hooksLibIsRealDir) return;
-
-  const existingHookLibFiles = listMjsFilesRecursiveSync(hooksLibDir);
-  for (const existingRel of existingHookLibFiles) {
-    if (expectedLibSet.has(existingRel)) continue;
-
-    const candidatePath = path.join(hooksLibDir, ...existingRel.split('/'));
-    if (!isPathWithinDir(candidatePath, hooksLibDir)) {
-      console.warn(`[Safe Clean] 跳過超出 hooks/lib/ 範圍的異常路徑: ${candidatePath}`);
-      continue;
-    }
-
-    // 額外確認實體父目錄未透過符號連結逃逸至 hooks/lib/ 外部
-    try {
-      const realHooksLib = fs.realpathSync(hooksLibDir);
-      const realParent = fs.realpathSync(path.dirname(candidatePath));
-      if (realParent !== realHooksLib && !isPathWithinDir(realParent, realHooksLib)) {
-        console.warn(`[Safe Clean] 跳過指向 hooks/lib/ 外部的符號連結路徑: ${candidatePath}`);
-        continue;
-      }
-    } catch (_) {
-      continue;
-    }
-
-    safeRemoveSync(candidatePath);
-  }
-}
-
-/**
  * 部署狀態列掛鉤主程式、遞迴 lib/ 模組與 .hook-version.json 中繼資料。
  * @param {string} homeDir
  * @returns {string} hooksDir
  */
 function deployHookScripts(homeDir) {
   const hooksDir = path.join(homeDir, '.gemini', 'antigravity-cli', 'hooks');
-
   console.log(`正在部署掛鉤腳本至 ${hooksDir}...`);
-  if (!fs.existsSync(hooksDir)) {
-    fs.mkdirSync(hooksDir, { recursive: true });
-  }
 
   const statuslineQuotaSrcPath = path.join(sourceDir, 'statusline-quota.mjs');
   const fetchLocalQuotaSrcPath = path.join(sourceDir, 'fetch-local-quota.mjs');
-
   if (!fs.existsSync(statuslineQuotaSrcPath) || !fs.existsSync(fetchLocalQuotaSrcPath)) {
     console.error('在以下目錄找不到掛鉤腳本來源：', sourceDir);
     process.exit(1);
   }
 
-  const statuslineQuotaContent = fs.readFileSync(statuslineQuotaSrcPath, 'utf8');
-  const fetchLocalQuotaContent = fs.readFileSync(fetchLocalQuotaSrcPath, 'utf8');
-
-  const destStatuslinePath = path.join(hooksDir, 'statusline-quota.mjs');
-  const destFetchPath = path.join(hooksDir, 'fetch-local-quota.mjs');
-  writeContentAndVerifyNoBOMSync(destStatuslinePath, statuslineQuotaContent);
-  writeContentAndVerifyNoBOMSync(destFetchPath, fetchLocalQuotaContent);
-
-  const filesMeta = {
-    'statusline-quota.mjs': sha256String(fs.readFileSync(destStatuslinePath, 'utf8')),
-    'fetch-local-quota.mjs': sha256String(fs.readFileSync(destFetchPath, 'utf8'))
-  };
-
-  // 遞迴部署 scripts/lib/ 下所有 .mjs 模組至 hooks/lib/
-  const srcLibDir = path.join(sourceDir, 'lib');
-  const hooksLibDir = path.join(hooksDir, 'lib');
-  const libRelPaths = listMjsFilesRecursiveSync(srcLibDir);
-
-  for (const relPath of libRelPaths) {
-    const relParts = relPath.split('/');
-    const srcLibFile = path.join(srcLibDir, ...relParts);
-    const destLibFile = path.join(hooksLibDir, ...relParts);
-    const libContent = fs.readFileSync(srcLibFile, 'utf8');
-    writeContentAndVerifyNoBOMSync(destLibFile, libContent);
-    filesMeta[`lib/${relPath}`] = sha256String(fs.readFileSync(destLibFile, 'utf8'));
-  }
-
-  cleanupObsoleteHookLibFiles(hooksLibDir, new Set(libRelPaths));
-
-  // 寫入已部署掛鉤版本與檔案雜湊中繼資料，供 diagnose-statusline.mjs 比對外掛與掛鉤同步狀態
-  const deployedPluginVersion = resolveDeployedPluginVersion(statuslineQuotaContent);
-  writeJsonAndVerifyNoBOMSync(path.join(hooksDir, '.hook-version.json'), {
-    pluginVersion: deployedPluginVersion || 'unknown',
-    syncedAt: new Date().toISOString(),
-    files: filesMeta
+  const pluginRootDir = path.resolve(sourceDir, '..', '..', '..');
+  coreDeployCliHooksSync({
+    homeDir,
+    srcScriptsDir: sourceDir,
+    pluginRootDir,
+    fallbackPluginVersion: HOOK_VERSION,
+    onWarn: (msg) => console.warn(msg)
   });
 
   console.log('掛鉤腳本部署成功。');
@@ -526,43 +413,12 @@ function cleanupLegacyHooksDir(homeDir) {
 function updateSettingsFile(settingsPath, config, statusLineCommand) {
   console.log(`正在更新設定檔：${settingsPath}`);
   try {
-    const settings = readJsonWithBOMDefenseSync(settingsPath);
-    if (settings === null) {
-      return;
-    }
-
-    if (!settings.ui) settings.ui = {};
-    settings.ui.language = config.lang;
-
-    if (!settings.ui.footer) settings.ui.footer = {};
-    if (settings.ui.footer.theme) {
-      delete settings.ui.footer.theme;
-    }
-    if (settings.ui.footer.style) {
-      delete settings.ui.footer.style;
-    }
-    if (settings.ui.labelStyle) {
-      delete settings.ui.labelStyle;
-    }
-    settings.ui.footer.items = config.items;
-    settings.ui.footer.itemStyles = config.itemStyles;
-    settings.ui.footer.labelStyle = config.labelStyle || 'text';
-    if (config.timeFormat) settings.ui.footer.timeFormat = config.timeFormat;
-    if (config.barLength && !isNaN(config.barLength) && config.barLength > 0) {
-      settings.ui.footer.barLength = config.barLength;
-    }
-
-    const existingStatusLine = (settings.statusLine && typeof settings.statusLine === 'object' && !Array.isArray(settings.statusLine))
-      ? settings.statusLine
-      : {};
-    settings.statusLine = {
-      ...existingStatusLine,
-      enabled: true,
-      type: 'command',
-      command: statusLineCommand
-    };
-
-    writeJsonAndVerifyNoBOMSync(settingsPath, settings);
+    updateSingleSettingsAtomicSync(settingsPath, config, {
+      statusLineCommand,
+      updateStatusLine: true,
+      preserveExistingStatuslineCommand: false,
+      useR27StyleNormalization: false
+    });
   } catch (err) {
     console.warn(`更新設定檔 ${settingsPath} 時略過（${err.message}）。可於 CLI 輸入 /statusline ${statusLineCommand} 手動套用。`);
   }

@@ -44,6 +44,7 @@ import {
   resolveAgySessionAsync,
   tokenizeCommandLine
 } from './lib/collectors/plugin-update.mjs';
+import { isOrchestratorSession } from './lib/collectors/runtime-model.mjs';
 import { extractMetricsAsync, getGitBranch, getGitDirty } from './lib/collectors/probes.mjs';
 import {
   mergeQuotaBuckets,
@@ -164,7 +165,8 @@ async function main() {
     const needsContext = footerItems.some(
       item => typeof item === 'string' && (item.startsWith('context-used') || item.startsWith('token-count'))
     );
-    const needsCache = needsQuotaOrAccount || needsContext;
+    const wantsActiveModel = footerItemsSet.has('active-model');
+    const needsCache = needsQuotaOrAccount || needsContext || wantsActiveModel;
     if (footerItemsSet.has('account-email') && !cachedAccount.email && !(meta?.email || meta?.account?.email)) {
       cachedAccount = await manageAccountMetaCacheAsync(meta);
     }
@@ -267,9 +269,11 @@ async function main() {
     );
 
     const prevPollAttemptAt = cache?.lastPollAttemptAt || 0;
+    const needsActiveModel = wantsActiveModel && isOrchestratorSession(meta, settings, null, fallbackModel, { cache });
     const shouldUpdateForQuota = needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale || hasExpiredActiveQuota);
     const shouldUpdateForContext = needsContext && (missingModelLimits || stateOrTokensChanged || isCacheStale);
-    if (needsCache && (shouldUpdateForQuota || shouldUpdateForContext)) {
+    const shouldUpdateForActiveModel = needsActiveModel && (stateOrTokensChanged || isCacheStale || (currentState !== '' && currentState !== 'idle'));
+    if (needsCache && (shouldUpdateForQuota || shouldUpdateForContext || shouldUpdateForActiveModel)) {
       const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
         cachePath,
         missingRequiredBuckets: (needsQuotaOrAccount && missingRequiredBuckets) || missingModelLimits,
@@ -356,6 +360,7 @@ async function main() {
           argonInfo,
           footerItems: footerItemsSet,
           workspacePath: projectPath,
+          settings,
           skipPluginVersionResolve: needsPluginUpdate
         }
       )
