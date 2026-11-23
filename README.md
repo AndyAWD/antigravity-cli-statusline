@@ -216,24 +216,17 @@ In Step 4 of the CLI wizard (or via the order import/export box in Antigravity 2
 
 #### Sort Input Example
 
-- **Numeric Version**:
-  ```text
-  e1,e5,e19,e18,e32,n,e2,3,36,37,34,35,33,n,n,20,21,22,23,n,6,7,8,9,n,10,11,12,13,n,14,15,16,17,n,n,27,28,e26,n,e24,25,n,e4,e31,e29,30,40,38,n,n,e39
-  ```
-
 - **Identifier Version**:
   ```text
-  e:model-name,e:active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,n,n,e:plugin-update
+  e:model-name,active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,n,e:plugin-update
   ```
-
-*(Note: English identifiers such as `model-name` or `e:quota` are also supported, but numeric indices are recommended for conciseness.)*
 
 #### Output Preview (Mixed Mode)
 
-4 logical groups across 9 content lines separated by blank lines (when up to date, `e:plugin-update` hides automatically and trims the trailing blank lines):
+4 logical groups across 9 content lines separated by blank lines (when up to date, `e:plugin-update` hides automatically and trims the trailing newline):
 
 ```text
-🤖 Orchestrator (Neon) │ 🪄 Plan → Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ off
+🤖 Orchestrator (Neon) │ Orchestrator Plan: Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ off
 🪪 Default │ Agent: working │ Subagents: 2 │ Outputs: 0 │ Queue: 0 │ BG: 0 │ Awaiting You: none
 
 Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 47.4k / 256.0k [█░░░░░░░░░]
@@ -243,6 +236,7 @@ Argon Available: 59% [█████░░░░░] │ Argon Reset: 6d 1h │
 
 VCS Status: no changes │ VCS: git │ 🔀 main
 📁 antigravity-cli-statusline │ Project Path: /Users/andyawd/Project/antigravity-cli-statusline
+
 ⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI Version: v1.5.10 │ Agy 2.0 Version: v2.34.0 │ Statusline Version: v2.0.0
 ```
 
@@ -261,7 +255,8 @@ Contributions are welcome — including new indicators, cross-platform fixes, an
 
 ## Acknowledgements
 
-Special thanks to [60ke/antigravity-statusline](https://github.com/60ke/antigravity-statusline) for the inspiration behind the quota monitoring feature. Their original project paved the way for statusline integrations. Since their implementation was written in Python, which could be challenging to execute consistently across Windows and macOS, this project was rewritten in JavaScript (Node.js) to ensure seamless cross-platform compatibility without relying on external Python dependencies.
+- **[60ke/antigravity-statusline](https://github.com/60ke/antigravity-statusline)**: Special thanks for the inspiration behind the quota monitoring feature—their original project paved the way for statusline integrations. Since their implementation was written in Python, which could be challenging to execute consistently across Windows and macOS, this project was rewritten in JavaScript (Node.js) to ensure seamless cross-platform compatibility without relying on external Python dependencies.
+- **[ericsk/agy-gcp-companion](https://github.com/ericsk/agy-gcp-companion)**: The migration of the bottom CLI statusline into an interactive Antigravity 2.0 panel was directly inspired by this project's sidebar design.
 
 ## License
 

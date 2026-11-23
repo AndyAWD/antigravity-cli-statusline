@@ -230,24 +230,17 @@ CLI ウィザードのステップ 4 入力欄（または Antigravity 2.0 パ�
 
 #### 並び替え入力例
 
-- **数字インデックスバージョン**：
-  ```text
-  e1,e5,e19,e18,e32,n,e2,3,36,37,34,35,33,n,n,20,21,22,23,n,6,7,8,9,n,10,11,12,13,n,14,15,16,17,n,n,27,28,e26,n,e24,25,n,e4,e31,e29,30,40,38,39
-  ```
-
 - **英字識別子バージョン**：
   ```text
-  e:model-name,e:active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,plugin-update
+  e:model-name,active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,n,e:plugin-update
   ```
-
-*(注：`model-name` や `e:quota` などの英字識別子も利用できますが、簡潔な数字インデックスを推奨します。)*
 
 #### 出力プレビュー（混在モード）
 
-4 つの論理グループ、空行で区切られた計 9 行の情報（最新バージョン時は `plugin-update` が自動非表示となり末尾の空行もトリムされます）：
+4 つの論理グループ、空行で区切られた計 9 行の情報（最新バージョン時は `e:plugin-update` が自動非表示となり末尾の改行もトリムされます）：
 
 ```text
-🤖 Orchestrator (Neon) │ 🪄 計画 → Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ オフ
+🤖 Orchestrator (Neon) │ Orchestrator 計画: Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ オフ
 🪪 Default │ 状態: 実行中 │ サブ代理: 2 │ 成果物: 0 │ 入力キュー: 0 │ BGタスク: 0 │ ご承認待ち: なし
 
 コンテキスト使用: 18.5% [█░░░░░░░░░] │ トークン: 47.4k / 256.0k [█░░░░░░░░░]
@@ -257,6 +250,7 @@ Argon 残量: 59% [█████░░░░░] │ Argon リセット: 6d 1h
 
 版管理状態: 変更なし │ 版管理種別: git │ 🔀 main
 📁 antigravity-cli-statusline │ パス: /Users/andyawd/Project/antigravity-cli-statusline
+
 ⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ Agy 2.0 バージョン: v2.34.0 │ ステータスライン版: v2.0.0
 ```
 
@@ -275,7 +269,8 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ## 謝辞
 
-クォータ監視機能のインスピレーションを与えてくださった [60ke/antigravity-statusline](https://github.com/60ke/antigravity-statusline) に特別な感謝を捧げます。彼らのオリジナルプロジェクトがステータスライン統合の道を切り拓きました。元の実装は Python で記述されており、Windows と macOS の間で一貫して実行することが難しい場合があったため、本プロジェクトは外部の Python 依存関係に頼ることなくシームレスなクロスプラットフォーム互換性を確保するため JavaScript（Node.js）で書き直されました。
+- **[60ke/antigravity-statusline](https://github.com/60ke/antigravity-statusline)**：クォータ監視機能のインスピレーションを与えてくださったオリジナルプロジェクトに感謝します。元の実装は Python で記述されており、Windows と macOS の間で一貫して実行することが難しい場合があったため、本プロジェクトは外部の Python 依存関係に頼ることなくシームレスなクロスプラットフォーム互換性を確保するため JavaScript（Node.js）で書き直されました。
+- **[ericsk/agy-gcp-companion](https://github.com/ericsk/agy-gcp-companion)**：CLI の下部ステータスラインを Antigravity 2.0 のインタラクティブパネルへ移植する構成は、同プロジェクトのサイドバー設計から直接インスピレーションを得て実装しました。
 
 ## ライセンス
 

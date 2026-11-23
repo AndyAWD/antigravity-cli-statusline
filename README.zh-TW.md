@@ -216,24 +216,17 @@ antigravity-cli-statusline/
 
 #### 排序輸入範例
 
-- **數字序號版本**：
-  ```text
-  e1,e5,e19,e18,e32,n,e2,3,36,37,34,35,33,n,n,20,21,22,23,n,6,7,8,9,n,10,11,12,13,n,14,15,16,17,n,n,27,28,e26,n,e24,25,n,e4,e31,e29,30,40,38,39
-  ```
-
 - **英文識別碼版本**：
   ```text
-  e:model-name,e:active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,plugin-update
+  e:model-name,active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,n,e:plugin-update
   ```
-
-*(註：亦支援 `model-name`、`e:quota` 等英文識別碼，使用數字序號可縮短輸入字數。)*
 
 #### 效果預覽（混搭模式）
 
-包含四大邏輯分區、共 9 行資訊並搭配空白分隔行：
+包含四大邏輯分區、共 9 行資訊並搭配空白分隔行（版本已是最新時，`e:plugin-update` 會自動隱藏並修剪尾端換行）：
 
 ```text
-🤖 Orchestrator (Neon) │ 🪄 規劃 → Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ 關閉
+🤖 Orchestrator (Neon) │ 協調規劃: Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ 關閉
 🪪 Default │ 代理狀態: 執行中 │ 子代理: 2 │ 產出檔案: 0 │ 待處理輸入: 0 │ 背景任務: 0 │ 工具待確認: 無
 
 脈絡用量: 18.5% [█░░░░░░░░░] │ 權杖數: 47.4k / 256.0k [█░░░░░░░░░]
@@ -243,6 +236,7 @@ Argon 可用: 59% [█████░░░░░] │ Argon 倒數: 6d 1h │ A
 
 版控狀態: 無變更 │ 版控類型: git │ 🔀 main
 📁 antigravity-cli-statusline │ 完整路徑: /Users/andyawd/Project/antigravity-cli-statusline
+
 ⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI 版本: v1.5.10 │ Agy 2.0 版本: v2.34.0 │ 狀態列版本: v2.0.0
 ```
 
@@ -261,7 +255,8 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ## 鳴謝
 
-特別感謝 [60ke/antigravity-statusline](https://github.com/60ke/antigravity-statusline) 專案。本專案的額度監控靈感正是來自於此。由於該原專案主要是使用 Python 撰寫，在 Windows 和 macOS 跨平台執行上可能遇到環境設定的困難，因此本專案使用 JavaScript (Node.js) 進行改寫，以實現真正的跨平台免額外依賴執行。
+- **[60ke/antigravity-statusline](https://github.com/60ke/antigravity-statusline)**：本專案的額度監控靈感正是來自於此。由於該原專案主要是使用 Python 撰寫，在 Windows 和 macOS 跨平台執行上可能遇到環境設定的困難，因此本專案使用 JavaScript (Node.js) 進行改寫，以實現真正的跨平台免額外依賴執行。
+- **[ericsk/agy-gcp-companion](https://github.com/ericsk/agy-gcp-companion)**：本次將底部狀態列轉移並整合至 Antigravity 2.0 的互動式面板，正是受到該專案側邊欄設計的啟發而實作。
 
 ## 授權條款
 
