@@ -5,9 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parseOrderAndStyles } from '../../skills/agy-cli-statusline/scripts/configure-statusline.mjs';
 import { checkPluginHookSync } from '../../skills/agy-cli-statusline/scripts/diagnose-statusline.mjs';
 import {
-  DEFAULT_COMPACTION_THRESHOLD,
-  GITHUB_LATEST_RELEASE_URL,
-  STEP_UP_INTERMEDIATE_THRESHOLD
+  GITHUB_LATEST_RELEASE_URL
 } from '../../skills/agy-cli-statusline/scripts/lib/core/constants.mjs';
 import {
   readJsonSafeAsync,
@@ -21,10 +19,9 @@ import { resolveInstalledPluginVersionAsync } from '../../skills/agy-cli-statusl
 import { isVersionBehind } from '../../skills/agy-cli-statusline/scripts/lib/core/semver.mjs';
 import { getSettingsAsync } from '../../skills/agy-cli-statusline/scripts/lib/core/settings.mjs';
 import {
-  computeSteppedCeiling,
   extractModelCandidateKeys,
-  parseCeilingValue,
-  resolveCatalogEntry
+  resolveCatalogEntry,
+  resolveContextMetricsPure
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/context.mjs';
 import { fetchLatestPluginReleaseAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/plugin-update.mjs';
 import { extractMetricsAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs';
@@ -125,96 +122,58 @@ async function computePureContextInfoAsync({
     ? Number(runtimeTelemetry.estimatedTokensUsed)
     : usageTotalInput;
 
-  let effectiveTokenCeiling = null;
+  const primaryModelKey = modelKeys[0] || '';
+  const convStepKey = primaryModelKey || '_default';
+  const stepStatePath = pluginDataDir ? path.join(pluginDataDir, 'context_step_state.json') : '';
+  const stepState = stepStatePath ? ((await readJsonSafeAsync(stepStatePath)) || {}) : {};
+  const convRemembered = Number(stepState?.conversations?.[conversationId]?.[convStepKey] || 0) || 0;
+  const modelRemembered = primaryModelKey ? (Number(stepState?.modelCeilings?.[primaryModelKey] || 0) || 0) : 0;
 
-  // 第 1b 層：外部設定檔與環境變數覆寫（與 CLI context.mjs 同步）
-  const overrideSources = [
-    { raw: cliSettings?.ui?.footer?.tokenCeiling, allowPercent: false },
-    { raw: cliSettings?.ui?.tokenCeiling, allowPercent: false },
-    { raw: process.env.AGY_TOKEN_CEILING, allowPercent: false },
-    { raw: process.env.AGY_CLI_AUTO_COMPACT_OVERRIDE, allowPercent: true }
-  ];
-  for (const src of overrideSources) {
-    const parsedOverride = parseCeilingValue(src.raw, contextSize, src.allowPercent);
-    if (parsedOverride !== null) {
-      effectiveTokenCeiling = parsedOverride;
-      break;
-    }
-  }
+  const resolved = resolveContextMetricsPure({
+    totalInput,
+    contextSize,
+    settings: cliSettings,
+    env: process.env,
+    modelKeys,
+    catalogEntry,
+    runtimeMaxContextTokens: runtimeTelemetry?.maxContextTokens || 0,
+    runtimeModelKeys: [
+      runtimeTelemetry?.modelDisplayName,
+      runtimeTelemetry?.model
+    ],
+    convRemembered,
+    modelRemembered
+  });
 
-  // 第 2 層：單一對話執行期 maxContextTokens（來自 GetCascadeTrajectoryGeneratorMetadata）
-  if (effectiveTokenCeiling === null && runtimeTelemetry?.maxContextTokens > 0) {
-    effectiveTokenCeiling = computeSteppedCeiling(
-      totalInput,
-      contextSize,
-      Math.min(contextSize, runtimeTelemetry.maxContextTokens)
-    );
-  }
-
-  // 第 3 層：動態模型目錄對照（來自 GetAvailableModels 快取 modelLimits）
-  if (effectiveTokenCeiling === null && catalogEntry?.limit > 0) {
-    effectiveTokenCeiling = computeSteppedCeiling(
-      totalInput,
-      contextSize,
-      Math.min(contextSize, catalogEntry.limit)
-    );
-  }
-
-  // 第 4 層：退回 256k 基準，並針對單一對話／單一模型步進自癒（256k -> 512k -> contextSize）
-  if (effectiveTokenCeiling === null) {
-    const baseDefault = Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD);
-    const primaryModelKey = modelKeys[0] || '';
-    const convStepKey = primaryModelKey || '_default';
-    const stepStatePath = pluginDataDir ? path.join(pluginDataDir, 'context_step_state.json') : '';
-    const stepState = stepStatePath ? ((await readJsonSafeAsync(stepStatePath)) || {}) : {};
-    const convRemembered = Number(stepState?.conversations?.[conversationId]?.[convStepKey] || 0) || 0;
-    const rawModelRemembered = primaryModelKey ? (Number(stepState?.modelCeilings?.[primaryModelKey] || 0) || 0) : 0;
-    const modelRemembered = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
-      ? Math.min(rawModelRemembered, STEP_UP_INTERMEDIATE_THRESHOLD)
-      : rawModelRemembered;
-
-    const rememberedBase = Math.max(baseDefault, Math.min(contextSize, Math.max(convRemembered, modelRemembered)));
-    const stepped = computeSteppedCeiling(totalInput, contextSize, rememberedBase);
-
-    if (stepStatePath && totalInput > baseDefault) {
-      const needConvSave = stepped > convRemembered;
-      const persistModelCeiling = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
-        ? Math.min(stepped, STEP_UP_INTERMEDIATE_THRESHOLD)
-        : stepped;
-      const needModelSave = Boolean(primaryModelKey && persistModelCeiling > baseDefault && persistModelCeiling > modelRemembered);
-      if (needConvSave || needModelSave) {
-        try {
-          const nextState = {
-            version: 1,
-            modelCeilings: { ...(stepState.modelCeilings || {}) },
-            conversations: { ...(stepState.conversations || {}) }
-          };
-          if (needConvSave && conversationId) {
-            nextState.conversations[conversationId] = {
-              ...(nextState.conversations[conversationId] || {}),
-              [convStepKey]: stepped,
-              updatedAt: Date.now()
-            };
-          }
-          if (needModelSave) {
-            nextState.modelCeilings[primaryModelKey] = persistModelCeiling;
-          }
-          await writeFileAndVerifyNoBOM(stepStatePath, JSON.stringify(nextState, null, 2));
-        } catch (_) {}
+  if (stepStatePath && resolved.stepUpdate) {
+    const { needConvSave, needModelSave, stepped, persistModelCeiling } = resolved.stepUpdate;
+    try {
+      const nextState = {
+        version: 1,
+        modelCeilings: { ...(stepState.modelCeilings || {}) },
+        conversations: { ...(stepState.conversations || {}) }
+      };
+      if (needConvSave && conversationId) {
+        nextState.conversations[conversationId] = {
+          ...(nextState.conversations[conversationId] || {}),
+          [convStepKey]: stepped,
+          updatedAt: Date.now()
+        };
       }
-    }
-
-    effectiveTokenCeiling = stepped;
+      if (needModelSave && primaryModelKey) {
+        nextState.modelCeilings[primaryModelKey] = persistModelCeiling;
+      }
+      await writeFileAndVerifyNoBOM(stepStatePath, JSON.stringify(nextState, null, 2));
+    } catch (_) {}
   }
 
-  const usedPctNum = contextSize > 0
-    ? Math.min(100, Math.max(0, (totalInput / contextSize) * 100))
-    : 0;
-  const tokenPctNum = effectiveTokenCeiling > 0
-    ? Math.min(100, Math.max(0, (totalInput / effectiveTokenCeiling) * 100))
-    : usedPctNum;
-
-  return { totalInput, contextSize, effectiveTokenCeiling, usedPctNum, tokenPctNum };
+  return {
+    totalInput: resolved.totalInput,
+    contextSize: resolved.contextSize,
+    effectiveTokenCeiling: resolved.effectiveTokenCeiling,
+    usedPctNum: resolved.usedPctNum,
+    tokenPctNum: resolved.tokenPctNum
+  };
 }
 
 export class StatuslineService {
@@ -238,7 +197,7 @@ export class StatuslineService {
       hasCustomLayout: Boolean(saved?.hasCustomLayout),
       layout: saved?.layout || null,
       viewDensity: saved?.viewDensity === 'strip' ? 'strip' : 'cards',
-      autoRefreshSec: [0, 5, 15, 30].includes(Number(saved?.autoRefreshSec)) ? Number(saved.autoRefreshSec) : 5,
+      autoRefreshSec: [0, 5, 15, 30].includes(Number(saved?.autoRefreshSec)) ? Number(saved.autoRefreshSec) : 15,
       maskEmail: Boolean(saved?.maskEmail)
     };
   }
@@ -714,10 +673,24 @@ export class StatuslineService {
 
     let cliSyncResult = null;
     if (action === 'save-both') {
+      const sessionsData = await readJsonSafeAsync(path.join(this.pluginDataDir, 'sessions.json'));
+      const knownWorkspaces = [];
+      for (const sess of Object.values(sessionsData?.sessions || {})) {
+        if (!sess || typeof sess !== 'object') continue;
+        if (Array.isArray(sess.workspacePaths)) {
+          for (const wp of sess.workspacePaths) {
+            if (typeof wp === 'string' && wp.trim()) knownWorkspaces.push(wp);
+          }
+        }
+        if (typeof sess.cwd === 'string' && sess.cwd.trim()) {
+          knownWorkspaces.push(sess.cwd);
+        }
+      }
       cliSyncResult = saveCliSettingsAtomicSync({
         homeDir: this.homeDir,
         pluginRootDir: this.pluginRootDir,
         workspacePath,
+        knownWorkspaces,
         config: validatedLayout,
         deployHooks: Boolean(deployHooks)
       });

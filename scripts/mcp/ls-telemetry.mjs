@@ -2,8 +2,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  extractRuntimeGeneratorContext,
-  mergeQuotaBuckets,
   parseModelLimits,
   parseShortTermBuckets,
   parseWeeklyBuckets,
@@ -13,171 +11,28 @@ import {
   requestUserStatus
 } from '../../skills/agy-cli-statusline/scripts/fetch-local-quota.mjs';
 import {
+  extractDetailedRuntimeContext,
+  fetchPaginatedTrajectoryMetadataAsync,
+  hasPositiveUsage,
+  inferModelPoolsFromModels,
+  mergeQuotaCacheSnapshots,
+  mergeRuntimeTelemetry,
+  parseHostPort,
+  parseModelPools,
+  parseUserStatusModels
+} from '../../skills/agy-cli-statusline/scripts/lib/collectors/ls-rpc.mjs';
+import {
   readJsonSafeAsync,
   writeFileAndVerifyNoBOM
 } from '../../skills/agy-cli-statusline/scripts/lib/core/fs-utils.mjs';
-import { normalizeModelName } from '../../skills/agy-cli-statusline/scripts/lib/core/normalize.mjs';
-import {
-  inferModelPoolsFromModels,
-  parseModelPools
-} from '../../skills/agy-cli-statusline/scripts/lib/collectors/quota.mjs';
+
+export { extractDetailedRuntimeContext, mergeRuntimeTelemetry, parseHostPort };
 
 const MAX_CONTEXT_CACHE_ENTRIES = 20;
-
-function hasPositiveUsage(usage) {
-  if (!usage || typeof usage !== 'object') return false;
-  return (
-    Number(usage.inputTokens || 0) > 0 ||
-    Number(usage.cacheReadTokens || 0) > 0 ||
-    Number(usage.outputTokens || 0) > 0
-  );
-}
-
-/**
- * 合併兩筆脈絡遙測，避免串流進行中的不完整步驟（例如只有 maxContextTokens、尚未回填 usage）洗掉既有數值。
- * @param {object|null} prev
- * @param {object|null} next
- * @returns {object|null}
- */
-export function mergeRuntimeTelemetry(prev, next) {
-  if (!prev && !next) return null;
-  if (!prev) return next;
-  if (!next) return prev;
-
-  const nextMaxCtx = Number(next.maxContextTokens || 0) || 0;
-  const prevMaxCtx = Number(prev.maxContextTokens || 0) || 0;
-  const nextEst = Number(next.estimatedTokensUsed || 0) || 0;
-  const prevEst = Number(prev.estimatedTokensUsed || 0) || 0;
-
-  let usage = prev.usage || null;
-  if (hasPositiveUsage(next.usage) || (!usage && next.usage)) {
-    usage = next.usage;
-  }
-
-  const tokenBreakdown = (Array.isArray(next.tokenBreakdown) && next.tokenBreakdown.length > 0)
-    ? next.tokenBreakdown
-    : (Array.isArray(prev.tokenBreakdown) ? prev.tokenBreakdown : []);
-
-  return {
-    maxContextTokens: nextMaxCtx > 0 ? nextMaxCtx : prevMaxCtx,
-    estimatedTokensUsed: nextEst > 0 ? nextEst : prevEst,
-    modelDisplayName: next.modelDisplayName || prev.modelDisplayName || '',
-    model: next.model || prev.model || '',
-    usage,
-    tokenBreakdown
-  };
-}
-
-/**
- * 自 GetCascadeTrajectoryGeneratorMetadata 回應擷取完整 tokenBreakdown 與 usage，
- * 各欄位獨立取最新非空／非零值並往前補齊。
- * @param {object} genMetaResponse
- * @returns {{ maxContextTokens: number, estimatedTokensUsed: number, modelDisplayName: string, model: string, usage: object|null, tokenBreakdown: Array<{ name: string, type: string, numTokens: number }> }}
- */
-export function extractDetailedRuntimeContext(genMetaResponse) {
-  const base = extractRuntimeGeneratorContext(genMetaResponse);
-  const list = genMetaResponse?.generatorMetadata;
-  let maxContextTokens = base.maxContextTokens || 0;
-  let modelDisplayName = base.modelDisplayName || '';
-  let model = base.model || '';
-  let estimatedTokensUsed = 0;
-  let usage = null;
-  let fallbackZeroUsage = null;
-  let tokenBreakdown = [];
-
-  if (Array.isArray(list) && list.length > 0) {
-    for (let i = list.length - 1; i >= 0; i--) {
-      const cm = list[i]?.chatModel;
-      if (!cm || typeof cm !== 'object') continue;
-
-      if (!modelDisplayName && typeof cm.modelDisplayName === 'string' && cm.modelDisplayName.trim()) {
-        modelDisplayName = cm.modelDisplayName.trim();
-      }
-      if (!model && typeof cm.model === 'string' && cm.model.trim()) {
-        model = cm.model.trim();
-      }
-
-      const cwMeta = cm.chatStartMetadata?.contextWindowMetadata;
-      if (cwMeta && typeof cwMeta === 'object') {
-        if (maxContextTokens <= 0) {
-          const mCtx = Number(cwMeta.maxContextTokens || 0);
-          if (!isNaN(mCtx) && mCtx > 0) maxContextTokens = mCtx;
-        }
-        if (estimatedTokensUsed <= 0) {
-          const est = Number(cwMeta.estimatedTokensUsed || 0);
-          if (!isNaN(est) && est > 0) estimatedTokensUsed = est;
-        }
-        if (tokenBreakdown.length === 0) {
-          const groups = cwMeta.tokenBreakdown?.groups;
-          if (Array.isArray(groups) && groups.length > 0) {
-            tokenBreakdown = groups
-              .filter(g => g && typeof g === 'object')
-              .map(g => ({
-                name: String(g.name || 'Other'),
-                type: String(g.type || ''),
-                numTokens: Math.max(0, Number(g.numTokens || 0) || 0)
-              }));
-          }
-        }
-      }
-
-      if (cm.usage && typeof cm.usage === 'object') {
-        const parsedUsage = {
-          inputTokens: Math.max(0, Number(cm.usage.inputTokens || 0) || 0),
-          outputTokens: Math.max(0, Number(cm.usage.outputTokens || 0) || 0),
-          thinkingOutputTokens: Math.max(0, Number(cm.usage.thinkingOutputTokens || 0) || 0),
-          responseOutputTokens: Math.max(0, Number(cm.usage.responseOutputTokens || 0) || 0),
-          cacheReadTokens: Math.max(0, Number(cm.usage.cacheReadTokens || 0) || 0)
-        };
-        if (hasPositiveUsage(parsedUsage)) {
-          if (!usage) usage = parsedUsage;
-        } else if (!fallbackZeroUsage) {
-          fallbackZeroUsage = parsedUsage;
-        }
-      }
-
-      if (
-        maxContextTokens > 0 &&
-        estimatedTokensUsed > 0 &&
-        tokenBreakdown.length > 0 &&
-        usage &&
-        modelDisplayName &&
-        model
-      ) {
-        break;
-      }
-    }
-  }
-
-  return {
-    maxContextTokens,
-    estimatedTokensUsed,
-    modelDisplayName,
-    model,
-    usage: usage || fallbackZeroUsage,
-    tokenBreakdown
-  };
-}
-
-const MAX_METADATA_PAGES = 5;
-const METADATA_PAGE_LIMIT = 256;
 const runtimeCursorCache = new Map();
 
 export function resetLsTelemetryMemoryCache() {
   runtimeCursorCache.clear();
-}
-
-export function parseHostPort(addr) {
-  if (!addr || typeof addr !== 'string') return { host: '', port: NaN };
-  const trimmed = addr.trim();
-  const idx = trimmed.lastIndexOf(':');
-  if (idx <= 0) return { host: '', port: NaN };
-  let host = trimmed.slice(0, idx).trim();
-  if (host.startsWith('[') && host.endsWith(']')) {
-    host = host.slice(1, -1);
-  }
-  const port = parseInt(trimmed.slice(idx + 1).trim(), 10);
-  return { host, port };
 }
 
 async function fetchPaginatedRuntimeTelemetryAsync({
@@ -192,42 +47,21 @@ async function fetchPaginatedRuntimeTelemetryAsync({
   const cached = runtimeCursorCache.get(conversationId) || { nextOffset: 0, telemetry: null };
   // 重讀最後一筆（nextOffset - 1），避免串流生成中只取得 maxContextTokens 後游標推進導致漏讀後續補齊的 usage 與 breakdown
   const startOffset = cached.nextOffset > 0 ? cached.nextOffset - 1 : 0;
-  let offset = startOffset;
-  let latestTelemetry = cached.telemetry || null;
-  let notFound = false;
-  let rpcOk = false;
+  const paged = await fetchPaginatedTrajectoryMetadataAsync({
+    port,
+    csrfToken,
+    host,
+    preferHttps,
+    conversationId,
+    startOffset,
+    initialTelemetry: cached.telemetry || null,
+    requestFn
+  });
 
-  for (let page = 0; page < MAX_METADATA_PAGES; page++) {
-    let resp = null;
-    try {
-      resp = await requestFn(port, csrfToken, conversationId, offset, host, preferHttps);
-      rpcOk = true;
-    } catch (err) {
-      if (err?.message && /\b404\b/.test(err.message)) {
-        notFound = true;
-      }
-      break;
-    }
-    const list = resp?.generatorMetadata;
-    if (!Array.isArray(list) || list.length === 0) break;
-
-    const extracted = extractDetailedRuntimeContext(resp);
-    if (
-      extracted.maxContextTokens > 0 ||
-      extracted.estimatedTokensUsed > 0 ||
-      extracted.usage ||
-      extracted.tokenBreakdown.length > 0
-    ) {
-      latestTelemetry = mergeRuntimeTelemetry(latestTelemetry, extracted);
-    }
-    offset += list.length;
-    if (list.length < METADATA_PAGE_LIMIT) break;
+  if (paged.telemetry || paged.nextOffset > (cached.nextOffset || 0)) {
+    runtimeCursorCache.set(conversationId, { nextOffset: paged.nextOffset, telemetry: paged.telemetry });
   }
-
-  if (latestTelemetry || offset > (cached.nextOffset || 0)) {
-    runtimeCursorCache.set(conversationId, { nextOffset: offset, telemetry: latestTelemetry });
-  }
-  return { telemetry: latestTelemetry, notFound, rpcOk };
+  return { telemetry: paged.telemetry, notFound: paged.notFound, rpcOk: paged.rpcOk };
 }
 
 async function readContextCacheEntryAsync(pluginDataDir, conversationId) {
@@ -407,24 +241,9 @@ export async function collectLsTelemetryAsync({
     }
 
     if (anyQuotaRpcOk) {
-      const allModels = {};
       const userStatus = statusRes?.userStatus || {};
-      for (const model of userStatus.cascadeModelConfigData?.clientModelConfigs || []) {
-        const qi = model?.quotaInfo;
-        if (!qi) continue;
-        let fraction = 1;
-        if (qi.remainingFraction !== undefined) fraction = parseFloat(qi.remainingFraction);
-        else if (qi.resetTime) fraction = 0;
-        else continue;
-        const label = model.label || model.modelOrAlias?.model || 'Unknown';
-        const remaining = Math.max(0, Math.min(100, fraction > 1 ? fraction : fraction * 100));
-        const entry = { name: label, remaining_percentage: remaining };
-        if (qi.resetTime) entry.reset_time = qi.resetTime;
-        const normKey = normalizeModelName(label);
-        if (!allModels[normKey] || entry.remaining_percentage < allModels[normKey].remaining_percentage) {
-          allModels[normKey] = entry;
-        }
-      }
+      const now = Date.now();
+      const allModels = parseUserStatusModels(userStatus, now);
 
       const weekly = summaryRes ? parseWeeklyBuckets(summaryRes) : {};
       const shortTerm = summaryRes ? parseShortTermBuckets(summaryRes) : {};
@@ -434,14 +253,15 @@ export async function collectLsTelemetryAsync({
         if (!modelPools[k]) modelPools[k] = pool;
       }
       const modelLimits = modelsRes ? parseModelLimits(modelsRes) : {};
+      const modelLimitsUpdatedAt = Object.keys(modelLimits).length > 0 ? now : 0;
 
-      const now = Date.now();
       liveData = {
         models: allModels,
         weekly,
         shortTerm,
         modelPools,
         modelLimits,
+        ...(modelLimitsUpdatedAt > 0 ? { modelLimitsUpdatedAt } : {}),
         updatedAt: now,
         lsUpdatedAt: now,
         email: userStatus.email || '',
@@ -472,22 +292,7 @@ export async function collectLsTelemetryAsync({
       try {
         const prev = await readJsonSafeAsync(pluginQuotaCachePath);
         if (prev) {
-          liveData.shortTerm = mergeQuotaBuckets(prev.shortTerm, liveData.shortTerm, true);
-          liveData.weekly = mergeQuotaBuckets(prev.weekly, liveData.weekly, true);
-          const nowMs = Date.now();
-          const validPrevModels = {};
-          for (const [k, v] of Object.entries(prev.models || {})) {
-            if (!v || typeof v !== 'object') continue;
-            const rMs = v.reset_time ? new Date(v.reset_time).getTime() : 0;
-            if (!rMs || isNaN(rMs) || rMs > nowMs) {
-              validPrevModels[k] = v;
-            }
-          }
-          liveData.models = { ...validPrevModels, ...(liveData.models || {}) };
-          liveData.modelPools = { ...(prev.modelPools || {}), ...(liveData.modelPools || {}) };
-          liveData.modelLimits = { ...(prev.modelLimits || {}), ...(liveData.modelLimits || {}) };
-          if (!liveData.email && prev.email) liveData.email = prev.email;
-          if (!liveData.planTier && prev.planTier) liveData.planTier = prev.planTier;
+          liveData = mergeQuotaCacheSnapshots(prev, liveData);
         }
         await writeFileAndVerifyNoBOM(pluginQuotaCachePath, JSON.stringify(liveData, null, 2));
       } catch (_) {}

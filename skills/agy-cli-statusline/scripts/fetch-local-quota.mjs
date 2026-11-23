@@ -6,6 +6,13 @@ import os from 'os';
 import { isDirectExecution, readJsonSafeSync, writeFileSyncAndVerifyNoBOM } from './lib/core/fs-utils.mjs';
 import { normalizeModelName, sanitizeConversationId } from './lib/core/normalize.mjs';
 import { inferModelPoolsFromModels, mergeQuotaBuckets, parseModelPools } from './lib/collectors/quota.mjs';
+import {
+  extractDetailedRuntimeContext,
+  fetchPaginatedTrajectoryMetadataAsync,
+  mergeQuotaCacheSnapshots,
+  parseHostPort,
+  parseUserStatusModels
+} from './lib/collectors/ls-rpc.mjs';
 import { formatResetTime } from './lib/collectors/time-format.mjs';
 
 export { sanitizeConversationId, formatResetTime, mergeQuotaBuckets };
@@ -207,23 +214,13 @@ export function parseModelLimits(availableModelsResponse) {
  * @returns {{maxContextTokens: number, modelDisplayName: string, model: string, count: number}}
  */
 export function extractRuntimeGeneratorContext(genMetaResponse) {
-  const list = genMetaResponse?.generatorMetadata;
-  if (!Array.isArray(list) || list.length === 0) {
-    return { maxContextTokens: 0, modelDisplayName: '', model: '', count: 0 };
-  }
-  for (let i = list.length - 1; i >= 0; i--) {
-    const cm = list[i]?.chatModel;
-    const maxCtx = Number(cm?.chatStartMetadata?.contextWindowMetadata?.maxContextTokens || 0);
-    if (!isNaN(maxCtx) && maxCtx > 0) {
-      return {
-        maxContextTokens: maxCtx,
-        modelDisplayName: typeof cm?.modelDisplayName === 'string' ? cm.modelDisplayName.trim() : '',
-        model: typeof cm?.model === 'string' ? cm.model.trim() : '',
-        count: list.length
-      };
-    }
-  }
-  return { maxContextTokens: 0, modelDisplayName: '', model: '', count: list.length };
+  const detail = extractDetailedRuntimeContext(genMetaResponse);
+  return {
+    maxContextTokens: detail.maxContextTokens,
+    modelDisplayName: detail.modelDisplayName,
+    model: detail.model,
+    count: detail.count
+  };
 }
 
 /**
@@ -351,40 +348,26 @@ export function persistRuntimeContextToCtxFile(ctxCachePath, runtimeContext) {
 
 async function fetchTrajectoryGeneratorContextAsync(port, csrfToken, host, preferHttps, conversationId, ctxCachePath) {
   const existingCtx = readJsonSafeSync(ctxCachePath);
-  let offset = Math.max(0, Number(existingCtx?.generator_metadata_offset || 0) || 0);
-  const startOffset = offset;
-  let best = { maxContextTokens: 0, modelDisplayName: '', model: '' };
+  const startOffset = Math.max(0, Number(existingCtx?.generator_metadata_offset || 0) || 0);
+  const paged = await fetchPaginatedTrajectoryMetadataAsync({
+    port,
+    csrfToken,
+    host,
+    preferHttps,
+    conversationId,
+    startOffset,
+    requestFn: requestTrajectoryGeneratorMetadata
+  });
 
-  const MAX_PAGES = 5;
-  const PAGE_LIMIT = 256;
-  for (let page = 0; page < MAX_PAGES; page++) {
-    let resp;
-    try {
-      resp = await requestTrajectoryGeneratorMetadata(port, csrfToken, conversationId, offset, host, preferHttps);
-    } catch (_) {
-      break;
-    }
-    const list = resp?.generatorMetadata;
-    if (!Array.isArray(list) || list.length === 0) break;
-
-    const extracted = extractRuntimeGeneratorContext(resp);
-    if (extracted && extracted.maxContextTokens > 0) {
-      best = {
-        maxContextTokens: extracted.maxContextTokens,
-        modelDisplayName: extracted.modelDisplayName,
-        model: extracted.model
-      };
-    }
-    offset += list.length;
-    if (list.length < PAGE_LIMIT) break;
-  }
-
-  if (best.maxContextTokens <= 0 && offset === startOffset) {
+  const best = paged.telemetry || { maxContextTokens: 0, modelDisplayName: '', model: '' };
+  if (best.maxContextTokens <= 0 && paged.nextOffset === startOffset) {
     return null;
   }
   return {
-    ...best,
-    nextOffset: offset
+    maxContextTokens: best.maxContextTokens || 0,
+    modelDisplayName: best.modelDisplayName || '',
+    model: best.model || '',
+    nextOffset: paged.nextOffset
   };
 }
 
@@ -406,32 +389,8 @@ export async function fetchLiveQuotaCache(options = {}) {
     if (userStatus.userTier?.name) planTierName = userStatus.userTier.name;
     if (userStatus.planStatus) planStatusData = userStatus.planStatus;
 
-    const cascade = userStatus.cascadeModelConfigData || {};
-    for (const model of cascade.clientModelConfigs || []) {
-      const quotaInfo = model.quotaInfo;
-      if (!quotaInfo) continue;
-
-      let fraction = 1;
-      if (quotaInfo.remainingFraction !== undefined) {
-        fraction = parseFloat(quotaInfo.remainingFraction);
-      } else if (quotaInfo.resetTime) {
-        fraction = 0;
-      } else {
-        continue;
-      }
-
-      const label = model.label || (model.modelOrAlias && model.modelOrAlias.model) || 'Unknown';
-      const remainingNum = fraction > 1 ? fraction : fraction * 100;
-      const remaining = Math.max(0, Math.min(100, remainingNum));
-      const entry = {
-        name: label,
-        remaining_percentage: remaining,
-      };
-      if (quotaInfo.resetTime) {
-        entry.reset_time = quotaInfo.resetTime;
-        entry.refreshes_in = formatResetTime(quotaInfo.resetTime);
-      }
-      const normKey = normalizeModelName(label);
+    const parsedModels = parseUserStatusModels(userStatus);
+    for (const [normKey, entry] of Object.entries(parsedModels)) {
       if (!allModels[normKey] || entry.remaining_percentage < allModels[normKey].remaining_percentage) {
         allModels[normKey] = entry;
       }
@@ -497,9 +456,8 @@ export async function fetchLiveQuotaCache(options = {}) {
 
   if (envLsAddr) {
     try {
-      const [host, portStr] = envLsAddr.split(':');
-      const port = parseInt(portStr, 10);
-      if (!isNaN(port)) {
+      const { host, port } = parseHostPort(envLsAddr);
+      if (!isNaN(port) && port > 0 && host) {
         // 併行請求 GetUserStatus、RetrieveUserQuotaSummary、GetAvailableModels 與對話執行期 metadata 以縮短延遲
         const [response, summaryResponse, availableModelsResponse, genCtx] = await Promise.all([
           requestUserStatus(port, envCsrfToken, host, envPreferHttps),
@@ -582,35 +540,8 @@ async function main() {
       if (hasCacheData) {
         const cacheFilePath = join(tmpDir, 'real_quota_cache.json');
         const prev = readJsonSafeSync(cacheFilePath);
-        if (prev) {
-          if (prev.lastAgentState !== undefined) cache.lastAgentState = prev.lastAgentState;
-          if (prev.lastOutputTokens !== undefined) cache.lastOutputTokens = prev.lastOutputTokens;
-          if (prev.lastTotalTokens !== undefined) cache.lastTotalTokens = prev.lastTotalTokens;
-          if (prev.lastPollAttemptAt !== undefined) cache.lastPollAttemptAt = prev.lastPollAttemptAt;
-          if (prev.lastModelKey !== undefined) cache.lastModelKey = prev.lastModelKey;
-          if (prev.lastModelLimitAttemptAt !== undefined) cache.lastModelLimitAttemptAt = prev.lastModelLimitAttemptAt;
-          cache.shortTerm = mergeQuotaBuckets(prev.shortTerm, cache.shortTerm, true);
-          cache.weekly = mergeQuotaBuckets(prev.weekly, cache.weekly, true);
-          cache.modelPools = { ...(prev.modelPools || {}), ...(cache.modelPools || {}) };
-          const nowMs = Date.now();
-          const validPrevModels = {};
-          for (const [k, v] of Object.entries(prev.models || {})) {
-            if (!v || typeof v !== 'object') continue;
-            const rMs = v.reset_time ? new Date(v.reset_time).getTime() : 0;
-            if (!rMs || isNaN(rMs) || rMs > nowMs) {
-              validPrevModels[k] = v;
-            }
-          }
-          cache.models = { ...validPrevModels, ...(cache.models || {}) };
-          cache.modelLimits = { ...(prev.modelLimits || {}), ...(cache.modelLimits || {}) };
-          if (!cache.modelLimitsUpdatedAt && prev.modelLimitsUpdatedAt) {
-            cache.modelLimitsUpdatedAt = prev.modelLimitsUpdatedAt;
-          }
-          if (!cache.email && prev.email) cache.email = prev.email;
-          if (!cache.planTier && prev.planTier) cache.planTier = prev.planTier;
-          if (!cache.planStatus && prev.planStatus) cache.planStatus = prev.planStatus;
-        }
-        writeFileSyncAndVerifyNoBOM(cacheFilePath, JSON.stringify(cache, null, 2));
+        const finalCache = prev ? mergeQuotaCacheSnapshots(prev, cache) : cache;
+        writeFileSyncAndVerifyNoBOM(cacheFilePath, JSON.stringify(finalCache, null, 2));
       }
     }
   } catch (_) {}

@@ -527,3 +527,110 @@ test('StatuslineService skips ghost 404 hook sessions in auto-follow mode and fa
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }
 });
+
+test('StatuslineService shares resolveContextMetricsPure and guards Layer-2 model mismatch on switch', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-ctx-switch-'));
+  const pluginData = path.join(tmpHome, 'plugin_data');
+  try {
+    fs.mkdirSync(pluginData, { recursive: true });
+    fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      latestConversationId: 'conv-switch',
+      sessions: {
+        'conv-switch': {
+          conversationId: 'conv-switch',
+          modelName: 'Claude Opus 4.6',
+          updatedAt: Date.now()
+        }
+      }
+    }), 'utf8');
+
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: pluginData,
+      fetchReleaseFn: async () => ({ ok: false }),
+      collectLsTelemetryFn: async () => ({
+        cache: {
+          modelLimits: {
+            claudeopus46: { limit: 200000, maxTokens: 200000, slug: 'claude-opus-4-6' }
+          }
+        },
+        runtimeTelemetry: {
+          // 模擬切換模型時，LS 尚未更新 runtimeTelemetry 模型，仍殘留舊 Gemini 模型的 512k
+          modelDisplayName: '',
+          model: 'gemini-4-neon',
+          maxContextTokens: 512000,
+          estimatedTokensUsed: 100000
+        },
+        telemetryStatus: { lsConnected: true, lsEnvSource: 'env', source: 'live', warning: '' }
+      })
+    });
+
+    const res = await svc.getDashboardSnapshot({ conversationId: 'conv-switch' });
+    assert.equal(res.snapshot.context.effectiveCeiling, 200000, 'Must skip mismatched Layer-2 runtime ceiling and resolve Layer-3 catalog limit');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('MCP resources/read enforces strict CSP and save-both enforces workspacePath allowlist', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-sec-p5-'));
+  const pluginData = path.join(tmpHome, 'plugin_data');
+  const allowedWs = path.join(tmpHome, 'allowed-ws');
+  const unknownWs = path.join(tmpHome, 'unknown-ws');
+  try {
+    fs.mkdirSync(pluginData, { recursive: true });
+    fs.mkdirSync(path.join(allowedWs, '.gemini'), { recursive: true });
+    fs.mkdirSync(path.join(unknownWs, '.gemini'), { recursive: true });
+    fs.writeFileSync(path.join(allowedWs, '.gemini', 'settings.json'), '{}', 'utf8');
+    fs.writeFileSync(path.join(unknownWs, '.gemini', 'settings.json'), '{"keep":"untouched"}', 'utf8');
+    fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      sessions: {
+        s1: { conversationId: 's1', workspacePaths: [allowedWs], updatedAt: Date.now() }
+      }
+    }), 'utf8');
+
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: pluginData,
+      fetchReleaseFn: async () => ({ ok: false }),
+      collectLsTelemetryFn: async () => ({
+        cache: null,
+        runtimeTelemetry: null,
+        telemetryStatus: { lsConnected: false, lsEnvSource: 'none', source: 'public_only', warning: '' }
+      })
+    });
+    const handler = new StatuslineMcpHandler({ service: svc });
+    const resRead = await handler.handleMessage({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'resources/read',
+      params: { uri: 'ui://statusline/app.html' }
+    });
+    assert.deepEqual(resRead.result.contents[0]._meta.ui.csp, { connectDomains: [], resourceDomains: [] });
+
+    await svc.saveConfig({
+      action: 'save-both',
+      workspacePath: unknownWs,
+      layout: { lang: 'us', items: ['model-name', 'quota'] }
+    });
+    assert.equal(
+      fs.readFileSync(path.join(unknownWs, '.gemini', 'settings.json'), 'utf8'),
+      '{"keep":"untouched"}',
+      'Unknown workspacePath outside sessions.json allowlist must not be modified'
+    );
+
+    await svc.saveConfig({
+      action: 'save-both',
+      workspacePath: allowedWs,
+      layout: { lang: 'us', items: ['model-name', 'quota'] }
+    });
+    const updatedAllowed = JSON.parse(fs.readFileSync(path.join(allowedWs, '.gemini', 'settings.json'), 'utf8'));
+    assert.deepEqual(updatedAllowed.ui.footer.items, ['model-name', 'quota']);
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});

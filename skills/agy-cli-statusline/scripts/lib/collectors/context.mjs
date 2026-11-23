@@ -122,6 +122,145 @@ export function computeSteppedCeiling(totalInput, contextSize, baseCeiling = DEF
   return Math.max(clampedBase, cap);
 }
 
+/**
+ * 純函式：依 4 層優先序計算脈絡用量百分比與有效權杖上限，並回傳第 4 層步進自癒持久化建議。
+ * 供 CLI 與 Antigravity 2.0 共用，完全不碰檔案系統。
+ * @param {object} params
+ * @returns {{
+ *   totalInput: number,
+ *   contextSize: number,
+ *   effectiveTokenCeiling: number,
+ *   usedPctNum: number,
+ *   tokenPctNum: number,
+ *   stepUpdate: { primaryModelKey: string, convStepKey: string, stepped: number, persistModelCeiling: number, needConvSave: boolean, needModelSave: boolean }|null
+ * }}
+ */
+export function resolveContextMetricsPure({
+  totalInput = 0,
+  contextSize = 1048576,
+  usedPctNum = 0,
+  nativeLimit = undefined,
+  settings = {},
+  env = process.env,
+  modelKeys = [],
+  catalogEntry = null,
+  runtimeMaxContextTokens = 0,
+  runtimeModelKeys = [],
+  convRemembered = 0,
+  modelRemembered = 0
+} = {}) {
+  const safeTotalInput = Math.max(0, Number(totalInput) || 0);
+  const safeContextSize = (typeof contextSize === 'number' && !isNaN(contextSize) && contextSize > 0)
+    ? contextSize
+    : 1048576;
+
+  let resolvedUsedPct = Number(usedPctNum) || 0;
+  if (safeContextSize > 0 && safeTotalInput > 0 && !resolvedUsedPct) {
+    resolvedUsedPct = Math.min(100, Math.max(0, (safeTotalInput / safeContextSize) * 100));
+  } else {
+    resolvedUsedPct = Math.min(100, Math.max(0, resolvedUsedPct));
+  }
+
+  let effectiveTokenCeiling = null;
+  let stepUpdate = null;
+
+  // 第 1 層：(1a) contextWindow 原生擴充欄位嗅探
+  const parsedNative = parseCeilingValue(nativeLimit, safeContextSize, false);
+  if (parsedNative !== null) {
+    effectiveTokenCeiling = parsedNative;
+  }
+
+  // 第 1 層：(1b) 外部設定檔與環境變數覆寫 (settings / AGY_TOKEN_CEILING / AGY_CLI_AUTO_COMPACT_OVERRIDE)
+  if (effectiveTokenCeiling === null) {
+    const overrideSources = [
+      { raw: settings?.ui?.footer?.tokenCeiling, allowPercent: false },
+      { raw: settings?.ui?.tokenCeiling, allowPercent: false },
+      { raw: env?.AGY_TOKEN_CEILING, allowPercent: false },
+      { raw: env?.AGY_CLI_AUTO_COMPACT_OVERRIDE, allowPercent: true }
+    ];
+    for (const src of overrideSources) {
+      const parsedOverride = parseCeilingValue(src.raw, safeContextSize, src.allowPercent);
+      if (parsedOverride !== null) {
+        effectiveTokenCeiling = parsedOverride;
+        break;
+      }
+    }
+  }
+
+  // 第 2 層：單一對話執行期 maxContextTokens（來自 GetCascadeTrajectoryGeneratorMetadata），需與當前模型吻合
+  const safeRuntimeMax = Number(runtimeMaxContextTokens || 0) || 0;
+  if (effectiveTokenCeiling === null && safeRuntimeMax > 0) {
+    const normRuntimeKeys = (Array.isArray(runtimeModelKeys) ? runtimeModelKeys : [])
+      .map(normalizeModelName)
+      .filter(Boolean);
+    const modelMatches =
+      modelKeys.length === 0 ||
+      normRuntimeKeys.length === 0 ||
+      normRuntimeKeys.some(rk => modelKeys.includes(rk));
+    if (modelMatches) {
+      const runtimeBase = safeContextSize > 0
+        ? Math.min(safeContextSize, safeRuntimeMax)
+        : safeRuntimeMax;
+      effectiveTokenCeiling = computeSteppedCeiling(safeTotalInput, safeContextSize, runtimeBase);
+    }
+  }
+
+  // 第 3 層：動態模型目錄對照（來自 GetAvailableModels 快取 modelLimits）
+  if (effectiveTokenCeiling === null && catalogEntry && typeof catalogEntry.limit === 'number' && catalogEntry.limit > 0) {
+    const catalogBase = safeContextSize > 0 ? Math.min(safeContextSize, catalogEntry.limit) : catalogEntry.limit;
+    effectiveTokenCeiling = computeSteppedCeiling(safeTotalInput, safeContextSize, catalogBase);
+  }
+
+  // 第 4 層：無連線與無快取時退回 256k 基準，並僅針對單一模型／單一對話破頂步進自癒（256k -> 512k -> contextSize）
+  if (effectiveTokenCeiling === null) {
+    const baseDefault = Math.min(safeContextSize, DEFAULT_COMPACTION_THRESHOLD);
+    const primaryModelKey = modelKeys[0] || '';
+    const convStepKey = primaryModelKey || '_default';
+
+    const safeConvRemembered = Number(convRemembered || 0) || 0;
+    const rawModelRemembered = primaryModelKey ? (Number(modelRemembered || 0) || 0) : 0;
+    const clampedModelRemembered = (safeContextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
+      ? Math.min(rawModelRemembered, STEP_UP_INTERMEDIATE_THRESHOLD)
+      : rawModelRemembered;
+
+    const rememberedBase = Math.max(baseDefault, Math.min(safeContextSize, Math.max(safeConvRemembered, clampedModelRemembered)));
+    const stepped = computeSteppedCeiling(safeTotalInput, safeContextSize, rememberedBase);
+
+    if (safeTotalInput > baseDefault) {
+      const needConvSave = stepped > safeConvRemembered;
+      const persistModelCeiling = (safeContextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
+        ? Math.min(stepped, STEP_UP_INTERMEDIATE_THRESHOLD)
+        : stepped;
+      const needModelSave = Boolean(primaryModelKey && persistModelCeiling > baseDefault && persistModelCeiling > clampedModelRemembered);
+      if (needConvSave || needModelSave) {
+        stepUpdate = {
+          primaryModelKey,
+          convStepKey,
+          stepped,
+          persistModelCeiling,
+          needConvSave,
+          needModelSave
+        };
+      }
+    }
+
+    effectiveTokenCeiling = stepped;
+  }
+
+  const tokenPctNum = effectiveTokenCeiling > 0
+    ? Math.min(100, Math.max(0, (safeTotalInput / effectiveTokenCeiling) * 100))
+    : resolvedUsedPct;
+
+  return {
+    totalInput: safeTotalInput,
+    contextSize: safeContextSize,
+    effectiveTokenCeiling,
+    usedPctNum: resolvedUsedPct,
+    tokenPctNum,
+    stepUpdate
+  };
+}
+
 function updateCtxCacheAsync(ctxCachePath, patch) {
   ctxWriteQueue = ctxWriteQueue.then(async () => {
     try {
@@ -193,116 +332,68 @@ export async function calculateContextUsageAsync(meta, conversationId, settings 
   if (!contextSize) {
     contextSize = (catalogEntry && catalogEntry.maxTokens > 0) ? catalogEntry.maxTokens : 1048576;
   }
-  if (contextSize > 0 && totalInput > 0 && !usedPctNum) {
-    usedPctNum = (totalInput / contextSize) * 100;
-  }
 
-  let effectiveTokenCeiling = null;
+  const primaryModelKey = currentModelKeys[0] || '';
+  const convStepKey = primaryModelKey || '_default';
+  const statePath = join(os.homedir(), '.gemini', 'tmp', 'compaction_ceiling_state.json');
+  const parsedState = await readJsonSafeAsync(statePath);
+  const modelCeilings = (parsedState && typeof parsedState.modelCeilings === 'object' && parsedState.modelCeilings !== null && !Array.isArray(parsedState.modelCeilings))
+    ? parsedState.modelCeilings
+    : {};
 
-  // 第 1 層：(1a) contextWindow 原生擴充欄位嗅探
-  const nativeLimit = contextWindow.compaction_threshold ??
-    contextWindow.compaction_token_limit ??
-    contextWindow.compact_threshold ??
-    contextWindow.effective_context_window_size;
-
-  const parsedNative = parseCeilingValue(nativeLimit, contextSize, false);
-  if (parsedNative !== null) {
-    effectiveTokenCeiling = parsedNative;
-  }
-
-  // 第 1 層：(1b) 外部設定檔與環境變數覆寫 (settings / AGY_TOKEN_CEILING / AGY_CLI_AUTO_COMPACT_OVERRIDE)
-  if (effectiveTokenCeiling === null) {
-    const overrideSources = [
-      { raw: settings?.ui?.footer?.tokenCeiling, allowPercent: false },
-      { raw: settings?.ui?.tokenCeiling, allowPercent: false },
-      { raw: process.env.AGY_TOKEN_CEILING, allowPercent: false },
-      { raw: process.env.AGY_CLI_AUTO_COMPACT_OVERRIDE, allowPercent: true }
-    ];
-    for (const src of overrideSources) {
-      const parsedOverride = parseCeilingValue(src.raw, contextSize, src.allowPercent);
-      if (parsedOverride !== null) {
-        effectiveTokenCeiling = parsedOverride;
-        break;
-      }
-    }
-  }
-
-  // 第 2 層：單一對話執行期 maxContextTokens（來自 GetCascadeTrajectoryGeneratorMetadata），需與當前模型吻合
-  if (effectiveTokenCeiling === null && cachedCtx && typeof cachedCtx.runtime_max_context_tokens === 'number' && cachedCtx.runtime_max_context_tokens > 0) {
-    const runtimeKeys = [
+  const resolved = resolveContextMetricsPure({
+    totalInput,
+    contextSize,
+    usedPctNum,
+    nativeLimit: contextWindow.compaction_threshold ??
+      contextWindow.compaction_token_limit ??
+      contextWindow.compact_threshold ??
+      contextWindow.effective_context_window_size,
+    settings,
+    env: process.env,
+    modelKeys: currentModelKeys,
+    catalogEntry,
+    runtimeMaxContextTokens: cachedCtx?.runtime_max_context_tokens || 0,
+    runtimeModelKeys: cachedCtx ? [
       cachedCtx.runtime_model_display_name,
       cachedCtx.runtime_model_enum,
       cachedCtx.runtime_model_key
-    ].map(normalizeModelName).filter(Boolean);
-    const modelMatches = currentModelKeys.length === 0 || runtimeKeys.some(rk => currentModelKeys.includes(rk));
-    if (modelMatches) {
-      const runtimeBase = contextSize > 0
-        ? Math.min(contextSize, cachedCtx.runtime_max_context_tokens)
-        : cachedCtx.runtime_max_context_tokens;
-      effectiveTokenCeiling = computeSteppedCeiling(totalInput, contextSize, runtimeBase);
+    ] : [],
+    convRemembered: Number(cachedCtx?.step_up_ceilings?.[convStepKey] || 0),
+    modelRemembered: primaryModelKey ? Number(modelCeilings[primaryModelKey] || 0) : 0
+  });
+
+  if (resolved.stepUpdate) {
+    const { needConvSave, needModelSave, stepped, persistModelCeiling } = resolved.stepUpdate;
+    if (needConvSave) {
+      await updateCtxCacheAsync(ctxCachePath, {
+        step_up_ceilings: { [convStepKey]: stepped }
+      });
+    }
+    if (needModelSave && primaryModelKey) {
+      stateWriteQueue = stateWriteQueue.then(async () => {
+        try {
+          await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
+          const diskParsed = (await readJsonSafeAsync(statePath)) || {};
+          const { unlockedVersions: _legacyVersions, ...restState } = diskParsed;
+          const latestModels = (restState.modelCeilings && typeof restState.modelCeilings === 'object' && !Array.isArray(restState.modelCeilings))
+            ? { ...restState.modelCeilings }
+            : {};
+          const existingVal = Number(latestModels[primaryModelKey] || 0);
+          if (persistModelCeiling > existingVal) {
+            latestModels[primaryModelKey] = persistModelCeiling;
+          }
+          await writeFileAndVerifyNoBOM(statePath, JSON.stringify({ ...restState, modelCeilings: latestModels }, null, 2));
+        } catch (_) {}
+      }).catch(() => {});
+      await stateWriteQueue;
     }
   }
 
-  // 第 3 層：動態模型目錄對照（來自 GetAvailableModels 快取 modelLimits）
-  if (effectiveTokenCeiling === null && catalogEntry && typeof catalogEntry.limit === 'number' && catalogEntry.limit > 0) {
-    const catalogBase = contextSize > 0 ? Math.min(contextSize, catalogEntry.limit) : catalogEntry.limit;
-    effectiveTokenCeiling = computeSteppedCeiling(totalInput, contextSize, catalogBase);
-  }
-
-  // 第 4 層（方案 B）：無連線與無快取時退回 256k 基準，並僅針對單一模型／單一對話破頂步進自癒（256k -> 512k -> contextSize），絕不跨模型或全版本鎖死 1.0M
-  if (effectiveTokenCeiling === null) {
-    const baseDefault = Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD);
-    const primaryModelKey = currentModelKeys[0] || '';
-    const convStepKey = primaryModelKey || '_default';
-
-    const statePath = join(os.homedir(), '.gemini', 'tmp', 'compaction_ceiling_state.json');
-    const parsedState = await readJsonSafeAsync(statePath);
-    const modelCeilings = (parsedState && typeof parsedState.modelCeilings === 'object' && parsedState.modelCeilings !== null && !Array.isArray(parsedState.modelCeilings))
-      ? parsedState.modelCeilings
-      : {};
-
-    const convRemembered = Number(cachedCtx?.step_up_ceilings?.[convStepKey] || 0);
-    const rawModelRemembered = primaryModelKey ? Number(modelCeilings[primaryModelKey] || 0) : 0;
-    const modelRemembered = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
-      ? Math.min(rawModelRemembered, STEP_UP_INTERMEDIATE_THRESHOLD)
-      : rawModelRemembered;
-
-    const rememberedBase = Math.max(baseDefault, Math.min(contextSize, Math.max(convRemembered, modelRemembered)));
-    const stepped = computeSteppedCeiling(totalInput, contextSize, rememberedBase);
-
-    if (totalInput > baseDefault) {
-      if (stepped > convRemembered) {
-        await updateCtxCacheAsync(ctxCachePath, {
-          step_up_ceilings: { [convStepKey]: stepped }
-        });
-      }
-      if (primaryModelKey) {
-        const persistModelCeiling = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
-          ? Math.min(stepped, STEP_UP_INTERMEDIATE_THRESHOLD)
-          : stepped;
-        if (persistModelCeiling > baseDefault && persistModelCeiling > modelRemembered) {
-          stateWriteQueue = stateWriteQueue.then(async () => {
-            try {
-              await fs.mkdir(join(os.homedir(), '.gemini', 'tmp'), { recursive: true });
-              const diskParsed = (await readJsonSafeAsync(statePath)) || {};
-              const { unlockedVersions: _legacyVersions, ...restState } = diskParsed;
-              const latestModels = (restState.modelCeilings && typeof restState.modelCeilings === 'object' && !Array.isArray(restState.modelCeilings))
-                ? { ...restState.modelCeilings }
-                : {};
-              const existingVal = Number(latestModels[primaryModelKey] || 0);
-              if (persistModelCeiling > existingVal) {
-                latestModels[primaryModelKey] = persistModelCeiling;
-              }
-              await writeFileAndVerifyNoBOM(statePath, JSON.stringify({ ...restState, modelCeilings: latestModels }, null, 2));
-            } catch (_) {}
-          }).catch(() => {});
-          await stateWriteQueue;
-        }
-      }
-    }
-
-    effectiveTokenCeiling = stepped;
-  }
-
-  return { totalInput, contextSize, effectiveTokenCeiling, usedPctNum };
+  return {
+    totalInput: resolved.totalInput,
+    contextSize: resolved.contextSize,
+    effectiveTokenCeiling: resolved.effectiveTokenCeiling,
+    usedPctNum: resolved.usedPctNum
+  };
 }

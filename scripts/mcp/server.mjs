@@ -114,7 +114,11 @@ export class StatuslineMcpHandler {
                 text: this._readAppHtml(),
                 _meta: {
                   ui: {
-                    prefersBorder: false
+                    prefersBorder: false,
+                    csp: {
+                      connectDomains: [],
+                      resourceDomains: []
+                    }
                   }
                 }
               }
@@ -161,7 +165,7 @@ export class StatuslineMcpHandler {
         if (this.clientSupportsMcpApps) {
           tools.push({
             name: 'statusline_save_config',
-            description: 'App-only tool to persist panel preferences or synchronize CLI statusline settings.',
+            description: 'App-only tool to persist panel preferences in PLUGIN_DATA, or (with save-both / deployHooks) write CLI settings.json and deploy CLI hook scripts.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -181,7 +185,7 @@ export class StatuslineMcpHandler {
             },
             annotations: {
               readOnlyHint: false,
-              destructiveHint: false,
+              destructiveHint: true,
               idempotentHint: true
             },
             _meta: {
