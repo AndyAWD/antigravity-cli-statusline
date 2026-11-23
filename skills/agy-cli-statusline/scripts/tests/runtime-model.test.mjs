@@ -11,7 +11,8 @@ import {
   isOrchestratorWorkerModel,
   readAppSelectedModelAsync,
   readLatestTranscriptModelAsync,
-  resolveActiveRuntimeModelAsync
+  resolveActiveRuntimeModelAsync,
+  resolveOrchestratorWrapperDisplayName
 } from '../lib/collectors/runtime-model.mjs';
 import {
   buildI18nDict,
@@ -297,10 +298,10 @@ test('active-model renders across all 4 locales (text & emoji) and shows red off
   };
 
   const expectedPlanner = {
-    'zh-tw': { text: '協調器: [規劃] Gemini 4 Carbon (High)', emoji: '🧭 [規劃] Gemini 4 Carbon (High)' },
-    'zh-cn': { text: '协调器: [规划] Gemini 4 Carbon (High)', emoji: '🧭 [规划] Gemini 4 Carbon (High)' },
-    'us': { text: 'Orchestrator: [Plan] Gemini 4 Carbon (High)', emoji: '🧭 [Plan] Gemini 4 Carbon (High)' },
-    'jp': { text: 'Orchestrator: [計画] Gemini 4 Carbon (High)', emoji: '🧭 [計画] Gemini 4 Carbon (High)' }
+    'zh-tw': { text: '協調規劃: Gemini 4 Carbon (High)', emoji: '🪄 規劃 → Gemini 4 Carbon (High)' },
+    'zh-cn': { text: '协调规划: Gemini 4 Carbon (High)', emoji: '🪄 规划 → Gemini 4 Carbon (High)' },
+    'us': { text: 'Orchestrator Plan: Gemini 4 Carbon (High)', emoji: '🪄 Plan → Gemini 4 Carbon (High)' },
+    'jp': { text: 'Orchestrator 計画: Gemini 4 Carbon (High)', emoji: '🪄 計画 → Gemini 4 Carbon (High)' }
   };
 
   for (const [loc, exp] of Object.entries(expectedPlanner)) {
@@ -309,19 +310,20 @@ test('active-model renders across all 4 locales (text & emoji) and shows red off
   }
 
   const executorMetrics = { ...baseMetrics, activeModelName: 'Gemini 4 Hydrogen (High)', activeModelRole: 'executor' };
-  assert.equal(stripAnsi(buildI18nDict('zh-tw', executorMetrics, 'text')['active-model']), '協調器: [工作] Gemini 4 Hydrogen (High)');
-  assert.equal(stripAnsi(buildI18nDict('us', executorMetrics, 'emoji')['active-model']), '🧭 [Work] Gemini 4 Hydrogen (High)');
-  assert.equal(stripAnsi(buildI18nDict('jp', executorMetrics, 'emoji')['active-model']), '🧭 [作業] Gemini 4 Hydrogen (High)');
+  assert.equal(stripAnsi(buildI18nDict('zh-tw', executorMetrics, 'text')['active-model']), '協調工作: Gemini 4 Hydrogen (High)');
+  assert.equal(stripAnsi(buildI18nDict('us', executorMetrics, 'emoji')['active-model']), '🪄 Work → Gemini 4 Hydrogen (High)');
+  assert.equal(stripAnsi(buildI18nDict('jp', executorMetrics, 'emoji')['active-model']), '🪄 作業 → Gemini 4 Hydrogen (High)');
 
   const pendingMetrics = { ...baseMetrics, activeModelName: '', activeModelRole: 'pending' };
   assert.equal(stripAnsi(buildI18nDict('zh-tw', pendingMetrics, 'text')['active-model']), '協調器: 待命');
+  assert.equal(stripAnsi(buildI18nDict('zh-tw', pendingMetrics, 'emoji')['active-model']), '🪄 待命');
 
   const nonOrchMetrics = { ...baseMetrics, isOrchestrator: false, activeModelName: '', activeModelRole: 'none' };
   const expectedOff = {
-    'zh-tw': { text: '協調器: 關閉', emoji: '🧭 關閉' },
-    'zh-cn': { text: '协调器: 关闭', emoji: '🧭 关闭' },
-    'us': { text: 'Orchestrator: off', emoji: '🧭 off' },
-    'jp': { text: 'Orchestrator: オフ', emoji: '🧭 オフ' }
+    'zh-tw': { text: '協調器: 關閉', emoji: '🪄 關閉' },
+    'zh-cn': { text: '协调器: 关闭', emoji: '🪄 关闭' },
+    'us': { text: 'Orchestrator: off', emoji: '🪄 off' },
+    'jp': { text: 'Orchestrator: オフ', emoji: '🪄 オフ' }
   };
   for (const [loc, exp] of Object.entries(expectedOff)) {
     const textRaw = buildI18nDict(loc, nonOrchMetrics, 'text')['active-model'];
@@ -377,7 +379,7 @@ test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and r
     assert.equal(orchRes.code, 0);
     assert.equal(
       stripAnsi(orchRes.stdout).trim(),
-      '模型: Orchestrator (Carbon) │ 🧭 [工作] Gemini 4 Hydrogen (High)'
+      '模型: Orchestrator (Carbon) │ 🪄 工作 → Gemini 4 Hydrogen (High)'
     );
 
     // 切換為一般模型時，active-model 一律以紅色顯示關閉
@@ -388,7 +390,7 @@ test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and r
       terminal_width: 160
     }, fakeHome);
     assert.equal(normalRes.code, 0);
-    assert.equal(stripAnsi(normalRes.stdout).trim(), '模型: Gemini 4 Neon (High) │ 🧭 關閉');
+    assert.equal(stripAnsi(normalRes.stdout).trim(), '模型: Gemini 4 Neon (High) │ 🪄 關閉');
     assert.equal(normalRes.stdout.includes('\x1b[38;2;255;125;175m'), true);
 
     // 確認 probes-and-gating：當 footerItems 不含 active-model 時不探測
@@ -440,6 +442,10 @@ test('resolves MODEL_PLACEHOLDER wrappers and preserves worker executor models a
   assert.equal(isOrchestratorModelName('MODEL_PLACEHOLDER_M537', cache), true);
   assert.equal(isOrchestratorModelName('MODEL_PLACEHOLDER_M668', cache), true);
   assert.equal(isOrchestratorModelName('MODEL_PLACEHOLDER_M525', cache), false);
+  assert.equal(resolveOrchestratorWrapperDisplayName('MODEL_PLACEHOLDER_M537', cache), 'Orchestrator (Neon)');
+  assert.equal(resolveOrchestratorWrapperDisplayName('MODEL_PLACEHOLDER_M668', cache), 'Orchestrator (Argon)');
+  assert.equal(resolveOrchestratorWrapperDisplayName('MODEL_PLACEHOLDER_M669', cache), '');
+  assert.equal(resolveOrchestratorWrapperDisplayName('MODEL_PLACEHOLDER_M525', cache), '');
   assert.equal(isOrchestratorWorkerModel('gemini-flash-worker-agy'), true);
   assert.equal(isOrchestratorWorkerModel('MODEL_PLACEHOLDER_M669', cache), true);
   assert.equal(isOrchestratorWorkerModel('Gemini 4 Hydrogen (Orchestrator)'), true);

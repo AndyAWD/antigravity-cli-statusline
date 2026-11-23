@@ -194,7 +194,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🪪 使用中のエージェント（agent-profile）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] ⚡ エージェント状態（agent-state）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ 現在の実行モード（mode）</text>
-  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 Orchestrator実行中の実モデル（active-model）</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🪄 Orchestrator実行中の実モデル（active-model）</text>
   <text x="44" y="336" fill="#8b949e">⎿ ページ進捗：[ 第 1 / 5 ページ ] · 5 項目を選択中</text>
   <text x="24" y="358" fill="#6e7681">Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要</text>
 

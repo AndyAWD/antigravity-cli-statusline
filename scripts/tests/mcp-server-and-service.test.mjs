@@ -747,8 +747,9 @@ test('StatuslineService renders active-model for Orchestrator sessions and red o
     });
 
     const resOrch = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw' });
-    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].plainText, '協調器: [工作] Gemini 4 Hydrogen (High)');
-    assert.equal(resOrch.snapshot.renderedItems.emoji['active-model'].plainText, '🧭 [工作] Gemini 4 Hydrogen (High)');
+    assert.equal(resOrch.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
+    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].plainText, '協調工作: Gemini 4 Hydrogen (High)');
+    assert.equal(resOrch.snapshot.renderedItems.emoji['active-model'].plainText, '🪄 工作 → Gemini 4 Hydrogen (High)');
 
     // 切換為一般模型時，active-model 一律以紅色顯示關閉
     fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
@@ -767,8 +768,9 @@ test('StatuslineService renders active-model for Orchestrator sessions and red o
     runtimeModelSlug = 'gemini-4-neon-high';
 
     const resSingle = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resSingle.snapshot.renderedItems.text['model-name'].plainText, '模型: Gemini 4 Neon (High)');
     assert.equal(resSingle.snapshot.renderedItems.text['active-model'].plainText, '協調器: 關閉');
-    assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].plainText, '🧭 關閉');
+    assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].plainText, '🪄 關閉');
     assert.equal(resSingle.snapshot.renderedItems.text['active-model'].valueSegments[0].color, '#ff7daf');
     assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].segments.at(-1).color, '#ff7daf');
   } finally {
@@ -859,14 +861,17 @@ test('StatuslineService detects 2.0 Orchestrator via antigravity_state.pbtxt and
       })
     });
 
-    // 1. Auto-follow 維持選取 2.0 對話，並透過 antigravity_state.pbtxt 正確顯示協調器與規劃角色
+    // 1. Auto-follow 維持選取 2.0 對話，model-name 顯示外層 Orchestrator (Neon)，active-model 顯示底層規劃模型
     const resAuto = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw' });
     assert.equal(resAuto.snapshot.session.conversationId, appConvId);
-    assert.equal(resAuto.snapshot.renderedItems.text['active-model'].plainText, '協調器: [規劃] Gemini 4 Neon (High)');
+    assert.equal(resAuto.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Neon)');
+    assert.equal(resAuto.snapshot.renderedItems.text['active-model'].plainText, '協調規劃: Gemini 4 Neon (High)');
+    assert.equal(resAuto.snapshot.renderedItems.emoji['active-model'].plainText, '🪄 規劃 → Gemini 4 Neon (High)');
 
-    // 2. 切回單一模型代號後顯示紅色關閉
+    // 2. 切回單一模型代號後，model-name 恢復顯示實際模型，active-model 顯示紅色關閉
     fs.writeFileSync(pbtxtPath, 'last_selected_agent_model: MODEL_PLACEHOLDER_M525\n', 'utf8');
     const resOff = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resOff.snapshot.renderedItems.text['model-name'].plainText, '模型: Gemini 4 Neon (High)');
     assert.equal(resOff.snapshot.renderedItems.text['active-model'].plainText, '協調器: 關閉');
 
     // 3. 明確切換檢視 CLI 對話時，可從合併後的 CLI sessions.json 拿到工作區與模型

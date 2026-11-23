@@ -194,7 +194,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🪪 Active agent profile (agent-profile)</text>
   <text x="44" y="262" fill="#39c5cf">[✓] ⚡ Agent state (agent-state)</text>
   <text x="44" y="280" fill="#39c5cf">[✓] ⚙️ Current running mode (mode)</text>
-  <text x="44" y="298" fill="#39c5cf">[✓] 🧭 Active underlying model under Orchestrator (active-model)</text>
+  <text x="44" y="298" fill="#39c5cf">[✓] 🪄 Active underlying model under Orchestrator (active-model)</text>
   <text x="44" y="336" fill="#8b949e">⎿ Wizard pager: [ Page 1 / 5 ] · 5 metrics selected</text>
   <text x="24" y="358" fill="#6e7681">Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation</text>
 

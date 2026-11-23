@@ -41,40 +41,51 @@ export function formatAgentState(state, normLang) {
 }
 
 /**
- * 格式化 Orchestrator 實際執行模型與規劃／工作角色徽章（非 Orchestrator 模式一律以紅色顯示關閉）。
+ * 格式化 Orchestrator 實際執行模型與規劃／工作角色（文字採動態標籤整合角色，Emoji 採箭頭分隔；非 Orchestrator 一律紅色顯示關閉）。
  * @param {object} m
  * @param {string} normLang
+ * @param {'text'|'emoji'} [style='text']
  * @returns {string}
  */
-export function formatActiveModelDisplay(m, normLang) {
+export function formatActiveModelDisplay(m, normLang, style = 'text') {
   const modelName = typeof m?.activeModelName === 'string' ? m.activeModelName.trim() : '';
   const isOrchestrator = Boolean(m?.isOrchestrator) || Boolean(modelName);
   const role = typeof m?.activeModelRole === 'string' ? m.activeModelRole.trim().toLowerCase() : '';
   const labels = {
-    'zh-tw': { prefix: '協調器:', planner: '[規劃]', executor: '[工作]', pending: '待命', off: '關閉' },
-    'zh-cn': { prefix: '协调器:', planner: '[规划]', executor: '[工作]', pending: '待命', off: '关闭' },
-    'us': { prefix: 'Orchestrator:', planner: '[Plan]', executor: '[Work]', pending: 'Pending', off: 'off' },
-    'jp': { prefix: 'Orchestrator:', planner: '[計画]', executor: '[作業]', pending: '待機中', off: 'オフ' }
+    'zh-tw': { prefix: '協調器:', rolePrefix: '協調', planner: '規劃', executor: '工作', pending: '待命', off: '關閉' },
+    'zh-cn': { prefix: '协调器:', rolePrefix: '协调', planner: '规划', executor: '工作', pending: '待命', off: '关闭' },
+    'us': { prefix: 'Orchestrator:', rolePrefix: 'Orchestrator ', planner: 'Plan', executor: 'Work', pending: 'Pending', off: 'off' },
+    'jp': { prefix: 'Orchestrator:', rolePrefix: 'Orchestrator ', planner: '計画', executor: '作業', pending: '待機中', off: 'オフ' }
   };
   const t = labels[normLang] || labels['zh-tw'];
+  const isEmoji = style === 'emoji';
+  const emojiPrefix = `${WHITE}${EMOJI_MAP['active-model'] || '🪄'}${RESET}`;
 
   if (!isOrchestrator) {
-    return `${WHITE}${t.prefix}${RESET} ${RED}${BOLD}${t.off}${RESET}`;
+    return isEmoji
+      ? `${emojiPrefix} ${RED}${BOLD}${t.off}${RESET}`
+      : `${WHITE}${t.prefix}${RESET} ${RED}${BOLD}${t.off}${RESET}`;
   }
 
   if (!modelName) {
-    return `${WHITE}${t.prefix}${RESET} ${GRAY}${BOLD}${t.pending}${RESET}`;
+    return isEmoji
+      ? `${emojiPrefix} ${GRAY}${BOLD}${t.pending}${RESET}`
+      : `${WHITE}${t.prefix}${RESET} ${GRAY}${BOLD}${t.pending}${RESET}`;
   }
 
   const modelColor = getModelColor(modelName);
   const modelPart = `${modelColor}${BOLD}${modelName}${RESET}`;
   if (role === 'planner' || role === 'executor') {
-    const roleTag = t[role];
+    const roleWord = t[role];
     const roleColor = getActiveModelRoleColor(role);
-    return `${WHITE}${t.prefix}${RESET} ${roleColor}${BOLD}${roleTag}${RESET} ${modelPart}`;
+    return isEmoji
+      ? `${emojiPrefix} ${roleColor}${BOLD}${roleWord}${RESET} ${GRAY}→${RESET} ${modelPart}`
+      : `${WHITE}${t.rolePrefix}${roleColor}${BOLD}${roleWord}${RESET}${WHITE}:${RESET} ${modelPart}`;
   }
 
-  return `${WHITE}${t.prefix}${RESET} ${modelPart}`;
+  return isEmoji
+    ? `${emojiPrefix} ${modelPart}`
+    : `${WHITE}${t.prefix}${RESET} ${modelPart}`;
 }
 
 /**
@@ -304,6 +315,10 @@ export function buildI18nDict(lang, m, labelStyle = 'text', itemStyles = undefin
 
   const emojiDict = {};
   for (const [key, val] of Object.entries(baseDict)) {
+    if (key === 'active-model') {
+      emojiDict[key] = formatActiveModelDisplay(m, normLang, 'emoji');
+      continue;
+    }
     if (key === 'plugin-update') {
       if (pluginUpdateLines.length >= 2) {
         const cur = formatVersionTag(pluginUpdateCurrentTag) || String(pluginUpdateCurrentTag || '');
