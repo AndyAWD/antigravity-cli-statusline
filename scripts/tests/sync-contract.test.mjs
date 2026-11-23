@@ -52,6 +52,10 @@ test('scripts/mcp/statusline-app.html is up-to-date, BOM-free, self-contained, a
   const mainJs = fs.readFileSync(path.join(ROOT, 'src', 'app', 'main.js'), 'utf8');
   assert.equal(mainJs.includes('getDashboardArgs'), true, 'main.js must route dashboard calls through getDashboardArgs()');
   assert.equal(/callToolSafe\('statusline_dashboard',\s*\{[^}]*snap\.session\?\.conversationId/.test(mainJs), false, 'main.js must use getDashboardArgs() instead of hardcoding snap.session?.conversationId on refresh');
+  assert.equal(/import\s*\{[^}]*\bformatResetTime\b[^}]*\}\s*from\s*['"][^'"]*time-format\.mjs['"]/.test(mainJs), true, 'main.js must import formatResetTime from shared time-format.mjs');
+  assert.equal(/\bfunction\s+formatLiveCountdown\b/.test(mainJs), false, 'main.js must not reimplement duplicate formatLiveCountdown logic');
+  assert.equal(/\bfunction\s+computeDraftOrderExpressions\b/.test(mainJs), false, 'main.js must use shared formatOrderExpressions instead of duplicate computeDraftOrderExpressions');
+  assert.equal(/getPercentageTier/.test(mainJs), true, 'main.js must use shared getPercentageTier from ansi.mjs');
 
   const m = html.match(/<!--\s*source-sha256:\s*([a-f0-9]{64})\s*-->/i);
   assert.ok(m, 'statusline-app.html must embed source-sha256 comment');

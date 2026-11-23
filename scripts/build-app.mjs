@@ -8,15 +8,31 @@ import { isDirectExecution, writeFileSyncAndVerifyNoBOM } from '../skills/agy-cl
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SRC_APP_DIR = path.join(ROOT, 'src', 'app');
+const SHARED_APP_DEPS = [
+  'skills/agy-cli-statusline/scripts/lib/collectors/time-format.mjs',
+  'skills/agy-cli-statusline/scripts/lib/core/normalize.mjs',
+  'skills/agy-cli-statusline/scripts/lib/metrics/layout-utils.mjs',
+  'skills/agy-cli-statusline/scripts/lib/metrics/registry.mjs',
+  'skills/agy-cli-statusline/scripts/lib/renderers/ansi.mjs'
+];
 const OUT_HTML_PATH = path.join(ROOT, 'scripts', 'mcp', 'statusline-app.html');
 
-export function computeSrcAppSha256(srcDir = SRC_APP_DIR) {
+export function computeSrcAppSha256(srcDir = SRC_APP_DIR, extraDeps = SHARED_APP_DEPS) {
   const files = fs.readdirSync(srcDir).sort();
   const hash = createHash('sha256');
   for (const f of files) {
     const full = path.join(srcDir, f);
     if (fs.statSync(full).isFile()) {
       hash.update(f);
+      hash.update('\0');
+      hash.update(fs.readFileSync(full));
+      hash.update('\0');
+    }
+  }
+  for (const relDep of [...(extraDeps || [])].sort()) {
+    const full = path.join(ROOT, ...relDep.split('/'));
+    if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+      hash.update(relDep);
       hash.update('\0');
       hash.update(fs.readFileSync(full));
       hash.update('\0');

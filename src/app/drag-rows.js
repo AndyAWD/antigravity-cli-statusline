@@ -2,6 +2,7 @@
  * 分列式視覺畫布（Row-Based Canvas）轉換與相鄰長條圖合併輔助模組。
  * 與 CLI 端 items ('n' 換行分隔) 100% 無損雙向對應。
  */
+import { groupAdjacentItems } from '../../skills/agy-cli-statusline/scripts/lib/metrics/layout-utils.mjs';
 
 /**
  * 將一維 items（含 'n'）轉換為二維列陣列 rows。
@@ -42,38 +43,7 @@ export function rowsToItems(rows = []) {
  * 計算單一列內之相鄰長條圖合併項目（供監控態合併顯示與編輯態 🔗 標記）。
  */
 export function groupRowWithAdjacentMerges(row = [], itemStyles = {}, defaultStyle = 'text', adjacentPairs = []) {
-  const getStyle = (id) => {
-    if (itemStyles && itemStyles[id]) return itemStyles[id];
-    return defaultStyle === 'emoji' ? 'emoji' : 'text';
-  };
-
-  const groups = [];
-  for (let i = 0; i < row.length; i++) {
-    const cur = row[i];
-    const next = row[i + 1];
-    if (next) {
-      const pair = adjacentPairs.find(p =>
-        (cur === p.val && next === p.bar) || (cur === p.bar && next === p.val)
-      );
-      if (pair && getStyle(cur) === getStyle(next)) {
-        groups.push({
-          key: pair.merged,
-          ids: [cur, next],
-          style: getStyle(cur),
-          merged: true
-        });
-        i++;
-        continue;
-      }
-    }
-    groups.push({
-      key: cur,
-      ids: [cur],
-      style: getStyle(cur),
-      merged: false
-    });
-  }
-  return groups;
+  return groupAdjacentItems(row, itemStyles, defaultStyle, adjacentPairs, { strictR27: false });
 }
 
 /**

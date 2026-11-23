@@ -3,6 +3,9 @@ import {
   applyDocumentTheme,
   applyHostStyleVariables
 } from '@modelcontextprotocol/ext-apps';
+import { formatResetTime } from '../../skills/agy-cli-statusline/scripts/lib/collectors/time-format.mjs';
+import { formatOrderExpressions } from '../../skills/agy-cli-statusline/scripts/lib/metrics/layout-utils.mjs';
+import { ANSI_HEX_PALETTE, getPercentageTier } from '../../skills/agy-cli-statusline/scripts/lib/renderers/ansi.mjs';
 import {
   groupRowWithAdjacentMerges,
   isDashboardSnapshot,
@@ -122,37 +125,29 @@ async function copyTextWithFallback(text, t) {
   fallbackInput.select();
 }
 
-function formatLiveCountdown(isoStr) {
-  if (!isoStr) return '';
-  const diffSec = Math.floor((new Date(isoStr).getTime() - Date.now()) / 1000);
-  if (isNaN(diffSec) || diffSec <= 0) return 'now';
-  const d = Math.floor(diffSec / 86400);
-  const h = Math.floor((diffSec % 86400) / 3600);
-  const m = Math.floor((diffSec % 3600) / 60);
-  const s = diffSec % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
+const TIER_CSS_VARS = {
+  blue: 'var(--tier-blue)',
+  green: 'var(--tier-green)',
+  yellow: 'var(--tier-yellow)',
+  red: 'var(--tier-red)'
+};
+
+const HEX_TO_THEME_VAR = {
+  [ANSI_HEX_PALETTE.white]: 'var(--fg-1)',
+  [ANSI_HEX_PALETTE.blue]: 'var(--tier-blue-fg)',
+  [ANSI_HEX_PALETTE.green]: 'var(--tier-green-fg)',
+  [ANSI_HEX_PALETTE.yellow]: 'var(--tier-yellow-fg)',
+  [ANSI_HEX_PALETTE.red]: 'var(--tier-red-fg)',
+  [ANSI_HEX_PALETTE.gray]: 'var(--fg-3)'
+};
 
 function getTierColor(pct) {
-  if (pct >= 75) return 'var(--tier-blue)';
-  if (pct >= 50) return 'var(--tier-green)';
-  if (pct >= 25) return 'var(--tier-yellow)';
-  return 'var(--tier-red)';
+  return TIER_CSS_VARS[getPercentageTier(pct)];
 }
 
 function mapAnsiColorToThemeVar(hexColor) {
   if (!hexColor) return '';
-  const lower = String(hexColor).toLowerCase();
-  if (lower === '#ffffff') return 'var(--fg-1)';
-  if (lower === '#57caff') return 'var(--tier-blue-fg)';
-  if (lower === '#5cdb6d') return 'var(--tier-green-fg)';
-  if (lower === '#ffd427') return 'var(--tier-yellow-fg)';
-  if (lower === '#ff7daf') return 'var(--tier-red-fg)';
-  if (lower === '#6e7b8f') return 'var(--fg-3)';
-  return hexColor;
+  return HEX_TO_THEME_VAR[String(hexColor).toLowerCase()] || hexColor;
 }
 
 function getCountdownIsoForKey(key, snap) {
@@ -176,30 +171,10 @@ function renderColoredSegments(segments = [], countdownIso = '') {
   }
   if (countdownIso && lastNonEmptySpan) {
     lastNonEmptySpan.setAttribute('data-countdown-iso', countdownIso);
+    const syncedText = formatResetTime(countdownIso);
+    if (syncedText) lastNonEmptySpan.textContent = syncedText;
   }
   return frag;
-}
-
-function computeDraftOrderExpressions(items = [], itemStyles = {}, labelStyle = 'text', metrics = []) {
-  const indexMap = new Map(metrics.map((m, idx) => [m.id, idx + 1]));
-  const idParts = [];
-  const numParts = [];
-  for (const item of items) {
-    if (item === 'n') {
-      idParts.push('n');
-      numParts.push('n');
-      continue;
-    }
-    const effective = (itemStyles && itemStyles[item]) ? itemStyles[item] : labelStyle;
-    const isEmoji = effective === 'emoji';
-    idParts.push(isEmoji ? `e:${item}` : item);
-    const num = indexMap.get(item);
-    if (num) numParts.push(isEmoji ? `e${num}` : String(num));
-  }
-  return {
-    idExpression: idParts.join(', '),
-    numericExpression: numParts.join(', ')
-  };
 }
 
 function cloneEditSnapshot() {
@@ -1120,7 +1095,7 @@ function renderEditorDrawer(root, snap, t) {
       className: 'btn btn-sm',
       textContent: t.copyIdExpr,
       onClick: () => {
-        const expr = computeDraftOrderExpressions(rowsToItems(state.editRows), state.editItemStyles, state.editLabelStyle, snap.registry.metrics);
+        const expr = formatOrderExpressions(rowsToItems(state.editRows), state.editItemStyles, state.editLabelStyle, snap.registry.metrics.map(m => m.id));
         copyTextWithFallback(expr.idExpression, t);
       }
     }),
@@ -1128,7 +1103,7 @@ function renderEditorDrawer(root, snap, t) {
       className: 'btn btn-sm',
       textContent: t.copyNumExpr,
       onClick: () => {
-        const expr = computeDraftOrderExpressions(rowsToItems(state.editRows), state.editItemStyles, state.editLabelStyle, snap.registry.metrics);
+        const expr = formatOrderExpressions(rowsToItems(state.editRows), state.editItemStyles, state.editLabelStyle, snap.registry.metrics.map(m => m.id));
         copyTextWithFallback(expr.numericExpression, t);
       }
     })
@@ -1372,16 +1347,28 @@ function render() {
 
 function startLocalCountdownTicker() {
   if (state.countdownTimer) clearInterval(state.countdownTimer);
-  state.countdownTimer = setInterval(() => {
+  const updateCountdowns = () => {
     if (document.hidden || state.editMode) return;
     document.querySelectorAll('[data-countdown-iso]').forEach((node) => {
       const iso = node.getAttribute('data-countdown-iso');
       if (iso) {
-        const text = formatLiveCountdown(iso);
+        const text = formatResetTime(iso);
         if (text) node.textContent = text;
       }
     });
-  }, 1000);
+  };
+  state.countdownTimer = setInterval(updateCountdowns, 1000);
+  if (typeof document !== 'undefined' && !state._visibilityBound) {
+    state._visibilityBound = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !state.editMode) {
+        updateCountdowns();
+        if (!state.inFlight && (state.snapshot?.panelPrefs?.autoRefreshSec || 0) > 0) {
+          void callToolSafe('statusline_dashboard', getDashboardArgs());
+        }
+      }
+    });
+  }
 }
 
 // 嚴格依循官方生命週期：先註冊全部 handler 再 connect()

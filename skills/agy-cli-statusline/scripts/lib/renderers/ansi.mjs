@@ -11,16 +11,41 @@ export const GREEN = '\x1b[38;2;92;219;109m';
 export const YELLOW = '\x1b[38;2;255;212;39m';
 export const RED = '\x1b[38;2;255;125;175m';
 
+export const ANSI_HEX_PALETTE = Object.freeze({
+  white: '#ffffff',
+  blue: '#57caff',
+  green: '#5cdb6d',
+  yellow: '#ffd427',
+  red: '#ff7daf',
+  gray: '#6e7b8f'
+});
+
+/**
+ * 依剩餘百分比取得四階等級名稱（'blue' | 'green' | 'yellow' | 'red'），供 CLI 與 2.0 UI 共用。
+ * @param {number} pct
+ * @returns {'blue'|'green'|'yellow'|'red'}
+ */
+export function getPercentageTier(pct) {
+  if (pct >= 75) return 'blue';
+  if (pct >= 50) return 'green';
+  if (pct >= 25) return 'yellow';
+  return 'red';
+}
+
+const TIER_TO_ANSI = {
+  blue: BLUE,
+  green: GREEN,
+  yellow: YELLOW,
+  red: RED
+};
+
 /**
  * 依剩餘百分比取得四階 ANSI 顏色（>=75 藍、>=50 綠、>=25 黃、<25 紅）。
  * @param {number} pct
  * @returns {string}
  */
 export function getColorByPercentage(pct) {
-  if (pct >= 75) return BLUE;
-  if (pct >= 50) return GREEN;
-  if (pct >= 25) return YELLOW;
-  return RED;
+  return TIER_TO_ANSI[getPercentageTier(pct)];
 }
 
 /**
