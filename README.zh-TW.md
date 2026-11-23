@@ -2,13 +2,13 @@
 
 [English](README.md) | 繁體中文 | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-[![版本](https://img.shields.io/badge/版本-1.13.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![版本](https://img.shields.io/badge/版本-2.0.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![授權條款: MIT](https://img.shields.io/badge/授權條款-MIT-yellow.svg)](LICENSE)
 [![平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-一個同時支援 **Antigravity 命令列介面（`agy`）** 與 **Antigravity App（2.0，`v2.34.0+`）** 的外掛程式（Plugin）——支援從 40 項即時指標（模型、Orchestrator 實際執行模型、5 小時／7 日／Argon 額度、脈絡權杖分解、Git 狀態、代理狀態、CLI 與 2.0 版本號）中自由挑選、切換文字（`text`）或繪圖符號（`emoji`）標籤風格、在 Antigravity 2.0 側邊欄以滑鼠分列拖曳調序與換行（或於 CLI 使用 7 步驟問卷精靈），並提供 4 種顯示語系（`zh-tw`、`zh-cn`、`us`、`jp`）。
+專為 **Antigravity 命令列介面（`agy`）** 與 **Antigravity App（2.0，`v2.34.0+`）** 打造的雙端即時遙測與狀態列外掛程式（Plugin）——提供 40 項即時指標（人工智慧模型與 Orchestrator 協調器實際底層模型追蹤、5 小時／7 日／Argon 三軌額度、脈絡權杖分解、Git 狀態、代理活動、以及 CLI 與 2.0 雙端版本號），支援個別混搭文字（`text`）或繪圖符號（`emoji`）標籤風格、在 Antigravity 2.0 以滑鼠分列拖曳調序與換行（或於 CLI 透過 7 步驟問卷精靈客製化），並內建 4 種語系（`zh-tw`、`zh-cn`、`us`、`jp`）。
 
-全面支援 Google Antigravity 的三大核心平台：Antigravity 命令列介面（`agy`）、Antigravity 整合開發環境（Integrated Development Environment）以及 Antigravity 2.0 桌面應用程式。
+全面跨平台支援 Windows、macOS 與 Linux，涵蓋 Google Antigravity 的三大使用介面：Antigravity 命令列介面（`agy`）、Antigravity 整合開發環境（Integrated Development Environment）側邊欄，以及 Antigravity 2.0 桌面應用程式。
 
 ## 狀態列實際運作展示
 
@@ -16,7 +16,22 @@
   <img src="docs/images/statusline-demo-zh-tw.svg" alt="Antigravity 命令列介面狀態列互動設定與動態遙測展示：從執行 /antigravity-cli-statusline:agy-cli-statusline 指令、語系選擇、五大分類分頁勾選、自訂排序 Write-in 到 11 列完整狀態列即時運作。" width="100%">
 </p>
 
-動態展示從執行設定指令 `/antigravity-cli-statusline:agy-cli-statusline`、問卷互動選取指標、自訂排序輸入，到最終呈現 11 列高資訊密度狀態列的完整即時遙測流程。
+動態展示從執行設定指令 `/antigravity-cli-statusline:agy-cli-statusline`、問卷互動選取指標、自訂排序輸入，到最終呈現多列高資訊密度狀態列的完整 CLI 即時遙測流程。
+
+## 特色亮點
+
+1. **雙端原生體驗（Antigravity 2.0 視覺化面板 ＋ CLI 終端機）**：
+   - **Antigravity 2.0（MCP Apps）**：透過 `ui://statusline/app.html` 零相依開箱即用（無需 `npm install`），提供右側輔助面板與全頁儀表板雙視圖，支援就地分列拖曳排版、5 大分類 40 項指標抽屜與即時數值預覽、可收合權杖分類明細（`tokenBreakdown`）堆疊條、自動跟隨／釘選對話切換、1 秒即時倒數、舊版排序語法匯入／匯出，以及精簡列不拆斷指標自動換行。
+   - **Antigravity CLI（`agy`）**：提供 7 步驟分頁問卷精靈、終端機寬度感知智慧折行與即時熱更新。
+2. **40 項即時指標、4 種語系與雙標籤風格**：涵蓋人工智慧（Artificial Intelligence）模型狀態（在 Orchestrator 模式下，`model-name` 保留外層包裝模型名稱，`active-model` 即時追蹤 `規劃` 與 `工作` 角色對應之實際底層模型，非協調器模式則一律以紅色顯示關閉）、應用程式介面（Application Programming Interface）配額（五小時、每週與 Gemini 4 Argon 三軌額度，具備四層動態配額池歸屬解析與 60 秒過期寬限期即時倒數重算）、脈絡（Context）與權杖（Token）消耗、互動佇列、Git 版本控制狀態、系統資源，以及同時跨平台偵測的 Agy CLI 與 Agy 2.0 雙端版本號；支援繁體中文（`zh-tw`）、簡體中文（`zh-cn`）、英文（`us`）與日文（`jp`），並可為各指標獨立切換**文字標籤（`text`）**或**繪圖符號標籤（`emoji`）**。
+3. **彈性百分比長條圖（支援合併與分開顯示）**：針對五小時額度、每週額度、Gemini 4 Argon 額度、脈絡用量與權杖數提供預設 10 格視覺長條圖（`[████████░░]`）；數值與長條圖相鄰且樣式一致時自動合併為單一標籤，未相鄰或樣式不同時則各自獨立顯示。
+4. **自訂排序與雙軌換行機制**：支援以 1 起算數字序號或英文識別碼（Identifier）排序、個別樣式前綴（`t` / `e`）、`n` 強制換行、`n,n` 空白分隔行，並依終端機或 2.0 面板寬度自動整組折行。
+5. **24-bit 四階動態色彩與品牌識別色**：依據配額剩餘比例或脈絡消耗程度動態切換 4 個色階（`#57caff` 藍色 `100~75%`、`#5cdb6d` 綠色 `74~50%`、`#ffd427` 黃色 `49~25%`、`#ff7daf` 粉紅色 `24~0%`），並為各人工智慧模型家族套用專屬品牌識別色。
+6. **跨端設定同步、智慧掛鉤維護與安全邊界**：
+   - CLI 與 2.0 共用 4 層脈絡上限計算、Language Server 遠端程序呼叫（RPC）遙測解析與設定／掛鉤部署核心，並強化嚴格內容安全政策（CSP）與工作區路徑白名單。
+   - 在 Antigravity 2.0 首次開啟會自動繼承既有 CLI `settings.json` 排版，並提供「僅套用至 2.0 面板」與「同步套用至 2.0 ＋ CLI」雙儲存模式；同步至 CLI 時會自動更新過舊或雜湊不同步的既有 CLI 掛鉤腳本（不覆寫既有 `statusLine` 指令，對已同步、更新版本或未安裝狀態保持略過）。
+   - CLI 端同步命令列介面專屬、全域與專案三層 `settings.json` 及 `trusted_hooks.json`，內建 macOS/Linux NVM 絕對路徑解析與 Windows UTF-8 位元組順序記號（Byte Order Mark）自動剝除機制。
+7. **非侵入式版本更新檢查**：當 `ui.footer.items` 啟用 `plugin-update`（`#39`）時，每次啟動互動式 `agy` 檢查一次 GitHub Releases（略過 `agy -p`），無更新自動隱藏並修剪頭尾純空白行，離線時沿用快取版本比對，落後時於設定位置獨立顯示兩行在地化更新指令提醒（繪圖符號模式精簡顯示 `🆕 vX → vY`），與僅顯示狀態列版本號的 `plugin-version`（`#38`）完全解耦；隨時可執行 `diagnose-statusline.mjs` 檢查外掛與掛鉤版本一致性。
 
 ## 如何安裝
 
@@ -28,47 +43,63 @@ agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 
 ### 環境需求
 
-- **Node.js**（必要）：渲染腳本以純 `.mjs` 撰寫；若系統未安裝 Node.js，狀態列將呈現空白，且 `agy` 會在連續失敗 30 次後自動停用狀態列。本技能在寫入設定前會先執行環境預檢。
+- **Node.js**（必要）：渲染與 MCP 腳本皆以純 `.mjs` 撰寫；若系統未安裝 Node.js，CLI 狀態列將呈現空白，且 `agy` 會在連續失敗 30 次後自動停用狀態列。CLI 設定技能在寫入設定前會先執行環境預檢。
 - **Git**（選用）：用於讀取 `git-branch`、`vcs-dirty`、`vcs-type` 等版本控制系統（Version Control System）指標。
 
 ### 啟用與生效機制
 
-- **初次啟用（CLI）**：初次安裝或初次啟用狀態列時，可直接於 `agy` 輸入配置腳本輸出的 `/statusline <command>` 立即啟用；若採用重新載入方式，請重新啟動 `agy` 命令列介面（退出後重新開啟）以載入狀態列掛鉤（Hook）。
+- **Antigravity App（2.0，`v2.34.0+`）**：安裝後即可開箱即用，**無需執行 `npm install`**。可於 **Overview > Plugins > Statusline**、側邊欄 **`+`** 選單（右側輔助面板）或左側導覽列 **Plugins > Statusline**（全頁儀表板）開啟；首次執行會自動繼承 CLI `settings.json` 排版，透過「同步套用至 2.0 ＋ CLI」儲存時也會自動更新過舊的既有 CLI 掛鉤腳本。
+- **初次啟用（CLI）**：初次安裝或初次啟用 CLI 狀態列時，可直接於 `agy` 輸入配置腳本輸出的 `/statusline <command>` 立即啟用，或重新啟動 `agy` 命令列介面（退出後重新開啟）以載入狀態列掛鉤（Hook）。
 - **熱更新（Hot Reload，CLI）**：先前已啟用狀態列者，後續調整指標順序、切換標籤顯示風格（`text` / `emoji`）或切換語系時，狀態列會直接熱更新生效，無需重新啟動命令列介面。
-- **Antigravity App（2.0，`v2.34.0+`）**：透過模型上下文協定（Model Context Protocol）應用程式（MCP Apps，`ui://statusline/app.html`）開箱即用，**無需執行 `npm install`**。可於 **Overview > Plugins > Statusline**、側邊欄 **`+`** 選單（輔助面板）或左側導覽列 **Plugins > Statusline**（全頁）開啟；首次執行會自動繼承 CLI `settings.json` 排版，並支援「僅套用至 2.0 面板」或「同步套用至 2.0 ＋ CLI」及選配掛鉤部署。
 
-## 特色亮點
+## 指令功能說明
 
-1. **跨平台相容**：支援 Antigravity 命令列介面終端機、整合開發環境側邊欄對話方塊（Dialog Box）以及 Antigravity 2.0 桌面應用程式，涵蓋 Windows、macOS 與 Linux 作業系統。
-2. **40 項即時指標、4 種語系與雙標籤顯示風格**：涵蓋人工智慧（Artificial Intelligence）模型狀態（含 Orchestrator 模式下即時追蹤 `規劃` 與 `工作` 角色之實際底層模型）、應用程式介面（Application Programming Interface）配額（含五小時、每週與 Gemini 4 Argon 專屬配額，並具備四層動態配額池歸屬解析與 60 秒過期寬限期即時倒數重算）、脈絡（Context）與權杖（Token）消耗、互動佇列、Git 版本控制狀態及系統資源，支援繁體中文（`zh-tw`）、簡體中文（`zh-cn`）、英文（`us`）與日文（`jp`），並可自由切換**文字標籤（`text`）**或**繪圖符號標籤（`emoji`，無冒號精簡排版）**顯示風格（`ui.footer.labelStyle`）。
-3. **彈性百分比長條圖（支援合併與分開顯示）**：針對五小時額度、每週額度、Gemini 4 Argon 額度、脈絡用量與權杖數提供預設 10 格視覺長條圖（`[████████░░]`）；當數值與長條圖相鄰時自動合併為單一標籤，未相鄰時則各自以獨立標籤顯示。
-4. **自訂排序與雙軌換行機制**：支援以數字序號或英文識別碼（Identifier）排序、使用 `n` 強制換行、使用 `n,n` 建立空白分隔行，並依終端機寬度自動智慧折行。
-5. **24-bit 四階動態色彩**：依據配額剩餘比例或脈絡消耗程度自動切換 4 個色階（`#57caff` 藍色 `100~75%`、`#5cdb6d` 綠色 `74~50%`、`#ffd427` 黃色 `49~25%`、`#ff7daf` 粉紅色 `24~0%`），並為不同人工智慧模型家族套用專屬品牌識別色。
-6. **三層設定檔同步與系統防護**：自動同步命令列介面專屬、全域與專案三層 `settings.json` 及 `trusted_hooks.json`，內建 macOS/Linux NVM 絕對路徑解析與 Windows UTF-8 位元組順序記號（Byte Order Mark）自動剝除機制。
-7. **初次開啟更新檢查與手動掛鉤同步**：當 `ui.footer.items` 啟用 `plugin-update`（`#39`）時，每次啟動互動式 `agy` 命令列介面會自動檢查一次 GitHub Releases（略過 `agy -p`），無更新自動隱藏並修剪頭尾純空白行，離線時沿用快取版本比對，落後時於設定位置獨立顯示兩行在地化更新指令提醒（繪圖符號模式精簡顯示 `🆕 vX → vY`），且與僅顯示狀態列版本號的 `plugin-version`（`#38`）完全解耦、不影響單行排版。掛鉤程式碼維持由 `/antigravity-cli-statusline:agy-cli-statusline` 手動同步，並可透過 `diagnose-statusline.mjs` 檢查外掛與掛鉤版本差異。
-8. **Antigravity 2.0 原生視覺化面板（MCP Apps）**：提供側邊輔助面板與全頁儀表板，支援就地分列拖曳排版、`5 大分類 40 項指標` 抽屜與即時數值預覽、可收合權杖分類明細（`tokenBreakdown`）堆疊條、1 秒即時倒數、舊版排序語法匯入／匯出，以及雙按鈕獨立或同步儲存。
+安裝完成後，可依目前使用的介面執行對應斜線指令（Slash Command）：
+
+### 1. 開啟視覺化狀態列面板（Antigravity 2.0 App）
+
+```text
+/antigravity-cli-statusline:agy-app-statusline
+```
+
+- **使用情境**：在 Antigravity App（`v2.34.0+`）直接於右側輔助面板開啟 **Statusline** 即時監控與分列拖曳排版介面（不需回答任何 `ask_question` 問卷）；亦可隨時從右上角 **Overview > Plugins > Statusline**、側邊欄 **`+`** 選單或左側導覽列 **Plugins > Statusline**（全頁）開啟。
+- **CLI 回退行為**：若於 Antigravity CLI（`agy`）中呼叫，`statusline_dashboard` 工具會回傳純文字狀態摘要，並引導改用 `/antigravity-cli-statusline:agy-cli-statusline` 進行終端機底部狀態列設定。
+
+### 2. 狀態列設定技能（Antigravity CLI）
+
+```text
+/antigravity-cli-statusline:agy-cli-statusline
+```
+
+- **使用情境**：初次啟用命令列介面狀態列、切換顯示語系（`zh-tw` / `zh-cn` / `us` / `jp`）、切換文字（`text`）或繪圖符號（`emoji`）標籤顯示風格、增減顯示指標，或重新調整多行排版順序時。
+- **運作流程**：
+  1. 詢問顯示語系，並將後續所有設定互動鎖定為所選語系。
+  2. 執行 Node.js 環境預檢（三層 `settings.json` 讀寫一律由步驟 5 的 `configure-statusline.mjs` 安全處理，不直接存取 `~/.gemini/`）。
+  3. 載入 `questions.json` 以五大分類分頁依序提供指標勾選，避開終端機螢幕高度截斷問題。
+  4. 以精簡三欄表格列出所選指標，接收自訂排序與個別樣式前綴（純數字、`t` 文字前綴、`e` 繪圖符號前綴與 `n` 換行符號），將 `ui.footer.items` 與 `ui.footer.itemStyles` 寫入三層 `settings.json`，並將主掛鉤腳本、四層 `lib/` 子模組及 `.hook-version.json` SHA-256 雜湊清單同步部署至 `~/.gemini/antigravity-cli/hooks/` 完成驗證。
+  5. 設定完成後，自動以程式碼區塊回報先前與本次的排版順序字串，方便隨時複製貼上重現設定。
 
 ## 如何管理與切換外掛程式
 
-• 列出已安裝外掛：
+- 列出已安裝外掛：
 
   ```bash
   agy plugin list
   ```
 
-• 啟用外掛：
+- 啟用外掛：
 
   ```bash
   agy plugin enable antigravity-cli-statusline
   ```
 
-• 停用外掛：
+- 停用外掛：
 
   ```bash
   agy plugin disable antigravity-cli-statusline
   ```
 
-• 移除外掛：
+- 移除外掛：
 
   ```bash
   agy plugin uninstall antigravity-cli-statusline
@@ -107,32 +138,6 @@ antigravity-cli-statusline/
         └── scripts/                                # CLI statusLine 掛鉤與四層零相依 ESM 模組
 ```
 
-## 指令功能說明
-
-安裝完成後，可依目前使用的介面執行對應斜線指令（Slash Command）：
-
-### 1. 開啟視覺化狀態列面板（Antigravity 2.0 App）
-
-```text
-/antigravity-cli-statusline:agy-app-statusline
-```
-
-- **使用情境**：在 Antigravity App（`v2.34.0+`）直接於右側輔助面板開啟 **Statusline** 即時監控與分列拖曳排版介面（不需回答任何 `ask_question` 問卷）；亦可隨時從右上角 **Overview > Plugins > Statusline** 或左側導覽列 **Plugins > Statusline** 開啟。
-
-### 2. 狀態列設定技能（Antigravity CLI）
-
-```text
-/antigravity-cli-statusline:agy-cli-statusline
-```
-
-- **使用情境**：初次啟用命令列介面狀態列、切換顯示語系（`zh-tw` / `zh-cn` / `us` / `jp`）、切換文字（`text`）或繪圖符號（`emoji`）標籤顯示風格、增減顯示指標，或重新調整多行排版順序時。
-- **運作流程**：
-  1. 詢問顯示語系，並將後續所有設定互動鎖定為所選語系。
-  2. 執行 Node.js 環境預檢（三層 `settings.json` 讀寫一律由步驟 5 的 `configure-statusline.mjs` 安全處理，不直接存取 `~/.gemini/`）。
-  3. 載入 `questions.json` 以五大分類分頁依序提供指標勾選，避開終端機螢幕高度截斷問題。
-  4. 列出使用者所選指標，接收自訂排序與個別樣式前綴（支援純數字、`t` 文字前綴、`e` 繪圖符號前綴與 `n` 換行符號），將 `ui.footer.items` 與 `ui.footer.itemStyles` 寫入三層 `settings.json`，並將主掛鉤腳本、四層 `lib/` 子模組及 `.hook-version.json` SHA-256 雜湊清單同步部署至 `~/.gemini/antigravity-cli/hooks/` 完成測試驗證。
-  5. 設定完成後，自動以程式碼區塊回報先前與本次的排版順序字串，方便隨時複製貼上重現設定。
-
 ---
 
 ## 指標、排序與換行
@@ -142,7 +147,7 @@ antigravity-cli-statusline/
 以下編號對應技能步驟 3 問卷（`resources/questions.json`）中五大分類分頁選項序號（從 1 起算），以及各指標在 `emoji` 模式下對應的繪圖符號：
 
 **1. 模型與代理（5 項）**
-- `1.` 🤖 **目前使用的人工智慧模型名稱（`model-name`）**：即時顯示對話正在使用的模型
+- `1.` 🤖 **目前使用的人工智慧模型名稱（`model-name`）**：即時顯示對話正在使用的模型（於 Orchestrator 模式下顯示外層包裝模型名稱，如 `Orchestrator (Neon)`）
 - `2.` 🪪 **使用中代理（`agent-profile`）**：目前載入的 Agent Profile 名稱
 - `3.` ⚡ **代理當前狀態（`agent-state`）**：`閒置 / 思考中 / 執行中 / 呼叫工具 / 初始化`
 - `4.` ⚙️ **目前運行模式（`mode`）**：`default / code-only / plan / interactive / accept-edits`
@@ -193,7 +198,7 @@ antigravity-cli-statusline/
 
 ### 排序規則與樣式設定
 
-在技能步驟 4 的自訂排序輸入框（Write-in）填入以逗號分隔的指標序號，即可完成排序與個別樣式設定（未列入的指標不予顯示；留白或選擇略過則沿用原勾選順序與預設文字樣式）：
+在 CLI 精靈步驟 4 的自訂排序輸入框（或 Antigravity 2.0 面板的排序語法匯入／匯出欄位）填入以逗號分隔的指標序號，即可完成排序與個別樣式設定（未列入的指標不予顯示；留白或選擇略過則沿用原勾選順序與預設文字樣式）：
 
 - **樣式前綴設定**：
   - **文字標籤樣式（`text`，預設）**：純數字序號（如 `1`）、`t` 前綴（如 `t1`）或純英文識別碼（如 `quota`、`t:quota`），顯示為所選語系的文字標籤搭配冒號（例如 `五小時可用: 88%`）。
@@ -205,7 +210,7 @@ antigravity-cli-statusline/
   - 長條圖預設長度為 10 格（`[████████░░]`，可透過 `ui.footer.barLength` 自訂），絕對重置時間格式可透過 `ui.footer.timeFormat` 設定。
 - **換行與分區間隔**：
   - **強制換行（`n`）**：插入 `n` 在指定位置換行；連續插入 `n,n` 可產生一行空白分隔行。
-  - **自動智慧折行**：當指標總長度超出終端機視窗寬度時，渲染器會自動折疊至下一行。
+  - **自動智慧折行**：當指標總長度超出終端機或 2.0 面板寬度時，會以完整指標為單位自動折疊至下一行。
 - **動態色彩變換**：
   - 狀態列採用 24-bit truecolor 四階柔和配色（`#57caff` 藍色 → `#5cdb6d` 綠色 → `#ffd427` 黃色 → `#ff7daf` 粉紅色），依據額度剩餘比例或脈絡消耗比例動態變色；不同模型家族亦套用專屬品牌識別色。
 
@@ -213,12 +218,12 @@ antigravity-cli-statusline/
 
 - **數字序號版本**：
   ```text
-  e1,e19,e18,e32,n,e2,3,36,37,34,35,33,n,n,20,21,22,23,n,6,7,8,9,n,10,11,12,13,n,14,15,16,17,n,n,27,28,e26,n,e24,25,n,e4,e31,e29,30,38,39
+  e1,e5,e19,e18,e32,n,e2,3,36,37,34,35,33,n,n,20,21,22,23,n,6,7,8,9,n,10,11,12,13,n,14,15,16,17,n,n,27,28,e26,n,e24,25,n,e4,e31,e29,30,40,38,39
   ```
 
 - **英文識別碼版本**：
   ```text
-  e:model-name,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,plugin-version,plugin-update
+  e:model-name,e:active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,plugin-update
   ```
 
 *(註：亦支援 `model-name`、`e:quota` 等英文識別碼，使用數字序號可縮短輸入字數。)*
@@ -228,7 +233,7 @@ antigravity-cli-statusline/
 包含四大邏輯分區、共 9 行資訊並搭配空白分隔行：
 
 ```text
-🤖 Gemini 3.8 Flash (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ 關閉
+🤖 Orchestrator (Neon) │ 🪄 規劃 → Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ 關閉
 🪪 Default │ 代理狀態: 執行中 │ 子代理: 2 │ 產出檔案: 0 │ 待處理輸入: 0 │ 背景任務: 0 │ 工具待確認: 無
 
 脈絡用量: 18.5% [█░░░░░░░░░] │ 權杖數: 47.4k / 256.0k [█░░░░░░░░░]
@@ -238,17 +243,17 @@ Argon 可用: 59% [█████░░░░░] │ Argon 倒數: 6d 1h │ A
 
 版控狀態: 無變更 │ 版控類型: git │ 🔀 main
 📁 antigravity-cli-statusline │ 完整路徑: /Users/andyawd/Project/antigravity-cli-statusline
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI 版本: v1.5.10 │ 狀態列版本: v1.13.0
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI 版本: v1.5.10 │ Agy 2.0 版本: v2.34.0 │ 狀態列版本: v2.0.0
 ```
 
-當啟用 `plugin-update`（`#39`）且偵測到較新的 GitHub Release 時，會於設定的位置獨立顯示兩行更新提醒（在終端機執行 `agy plugin install` 後版本即追平並自動消除提醒；如需同步 `~/.gemini/antigravity-cli/hooks/` 掛鉤腳本請重跑 `/antigravity-cli-statusline:agy-cli-statusline`，或執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 檢查版號差異）：
+當啟用 `plugin-update`（`#39`）且偵測到較新的 GitHub Release 時，會於設定的位置獨立顯示兩行更新提醒（在終端機執行 `agy plugin install` 後版本即追平並自動消除提醒；如需同步過舊的 CLI 掛鉤腳本，可在 Antigravity 2.0 點選「同步套用至 2.0 ＋ CLI」或於 CLI 重跑 `/antigravity-cli-statusline:agy-cli-statusline`，亦可執行 `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` 檢查版號差異）：
 
 ```text
-⚠️ 狀態列有新版本可用（目前 v1.12.0 → 最新 v1.13.0），請執行以下指令更新：
+⚠️ 狀態列有新版本可用（目前 v1.12.0 → 最新 v2.0.0），請執行以下指令更新：
 agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
-採用繪圖符號樣式（`e39` / `e:plugin-update`）時，第一行會精簡顯示為 `🆕 v1.12.0 → v1.13.0` 並搭配第二行獨立更新指令；若版本已是最新則自動隱藏並修剪頭尾純空白行。
+採用繪圖符號樣式（`e39` / `e:plugin-update`）時，第一行會精簡顯示為 `🆕 v1.12.0 → v2.0.0` 並搭配第二行獨立更新指令；若版本已是最新則自動隱藏並修剪頭尾純空白行。
 
 ## 貢獻指南
 
