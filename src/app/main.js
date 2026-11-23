@@ -20,6 +20,7 @@ const MAX_UNDO_HISTORY = 30;
 
 const state = {
   snapshot: null,
+  pinnedConversationId: '',
   tab: 'monitor', // 'monitor' | 'prefs'
   editMode: false,
   editRows: [],
@@ -283,15 +284,19 @@ async function saveConfigAction(action, extra = {}) {
   });
 }
 
+function getDashboardArgs(extra = {}) {
+  return state.pinnedConversationId
+    ? { conversationId: state.pinnedConversationId, ...extra }
+    : { ...extra };
+}
+
 function scheduleAutoRefresh() {
   if (state.refreshTimer) clearInterval(state.refreshTimer);
   const sec = state.snapshot?.panelPrefs?.autoRefreshSec || 0;
   if (sec > 0) {
     state.refreshTimer = setInterval(() => {
       if (document.hidden || state.editMode || state.inFlight) return;
-      void callToolSafe('statusline_dashboard', {
-        conversationId: state.snapshot?.session?.conversationId || ''
-      });
+      void callToolSafe('statusline_dashboard', getDashboardArgs());
     }, sec * 1000);
   }
 }
@@ -852,7 +857,8 @@ function renderMonitorView(root, snap, t) {
         if (g.key.startsWith('quota-weekly')) barPct = snap.quotas.weekly.remainingPct;
         else if (g.key.startsWith('quota-argon')) barPct = snap.quotas.argon.remainingPct;
         else if (g.key === 'quota' || g.key === 'quota-bar' || g.key === 'quota+bar') barPct = snap.quotas.shortTerm.remainingPct;
-        else if (g.key.startsWith('context-used') || g.key.startsWith('token-count')) barPct = snap.context.usedPct;
+        else if (g.key.startsWith('context-used')) barPct = snap.context.usedPct;
+        else if (g.key.startsWith('token-count')) barPct = snap.context.tokenPct ?? snap.context.usedPct;
 
         if (barPct !== null) {
           const fillPct = Math.max(0, Math.min(100, barPct));
@@ -1088,7 +1094,7 @@ function renderEditorDrawer(root, snap, t) {
         if (!res?.structuredContent?.ok) return;
         state.editMode = false;
         state.editHistory = [];
-        const dashRes = await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+        const dashRes = await callToolSafe('statusline_dashboard', getDashboardArgs({ forceRefresh: true }));
         if (!dashRes) render();
       }
     })
@@ -1165,7 +1171,7 @@ function renderEditorDrawer(root, snap, t) {
           state.editMode = false;
           state.editHistory = [];
           showToast(t.savedPanelToast);
-          const dashRes = await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+          const dashRes = await callToolSafe('statusline_dashboard', getDashboardArgs({ forceRefresh: true }));
           if (!dashRes) render();
         }
       }),
@@ -1179,7 +1185,7 @@ function renderEditorDrawer(root, snap, t) {
           state.editHistory = [];
           const partial = res.structuredContent.cliSyncResult?.results?.some(r => !r.updated);
           showToast(partial ? t.cliSyncPartialWarn : t.savedBothToast);
-          const dashRes = await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+          const dashRes = await callToolSafe('statusline_dashboard', getDashboardArgs({ forceRefresh: true }));
           if (!dashRes) render();
         }
       })
@@ -1198,7 +1204,7 @@ function renderPrefsView(root, snap, t) {
         onChange: async (e) => {
           snap.panelPrefs.maskEmail = e.target.checked;
           await saveConfigAction('save-prefs');
-          await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '' });
+          await callToolSafe('statusline_dashboard', getDashboardArgs());
         }
       }),
       el('span', { textContent: t.maskEmailLabel })
@@ -1223,11 +1229,10 @@ function renderPrefsView(root, snap, t) {
       el('button', {
         className: 'btn btn-sm',
         textContent: t.checkUpdateNow,
-        onClick: () => callToolSafe('statusline_dashboard', {
-          conversationId: snap.session?.conversationId || '',
+        onClick: () => callToolSafe('statusline_dashboard', getDashboardArgs({
           checkUpdate: true,
           forceRefresh: true
-        })
+        }))
       })
     ])
   ]);
@@ -1272,7 +1277,7 @@ function render() {
       if (!state.editMode) {
         state.editLang = nextLang;
         await saveConfigAction('save-panel');
-        await callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true });
+        await callToolSafe('statusline_dashboard', getDashboardArgs({ forceRefresh: true }));
       } else {
         if (nextLang !== state.editLang) {
           pushEditUndoSnapshot();
@@ -1285,16 +1290,29 @@ function render() {
     el('option', { value: code, textContent: localeLabels[code] || code })
   ));
 
+  const activeConvId = snap.session?.conversationId || '';
+  const autoOptionLabel = activeConvId
+    ? `${t.autoFollowSession} (${activeConvId.slice(0, 8)})`
+    : t.autoFollowSession;
+  const sessionList = snap.sessions || [];
+  const hasPinnedInList = !state.pinnedConversationId || sessionList.some(s => s.conversationId === state.pinnedConversationId);
+  const effectiveSelectValue = hasPinnedInList ? (state.pinnedConversationId || '') : '';
   const sessionSelect = el('select', {
     className: 'select-ctrl',
-    value: snap.session?.conversationId || '',
-    onChange: (e) => callToolSafe('statusline_dashboard', { conversationId: e.target.value, forceRefresh: true })
-  }, (snap.sessions || []).map(s =>
-    el('option', {
-      value: s.conversationId,
-      textContent: `${s.conversationId.slice(0, 8)} (${s.modelName || s.agentState || 'session'})`
-    })
-  ));
+    value: effectiveSelectValue,
+    onChange: (e) => {
+      state.pinnedConversationId = e.target.value || '';
+      void callToolSafe('statusline_dashboard', getDashboardArgs({ forceRefresh: true }));
+    }
+  }, [
+    el('option', { value: '', textContent: autoOptionLabel }),
+    ...sessionList.map(s =>
+      el('option', {
+        value: s.conversationId,
+        textContent: `${s.conversationId.slice(0, 8)} (${s.modelName || s.agentState || 'session'})`
+      })
+    )
+  ]);
 
   const topbar = el('header', { className: 'topbar' }, [
     el('div', { className: 'topbar-group' }, [
@@ -1339,7 +1357,7 @@ function render() {
       el('button', {
         className: 'btn btn-sm',
         textContent: `🔄 ${t.refresh}`,
-        onClick: () => callToolSafe('statusline_dashboard', { conversationId: snap.session?.conversationId || '', forceRefresh: true })
+        onClick: () => callToolSafe('statusline_dashboard', getDashboardArgs({ forceRefresh: true }))
       })
     ])
   ]);

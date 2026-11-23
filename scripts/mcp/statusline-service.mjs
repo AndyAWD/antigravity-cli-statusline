@@ -1,3 +1,4 @@
+import { promises as fsPromises } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +23,7 @@ import { getSettingsAsync } from '../../skills/agy-cli-statusline/scripts/lib/co
 import {
   computeSteppedCeiling,
   extractModelCandidateKeys,
+  parseCeilingValue,
   resolveCatalogEntry
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/context.mjs';
 import { fetchLatestPluginReleaseAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/plugin-update.mjs';
@@ -82,40 +84,137 @@ function maskEmailAddress(email) {
   return `${local.slice(0, 2)}${'*'.repeat(Math.min(5, local.length - 2))}@${domain}`;
 }
 
-function computePureContextInfo({ runtimeTelemetry, cache, fallbackModel, meta }) {
+function inferProductFromPath(transcriptPath = '', artifactDir = '') {
+  const combined = `${transcriptPath}\n${artifactDir}`.replace(/\\/g, '/').toLowerCase();
+  if (combined.includes('/.gemini/antigravity-cli/')) return 'antigravity-cli';
+  if (combined.includes('/.gemini/antigravity-ide/')) return 'antigravity-ide';
+  return 'antigravity';
+}
+
+async function pathExistsAsync(targetPath) {
+  if (!targetPath || typeof targetPath !== 'string') return false;
+  try {
+    await fsPromises.access(targetPath);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function computePureContextInfoAsync({
+  runtimeTelemetry,
+  cache,
+  fallbackModel,
+  meta,
+  cliSettings = {},
+  conversationId = '',
+  pluginDataDir = ''
+}) {
   const modelKeys = extractModelCandidateKeys(meta, fallbackModel);
   const catalogEntry = resolveCatalogEntry(modelKeys, cache?.modelLimits);
-  const contextSize = (catalogEntry?.maxTokens > 0) ? catalogEntry.maxTokens : 1048576;
+  const telemetryCtxSize = Number(runtimeTelemetry?.contextWindowSize || 0) || 0;
+  const contextSize = (catalogEntry?.maxTokens > 0)
+    ? catalogEntry.maxTokens
+    : (telemetryCtxSize > 0 ? telemetryCtxSize : 1048576);
 
-  const totalInput = runtimeTelemetry?.estimatedTokensUsed > 0
-    ? runtimeTelemetry.estimatedTokensUsed
-    : (runtimeTelemetry?.usage?.inputTokens || 0);
+  const usageObj = runtimeTelemetry?.usage;
+  const usageTotalInput = usageObj
+    ? (Number(usageObj.inputTokens || 0) || 0) + (Number(usageObj.cacheReadTokens || 0) || 0)
+    : 0;
+  const totalInput = Number(runtimeTelemetry?.estimatedTokensUsed || 0) > 0
+    ? Number(runtimeTelemetry.estimatedTokensUsed)
+    : usageTotalInput;
 
-  let effectiveTokenCeiling = DEFAULT_COMPACTION_THRESHOLD;
-  if (runtimeTelemetry?.maxContextTokens > 0) {
+  let effectiveTokenCeiling = null;
+
+  // 第 1b 層：外部設定檔與環境變數覆寫（與 CLI context.mjs 同步）
+  const overrideSources = [
+    { raw: cliSettings?.ui?.footer?.tokenCeiling, allowPercent: false },
+    { raw: cliSettings?.ui?.tokenCeiling, allowPercent: false },
+    { raw: process.env.AGY_TOKEN_CEILING, allowPercent: false },
+    { raw: process.env.AGY_CLI_AUTO_COMPACT_OVERRIDE, allowPercent: true }
+  ];
+  for (const src of overrideSources) {
+    const parsedOverride = parseCeilingValue(src.raw, contextSize, src.allowPercent);
+    if (parsedOverride !== null) {
+      effectiveTokenCeiling = parsedOverride;
+      break;
+    }
+  }
+
+  // 第 2 層：單一對話執行期 maxContextTokens（來自 GetCascadeTrajectoryGeneratorMetadata）
+  if (effectiveTokenCeiling === null && runtimeTelemetry?.maxContextTokens > 0) {
     effectiveTokenCeiling = computeSteppedCeiling(
       totalInput,
       contextSize,
       Math.min(contextSize, runtimeTelemetry.maxContextTokens)
     );
-  } else if (catalogEntry?.limit > 0) {
+  }
+
+  // 第 3 層：動態模型目錄對照（來自 GetAvailableModels 快取 modelLimits）
+  if (effectiveTokenCeiling === null && catalogEntry?.limit > 0) {
     effectiveTokenCeiling = computeSteppedCeiling(
       totalInput,
       contextSize,
       Math.min(contextSize, catalogEntry.limit)
     );
-  } else {
-    const base = Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD);
-    effectiveTokenCeiling = totalInput > base && contextSize >= STEP_UP_INTERMEDIATE_THRESHOLD
-      ? computeSteppedCeiling(totalInput, contextSize, base)
-      : base;
   }
 
-  const usedPctNum = effectiveTokenCeiling > 0
-    ? Math.min(100, Math.max(0, (totalInput / effectiveTokenCeiling) * 100))
-    : 0;
+  // 第 4 層：退回 256k 基準，並針對單一對話／單一模型步進自癒（256k -> 512k -> contextSize）
+  if (effectiveTokenCeiling === null) {
+    const baseDefault = Math.min(contextSize, DEFAULT_COMPACTION_THRESHOLD);
+    const primaryModelKey = modelKeys[0] || '';
+    const convStepKey = primaryModelKey || '_default';
+    const stepStatePath = pluginDataDir ? path.join(pluginDataDir, 'context_step_state.json') : '';
+    const stepState = stepStatePath ? ((await readJsonSafeAsync(stepStatePath)) || {}) : {};
+    const convRemembered = Number(stepState?.conversations?.[conversationId]?.[convStepKey] || 0) || 0;
+    const rawModelRemembered = primaryModelKey ? (Number(stepState?.modelCeilings?.[primaryModelKey] || 0) || 0) : 0;
+    const modelRemembered = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
+      ? Math.min(rawModelRemembered, STEP_UP_INTERMEDIATE_THRESHOLD)
+      : rawModelRemembered;
 
-  return { totalInput, contextSize, effectiveTokenCeiling, usedPctNum };
+    const rememberedBase = Math.max(baseDefault, Math.min(contextSize, Math.max(convRemembered, modelRemembered)));
+    const stepped = computeSteppedCeiling(totalInput, contextSize, rememberedBase);
+
+    if (stepStatePath && totalInput > baseDefault) {
+      const needConvSave = stepped > convRemembered;
+      const persistModelCeiling = (contextSize > STEP_UP_INTERMEDIATE_THRESHOLD)
+        ? Math.min(stepped, STEP_UP_INTERMEDIATE_THRESHOLD)
+        : stepped;
+      const needModelSave = Boolean(primaryModelKey && persistModelCeiling > baseDefault && persistModelCeiling > modelRemembered);
+      if (needConvSave || needModelSave) {
+        try {
+          const nextState = {
+            version: 1,
+            modelCeilings: { ...(stepState.modelCeilings || {}) },
+            conversations: { ...(stepState.conversations || {}) }
+          };
+          if (needConvSave && conversationId) {
+            nextState.conversations[conversationId] = {
+              ...(nextState.conversations[conversationId] || {}),
+              [convStepKey]: stepped,
+              updatedAt: Date.now()
+            };
+          }
+          if (needModelSave) {
+            nextState.modelCeilings[primaryModelKey] = persistModelCeiling;
+          }
+          await writeFileAndVerifyNoBOM(stepStatePath, JSON.stringify(nextState, null, 2));
+        } catch (_) {}
+      }
+    }
+
+    effectiveTokenCeiling = stepped;
+  }
+
+  const usedPctNum = contextSize > 0
+    ? Math.min(100, Math.max(0, (totalInput / contextSize) * 100))
+    : 0;
+  const tokenPctNum = effectiveTokenCeiling > 0
+    ? Math.min(100, Math.max(0, (totalInput / effectiveTokenCeiling) * 100))
+    : usedPctNum;
+
+  return { totalInput, contextSize, effectiveTokenCeiling, usedPctNum, tokenPctNum };
 }
 
 export class StatuslineService {
@@ -124,7 +223,7 @@ export class StatuslineService {
     this.pluginRootDir = options.pluginRootDir || resolveDefaultPluginRoot();
     this.pluginDataDir = options.pluginDataDir ||
       (typeof process.env.PLUGIN_DATA === 'string' && process.env.PLUGIN_DATA.trim()) ||
-      path.join(this.homeDir, '.gemini', 'plugin-data', 'antigravity-cli-statusline');
+      path.join(this.homeDir, '.gemini', 'antigravity', 'plugin_data', 'antigravity-cli-statusline');
     this.collectLsTelemetryFn = options.collectLsTelemetryFn || collectLsTelemetryAsync;
     this.fetchReleaseFn = options.fetchReleaseFn || fetchLatestPluginReleaseAsync;
     this.execFn = options.execFn;
@@ -209,29 +308,41 @@ export class StatuslineService {
         lastHookEvent: '',
         lastHookAt: '',
         updatedAt: bs.updatedAt,
+        product: bs.product || 'antigravity',
+        hasLocalFiles: true,
         source: 'brain'
       });
     }
     const hookMap = (hookSessionsData?.sessions && typeof hookSessionsData.sessions === 'object')
       ? hookSessionsData.sessions
       : {};
-    for (const [id, hs] of Object.entries(hookMap)) {
-      if (!hs || typeof hs !== 'object') continue;
+    await Promise.all(Object.entries(hookMap).map(async ([id, hs]) => {
+      if (!hs || typeof hs !== 'object') return;
       const prev = sessionMap.get(id) || {};
-      sessionMap.set(id, { ...prev, ...hs, conversationId: id, source: 'hook' });
-    }
+      const product = prev.product || inferProductFromPath(hs.transcriptPath, hs.artifactDirectoryPath);
+      const hasLocalFiles = prev.hasLocalFiles ||
+        await pathExistsAsync(hs.transcriptPath) ||
+        await pathExistsAsync(hs.artifactDirectoryPath);
+      sessionMap.set(id, {
+        ...prev,
+        ...hs,
+        conversationId: id,
+        product,
+        hasLocalFiles,
+        source: 'hook'
+      });
+    }));
 
     const sessions = [...sessionMap.values()]
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
       .slice(0, 15);
 
-    const requestedId = sanitizeConversationId(conversationId) ||
-      sanitizeConversationId(metaConversationId) ||
-      sanitizeConversationId(hookSessionsData?.latestConversationId || '') ||
-      (sessions[0]?.conversationId || '');
+    const explicitId = sanitizeConversationId(conversationId) || sanitizeConversationId(metaConversationId);
+    const latestId = sanitizeConversationId(hookSessionsData?.latestConversationId || '');
+    const isAutoFollow = !explicitId;
 
-    const activeSession = sessionMap.get(requestedId) || sessions[0] || {
-      conversationId: requestedId,
+    const makeFallbackSession = (id) => ({
+      conversationId: id,
       workspacePaths: [],
       cwd: '',
       transcriptPath: '',
@@ -240,8 +351,83 @@ export class StatuslineService {
       agentState: 'idle',
       lastHookEvent: '',
       lastHookAt: '',
-      updatedAt: 0
-    };
+      updatedAt: 0,
+      product: 'antigravity',
+      hasLocalFiles: false
+    });
+
+    const autoCandidates = [];
+    if (isAutoFollow) {
+      const seenIds = new Set();
+      const pushCandidate = (s) => {
+        if (!s || !s.conversationId || seenIds.has(s.conversationId)) return;
+        seenIds.add(s.conversationId);
+        autoCandidates.push(s);
+      };
+      const latestEntry = latestId ? sessionMap.get(latestId) : null;
+      if (latestEntry && latestEntry.product === 'antigravity') {
+        pushCandidate(latestEntry);
+      }
+      for (const s of sessions) {
+        if (s.product === 'antigravity' && s.hasLocalFiles) pushCandidate(s);
+      }
+      for (const s of sessions) {
+        if (s.product === 'antigravity') pushCandidate(s);
+      }
+      if (latestEntry) pushCandidate(latestEntry);
+      for (const s of sessions) pushCandidate(s);
+    }
+
+    let activeSession = explicitId
+      ? (sessionMap.get(explicitId) || makeFallbackSession(explicitId))
+      : (autoCandidates[0] || (latestId ? makeFallbackSession(latestId) : makeFallbackSession('')));
+
+    const probeSessionAsync = (sess) => Promise.all([
+      this.collectLsTelemetryFn({
+        homeDir: this.homeDir,
+        pluginDataDir: this.pluginDataDir,
+        conversationId: sess.conversationId || ''
+      }),
+      readTranscriptSummaryAsync(sess.transcriptPath),
+      countArtifactsInDirAsync(sess.artifactDirectoryPath)
+    ]);
+
+    const updatePromise = this._resolveUpdateInfoAsync({
+      installedVersion: installedPlugin.version,
+      forceCheck: checkUpdate
+    });
+
+    let [[lsResult, transcriptSummary, artifactsCount], updateInfo] = await Promise.all([
+      probeSessionAsync(activeSession),
+      updatePromise
+    ]);
+
+    // 自動追蹤模式：若首選為已銷毀／子代理幽靈對話（LS 404 且無本地檔案與脈絡），自動跳轉下一個有效 2.0 對話
+    const ghostIds = new Set();
+    if (
+      isAutoFollow &&
+      lsResult.conversationNotFound &&
+      !lsResult.runtimeTelemetry &&
+      !transcriptSummary.exists &&
+      autoCandidates.length > 1
+    ) {
+      ghostIds.add(activeSession.conversationId);
+      const maxFallbackTries = Math.min(autoCandidates.length, 4);
+      for (let idx = 1; idx < maxFallbackTries; idx++) {
+        const cand = autoCandidates[idx];
+        const [candLs, candTr, candArt] = await probeSessionAsync(cand);
+        const isGhost = Boolean(candLs.conversationNotFound && !candLs.runtimeTelemetry && !candTr.exists);
+        if (isGhost) {
+          ghostIds.add(cand.conversationId);
+          continue;
+        }
+        activeSession = cand;
+        lsResult = candLs;
+        transcriptSummary = candTr;
+        artifactsCount = candArt;
+        break;
+      }
+    }
 
     // 無工作區防洩漏（不退回 process.cwd() / PLUGIN_ROOT）
     const rawWorkspace = (Array.isArray(activeSession.workspacePaths) && activeSession.workspacePaths[0]) ||
@@ -275,18 +461,6 @@ export class StatuslineService {
       ? validateCliLayoutInput(panelPrefs.layout)
       : cliLayout;
 
-    // 採集本機 LS 遙測、Transcript 摘要與 Artifacts 數量
-    const [lsResult, transcriptSummary, artifactsCount, updateInfo] = await Promise.all([
-      this.collectLsTelemetryFn({
-        homeDir: this.homeDir,
-        pluginDataDir: this.pluginDataDir,
-        conversationId: activeSession.conversationId || ''
-      }),
-      readTranscriptSummaryAsync(activeSession.transcriptPath),
-      countArtifactsInDirAsync(activeSession.artifactDirectoryPath),
-      this._resolveUpdateInfoAsync({ installedVersion: installedPlugin.version, forceCheck: checkUpdate })
-    ]);
-
     const { cache, runtimeTelemetry, telemetryStatus } = lsResult;
     const fallbackModel = runtimeTelemetry?.modelDisplayName ||
       activeSession.modelName ||
@@ -310,7 +484,15 @@ export class StatuslineService {
     const quotaInfo = resolveModelQuota(fallbackModel, cache, meta);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache, meta);
     const argonInfo = resolveArgonQuota(cache);
-    const contextInfo = computePureContextInfo({ runtimeTelemetry, cache, fallbackModel, meta });
+    const contextInfo = await computePureContextInfoAsync({
+      runtimeTelemetry,
+      cache,
+      fallbackModel,
+      meta,
+      cliSettings,
+      conversationId: activeSession.conversationId || '',
+      pluginDataDir: this.pluginDataDir
+    });
 
     // 控制只對啟用中指標做昂貴探針（避免無工作區誤掃、避免 Windows 頻繁開 PowerShell）
     const activeItemsSet = new Set(activeLayout.items.filter(x => x !== 'n'));
@@ -384,6 +566,8 @@ export class StatuslineService {
       workspacePath: projectPath
     });
 
+    const visibleSessions = sessions.filter(s => !ghostIds.has(s.conversationId));
+
     const snapshot = {
       layout: activeLayout,
       cliLayout,
@@ -395,6 +579,8 @@ export class StatuslineService {
       },
       session: {
         conversationId: activeSession.conversationId || '',
+        isAutoFollow,
+        product: activeSession.product || 'antigravity',
         hasWorkspace,
         projectPath,
         agentState: derivedState,
@@ -405,8 +591,9 @@ export class StatuslineService {
         lastToolSummary: transcriptSummary.lastToolSummary,
         lastError: transcriptSummary.lastError
       },
-      sessions: sessions.map(s => ({
+      sessions: visibleSessions.map(s => ({
         conversationId: s.conversationId,
+        product: s.product || 'antigravity',
         workspacePath: (Array.isArray(s.workspacePaths) && s.workspacePaths[0]) || s.cwd || '',
         modelName: s.modelName || '',
         agentState: s.agentState || 'idle',
@@ -432,6 +619,7 @@ export class StatuslineService {
       },
       context: {
         usedPct: Number(contextInfo.usedPctNum.toFixed(1)),
+        tokenPct: Number(contextInfo.tokenPctNum.toFixed(1)),
         totalInput: contextInfo.totalInput,
         effectiveCeiling: contextInfo.effectiveTokenCeiling,
         contextSize: contextInfo.contextSize,

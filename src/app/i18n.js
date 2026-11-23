@@ -82,7 +82,8 @@ export const APP_UI_STRINGS = {
     mergePairTip: '相鄰數值與長條圖將自動合併顯示',
     advancedSectionTitle: '進階參數與舊版排序語法匯入 / 匯出',
     rowItemCount: '{count} 項',
-    barSuffix: '長條圖'
+    barSuffix: '長條圖',
+    autoFollowSession: '自動跟隨最新'
   },
   'zh-cn': {
     appTitle: 'Statusline',
@@ -162,7 +163,8 @@ export const APP_UI_STRINGS = {
     mergePairTip: '相邻数值与长条图将自动合并显示',
     advancedSectionTitle: '高级参数与旧版排序语法导入 / 导出',
     rowItemCount: '{count} 项',
-    barSuffix: '长条图'
+    barSuffix: '长条图',
+    autoFollowSession: '自动跟随最新'
   },
   'us': {
     appTitle: 'Statusline',
@@ -242,7 +244,8 @@ export const APP_UI_STRINGS = {
     mergePairTip: 'Adjacent value and bar auto-merge',
     advancedSectionTitle: 'Advanced Settings & Legacy Order Import / Export',
     rowItemCount: '{count}',
-    barSuffix: 'Bar'
+    barSuffix: 'Bar',
+    autoFollowSession: 'Auto (Latest)'
   },
   'jp': {
     appTitle: 'Statusline',
@@ -322,7 +325,8 @@ export const APP_UI_STRINGS = {
     mergePairTip: '隣接する数値とバーは自動結合されます',
     advancedSectionTitle: '詳細設定と旧並び順構文のインポート / エクスポート',
     rowItemCount: '{count} 件',
-    barSuffix: 'バー'
+    barSuffix: 'バー',
+    autoFollowSession: '自動追従（最新）'
   }
 };
 

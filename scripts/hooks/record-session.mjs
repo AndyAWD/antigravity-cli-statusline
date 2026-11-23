@@ -96,7 +96,7 @@ async function main() {
     const dataDir =
       (typeof process.env.PLUGIN_DATA === 'string' && process.env.PLUGIN_DATA.trim())
         ? process.env.PLUGIN_DATA.trim()
-        : path.join(os.homedir(), '.gemini', 'plugin-data', 'antigravity-cli-statusline');
+        : path.join(os.homedir(), '.gemini', 'antigravity', 'plugin_data', 'antigravity-cli-statusline');
 
     fs.mkdirSync(dataDir, { recursive: true });
 
