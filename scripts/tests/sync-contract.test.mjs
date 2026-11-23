@@ -44,6 +44,9 @@ test('scripts/mcp/statusline-app.html is up-to-date, BOM-free, self-contained, a
   assert.equal(/<script[^>]+src=/i.test(html), false, 'statusline-app.html must not contain external script src');
   assert.equal(/<link[^>]+href=/i.test(html), false, 'statusline-app.html must not contain external link href');
   assert.equal(/[←↑↓]/.test(html), false, 'statusline-app.html must not contain legacy arrow button glyphs');
+  assert.equal(html.includes('.strip-flow-clip'), true, 'statusline-app.html must wrap strip items in .strip-flow-clip');
+  assert.equal(html.includes('.strip-item::before'), true, 'statusline-app.html must render strip separators via .strip-item::before');
+  assert.equal(html.includes('.strip-item-content'), true, 'statusline-app.html must keep each metric label and value inside .strip-item-content');
 
   const m = html.match(/<!--\s*source-sha256:\s*([a-f0-9]{64})\s*-->/i);
   assert.ok(m, 'statusline-app.html must embed source-sha256 comment');

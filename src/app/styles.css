@@ -222,13 +222,55 @@ body {
   padding: 6px 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
 }
 
-.strip-sep { color: var(--fg-3); }
+.strip-flow-clip {
+  overflow: hidden;
+}
+
+@supports (overflow: clip) {
+  .strip-flow-clip {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+}
+
+.strip-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 6px;
+  margin-left: -20px;
+}
+
+.strip-item {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.strip-item::before {
+  content: '│';
+  color: var(--fg-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.strip-item-multiline {
+  flex: 1 0 100%;
+  align-items: flex-start;
+}
+
+.strip-item-content {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 /* 就地分列拖曳編輯樣式 */
 .edit-guide-bar {

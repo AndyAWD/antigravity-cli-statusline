@@ -809,15 +809,25 @@ function renderMonitorView(root, snap, t) {
 
     const groups = groupRowWithAdjacentMerges(row, itemStyles, labelStyle, snap.registry.adjacentPairs);
     if (density === 'strip') {
-      const strip = el('div', { className: 'strip-row' });
-      groups.forEach((g, idx) => {
-        if (idx > 0) strip.appendChild(el('span', { className: 'strip-sep', textContent: '│' }));
+      const stripFlow = el('div', { className: 'strip-flow' });
+      for (const g of groups) {
         const itemData = snap.renderedItems?.[g.style]?.[g.key] || snap.renderedItems?.text?.[g.key];
-        if (itemData?.segments?.length) {
-          strip.appendChild(renderColoredSegments(itemData.segments, getCountdownIsoForKey(g.key, snap)));
-        }
-      });
-      container.appendChild(strip);
+        if (!itemData?.segments?.length || !itemData.plainText) continue;
+        const isMultiline = itemData.plainText.includes('\n');
+        const contentEl = el('span', { className: 'strip-item-content' }, [
+          renderColoredSegments(itemData.segments, getCountdownIsoForKey(g.key, snap))
+        ]);
+        const itemEl = el('span', {
+          className: isMultiline ? 'strip-item strip-item-multiline' : 'strip-item'
+        }, [contentEl]);
+        stripFlow.appendChild(itemEl);
+      }
+      if (stripFlow.childNodes.length > 0) {
+        const strip = el('div', { className: 'strip-row' }, [
+          el('div', { className: 'strip-flow-clip' }, [stripFlow])
+        ]);
+        container.appendChild(strip);
+      }
     } else {
       const rowGrid = el('div', { className: 'row-cards' });
       for (const g of groups) {
