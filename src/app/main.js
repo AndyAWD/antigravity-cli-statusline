@@ -17,7 +17,7 @@ import {
 } from './drag-rows.js';
 import { getUiStrings } from './i18n.js';
 
-const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.13.0';
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.0';
 const app = new App({ name: 'Statusline', version: APP_VERSION }, {});
 const MAX_UNDO_HISTORY = 30;
 
