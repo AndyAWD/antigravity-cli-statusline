@@ -9,7 +9,7 @@ import { hasBOM } from '../../skills/agy-cli-statusline/scripts/lib/core/fs-util
 import { parseMetricRenderPayload } from '../mcp/ansi-segments.mjs';
 import { collectLsTelemetryAsync, resetLsTelemetryMemoryCache } from '../mcp/ls-telemetry.mjs';
 import { StatuslineMcpHandler } from '../mcp/server.mjs';
-import { StatuslineService } from '../mcp/statusline-service.mjs';
+import { isOutdatedCliHookSync, StatuslineService } from '../mcp/statusline-service.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVER_SCRIPT = path.join(ROOT, 'scripts', 'mcp', 'server.mjs');
@@ -769,6 +769,145 @@ test('StatuslineService renders active-model for Orchestrator sessions and hides
     const resSingle = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw', forceRefresh: true });
     assert.equal(resSingle.snapshot.renderedItems.text['active-model'].plainText, '');
     assert.equal(resSingle.snapshot.renderedItems.emoji['active-model'].plainText, '');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('isOutdatedCliHookSync accurately distinguishes outdated vs synced, newer, and missing hooks', () => {
+  assert.equal(isOutdatedCliHookSync({ status: 'version_mismatch', hookVersion: '1.11.4', pluginVersion: '1.13.0' }), true);
+  assert.equal(isOutdatedCliHookSync({ status: 'version_mismatch', hookVersion: '99.0.0', pluginVersion: '1.13.0' }), false);
+  assert.equal(isOutdatedCliHookSync({ status: 'content_mismatch', hookVersion: '1.13.0', pluginVersion: '1.13.0' }), true);
+  assert.equal(isOutdatedCliHookSync({ status: 'legacy_mismatch', hookVersion: '', pluginVersion: '1.13.0' }), true);
+  assert.equal(isOutdatedCliHookSync({ status: 'legacy_no_meta', hookVersion: '', pluginVersion: '1.13.0' }), true);
+  assert.equal(isOutdatedCliHookSync({ status: 'in_sync', hookVersion: '1.13.0', pluginVersion: '1.13.0' }), false);
+  assert.equal(isOutdatedCliHookSync({ status: 'hook_missing', hookVersion: '', pluginVersion: '1.13.0' }), false);
+  assert.equal(isOutdatedCliHookSync({ status: 'plugin_not_found', hookVersion: '1.11.4', pluginVersion: '' }), false);
+  assert.equal(isOutdatedCliHookSync(null), false);
+});
+
+test('save-both automatically updates outdated CLI hooks without mutating statusLine, skips in_sync/newer/missing, and save-panel never touches CLI hooks', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-auto-hook-'));
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  try {
+    const cliDir = path.join(tmpHome, '.gemini', 'antigravity-cli');
+    const hooksDir = path.join(cliDir, 'hooks');
+    const cliSettingsPath = path.join(cliDir, 'settings.json');
+    const hookMetaPath = path.join(hooksDir, '.hook-version.json');
+    fs.mkdirSync(hooksDir, { recursive: true });
+
+    // 1. 模擬既有舊版 CLI 掛鉤 v1.11.4，且使用者將 statusLine.enabled 設為 false
+    fs.writeFileSync(path.join(hooksDir, 'statusline-quota.mjs'), '// legacy v1.11.4\n', 'utf8');
+    fs.writeFileSync(path.join(hooksDir, 'fetch-local-quota.mjs'), '// legacy v1.11.4\n', 'utf8');
+    fs.writeFileSync(hookMetaPath, JSON.stringify({
+      pluginVersion: '1.11.4',
+      syncedAt: '2026-01-01T00:00:00.000Z',
+      files: {}
+    }), 'utf8');
+    fs.writeFileSync(cliSettingsPath, JSON.stringify({
+      statusLine: {
+        enabled: false,
+        type: 'command',
+        command: '/custom/node /custom/statusline-quota.mjs'
+      },
+      ui: { language: 'zh-tw', footer: { items: ['model-name'] } }
+    }), 'utf8');
+
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: path.join(tmpHome, 'plugin_data'),
+      fetchReleaseFn: async () => ({ ok: false }),
+      resolveCliVersionFn: async () => ({ version: '1.5.15', tag: 'v1.5.15', installed: true, source: 'mock' }),
+      resolveAppVersionFn: async () => ({ version: '2.34.0', tag: 'v2.34.0', installed: true, source: 'mock' }),
+      collectLsTelemetryFn: async () => ({
+        cache: null,
+        runtimeTelemetry: null,
+        telemetryStatus: { lsConnected: false, lsEnvSource: 'none', source: 'public_only', warning: '' }
+      })
+    });
+
+    const snapBefore = await svc.getDashboardSnapshot();
+    assert.equal(snapBefore.snapshot.hookSync.status, 'version_mismatch');
+    assert.equal(snapBefore.snapshot.hookSync.hookVersion, '1.11.4');
+    assert.equal(snapBefore.snapshot.hookSync.needsAutoUpdate, true);
+
+    // 2. save-panel 絕不可動到 CLI 掛鉤或 settings.json
+    await svc.saveConfig({
+      action: 'save-panel',
+      layout: { lang: 'zh-tw', items: ['model-name', 'app-version'] }
+    });
+    assert.equal(JSON.parse(fs.readFileSync(hookMetaPath, 'utf8')).pluginVersion, '1.11.4');
+    assert.deepEqual(JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8')).ui.footer.items, ['model-name']);
+
+    // 3. save-both（不傳 deployHooks）偵測到過舊掛鉤，自動更新掛鉤腳本但保留既有 statusLine
+    const syncRes1 = await svc.saveConfig({
+      action: 'save-both',
+      layout: { lang: 'zh-tw', items: ['model-name', 'app-version'] }
+    });
+    assert.equal(syncRes1.cliSyncResult.deployHooks, true);
+    assert.equal(syncRes1.cliSyncResult.hooksAutoUpdated, true);
+    assert.equal(syncRes1.cliSyncResult.hookSyncBefore.status, 'version_mismatch');
+    const updatedMeta1 = JSON.parse(fs.readFileSync(hookMetaPath, 'utf8'));
+    assert.equal(updatedMeta1.pluginVersion, pkg.version);
+    assert.equal(fs.existsSync(path.join(hooksDir, 'lib', 'collectors', 'versions.mjs')), true);
+    const updatedSettings1 = JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8'));
+    assert.deepEqual(updatedSettings1.ui.footer.items, ['model-name', 'app-version']);
+    assert.equal(updatedSettings1.statusLine.enabled, false, 'Auto-updating outdated hooks must not override statusLine.enabled');
+    assert.equal(updatedSettings1.statusLine.command, '/custom/node /custom/statusline-quota.mjs');
+
+    // 4. 已同步（in_sync）時再執行 save-both，不可重複寫入掛鉤
+    const syncedAtAfterUpdate = updatedMeta1.syncedAt;
+    const snapSynced = await svc.getDashboardSnapshot();
+    assert.equal(snapSynced.snapshot.hookSync.status, 'in_sync');
+    assert.equal(snapSynced.snapshot.hookSync.needsAutoUpdate, false);
+
+    const syncRes2 = await svc.saveConfig({
+      action: 'save-both',
+      layout: { lang: 'zh-tw', items: ['model-name', 'cli-version', 'app-version'] }
+    });
+    assert.equal(syncRes2.cliSyncResult.deployHooks, false);
+    assert.equal(syncRes2.cliSyncResult.hooksAutoUpdated, false);
+    assert.equal(JSON.parse(fs.readFileSync(hookMetaPath, 'utf8')).syncedAt, syncedAtAfterUpdate);
+
+    // 5. 同版本但檔案內容不同步（content_mismatch）應自動修復
+    fs.writeFileSync(path.join(hooksDir, 'statusline-quota.mjs'), '// drifted content\n', 'utf8');
+    const syncRes3 = await svc.saveConfig({
+      action: 'save-both',
+      layout: { lang: 'zh-tw', items: ['model-name', 'app-version'] }
+    });
+    assert.equal(syncRes3.cliSyncResult.hooksAutoUpdated, true);
+    assert.equal(syncRes3.cliSyncResult.hookSyncBefore.status, 'content_mismatch');
+    assert.equal(fs.readFileSync(path.join(hooksDir, 'statusline-quota.mjs'), 'utf8').includes('drifted content'), false);
+
+    // 6. 掛鉤版本高於外掛版本（99.0.0）時不可自動降級覆寫
+    fs.writeFileSync(hookMetaPath, JSON.stringify({
+      pluginVersion: '99.0.0',
+      syncedAt: '2099-01-01T00:00:00.000Z',
+      files: {}
+    }), 'utf8');
+    const syncRes4 = await svc.saveConfig({
+      action: 'save-both',
+      layout: { lang: 'zh-tw', items: ['model-name', 'app-version'] }
+    });
+    assert.equal(syncRes4.cliSyncResult.hooksAutoUpdated, false);
+    assert.equal(syncRes4.cliSyncResult.deployHooks, false);
+    assert.equal(JSON.parse(fs.readFileSync(hookMetaPath, 'utf8')).pluginVersion, '99.0.0');
+
+    // 7. 本機尚未部署過掛鉤（hook_missing）時，save-both 不可擅自建立掛鉤或覆寫第三方 statusLine.command
+    fs.rmSync(hooksDir, { recursive: true, force: true });
+    fs.writeFileSync(cliSettingsPath, JSON.stringify({
+      statusLine: { enabled: true, type: 'command', command: '/usr/local/bin/other-statusline' },
+      ui: { language: 'zh-tw', footer: { items: ['model-name'] } }
+    }), 'utf8');
+    const syncRes5 = await svc.saveConfig({
+      action: 'save-both',
+      layout: { lang: 'zh-tw', items: ['model-name', 'app-version'] }
+    });
+    assert.equal(syncRes5.cliSyncResult.hooksAutoUpdated, false);
+    assert.equal(syncRes5.cliSyncResult.deployHooks, false);
+    assert.equal(fs.existsSync(hooksDir), false);
+    assert.equal(JSON.parse(fs.readFileSync(cliSettingsPath, 'utf8')).statusLine.command, '/usr/local/bin/other-statusline');
   } finally {
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }

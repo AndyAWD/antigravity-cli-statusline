@@ -16,7 +16,7 @@ import {
   sanitizeConversationId
 } from '../../skills/agy-cli-statusline/scripts/lib/core/normalize.mjs';
 import { resolveInstalledPluginVersionAsync } from '../../skills/agy-cli-statusline/scripts/lib/core/plugin-manifest.mjs';
-import { isVersionBehind } from '../../skills/agy-cli-statusline/scripts/lib/core/semver.mjs';
+import { compareSemver, isVersionBehind } from '../../skills/agy-cli-statusline/scripts/lib/core/semver.mjs';
 import { getSettingsAsync } from '../../skills/agy-cli-statusline/scripts/lib/core/settings.mjs';
 import {
   extractModelCandidateKeys,
@@ -74,6 +74,28 @@ const DEFAULT_APP_ITEMS = [
 const UPDATE_CACHE_TTL_MS = 60 * 60 * 1000;
 const MEMORY_CACHE_TTL_MS = 15 * 1000;
 const VERSION_CACHE_TTL_MS = 60 * 1000;
+
+/**
+ * 判斷本機既有的 CLI 掛鉤腳本是否過舊或內容不同步，應於「同步套用至 2.0 ＋ CLI」時自動更新。
+ * 僅處理已存在之掛鉤（排除 hook_missing 與 plugin_not_found），且當掛鉤版本新於外掛時不降級覆寫。
+ * @param {{ status?: string, hookVersion?: string, pluginVersion?: string } | null | undefined} hookSync
+ * @returns {boolean}
+ */
+export function isOutdatedCliHookSync(hookSync) {
+  if (!hookSync || typeof hookSync !== 'object') return false;
+  const { status, hookVersion, pluginVersion } = hookSync;
+  if (status === 'content_mismatch' || status === 'legacy_mismatch' || status === 'legacy_no_meta') {
+    return true;
+  }
+  if (status === 'version_mismatch') {
+    if (hookVersion && pluginVersion) {
+      const cmp = compareSemver(hookVersion, pluginVersion);
+      if (cmp !== null) return cmp < 0;
+    }
+    return true;
+  }
+  return false;
+}
 
 function resolveDefaultPluginRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -632,7 +654,8 @@ export class StatuslineService {
       hookSync: {
         status: hookSync.status,
         pluginVersion: hookSync.pluginVersion,
-        hookVersion: hookSync.hookVersion
+        hookVersion: hookSync.hookVersion,
+        needsAutoUpdate: isOutdatedCliHookSync(hookSync)
       },
       registry: {
         supportedLocales: SUPPORTED_LOCALES,
@@ -670,7 +693,7 @@ export class StatuslineService {
     action = 'save-panel',
     layout = null,
     panelPrefs = null,
-    deployHooks = false,
+    deployHooks = undefined,
     orderExpression = '',
     workspacePath = ''
   } = {}) {
@@ -728,14 +751,33 @@ export class StatuslineService {
           knownWorkspaces.push(sess.cwd);
         }
       }
-      cliSyncResult = saveCliSettingsAtomicSync({
+      const hookSyncBefore = checkPluginHookSync({
+        home: this.homeDir,
+        currentPluginDir: this.pluginRootDir,
+        workspacePath
+      });
+      const explicitDeploy = typeof deployHooks === 'boolean' ? deployHooks : undefined;
+      const shouldAutoUpdateHooks = explicitDeploy === undefined && isOutdatedCliHookSync(hookSyncBefore);
+      const effectiveDeployHooks = explicitDeploy === true || shouldAutoUpdateHooks;
+
+      const syncOut = saveCliSettingsAtomicSync({
         homeDir: this.homeDir,
         pluginRootDir: this.pluginRootDir,
         workspacePath,
         knownWorkspaces,
         config: validatedLayout,
-        deployHooks: Boolean(deployHooks)
+        deployHooks: effectiveDeployHooks,
+        updateStatusLine: explicitDeploy === true
       });
+      cliSyncResult = {
+        ...syncOut,
+        hooksAutoUpdated: shouldAutoUpdateHooks,
+        hookSyncBefore: {
+          status: hookSyncBefore.status,
+          pluginVersion: hookSyncBefore.pluginVersion,
+          hookVersion: hookSyncBefore.hookVersion
+        }
+      };
     }
 
     return {

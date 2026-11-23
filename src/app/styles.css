@@ -712,6 +712,15 @@ body {
   gap: 8px;
 }
 
+.save-bar-actions {
+  margin-left: auto;
+}
+
+.hook-auto-hint {
+  font-size: 11px;
+  color: var(--fg-2);
+}
+
 .breakdown-card {
   background: var(--bg-2);
   border: 1px solid var(--bd-2);

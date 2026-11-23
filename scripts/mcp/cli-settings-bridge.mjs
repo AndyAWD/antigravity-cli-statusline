@@ -106,7 +106,8 @@ export function saveCliSettingsAtomicSync({
   workspacePath = '',
   knownWorkspaces = null,
   config,
-  deployHooks = false
+  deployHooks = false,
+  updateStatusLine = deployHooks
 }) {
   const validated = validateCliLayoutInput(config);
   let safeCommand = '';
@@ -119,9 +120,11 @@ export function saveCliSettingsAtomicSync({
       srcScriptsDir,
       pluginRootDir
     });
-    const statuslineScript = path.join(hooksDir, 'statusline-quota.mjs');
-    const safeNode = resolveSafeSystemNodeExecPath();
-    safeCommand = getStatusLineCommand(statuslineScript, process.platform, safeNode);
+    if (updateStatusLine) {
+      const statuslineScript = path.join(hooksDir, 'statusline-quota.mjs');
+      const safeNode = resolveSafeSystemNodeExecPath();
+      safeCommand = getStatusLineCommand(statuslineScript, process.platform, safeNode);
+    }
   }
 
   const targets = [
@@ -151,7 +154,7 @@ export function saveCliSettingsAtomicSync({
 
   const results = targets.map(t => updateSingleSettingsAtomicSync(t, validated, {
     statusLineCommand: safeCommand,
-    updateStatusLine: Boolean(deployHooks && safeCommand),
+    updateStatusLine: Boolean(deployHooks && updateStatusLine && safeCommand),
     preserveExistingStatuslineCommand: true,
     useR27StyleNormalization: true
   }));

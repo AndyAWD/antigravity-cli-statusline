@@ -34,7 +34,6 @@ const state = {
   editLang: 'zh-tw',
   editHistory: [],
   suppressNextClick: false,
-  deployHooks: false,
   searchQuery: '',
   inFlight: false,
   refreshTimer: null,
@@ -1117,17 +1116,25 @@ function renderEditorDrawer(root, snap, t) {
   drawer.appendChild(advDetails);
   root.appendChild(drawer);
 
-  // 底部固定雙按鈕儲存列
+  // 底部固定雙按鈕儲存列（偵測到過舊 CLI 掛鉤時顯示自動更新提示，無需手動勾選）
+  const hookSync = snap.hookSync;
+  let hookHintText = '';
+  if (hookSync?.needsAutoUpdate) {
+    const targetVer = hookSync.pluginVersion || APP_VERSION;
+    if (hookSync.hookVersion && hookSync.hookVersion !== targetVer) {
+      hookHintText = t.autoUpdateHooksHint
+        .replace('{from}', hookSync.hookVersion)
+        .replace('{to}', targetVer);
+    } else {
+      hookHintText = t.autoUpdateHooksHintNoPrev.replace('{to}', targetVer);
+    }
+  }
+
   const saveBar = el('div', { className: 'sticky-save-bar' }, [
-    el('label', { className: 'topbar-group', style: 'font-size:12px;' }, [
-      el('input', {
-        type: 'checkbox',
-        checked: state.deployHooks,
-        onChange: (e) => { state.deployHooks = e.target.checked; }
-      }),
-      el('span', { textContent: t.deployHooksCheck })
-    ]),
-    el('div', { className: 'topbar-group' }, [
+    hookHintText
+      ? el('span', { className: 'hook-auto-hint', textContent: `🔄 ${hookHintText}` })
+      : null,
+    el('div', { className: 'topbar-group save-bar-actions' }, [
       el('button', {
         className: 'btn',
         textContent: t.cancel,
@@ -1154,12 +1161,16 @@ function renderEditorDrawer(root, snap, t) {
         className: 'btn btn-primary',
         textContent: t.saveBoth,
         onClick: async () => {
-          const res = await saveConfigAction('save-both', { deployHooks: state.deployHooks });
+          const res = await saveConfigAction('save-both');
           if (!res?.structuredContent?.ok) return;
           state.editMode = false;
           state.editHistory = [];
-          const partial = res.structuredContent.cliSyncResult?.results?.some(r => !r.updated);
-          showToast(partial ? t.cliSyncPartialWarn : t.savedBothToast);
+          const syncRes = res.structuredContent.cliSyncResult;
+          const partial = syncRes?.results?.some(r => !r.updated);
+          const toastMsg = partial
+            ? t.cliSyncPartialWarn
+            : (syncRes?.hooksAutoUpdated ? t.savedBothAndHooksToast : t.savedBothToast);
+          showToast(toastMsg);
           const dashRes = await callToolSafe('statusline_dashboard', getDashboardArgs({ forceRefresh: true }));
           if (!dashRes) render();
         }

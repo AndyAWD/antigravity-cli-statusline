@@ -14,8 +14,18 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 
 test('src/app/i18n.js covers all SUPPORTED_LOCALES with identical key sets', () => {
   const baseKeys = Object.keys(APP_UI_STRINGS.us).sort();
-  const requiredNewKeys = ['barSuffix', 'editingBadge', 'editGuide', 'undo', 'styleTextShort', 'dropRowHere'];
-  const removedLegacyKeys = ['moveUp', 'moveDown', 'moveLeft', 'moveRight', 'doneEdit'];
+  const requiredNewKeys = [
+    'barSuffix',
+    'editingBadge',
+    'editGuide',
+    'undo',
+    'styleTextShort',
+    'dropRowHere',
+    'autoUpdateHooksHint',
+    'autoUpdateHooksHintNoPrev',
+    'savedBothAndHooksToast'
+  ];
+  const removedLegacyKeys = ['moveUp', 'moveDown', 'moveLeft', 'moveRight', 'doneEdit', 'deployHooksCheck'];
   for (const locale of SUPPORTED_LOCALES) {
     assert.ok(APP_UI_STRINGS[locale], `APP_UI_STRINGS missing locale: ${locale}`);
     assert.deepEqual(
@@ -48,6 +58,7 @@ test('scripts/mcp/statusline-app.html is up-to-date, BOM-free, self-contained, a
   assert.equal(html.includes('.strip-item::before'), true, 'statusline-app.html must render strip separators via .strip-item::before');
   assert.equal(html.includes('.strip-item-content'), true, 'statusline-app.html must keep each metric label and value inside .strip-item-content');
   assert.equal(html.includes('pinnedConversationId'), true, 'statusline-app.html must support auto-follow vs pinned conversation mode');
+  assert.equal(html.includes('deployHooksCheck'), false, 'statusline-app.html must not contain legacy manual deployHooksCheck checkbox');
 
   const mainJs = fs.readFileSync(path.join(ROOT, 'src', 'app', 'main.js'), 'utf8');
   assert.equal(mainJs.includes('getDashboardArgs'), true, 'main.js must route dashboard calls through getDashboardArgs()');

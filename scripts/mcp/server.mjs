@@ -165,7 +165,7 @@ export class StatuslineMcpHandler {
         if (this.clientSupportsMcpApps) {
           tools.push({
             name: 'statusline_save_config',
-            description: 'App-only tool to persist panel preferences in PLUGIN_DATA, or (with save-both / deployHooks) write CLI settings.json and deploy CLI hook scripts.',
+            description: 'App-only tool to persist panel preferences in PLUGIN_DATA, or (with save-both) write CLI settings.json and automatically update outdated CLI hook scripts.',
             inputSchema: {
               type: 'object',
               properties: {
