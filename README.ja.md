@@ -2,7 +2,7 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | 日本語
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -246,17 +246,17 @@ CLI ウィザードのステップ 4 入力欄（または Antigravity 2.0 パ�
 版管理状態: 変更なし │ 版管理種別: git │ 🔀 main
 📁 antigravity-cli-statusline │ パス: /Users/andyawd/Project/antigravity-cli-statusline
 
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ Agy 2.0 バージョン: v2.34.0 │ ステータスライン版: v2.0.0
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ Agy 2.0 バージョン: v2.34.0 │ ステータスライン版: v2.1.0
 ```
 
 `plugin-update`（`#35`）が有効で新しい GitHub Release が利用可能な場合、指定した配置位置に 2 行の更新案内が独立表示されます（ターミナルで `agy plugin install` を実行すると表示バージョンが追いつき警告は消えます。古い CLI フックスクリプトを同期する場合は Antigravity 2.0 の「2.0 ＋ CLI に同期適用」または CLI の `/antigravity-cli-statusline:agy-cli-statusline` を実行するか、`node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` でバージョン差を確認してください）：
 
 ```text
-⚠️ ステータスラインの新バージョンが利用可能です（現在 v1.12.0 → 最新 v2.0.0）。以下のコマンドで更新してください：
+⚠️ ステータスラインの新バージョンが利用可能です（現在 v2.0.0 → 最新 v2.1.0）。以下のコマンドで更新してください：
 agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
-絵文字スタイル（`e35` / `e:plugin-update`）では、1 行目が `🆕 v1.12.0 → v2.0.0` のコンパクト表示になり、2 行目に更新コマンドが独立出力されます。最新バージョンの場合は自動的に非表示となり、先頭・末尾の純粋な空白行もトリムされます。
+絵文字スタイル（`e35` / `e:plugin-update`）では、1 行目が `🆕 v2.0.0 → v2.1.0` のコンパクト表示になり、2 行目に更新コマンドが独立出力されます。最新バージョンの場合は自動的に非表示となり、先頭・末尾の純粋な空白行もトリムされます。
 
 ## コントリビューション
 
