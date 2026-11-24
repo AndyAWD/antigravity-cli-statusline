@@ -2,7 +2,7 @@
 
 English | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![Version](https://img.shields.io/badge/version-2.1.1-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
@@ -232,17 +232,17 @@ Context Used: 18.5% [█░░░░░░░░░] │ Tokens: 47.4k / 256.0k 
 VCS Status: no changes │ VCS: git │ 🔀 main
 📁 antigravity-cli-statusline │ Project Path: /Users/andyawd/Project/antigravity-cli-statusline
 
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI Version: v1.5.10 │ Agy 2.0 Version: v2.34.0 │ Statusline Version: v2.1.0
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI Version: v1.5.10 │ Agy 2.0 Version: v2.34.0 │ Statusline Version: v2.1.1
 ```
 
 When a newer GitHub Release is available, `e:plugin-update` appends two standalone notice lines after the blank line (the warning disappears automatically after running `agy plugin install` in your terminal; sync outdated CLI hooks via **Sync to 2.0 + CLI** in Antigravity 2.0 or `/antigravity-cli-statusline:agy-cli-statusline` in CLI, or inspect status with `node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs`):
 
 ```text
-🆕 v2.0.0 → v2.1.0
+🆕 v2.1.0 → v2.1.1
 agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
-*(In Text style `35` / `plugin-update`, the first line renders as `⚠️ Statusline update available (current v2.0.0 → latest v2.1.0). Run to update:`.)*
+*(In Text style `35` / `plugin-update`, the first line renders as `⚠️ Statusline update available (current v2.1.0 → latest v2.1.1). Run to update:`.)*
 
 ## Contributing
 
