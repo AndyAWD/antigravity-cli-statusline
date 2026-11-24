@@ -35,7 +35,6 @@ import {
   resolveInstalledCliVersionAsync
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/versions.mjs';
 import {
-  resolveArgonQuota,
   resolveModelQuota,
   resolveWeeklyQuota
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/quota.mjs';
@@ -555,7 +554,6 @@ export class StatuslineService {
 
     const quotaInfo = resolveModelQuota(fallbackModel, cache, meta);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache, meta);
-    const argonInfo = resolveArgonQuota(cache);
     const contextInfo = await computePureContextInfoAsync({
       runtimeTelemetry,
       cache,
@@ -598,7 +596,6 @@ export class StatuslineService {
         appSelectedModel: effectiveAppSelectedModel,
         timeFormat: activeLayout.timeFormat,
         barLength: activeLayout.barLength,
-        argonInfo,
         footerItems: probeItemsSet,
         workspacePath: projectPath,
         cliVersion: installedVersions.cliVersion,
@@ -692,11 +689,6 @@ export class StatuslineService {
           remainingPct: Math.round(weeklyInfo.remaining_percentage ?? 100),
           resetTime: weeklyInfo.reset_time || '',
           refreshesIn: weeklyInfo.refreshes_in || ''
-        },
-        argon: {
-          remainingPct: Math.round(argonInfo.remaining_percentage ?? 100),
-          resetTime: argonInfo.reset_time || '',
-          refreshesIn: argonInfo.refreshes_in || ''
         }
       },
       context: {
@@ -740,7 +732,7 @@ export class StatuslineService {
     const branch = snapshot.renderedItems?.text?.['git-branch']?.valueText || 'N/A';
     return [
       `Model: ${model}`,
-      `Quota (5h / 7d / Argon): ${q.shortTerm.remainingPct}% / ${q.weekly.remainingPct}% / ${q.argon.remainingPct}%`,
+      `Quota (5h / 7d): ${q.shortTerm.remainingPct}% / ${q.weekly.remainingPct}%`,
       `Context: ${c.usedPct}% (${c.totalInput} / ${c.effectiveCeiling})`,
       `Workspace: ${s.hasWorkspace ? s.projectPath : 'None'} (Git: ${branch})`,
       `Agent State: ${s.agentState} | Steps: ${s.stepCount} | Plugin: v${snapshot.updateInfo.installedVersion}`,
