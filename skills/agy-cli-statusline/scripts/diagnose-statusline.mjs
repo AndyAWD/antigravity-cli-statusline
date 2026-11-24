@@ -10,6 +10,10 @@ import {
   listMjsFilesRecursiveSync,
   isDirectExecution as coreIsDirectExecution
 } from './lib/core/fs-utils.mjs';
+import {
+  getLegacyCliUpdateCachePath,
+  getSharedUpdateCachePath
+} from './lib/collectors/plugin-update.mjs';
 import { compareSemver } from './lib/core/semver.mjs';
 import {
   discoverInstalledPluginSync,
@@ -270,8 +274,11 @@ export function checkPluginHookSync(options = {}) {
 
   const fileDiffs = collectHookFileDiffs(refPluginDir, hooksDir, hookMeta);
 
-  const updateCachePath = options.updateCachePath || join(home, '.gemini', 'tmp', 'plugin_update_cache.json');
-  const updateCache = readJsonSafeSync(updateCachePath);
+  const updateCachePath = options.updateCachePath || getSharedUpdateCachePath(home);
+  let updateCache = readJsonSafeSync(updateCachePath);
+  if (!updateCache && !options.updateCachePath) {
+    updateCache = readJsonSafeSync(getLegacyCliUpdateCachePath(home));
+  }
 
   const versionCmp = (hookVersion && pluginVersion) ? compareSemver(hookVersion, pluginVersion) : null;
   const isVersionMismatch = versionCmp !== null
@@ -336,7 +343,12 @@ function inspectPluginHookSync(syncResult) {
   if (syncResult.updateCache) {
     const latestTag = syncResult.updateCache.latestTag || (syncResult.updateCache.latestVersion ? `v${syncResult.updateCache.latestVersion}` : '無');
     const lastSessionStatus = syncResult.updateCache.lastSessionStatus || 'unknown';
-    console.log(dim(`GitHub 更新快取: 最新已知 ${latestTag} · 最近查詢狀態=${lastSessionStatus}`));
+    const lastKey = syncResult.updateCache.lastSessionKey || '';
+    const lastError = (lastSessionStatus === 'failed' && lastKey)
+      ? (syncResult.updateCache.checkedSessions?.[lastKey]?.lastError || '')
+      : '';
+    const errSuffix = lastError ? `（原因=${lastError}）` : '';
+    console.log(dim(`GitHub 更新快取: 最新已知 ${latestTag} · 最近查詢狀態=${lastSessionStatus}${errSuffix}`));
   }
 }
 

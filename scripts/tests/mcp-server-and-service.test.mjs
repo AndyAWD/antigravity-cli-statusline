@@ -1034,3 +1034,73 @@ test('save-both automatically updates outdated CLI hooks without mutating status
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }
 });
+
+test('StatuslineService shares update_cache.json with CLI without clobbering checkedSessions and picks newer quota cache read-only', async () => {
+  resetLsTelemetryMemoryCache();
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-shared-cache-'));
+  const pluginData = path.join(tmpHome, '.gemini', 'antigravity', 'plugin_data', 'antigravity-cli-statusline');
+  try {
+    fs.mkdirSync(pluginData, { recursive: true });
+    const updateCachePath = path.join(pluginData, 'update_cache.json');
+    fs.writeFileSync(updateCachePath, JSON.stringify({
+      latestVersion: '2.0.0',
+      latestTag: 'v2.0.0',
+      checkedAt: 1000,
+      lastSessionKey: '9001:cli',
+      lastSessionStatus: 'ok',
+      lastAttemptAt: 1000,
+      checkedSessions: {
+        '9001:cli': { status: 'ok', attemptAt: 1000 }
+      }
+    }, null, 2), 'utf8');
+
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: pluginData,
+      fetchReleaseFn: async () => ({ ok: true, latestVersion: '2.1.0', latestTag: 'v2.1.0' }),
+      resolveCliVersionFn: async () => ({ version: '1.5.16', tag: 'v1.5.16', installed: true, source: 'mock' }),
+      resolveAppVersionFn: async () => ({ version: '2.34.0', tag: 'v2.34.0', installed: true, source: 'mock' }),
+      collectLsTelemetryFn: async () => ({
+        cache: null,
+        runtimeTelemetry: null,
+        telemetryStatus: { lsConnected: false, lsEnvSource: 'none', source: 'public_only', warning: '' }
+      })
+    });
+
+    const snap = await svc.getDashboardSnapshot({ checkUpdate: true });
+    assert.equal(snap.snapshot.updateInfo.latestTag, 'v2.1.0');
+    const savedUpdate = JSON.parse(fs.readFileSync(updateCachePath, 'utf8'));
+    assert.equal(savedUpdate.latestVersion, '2.1.0');
+    assert.deepEqual(savedUpdate.checkedSessions['9001:cli'], { status: 'ok', attemptAt: 1000 });
+    assert.equal(fs.existsSync(path.join(tmpHome, '.gemini', 'tmp')), false, 'StatuslineService update check must never create ~/.gemini/tmp');
+
+    // 離線退讓時比對 pluginData/quota_cache.json 與 ~/.gemini/tmp/real_quota_cache.json 擇新回傳（唯讀）
+    const tmpDir = path.join(tmpHome, '.gemini', 'tmp');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const pluginQuotaPath = path.join(pluginData, 'quota_cache.json');
+    const cliQuotaPath = path.join(tmpDir, 'real_quota_cache.json');
+    fs.writeFileSync(pluginQuotaPath, JSON.stringify({
+      lsUpdatedAt: 1000,
+      shortTerm: { gemini: { remaining_percentage: 50 } }
+    }), 'utf8');
+    fs.writeFileSync(cliQuotaPath, JSON.stringify({
+      lsUpdatedAt: 2000,
+      shortTerm: { gemini: { remaining_percentage: 90 } }
+    }), 'utf8');
+
+    const pickedCli = await collectLsTelemetryAsync({ homeDir: tmpHome, pluginDataDir: pluginData, env: {} });
+    assert.equal(pickedCli.telemetryStatus.source, 'cli_cache');
+    assert.equal(pickedCli.cache.shortTerm.gemini.remaining_percentage, 90);
+
+    fs.writeFileSync(pluginQuotaPath, JSON.stringify({
+      lsUpdatedAt: 3000,
+      shortTerm: { gemini: { remaining_percentage: 75 } }
+    }), 'utf8');
+    const pickedPlugin = await collectLsTelemetryAsync({ homeDir: tmpHome, pluginDataDir: pluginData, env: {} });
+    assert.equal(pickedPlugin.telemetryStatus.source, 'plugin_cache');
+    assert.equal(pickedPlugin.cache.shortTerm.gemini.remaining_percentage, 75);
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});

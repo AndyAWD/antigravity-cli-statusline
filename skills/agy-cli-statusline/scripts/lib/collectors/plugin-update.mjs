@@ -1,16 +1,44 @@
+import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import http from 'http';
 import https from 'https';
 import { join } from 'path';
 import os from 'os';
-import { GITHUB_LATEST_RELEASE_URL } from '../core/constants.mjs';
-import { readJsonSafeAsync, writeFileAndVerifyNoBOM } from '../core/fs-utils.mjs';
+import { fileURLToPath } from 'url';
+import { GITHUB_LATEST_RELEASE_URL, PLUGIN_PACKAGE_NAME } from '../core/constants.mjs';
+import { isDirectExecution, readJsonSafeAsync, writeFileAndVerifyNoBOM } from '../core/fs-utils.mjs';
 import { resolveInstalledPluginVersionAsync } from '../core/plugin-manifest.mjs';
 import { runCmdDetailedAsync, withTimeout } from '../core/process-utils.mjs';
 import { formatVersionTag, isVersionBehind, normalizeSemver } from '../core/semver.mjs';
 
+export const SHARED_UPDATE_CACHE_TTL_MS = 60 * 60 * 1000;
+export const PENDING_LEASE_TTL_MS = 5000;
+export const MAX_INTERRUPTED_ATTEMPTS = 3;
+
 const SESSION_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_CACHE_MAX_ENTRIES = 32;
+
+/**
+ * 取得 CLI 與 Antigravity 2.0 共用的外掛更新快取檔案路徑。
+ * @param {string} [homeDir=os.homedir()]
+ * @param {string} [pluginDataDir='']
+ * @returns {string}
+ */
+export function getSharedUpdateCachePath(homeDir = os.homedir(), pluginDataDir = '') {
+  if (typeof pluginDataDir === 'string' && pluginDataDir.trim()) {
+    return join(pluginDataDir.trim(), 'update_cache.json');
+  }
+  return join(homeDir, '.gemini', 'antigravity', 'plugin_data', PLUGIN_PACKAGE_NAME, 'update_cache.json');
+}
+
+/**
+ * 取得舊版 CLI 專屬外掛更新快取路徑（僅供相容唯讀遷移與診斷退讓）。
+ * @param {string} [homeDir=os.homedir()]
+ * @returns {string}
+ */
+export function getLegacyCliUpdateCachePath(homeDir = os.homedir()) {
+  return join(homeDir, '.gemini', 'tmp', 'plugin_update_cache.json');
+}
 
 /**
  * 將命令列字串拆解為參數陣列，正確處理單雙引號與反斜線跳脫。
@@ -509,23 +537,56 @@ function hasPlainCheckedSessions(cacheObj) {
   );
 }
 
-function isSessionAlreadyChecked(cacheObj, sessionKey) {
+function extractPreservedVersionFields(cacheObj) {
+  const preserved = {};
+  const diskLatestVersion = normalizeSemver(cacheObj?.latestVersion || '');
+  if (diskLatestVersion) {
+    preserved.latestVersion = diskLatestVersion;
+    preserved.latestTag = formatVersionTag(cacheObj?.latestTag || diskLatestVersion);
+    const ts = Number(cacheObj?.checkedAt || cacheObj?.latestCheckedAt || 0);
+    if (Number.isFinite(ts) && ts > 0) {
+      preserved.checkedAt = ts;
+      preserved.latestCheckedAt = ts;
+    }
+  }
+  return preserved;
+}
+
+function isSessionAlreadyChecked(cacheObj, sessionKey, now = Date.now(), pendingLeaseMs = PENDING_LEASE_TTL_MS) {
   if (!cacheObj || !sessionKey) return false;
   if (hasPlainCheckedSessions(cacheObj)) {
-    return Object.prototype.hasOwnProperty.call(cacheObj.checkedSessions, sessionKey) &&
-      Boolean(cacheObj.checkedSessions[sessionKey]);
+    if (!Object.prototype.hasOwnProperty.call(cacheObj.checkedSessions, sessionKey)) {
+      return false;
+    }
+    const entry = cacheObj.checkedSessions[sessionKey];
+    if (!entry) return false;
+    if (typeof entry !== 'object') return Boolean(entry);
+    if (entry.status === 'pending') {
+      const attempts = Number(entry.attempts || 1);
+      if (attempts >= MAX_INTERRUPTED_ATTEMPTS) return true;
+      const attemptAt = Number(entry.attemptAt || 0);
+      if (attemptAt > 0 && (now - attemptAt) < pendingLeaseMs) return true;
+      return false;
+    }
+    return true;
   }
-  return cacheObj.lastSessionKey === sessionKey;
+  if (cacheObj.lastSessionKey !== sessionKey) return false;
+  if (cacheObj.lastSessionStatus === 'pending') {
+    const attemptAt = Number(cacheObj.lastAttemptAt || 0);
+    if (attemptAt > 0 && (now - attemptAt) < pendingLeaseMs) return true;
+    return false;
+  }
+  return true;
 }
 
 /**
  * 合併磁碟上已紀錄的多視窗 checkedSessions（含遷移舊版 lastSessionKey），
- * 更新當前 sessionKey 狀態並依 7 天 TTL 與上限 32 筆裁剪舊紀錄（永遠保留當前 sessionKey）。
+ * 更新當前 sessionKey 狀態（ok / failed / pending）並依 7 天 TTL 與上限 32 筆裁剪舊紀錄（永遠保留當前 sessionKey）。
  * @param {object|null} diskCache
  * @param {string} sessionKey
- * @param {{ status: 'ok'|'failed', attemptAt: number }} currentEntry
+ * @param {{ status: 'ok'|'failed'|'pending', attemptAt: number, attempts?: number, lastError?: string }} currentEntry
  * @param {number} now
- * @returns {Record<string, { status: 'ok'|'failed', attemptAt: number }>}
+ * @returns {Record<string, { status: 'ok'|'failed'|'pending', attemptAt: number, attempts?: number, lastError?: string }>}
  */
 function mergeAndPruneCheckedSessions(diskCache, sessionKey, currentEntry, now) {
   const merged = {};
@@ -540,10 +601,15 @@ function mergeAndPruneCheckedSessions(diskCache, sessionKey, currentEntry, now) 
             ? Number(diskCache.lastAttemptAt)
             : now);
       if (now - attemptAt > SESSION_CACHE_TTL_MS) continue;
-      merged[key] = {
-        status: val.status === 'ok' ? 'ok' : 'failed',
-        attemptAt
-      };
+      const status = val.status === 'ok' ? 'ok' : (val.status === 'pending' ? 'pending' : 'failed');
+      const item = { status, attemptAt };
+      if (Number.isFinite(Number(val.attempts)) && Number(val.attempts) > 0) {
+        item.attempts = Number(val.attempts);
+      }
+      if (status === 'failed' && typeof val.lastError === 'string' && val.lastError.trim()) {
+        item.lastError = val.lastError.trim();
+      }
+      merged[key] = item;
     }
   }
 
@@ -555,17 +621,30 @@ function mergeAndPruneCheckedSessions(diskCache, sessionKey, currentEntry, now) 
       ? legacyAttemptRaw
       : now;
     if (now - legacyAttemptAt <= SESSION_CACHE_TTL_MS) {
+      const legacyStatus = diskCache?.lastSessionStatus === 'ok'
+        ? 'ok'
+        : (diskCache?.lastSessionStatus === 'pending' ? 'pending' : 'failed');
       merged[legacyKey] = {
-        status: diskCache?.lastSessionStatus === 'ok' ? 'ok' : 'failed',
+        status: legacyStatus,
         attemptAt: legacyAttemptAt
       };
     }
   }
 
-  merged[sessionKey] = {
-    status: currentEntry.status === 'ok' ? 'ok' : 'failed',
+  const nextStatus = currentEntry.status === 'ok'
+    ? 'ok'
+    : (currentEntry.status === 'pending' ? 'pending' : 'failed');
+  const nextEntry = {
+    status: nextStatus,
     attemptAt: currentEntry.attemptAt
   };
+  if (Number.isFinite(Number(currentEntry.attempts)) && Number(currentEntry.attempts) > 0) {
+    nextEntry.attempts = Number(currentEntry.attempts);
+  }
+  if (nextStatus === 'failed' && typeof currentEntry.lastError === 'string' && currentEntry.lastError.trim()) {
+    nextEntry.lastError = currentEntry.lastError.trim();
+  }
+  merged[sessionKey] = nextEntry;
 
   const allKeys = Object.keys(merged);
   if (allKeys.length > SESSION_CACHE_MAX_ENTRIES) {
@@ -600,8 +679,120 @@ function updatePluginUpdateCacheAsync(cachePath, updaterFn) {
   return run.then(() => result);
 }
 
+async function finalizePluginUpdateResultAsync({
+  cachePath,
+  sessionKey,
+  attemptAt,
+  attempts = 1,
+  res,
+  fallbackSeed = null
+}) {
+  if (res && res.ok && res.latestVersion) {
+    const latestVersion = res.latestVersion;
+    const latestTag = res.latestTag || formatVersionTag(res.latestVersion);
+    return await updatePluginUpdateCacheAsync(cachePath, (diskCache) => {
+      const effectiveDisk = diskCache || fallbackSeed;
+      const okAt = Date.now();
+      const checkedSessions = mergeAndPruneCheckedSessions(
+        effectiveDisk,
+        sessionKey,
+        { status: 'ok', attemptAt, attempts },
+        okAt
+      );
+      return {
+        nextData: {
+          latestVersion,
+          latestTag,
+          checkedAt: okAt,
+          latestCheckedAt: okAt,
+          lastSessionKey: sessionKey,
+          lastSessionStatus: 'ok',
+          lastAttemptAt: attemptAt,
+          checkedSessions
+        },
+        result: { latestVersion, latestTag }
+      };
+    });
+  }
+
+  const lastError = String(res?.error || 'unknown');
+  return await updatePluginUpdateCacheAsync(cachePath, (diskCache) => {
+    const effectiveDisk = diskCache || fallbackSeed;
+    const failAt = Date.now();
+    const basePreserved = extractPreservedVersionFields(effectiveDisk);
+    const checkedSessions = mergeAndPruneCheckedSessions(
+      effectiveDisk,
+      sessionKey,
+      { status: 'failed', attemptAt, attempts, lastError },
+      failAt
+    );
+    return {
+      nextData: {
+        ...basePreserved,
+        lastSessionKey: sessionKey,
+        lastSessionStatus: 'failed',
+        lastAttemptAt: attemptAt,
+        checkedSessions
+      },
+      result: basePreserved
+    };
+  });
+}
+
+async function runDetachedFetchAndWaitAsync({
+  workerScriptPath,
+  cachePath,
+  sessionKey,
+  releaseUrl,
+  workerTimeoutMs,
+  parentWaitMs,
+  attemptAt,
+  attempts,
+  envObj
+}) {
+  try {
+    await fs.access(workerScriptPath);
+  } catch (_) {
+    return { spawned: false };
+  }
+
+  return await new Promise((resolve) => {
+    let settled = false;
+    const finish = (spawned, timedOut = false) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ spawned, timedOut });
+    };
+    const timer = setTimeout(() => finish(true, true), Math.max(100, parentWaitMs));
+    try {
+      const proc = spawn(process.execPath, [workerScriptPath, '--worker'], {
+        env: {
+          ...envObj,
+          DISABLE_QUOTA_HOOK: '1',
+          STATUSLINE_PLUGIN_UPDATE_WORKER: '1',
+          STATUSLINE_PLUGIN_UPDATE_CACHE_PATH: cachePath,
+          STATUSLINE_PLUGIN_UPDATE_SESSION_KEY: sessionKey,
+          STATUSLINE_PLUGIN_UPDATE_RELEASE_URL: releaseUrl,
+          STATUSLINE_PLUGIN_UPDATE_TIMEOUT_MS: String(workerTimeoutMs),
+          STATUSLINE_PLUGIN_UPDATE_ATTEMPT_AT: String(attemptAt),
+          STATUSLINE_PLUGIN_UPDATE_ATTEMPTS: String(attempts)
+        },
+        stdio: 'ignore',
+        detached: true,
+        windowsHide: true
+      });
+      proc.on('error', () => finish(false, false));
+      proc.on('close', () => finish(true, false));
+      proc.unref();
+    } catch (_) {
+      finish(false, false);
+    }
+  });
+}
+
 /**
- * 檢查外掛是否有可用的 GitHub 新版本；單一互動式 agy 視窗會話僅查詢一次，支援多視窗併行紀錄。
+ * 檢查外掛是否有可用的 GitHub 新版本；單一互動式 agy 視窗會話僅查詢一次，支援多視窗併行紀錄、pending 租約自癒與背景抓取。
  * @param {object} [options={}]
  * @returns {Promise<object>}
  */
@@ -635,46 +826,63 @@ export async function checkPluginUpdateAsync(options = {}) {
   }
 
   const homeDir = options.homeDir || os.homedir();
-  const cachePath = options.cachePath || join(homeDir, '.gemini', 'tmp', 'plugin_update_cache.json');
+  const explicitCachePath = typeof options.cachePath === 'string' ? options.cachePath.trim() : '';
+  const pluginDataDir = typeof options.pluginDataDir === 'string' ? options.pluginDataDir.trim() : '';
+  const cachePath = explicitCachePath || getSharedUpdateCachePath(homeDir, pluginDataDir);
+  const legacyCachePath = (!explicitCachePath && !pluginDataDir) ? getLegacyCliUpdateCachePath(homeDir) : '';
+
   const existingCache = await readJsonSafeAsync(cachePath);
-  const cachedLatestVersion = normalizeSemver(existingCache?.latestVersion || '');
+  const legacySeed = (!existingCache && legacyCachePath) ? await readJsonSafeAsync(legacyCachePath) : null;
+  const seedSource = existingCache || legacySeed;
+
+  const cachedLatestVersion = normalizeSemver(seedSource?.latestVersion || '');
   const cachedLatestTag = cachedLatestVersion
-    ? formatVersionTag(existingCache?.latestTag || cachedLatestVersion)
+    ? formatVersionTag(seedSource?.latestTag || cachedLatestVersion)
     : '';
 
   let latestVersion = cachedLatestVersion;
   let latestTag = cachedLatestTag;
   let checked = false;
 
-  if (session.found && session.sessionKey && !isSessionAlreadyChecked(existingCache, session.sessionKey)) {
+  const pendingLeaseMs = typeof options.pendingLeaseMs === 'number' && options.pendingLeaseMs >= 0
+    ? options.pendingLeaseMs
+    : PENDING_LEASE_TTL_MS;
+
+  if (!existingCache && legacySeed && session.found && session.sessionKey && isSessionAlreadyChecked(seedSource, session.sessionKey, checkStartedAt, pendingLeaseMs)) {
+    await updatePluginUpdateCacheAsync(cachePath, (diskCache) => {
+      if (diskCache) return {};
+      return { nextData: legacySeed };
+    });
+  }
+
+  if (session.found && session.sessionKey && !isSessionAlreadyChecked(seedSource, session.sessionKey, checkStartedAt, pendingLeaseMs)) {
     const now = Date.now();
-    // 先在序列化寫入佇列中讀取最新快取並寫入本次行程的嘗試/失敗標記，防止併發呼叫或超時中斷時重複請求或覆寫既有會話紀錄
+    // 先於寫入佇列寫入 pending 租約，防止併發重複請求；若程序遭中止導致租約過期，下一次刷新可安全接手重試
     const claimOutcome = await updatePluginUpdateCacheAsync(cachePath, (diskCache) => {
-      if (isSessionAlreadyChecked(diskCache, session.sessionKey)) {
-        return { result: { claimed: false, diskCache } };
+      const effectiveDisk = diskCache || legacySeed;
+      if (isSessionAlreadyChecked(effectiveDisk, session.sessionKey, now, pendingLeaseMs)) {
+        return { result: { claimed: false, diskCache: effectiveDisk } };
       }
-      const diskLatestVersion = normalizeSemver(diskCache?.latestVersion || '');
-      const basePreserved = {};
-      if (diskLatestVersion) {
-        basePreserved.latestVersion = diskLatestVersion;
-        basePreserved.latestTag = formatVersionTag(diskCache?.latestTag || diskLatestVersion);
-        if (diskCache?.latestCheckedAt) basePreserved.latestCheckedAt = diskCache.latestCheckedAt;
-      }
+      const prevEntry = hasPlainCheckedSessions(effectiveDisk) ? effectiveDisk.checkedSessions[session.sessionKey] : null;
+      const attempts = (prevEntry && typeof prevEntry === 'object' && prevEntry.status === 'pending')
+        ? (Number(prevEntry.attempts || 1) + 1)
+        : 1;
+      const basePreserved = extractPreservedVersionFields(effectiveDisk);
       const checkedSessions = mergeAndPruneCheckedSessions(
-        diskCache,
+        effectiveDisk,
         session.sessionKey,
-        { status: 'failed', attemptAt: now },
+        { status: 'pending', attemptAt: now, attempts },
         now
       );
       return {
         nextData: {
           ...basePreserved,
           lastSessionKey: session.sessionKey,
-          lastSessionStatus: 'failed',
+          lastSessionStatus: 'pending',
           lastAttemptAt: now,
           checkedSessions
         },
-        result: { claimed: true, diskCache }
+        result: { claimed: true, diskCache: effectiveDisk, attempts }
       };
     });
 
@@ -693,33 +901,56 @@ export async function checkPluginUpdateAsync(options = {}) {
       const timeoutMs = typeof options.timeoutMs === 'number'
         ? options.timeoutMs
         : (!isNaN(envWait) && envWait > 0 ? envWait : autoBudgetTimeout);
-      const fetchFn = typeof options.fetchReleaseFn === 'function' ? options.fetchReleaseFn : fetchLatestPluginReleaseAsync;
+      const useDetachedWorker = typeof options.fetchReleaseFn !== 'function' && options.detachedWorker !== false;
+      const attempts = claimOutcome?.attempts || 1;
 
       checked = true;
-      const res = await fetchFn(releaseUrl, timeoutMs).catch(() => ({ ok: false }));
-      if (res && res.ok && res.latestVersion) {
-        latestVersion = res.latestVersion;
-        latestTag = res.latestTag || formatVersionTag(res.latestVersion);
-        await updatePluginUpdateCacheAsync(cachePath, (diskCache) => {
-          const okAt = Date.now();
-          const checkedSessions = mergeAndPruneCheckedSessions(
-            diskCache,
-            session.sessionKey,
-            { status: 'ok', attemptAt: now },
-            okAt
-          );
-          return {
-            nextData: {
-              latestVersion,
-              latestTag,
-              latestCheckedAt: okAt,
-              lastSessionKey: session.sessionKey,
-              lastSessionStatus: 'ok',
-              lastAttemptAt: now,
-              checkedSessions
-            }
-          };
+      let ranDetached = false;
+      if (useDetachedWorker) {
+        const workerScriptPath = options.workerScriptPath || fileURLToPath(import.meta.url);
+        const parentWaitMs = typeof options.timeoutMs === 'number'
+          ? options.timeoutMs
+          : Math.min(1800, Math.max(timeoutMs + 250, 400));
+        const workerRes = await runDetachedFetchAndWaitAsync({
+          workerScriptPath,
+          cachePath,
+          sessionKey: session.sessionKey,
+          releaseUrl,
+          workerTimeoutMs: Math.max(timeoutMs, 3500),
+          parentWaitMs,
+          attemptAt: now,
+          attempts,
+          envObj
         });
+        if (workerRes.spawned) {
+          ranDetached = true;
+          const afterWorker = await readJsonSafeAsync(cachePath);
+          const refreshedLatest = normalizeSemver(afterWorker?.latestVersion || '');
+          if (refreshedLatest) {
+            latestVersion = refreshedLatest;
+            latestTag = formatVersionTag(afterWorker?.latestTag || refreshedLatest);
+          }
+        }
+      }
+
+      if (!ranDetached) {
+        const fetchFn = typeof options.fetchReleaseFn === 'function' ? options.fetchReleaseFn : fetchLatestPluginReleaseAsync;
+        const res = await fetchFn(releaseUrl, timeoutMs).catch((err) => ({
+          ok: false,
+          error: err?.message || 'fetch_throw'
+        }));
+        const finalized = await finalizePluginUpdateResultAsync({
+          cachePath,
+          sessionKey: session.sessionKey,
+          attemptAt: now,
+          attempts,
+          res,
+          fallbackSeed: legacySeed
+        });
+        if (finalized?.latestVersion) {
+          latestVersion = finalized.latestVersion;
+          latestTag = finalized.latestTag || formatVersionTag(finalized.latestVersion);
+        }
       }
     }
   }
@@ -735,4 +966,99 @@ export async function checkPluginUpdateAsync(options = {}) {
     skippedNonInteractive: false,
     sessionKey: session.sessionKey
   };
+}
+
+/**
+ * 供 Antigravity 2.0 常駐服務共用的 TTL 更新檢查與快取合併寫入函式（保留 CLI checkedSessions 不被覆寫）。
+ * @param {object} [options={}]
+ * @returns {Promise<{ installedVersion: string, installedTag: string, latestVersion: string, latestTag: string, updateAvailable: boolean, releaseUrl: string, checkedAt: number }>}
+ */
+export async function resolvePluginUpdateByTtlAsync(options = {}) {
+  const installedVersion = typeof options.installedVersion === 'string' ? options.installedVersion : '';
+  const homeDir = options.homeDir || os.homedir();
+  const pluginDataDir = typeof options.pluginDataDir === 'string' ? options.pluginDataDir : '';
+  const targetCachePath = options.cachePath || getSharedUpdateCachePath(homeDir, pluginDataDir);
+  const ttlMs = typeof options.ttlMs === 'number' && options.ttlMs >= 0 ? options.ttlMs : SHARED_UPDATE_CACHE_TTL_MS;
+  const forceCheck = Boolean(options.forceCheck);
+  const releaseUrl = options.releaseUrl || GITHUB_LATEST_RELEASE_URL;
+  const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 1500;
+  const fetchFn = typeof options.fetchReleaseFn === 'function' ? options.fetchReleaseFn : fetchLatestPluginReleaseAsync;
+
+  const cached = await readJsonSafeAsync(targetCachePath);
+  const now = Date.now();
+  let latestVersion = normalizeSemver(cached?.latestVersion || '') || (cached?.latestVersion || '');
+  let latestTag = latestVersion ? (cached?.latestTag || formatVersionTag(latestVersion)) : '';
+  let checkedAt = Number(cached?.checkedAt || cached?.latestCheckedAt || 0);
+
+  if (forceCheck || !checkedAt || (now - checkedAt) > ttlMs) {
+    const res = await fetchFn(releaseUrl, timeoutMs).catch(() => ({ ok: false }));
+    if (res?.ok && res.latestVersion) {
+      const normalizedLatest = normalizeSemver(res.latestVersion) || res.latestVersion;
+      const resolvedTag = res.latestTag || formatVersionTag(normalizedLatest);
+      const updated = await updatePluginUpdateCacheAsync(targetCachePath, (diskCache) => {
+        const okAt = Date.now();
+        const base = (diskCache && typeof diskCache === 'object' && !Array.isArray(diskCache)) ? diskCache : {};
+        return {
+          nextData: {
+            ...base,
+            latestVersion: normalizedLatest,
+            latestTag: resolvedTag,
+            checkedAt: okAt,
+            latestCheckedAt: okAt
+          },
+          result: {
+            latestVersion: normalizedLatest,
+            latestTag: resolvedTag,
+            checkedAt: okAt
+          }
+        };
+      });
+      if (updated) {
+        latestVersion = updated.latestVersion;
+        latestTag = updated.latestTag;
+        checkedAt = updated.checkedAt;
+      }
+    }
+  }
+
+  const updateAvailable = Boolean(installedVersion && latestVersion && isVersionBehind(installedVersion, latestVersion));
+  return {
+    installedVersion,
+    installedTag: installedVersion ? `v${installedVersion}` : '',
+    latestVersion,
+    latestTag,
+    updateAvailable,
+    releaseUrl,
+    checkedAt
+  };
+}
+
+async function runDetachedPluginUpdateWorkerAsync() {
+  const cachePath = process.env.STATUSLINE_PLUGIN_UPDATE_CACHE_PATH || '';
+  const sessionKey = process.env.STATUSLINE_PLUGIN_UPDATE_SESSION_KEY || '';
+  const releaseUrl = process.env.STATUSLINE_PLUGIN_UPDATE_RELEASE_URL || GITHUB_LATEST_RELEASE_URL;
+  const timeoutMs = parseInt(process.env.STATUSLINE_PLUGIN_UPDATE_TIMEOUT_MS || '', 10) || 3500;
+  const attemptAt = Number(process.env.STATUSLINE_PLUGIN_UPDATE_ATTEMPT_AT || '') || Date.now();
+  const attempts = Number(process.env.STATUSLINE_PLUGIN_UPDATE_ATTEMPTS || '') || 1;
+  if (!cachePath || !sessionKey) return;
+
+  const res = await fetchLatestPluginReleaseAsync(releaseUrl, timeoutMs).catch((err) => ({
+    ok: false,
+    error: err?.message || 'worker_throw'
+  }));
+  await finalizePluginUpdateResultAsync({
+    cachePath,
+    sessionKey,
+    attemptAt,
+    attempts,
+    res
+  });
+}
+
+if (
+  process.env.STATUSLINE_PLUGIN_UPDATE_WORKER === '1' &&
+  process.argv.includes('--worker') &&
+  isDirectExecution(import.meta.url, { treatEmptyArgv1AsDirect: false })
+) {
+  runDetachedPluginUpdateWorkerAsync().finally(() => process.exit(0));
 }

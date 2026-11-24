@@ -1,9 +1,16 @@
 import { writeFileSync, readFileSync, mkdirSync, rmSync, mkdtempSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import os from 'os';
 import http from 'http';
 import { execFileSync } from 'child_process';
 import assert from 'assert';
+import {
+  MAX_INTERRUPTED_ATTEMPTS,
+  PENDING_LEASE_TTL_MS,
+  getLegacyCliUpdateCachePath,
+  getSharedUpdateCachePath,
+  resolvePluginUpdateByTtlAsync
+} from '../lib/collectors/plugin-update.mjs';
 import {
   buildI18nDict,
   stripAnsi,
@@ -844,8 +851,9 @@ async function main() {
       // F. Full subprocess E2E with runStatusline
       const e2eHome = join(sandboxR35, 'e2e-home');
       const e2ePluginDir = join(e2eHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
-      const e2eCachePath = join(e2eHome, '.gemini', 'tmp', 'plugin_update_cache.json');
+      const e2eCachePath = getSharedUpdateCachePath(e2eHome);
       mkdirSync(join(e2eHome, '.gemini', 'tmp'), { recursive: true });
+      mkdirSync(dirname(e2eCachePath), { recursive: true });
       mkdirSync(e2ePluginDir, { recursive: true });
       writeFileSync(join(e2eHome, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ models: {} }), 'utf8');
       writeFileSync(join(e2ePluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
@@ -1096,7 +1104,7 @@ setTimeout(() => {
       if (liveSelfWalk.found && !liveSelfWalk.nonInteractive && serverPort) {
         const realTreeHome = join(sandboxR35, 'real-tree-home');
         const realTreePluginDir = join(realTreeHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
-        const realTreeCachePath = join(realTreeHome, '.gemini', 'tmp', 'plugin_update_cache.json');
+        const realTreeCachePath = getSharedUpdateCachePath(realTreeHome);
         mkdirSync(join(realTreeHome, '.gemini', 'tmp'), { recursive: true });
         mkdirSync(realTreePluginDir, { recursive: true });
         writeFileSync(join(realTreeHome, '.gemini', 'tmp', 'real_quota_cache.json'), JSON.stringify({ models: {} }), 'utf8');
@@ -1128,6 +1136,160 @@ setTimeout(() => {
         assert.strictEqual(realLines1.length, 3);
         assert.strictEqual(realLines1[2], `agy plugin install ${PLUGIN_REPO_URL}`);
       }
+
+      // ----------------------------------------------------
+      // I. 方案 A 共用快取、pending 租約自癒、lastError 紀錄與舊檔相容遷移
+      // ----------------------------------------------------
+      const planAHome = join(sandboxR35, 'plan-a-home');
+      const planAPluginDir = join(planAHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+      mkdirSync(planAPluginDir, { recursive: true });
+      writeFileSync(join(planAPluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '2.0.0' }), 'utf8');
+
+      // I1. pending 租約未過期時不重複請求；租約逾時（模擬前次啟動遭中止）自動接手重試並翻為 ok，最多重試 MAX_INTERRUPTED_ATTEMPTS 次
+      const leaseCachePath = join(planAHome, 'lease_update_cache.json');
+      const freshAttemptAt = Date.now() - 500;
+      writeFileSync(leaseCachePath, JSON.stringify({
+        lastSessionKey: '8001:lease',
+        lastSessionStatus: 'pending',
+        lastAttemptAt: freshAttemptAt,
+        checkedSessions: {
+          '8001:lease': { status: 'pending', attemptAt: freshAttemptAt, attempts: 1 }
+        }
+      }), 'utf8');
+      let leaseFetches = 0;
+      const freshPendingRes = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: planAHome,
+        cachePath: leaseCachePath,
+        session: { found: true, pid: 8001, startTime: 'lease', nonInteractive: false, sessionKey: '8001:lease' },
+        fetchReleaseFn: async () => { leaseFetches++; return { ok: true, latestVersion: '2.1.0', latestTag: 'v2.1.0' }; }
+      });
+      assert.strictEqual(freshPendingRes.checked, false, 'Unexpired pending lease must prevent duplicate fetches');
+      assert.strictEqual(leaseFetches, 0);
+
+      const expiredAttemptAt = Date.now() - PENDING_LEASE_TTL_MS - 1000;
+      writeFileSync(leaseCachePath, JSON.stringify({
+        lastSessionKey: '8001:lease',
+        lastSessionStatus: 'pending',
+        lastAttemptAt: expiredAttemptAt,
+        checkedSessions: {
+          '8001:lease': { status: 'pending', attemptAt: expiredAttemptAt, attempts: 1 }
+        }
+      }), 'utf8');
+      const recoveredRes = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: planAHome,
+        cachePath: leaseCachePath,
+        session: { found: true, pid: 8001, startTime: 'lease', nonInteractive: false, sessionKey: '8001:lease' },
+        fetchReleaseFn: async () => { leaseFetches++; return { ok: true, latestVersion: '2.1.0', latestTag: 'v2.1.0' }; }
+      });
+      assert.strictEqual(recoveredRes.checked, true, 'Expired pending lease must allow recovery fetch');
+      assert.strictEqual(recoveredRes.updateAvailable, true);
+      assert.strictEqual(recoveredRes.latestTag, 'v2.1.0');
+      assert.strictEqual(leaseFetches, 1);
+      const recoveredSaved = JSON.parse(readFileSync(leaseCachePath, 'utf8'));
+      assert.strictEqual(recoveredSaved.lastSessionStatus, 'ok');
+      assert.strictEqual(recoveredSaved.checkedSessions['8001:lease'].status, 'ok');
+      assert.strictEqual(recoveredSaved.checkedSessions['8001:lease'].attempts, 2);
+
+      // 連續中斷達 MAX_INTERRUPTED_ATTEMPTS 上限後停止重試；明確失敗須記錄 lastError
+      writeFileSync(leaseCachePath, JSON.stringify({
+        lastSessionKey: '8002:capped',
+        lastSessionStatus: 'pending',
+        lastAttemptAt: expiredAttemptAt,
+        checkedSessions: {
+          '8002:capped': { status: 'pending', attemptAt: expiredAttemptAt, attempts: MAX_INTERRUPTED_ATTEMPTS }
+        }
+      }), 'utf8');
+      const cappedRes = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: planAHome,
+        cachePath: leaseCachePath,
+        session: { found: true, pid: 8002, startTime: 'capped', nonInteractive: false, sessionKey: '8002:capped' },
+        fetchReleaseFn: async () => { leaseFetches++; return { ok: true, latestVersion: '2.1.0', latestTag: 'v2.1.0' }; }
+      });
+      assert.strictEqual(cappedRes.checked, false, 'Interrupted attempts reaching MAX_INTERRUPTED_ATTEMPTS must stop retrying');
+      assert.strictEqual(leaseFetches, 1);
+
+      const errRecordedRes = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: planAHome,
+        cachePath: leaseCachePath,
+        session: { found: true, pid: 8003, startTime: 'err', nonInteractive: false, sessionKey: '8003:err' },
+        fetchReleaseFn: async () => ({ ok: false, error: 'timeout' })
+      });
+      assert.strictEqual(errRecordedRes.checked, true);
+      const errSaved = JSON.parse(readFileSync(leaseCachePath, 'utf8'));
+      assert.strictEqual(errSaved.checkedSessions['8003:err'].status, 'failed');
+      assert.strictEqual(errSaved.checkedSessions['8003:err'].lastError, 'timeout');
+
+      // I2. CLI 與 2.0 共用同一份 update_cache.json 互惠且不互蓋
+      const sharedHome = join(sandboxR35, 'shared-home');
+      const sharedPluginDir = join(sharedHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+      mkdirSync(sharedPluginDir, { recursive: true });
+      writeFileSync(join(sharedPluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '2.0.0' }), 'utf8');
+      const appCheck = await resolvePluginUpdateByTtlAsync({
+        installedVersion: '2.0.0',
+        homeDir: sharedHome,
+        forceCheck: true,
+        fetchReleaseFn: async () => ({ ok: true, latestVersion: '2.1.0', latestTag: 'v2.1.0' })
+      });
+      assert.strictEqual(appCheck.updateAvailable, true);
+      assert.strictEqual(appCheck.latestTag, 'v2.1.0');
+
+      // CLI 即使離線也能立即沿用 2.0 寫入共用快取的 v2.1.0
+      const cliOfflineUsingShared = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: sharedHome,
+        session: { found: true, pid: 8100, startTime: 's-cli', nonInteractive: false, sessionKey: '8100:s-cli' },
+        fetchReleaseFn: async () => ({ ok: false, error: 'offline' })
+      });
+      assert.strictEqual(cliOfflineUsingShared.updateAvailable, true, 'CLI must see v2.1.0 written by 2.0 in shared update_cache.json');
+      assert.strictEqual(cliOfflineUsingShared.latestTag, 'v2.1.0');
+
+      // 2.0 再次強制檢查更新版本，不可覆蓋 CLI 的 checkedSessions
+      await resolvePluginUpdateByTtlAsync({
+        installedVersion: '2.0.0',
+        homeDir: sharedHome,
+        forceCheck: true,
+        fetchReleaseFn: async () => ({ ok: true, latestVersion: '2.2.0', latestTag: 'v2.2.0' })
+      });
+      const sharedSaved = JSON.parse(readFileSync(getSharedUpdateCachePath(sharedHome), 'utf8'));
+      assert.strictEqual(sharedSaved.latestVersion, '2.2.0');
+      assert.ok(sharedSaved.checkedSessions['8100:s-cli'], '2.0 TTL update must preserve CLI checkedSessions');
+      assert.strictEqual(sharedSaved.checkedSessions['8100:s-cli'].status, 'failed');
+
+      // I3. 舊版 ~/.gemini/tmp/plugin_update_cache.json 唯讀相容遷移
+      const migHome = join(sandboxR35, 'migration-home');
+      const migPluginDir = join(migHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+      const legacyPath = getLegacyCliUpdateCachePath(migHome);
+      const migratedSharedPath = getSharedUpdateCachePath(migHome);
+      mkdirSync(migPluginDir, { recursive: true });
+      mkdirSync(join(migHome, '.gemini', 'tmp'), { recursive: true });
+      writeFileSync(join(migPluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '2.0.0' }), 'utf8');
+      const legacyRaw = JSON.stringify({
+        latestVersion: '2.1.0',
+        latestTag: 'v2.1.0',
+        latestCheckedAt: 1795490000000,
+        lastSessionKey: '8200:old',
+        lastSessionStatus: 'ok',
+        lastAttemptAt: 1795490000000,
+        checkedSessions: {
+          '8200:old': { status: 'ok', attemptAt: 1795490000000 }
+        }
+      }, null, 2);
+      writeFileSync(legacyPath, legacyRaw, 'utf8');
+      const migRes = await checkPluginUpdateAsync({
+        enabled: true,
+        homeDir: migHome,
+        session: { found: true, pid: 8200, startTime: 'old', nonInteractive: false, sessionKey: '8200:old' },
+        fetchReleaseFn: async () => { throw new Error('must not fetch'); }
+      });
+      assert.strictEqual(migRes.checked, false);
+      assert.strictEqual(migRes.updateAvailable, true);
+      assert.strictEqual(migRes.latestTag, 'v2.1.0');
+      assert.strictEqual(existsSync(migratedSharedPath), true, 'Legacy cache must migrate into shared update_cache.json');
+      assert.strictEqual(readFileSync(legacyPath, 'utf8'), legacyRaw, 'Legacy cache file must remain read-only/unmodified');
 
       console.log("✅ Test R35 passed! (cli-version rename, plugin-version, process-tree tracking & GitHub update check verified)");
     } finally {

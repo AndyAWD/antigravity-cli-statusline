@@ -16,14 +16,17 @@ import {
   sanitizeConversationId
 } from '../../skills/agy-cli-statusline/scripts/lib/core/normalize.mjs';
 import { resolveInstalledPluginVersionAsync } from '../../skills/agy-cli-statusline/scripts/lib/core/plugin-manifest.mjs';
-import { compareSemver, isVersionBehind } from '../../skills/agy-cli-statusline/scripts/lib/core/semver.mjs';
+import { compareSemver } from '../../skills/agy-cli-statusline/scripts/lib/core/semver.mjs';
 import { getSettingsAsync } from '../../skills/agy-cli-statusline/scripts/lib/core/settings.mjs';
 import {
   extractModelCandidateKeys,
   resolveCatalogEntry,
   resolveContextMetricsPure
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/context.mjs';
-import { fetchLatestPluginReleaseAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/plugin-update.mjs';
+import {
+  fetchLatestPluginReleaseAsync,
+  resolvePluginUpdateByTtlAsync
+} from '../../skills/agy-cli-statusline/scripts/lib/collectors/plugin-update.mjs';
 import { extractMetricsAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs';
 import {
   isOrchestratorModelName,
@@ -266,35 +269,17 @@ export class StatuslineService {
   }
 
   async _resolveUpdateInfoAsync({ installedVersion, forceCheck = false }) {
-    const cachePath = path.join(this.pluginDataDir, 'update_cache.json');
-    const cached = await readJsonSafeAsync(cachePath);
-    const now = Date.now();
-    let latestVersion = cached?.latestVersion || '';
-    let latestTag = cached?.latestTag || '';
-    let checkedAt = Number(cached?.checkedAt || 0);
-
-    if (forceCheck || !checkedAt || (now - checkedAt) > UPDATE_CACHE_TTL_MS) {
-      const res = await this.fetchReleaseFn(GITHUB_LATEST_RELEASE_URL, 1500).catch(() => ({ ok: false }));
-      if (res?.ok && res.latestVersion) {
-        latestVersion = res.latestVersion;
-        latestTag = res.latestTag || `v${res.latestVersion}`;
-        checkedAt = now;
-        try {
-          await writeFileAndVerifyNoBOM(cachePath, JSON.stringify({ latestVersion, latestTag, checkedAt }, null, 2));
-        } catch (_) {}
-      }
-    }
-
-    const updateAvailable = Boolean(installedVersion && latestVersion && isVersionBehind(installedVersion, latestVersion));
-    return {
+    return resolvePluginUpdateByTtlAsync({
       installedVersion,
-      installedTag: installedVersion ? `v${installedVersion}` : '',
-      latestVersion,
-      latestTag,
-      updateAvailable,
+      homeDir: this.homeDir,
+      pluginDataDir: this.pluginDataDir,
+      cachePath: path.join(this.pluginDataDir, 'update_cache.json'),
+      ttlMs: UPDATE_CACHE_TTL_MS,
+      forceCheck,
       releaseUrl: GITHUB_LATEST_RELEASE_URL,
-      checkedAt
-    };
+      timeoutMs: 1500,
+      fetchReleaseFn: this.fetchReleaseFn
+    });
   }
 
   async getDashboardSnapshot({
