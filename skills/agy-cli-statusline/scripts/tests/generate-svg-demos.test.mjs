@@ -41,28 +41,29 @@ for (const lang of languages) {
 
   // 4. Wizard options checkmarks [✓]
   const checkmarks = (svg.match(/\[✓\]/g) || []).length;
-  assert.strictEqual(checkmarks, 40, `${lang}: SVG must visibly render all 40 options checked across 5 categories, got ${checkmarks}`);
+  assert.strictEqual(checkmarks, 36, `${lang}: SVG must visibly render all 36 options checked across 5 categories, got ${checkmarks}`);
 
   // 5. Monospace column spacing & anti-collision: checkmark for Node.js must be at x="370"
   assert.ok(svg.includes('<text x="370" y="158" fill="#5cdb6d" font-weight="700">✓</text>'), `${lang}: Node.js checkmark must be at x=370 to prevent text overlap`);
   assert.ok(svg.includes('<text x="390" y="158" fill="#8b949e">Node.js v20.18.0 detected</text>'), `${lang}: Node.js text must be at x=390`);
 
-  // 6. Metric 15 in Frame 6 reference table must be labeled Argon (not quota-bar) and 30 must be Agy CLI
+  // 6. Metric 14, 15, 26 in Frame 6 reference table and complete removal of Argon quota indicators
+  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">14</tspan> │'), `${lang}: Reference table must include metric 14`);
   assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │'), `${lang}: Reference table must include metric 15`);
-  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">30</tspan> │'), `${lang}: Reference table must include metric 30`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 額度 (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 额度 (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 残量 (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
-  assert.ok(!svg.includes('│ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon Quota (quota)'), `${lang}: Metric 15 must not mislabel Argon as quota`);
+  assert.ok(svg.includes('│ <tspan fill="#57caff" font-weight="700">26</tspan> │'), `${lang}: Reference table must include metric 26`);
+  assert.ok(!svg.includes('quota-argon'), `${lang}: SVG must not include removed quota-argon indicator`);
+  assert.ok(!svg.includes('Argon 可用'), `${lang}: SVG must not include Argon 可用`);
+  assert.ok(!svg.includes('Argon Available'), `${lang}: SVG must not include Argon Available`);
+  assert.ok(!svg.includes('Argon 残量'), `${lang}: SVG must not include Argon 残量`);
 
   // 7. Frame 7 cursor position must not be floating in empty space at x=650 or overlapping text
   assert.ok(!svg.includes('<rect class="cur" x="650" y="255"'), `${lang}: Frame 7 cursor must not be floating at x=650`);
   assert.ok(svg.includes('<rect class="cur" x="830" y="384"'), `${lang}: Frame 6 cursor must be at x=830 y=384`);
 
-  // 8. Frame 7 & 8 must render 11 rows of statusline telemetry ending at y=541
-  assert.ok(svg.includes('y="541"'), `${lang}: Frame 7/8 must render up to 11 statusline rows ending at y=541`);
+  // 8. Frame 7 & 8 must render 10 rows of statusline telemetry ending at y=522
+  assert.ok(svg.includes('y="522"'), `${lang}: Frame 7/8 must render up to 10 statusline rows ending at y=522`);
   assert.ok(svg.includes('<text x="24" y="389"> </text>'), `${lang}: Frame 7/8 must preserve empty row 2 for n,n`);
-  assert.ok(svg.includes('<text x="24" y="484"> </text>'), `${lang}: Frame 7/8 must preserve empty row 7 for n,n`);
+  assert.ok(svg.includes('<text x="24" y="465"> </text>'), `${lang}: Frame 7/8 must preserve empty row 6 for n,n`);
 
   // 9. Frame 7 & 8 prompt box docking
   assert.ok(svg.includes('<line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>'), `${lang}: Prompt box top border at y=294`);

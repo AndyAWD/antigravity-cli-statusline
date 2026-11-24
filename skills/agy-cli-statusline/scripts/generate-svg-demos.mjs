@@ -101,8 +101,7 @@ function ansiToTspans(ansiLine) {
 // agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,
 // context-used,context-used-bar,token-count,token-count-bar,n,
 // quota,quota-bar,quota-reset-countdown,quota-reset-time,n,
-// quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,
-// quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,
+// quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,n,
 // vcs-dirty,vcs-type,e:git-branch,n,
 // e:project-path,project-full-path,n,
 // e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,plugin-update]
@@ -112,8 +111,7 @@ const USER_SORTED_ITEMS = [
   'agent-profile', 'agent-state', 'subagents', 'artifacts', 'pending-input', 'background-tasks', 'tool-confirmation', 'n', 'n',
   'context-used', 'context-used-bar', 'token-count', 'token-count-bar', 'n',
   'quota', 'quota-bar', 'quota-reset-countdown', 'quota-reset-time', 'n',
-  'quota-weekly', 'quota-weekly-bar', 'quota-weekly-countdown', 'quota-weekly-reset-time', 'n',
-  'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'n', 'n',
+  'quota-weekly', 'quota-weekly-bar', 'quota-weekly-countdown', 'quota-weekly-reset-time', 'n', 'n',
   'vcs-dirty', 'vcs-type', 'git-branch', 'n',
   'project-path', 'project-full-path', 'n',
   'mode', 'conversation-id', 'memory-usage', 'cli-version', 'app-version', 'plugin-version', 'plugin-update'
@@ -204,11 +202,6 @@ function getScenarios(lang) {
     weeklyQuotaBarVal: renderBarGraph(100, 10, '\x1b[38;2;87;202;255m'),
     weeklyCountdownVal: '7d 00h',
     weeklyResetTimeVal: '07/09 03:22',
-    argonQuotaColor: '\x1b[38;2;87;202;255m',
-    argonQuotaVal: '100%',
-    argonQuotaBarVal: renderBarGraph(100, 10, '\x1b[38;2;87;202;255m'),
-    argonCountdownVal: '24h 00m',
-    argonResetTimeVal: '07/03 03:22',
     toolConfirmPending: false,
     pendingInputCount: 0,
     backgroundTasksCount: 0,
@@ -237,11 +230,6 @@ function getScenarios(lang) {
     weeklyQuotaBarVal: renderBarGraph(96, 10, '\x1b[38;2;87;202;255m'),
     weeklyCountdownVal: '6d 18h',
     weeklyResetTimeVal: '07/08 05:06',
-    argonQuotaColor: '\x1b[38;2;87;202;255m',
-    argonQuotaVal: '100%',
-    argonQuotaBarVal: renderBarGraph(100, 10, '\x1b[38;2;87;202;255m'),
-    argonCountdownVal: '23h 59m',
-    argonResetTimeVal: '07/02 08:30',
     toolConfirmPending: false,
     pendingInputCount: 0,
     backgroundTasksCount: 1,
@@ -264,10 +252,10 @@ const WIZARD_META = {
     header: '選擇要顯示的狀態列指標（五大分類分頁精靈 1/5 ~ 5/5）：',
     pagers: [
       '⎿ 分頁進度：[ 第 1 / 5 頁 ] · 已選取 5 項指標',
-      '⎿ 分頁進度：[ 第 2 / 5 頁 ] · 累計選取 19 項指標',
-      '⎿ 分頁進度：[ 第 3 / 5 頁 ] · 累計選取 23 項指標',
-      '⎿ 分頁進度：[ 第 4 / 5 頁 ] · 累計選取 28 項指標',
-      '★ 全部五大分類共 40 項指標已全數選取完成！'
+      '⎿ 分頁進度：[ 第 2 / 5 頁 ] · 累計選取 15 項指標',
+      '⎿ 分頁進度：[ 第 3 / 5 頁 ] · 累計選取 19 項指標',
+      '⎿ 分頁進度：[ 第 4 / 5 頁 ] · 累計選取 24 項指標',
+      '★ 全部五大分類共 36 項指標已全數選取完成！'
     ],
     navHints: [
       'Space 勾選/取消 · Enter 進入下一分頁 (2/5 額度計費) · 終端機分頁免滾動零截斷',
@@ -282,10 +270,10 @@ const WIZARD_META = {
     header: '选择要显示的状态栏指标（五大分类分页向导 1/5 ~ 5/5）：',
     pagers: [
       '⎿ 分页进度：[ 第 1 / 5 页 ] · 已选取 5 项指标',
-      '⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 19 项指标',
-      '⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 23 项指标',
-      '⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 28 项指标',
-      '★ 全部五大分类共 40 项指标已全数选取完成！'
+      '⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 15 项指标',
+      '⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 19 项指标',
+      '⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 24 项指标',
+      '★ 全部五大分类共 36 项指标已全数选取完成！'
     ],
     navHints: [
       'Space 勾选/取消 · Enter 进入下一分页 (2/5 额度计费) · 终端分页免滚动零截断',
@@ -300,10 +288,10 @@ const WIZARD_META = {
     header: '表示する指標を選択（5 大分類ウィザード 1/5 ~ 5/5）：',
     pagers: [
       '⎿ ページ進捗：[ 第 1 / 5 ページ ] · 5 項目を選択中',
-      '⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 19 項目を選択中',
-      '⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 23 項目を選択中',
-      '⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 28 項目を選択中',
-      '★ 全 5 カテゴリ 40 指標の一括選択が完了しました！'
+      '⎿ ページ進捗：[ 第 2 / 5 ページ ] · 累計 15 項目を選択中',
+      '⎿ ページ進捗：[ 第 3 / 5 ページ ] · 累計 19 項目を選択中',
+      '⎿ ページ進捗：[ 第 4 / 5 ページ ] · 累計 24 項目を選択中',
+      '★ 全 5 カテゴリ 36 指標の一括選択が完了しました！'
     ],
     navHints: [
       'Space 選択/解除 · Enter 次のカテゴリ (2/5 クォータ) · スクロール不要',
@@ -318,10 +306,10 @@ const WIZARD_META = {
     header: 'Select statusline indicators (Category Wizard 1/5 ~ 5/5):',
     pagers: [
       '⎿ Wizard pager: [ Page 1 / 5 ] · 5 metrics selected',
-      '⎿ Wizard pager: [ Page 2 / 5 ] · 19 metrics selected cumulatively',
-      '⎿ Wizard pager: [ Page 3 / 5 ] · 23 metrics selected cumulatively',
-      '⎿ Wizard pager: [ Page 4 / 5 ] · 28 metrics selected cumulatively',
-      '★ All 40 indicators across 5 categories successfully selected!'
+      '⎿ Wizard pager: [ Page 2 / 5 ] · 15 metrics selected cumulatively',
+      '⎿ Wizard pager: [ Page 3 / 5 ] · 19 metrics selected cumulatively',
+      '⎿ Wizard pager: [ Page 4 / 5 ] · 24 metrics selected cumulatively',
+      '★ All 36 indicators across 5 categories successfully selected!'
     ],
     navHints: [
       'Space Toggle · Enter Next category (2/5 Quota) · Eliminates scroll truncation',
@@ -364,58 +352,58 @@ export function generateDemoSvg(lang) {
 
   // Accessible Label & Captions (9 frames: language -> wizard 1/5..5/5 -> write-in -> reload -> live)
   const ariaLabel = isZhTw
-    ? 'Antigravity 命令列介面（CLI）狀態列互動設定與動態遙測展示：從執行 /antigravity-cli-statusline:agy-cli-statusline 指令、語系選擇、五大分類分頁精靈（Question 1/5 至 5/5 全五層展示）、自訂排序 Write-in 到 11 列完整狀態列即時運作。'
+    ? 'Antigravity 命令列介面（CLI）狀態列互動設定與動態遙測展示：從執行 /antigravity-cli-statusline:agy-cli-statusline 指令、語系選擇、五大分類分頁精靈（Question 1/5 至 5/5 全五層展示）、自訂排序 Write-in 到 10 列完整狀態列即時運作。'
     : (isZhCn
-      ? 'Antigravity 命令行界面（CLI）状态栏交互设置与动态遥测展示：从执行 /antigravity-cli-statusline:agy-cli-statusline 指令、语言选择、五大分类分页向导（Question 1/5 至 5/5 全五层展示）、自定义排序 Write-in 到 11 列完整状态栏即时运作。'
+      ? 'Antigravity 命令行界面（CLI）状态栏交互设置与动态遥测展示：从执行 /antigravity-cli-statusline:agy-cli-statusline 指令、语言选择、五大分类分页向导（Question 1/5 至 5/5 全五层展示）、自定义排序 Write-in 到 10 列完整状态栏即时运作。'
       : (isJp
-        ? 'Antigravity CLI ステータスライン対話型設定と動的テレメトリデモ：/antigravity-cli-statusline:agy-cli-statusline の実行、言語選択、5大分類ウィザード（Question 1/5〜5/5の全5階層）、カスタム並び順 Write-in、11列ステータスラインのリアルタイム稼働まで。'
-        : 'Antigravity CLI statusline interactive setup and live telemetry demo: from running /antigravity-cli-statusline:agy-cli-statusline command, language selection, 5-category wizard (all 5 layers Question 1/5 to 5/5), custom order Write-in, to full 11-row live statusline telemetry.'));
+        ? 'Antigravity CLI ステータスライン対話型設定と動的テレメトリデモ：/antigravity-cli-statusline:agy-cli-statusline の実行、言語選択、5大分類ウィザード（Question 1/5〜5/5の全5階層）、カスタム並び順 Write-in、10列ステータスラインのリアルタイム稼働まで。'
+        : 'Antigravity CLI statusline interactive setup and live telemetry demo: from running /antigravity-cli-statusline:agy-cli-statusline command, language selection, 5-category wizard (all 5 layers Question 1/5 to 5/5), custom order Write-in, to full 10-row live statusline telemetry.'));
 
   const captions = isZhTw
     ? [
       '① 執行設定指令與語系選擇 · /antigravity-cli-statusline:agy-cli-statusline 啟動精靈',
       '② 指標分頁勾選 (1/5 模型與代理) · 勾選 model-name, agent-profile, agent-state, mode',
-      '③ 指標分頁勾選 (2/5 額度計費帳號) · 勾選 5小時/每週/Argon 額度、長條圖與時間等 14 項',
+      '③ 指標分頁勾選 (2/5 額度計費帳號) · 勾選 5小時/每週額度、長條圖與時間等 10 項',
       '④ 指標分頁勾選 (3/5 脈絡與權杖) · 勾選脈絡消耗比例、脈絡長條圖、精確權杖數與長條圖',
       '⑤ 指標分頁勾選 (4/5 工作區與版控) · 勾選專案短/完整路徑、Git 分支、未提交變更與 VCS 類型',
       '⑥ 指標分頁勾選 (5/5 系統與背景任務) · 勾選 RAM、Agy CLI 版本、狀態列版本與更新提醒、子代理與產出等 11 項',
       '⑦ 手動排序與個別樣式 Write-in · 支援 e: 指定 Emoji 圖示、n/n,n 換行排版',
-      '⑧ 設定部署完成與即時熱重載 · 三層 settings.json 同步，立即呈現 11 列自訂狀態列',
+      '⑧ 設定部署完成與即時熱重載 · 三層 settings.json 同步，立即呈現 10 列自訂狀態列',
       '⑨ 完整狀態列即時遙測運作 · 依指定排序即時追蹤長條圖、權杖用量與子代理'
     ]
     : (isZhCn
       ? [
         '① 执行设置指令与语言选择 · 执行 /antigravity-cli-statusline:agy-cli-statusline 启动向导',
         '② 指标分页勾选 (1/5 模型与代理) · 勾选 model-name, agent-profile, agent-state, mode',
-        '③ 指标分页勾选 (2/5 额度计费账号) · 勾选 5小时/每周/Argon 额度、长条图与时间等 14 项',
+        '③ 指标分页勾选 (2/5 额度计费账号) · 勾选 5小时/每周额度、长条图与时间等 10 项',
         '④ 指标分页勾选 (3/5 上下文与令牌) · 勾选上下文消耗比例、上下文长条图、精确令牌数与长条图',
         '⑤ 指标分页勾选 (4/5 工作区与版控) · 勾选项目短/完整路径、Git 分支、未提交变更与 VCS 类型',
         '⑥ 指标分页勾选 (5/5 系统与后台任务) · 勾选 RAM、Agy CLI 版本、状态栏版本与更新提醒、子代理与产出等 11 项',
         '⑦ 手动排序与个别样式 Write-in · 支持 e: 指定 Emoji 图标、n/n,n 换行排版',
-        '⑧ 设置部署与即时热重载 · 三层 settings.json 同步，立即呈现 11 列自订状态栏',
+        '⑧ 设置部署与即时热重载 · 三层 settings.json 同步，立即呈现 10 列自订状态栏',
         '⑨ 完整状态栏即时遥测运作 · 依指定排序即时追踪长条图、令牌用量与子代理'
       ]
       : (isJp
         ? [
           '① 設定コマンド実行と言語選択 · /antigravity-cli-statusline:agy-cli-statusline でウィザード起動',
           '② 指標ウィザード (1/5 モデルとエージェント) · model-name, agent-profile, agent-state, mode を選択',
-          '③ 指標ウィザード (2/5 クォータ・請求) · 5時間/週間/Argon クォータ、バー、時刻など14項目',
+          '③ 指標ウィザード (2/5 クォータ・請求) · 5時間/週間クォータ、バー、時刻など10項目',
           '④ 指標ウィザード (3/5 コンテキスト・トークン) · コンテキスト使用率・バー、トークン数・バーを選択',
           '⑤ 指標ウィザード (4/5 ワークスペース・VCS) · プロジェクトパス、Gitブランチ、未コミット変更、VCS種別',
           '⑥ 指標ウィザード (5/5 システム・タスク) · メモリ、CLI/ステータスライン版・更新通知、会話ID、サブ代理等11項目',
           '⑦ 並び順・スタイル直接入力 · e: 接頭辞で絵文字指定、n/n,n で自在に改行',
-          '⑧ 設定の反映と即時ホットリロード · 3 層 settings.json 同期、11 列レイアウト即時適用',
+          '⑧ 設定の反映と即時ホットリロード · 3 層 settings.json 同期、10 列レイアウト即時適用',
           '⑨ リアルタイムテレメトリ稼働 · 指定順序でプログレスバー、トークン、サブ代理を追跡'
         ]
         : [
           '① Run Command & Select Language · Launch wizard with /antigravity-cli-statusline:agy-cli-statusline',
           '② Indicator Selection (1/5 Model & Agent) · Select model-name, agent-profile, agent-state, mode',
-          '③ Indicator Selection (2/5 Quota & Billing) · Select 5-hr/weekly/Argon quotas, bars & reset times (14 items)',
+          '③ Indicator Selection (2/5 Quota & Billing) · Select 5-hr/weekly quotas, bars & reset times (10 items)',
           '④ Indicator Selection (3/5 Context & Tokens) · Select context used %, context bar, token count & bar',
           '⑤ Indicator Selection (4/5 Workspace & VCS) · Select project path, full path, Git branch, dirty status & VCS type',
           '⑥ Indicator Selection (5/5 System & Tasks) · Select RAM, Agy CLI & statusline version & update, subagents & artifacts (11 items)',
           '⑦ Custom Order & Styles Write-in · Supports e: for Emoji, text styles, and n/n,n line breaks',
-          '⑧ Config Deployment & Hot Reload · Sync 3-tier settings.json & activate 11-row statusline',
+          '⑧ Config Deployment & Hot Reload · Sync 3-tier settings.json & activate 10-row statusline',
           '⑨ Live Telemetry Statusline in Action · Real-time tracking of bars, tokens, and subagents'
         ]));
 
@@ -529,14 +517,14 @@ ${optionLines}
   const termContentF6 = isZhTw
     ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 40 項）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已選取的狀態列指標（共 36 項）</text>
   <text x="290" y="156" fill="#8b949e">— 於 Write-in 輸入自訂順序（e: 為 Emoji，n 為換行，n,n 為空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 長條 (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 記憶體量 (memory)   │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 倒數 (cd)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 狀態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 時間 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 對話 ID (conv-id)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 訂閱方案 (plan)     │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ 沙盒狀態 (sandbox)  │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">13</tspan> │ 🗓️ 每週時間 (time)     │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 💾 記憶體量 (memory)   │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">14</tspan> │ 💎 訂閱方案 (plan)     │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 狀態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ 📧 帳號信箱 (email)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 💬 對話 ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ 🧠 脈絡比例 (ctx)      │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 🛡️ 沙盒狀態 (sandbox)  │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -548,18 +536,18 @@ ${optionLines}
   <text x="44" y="376" fill="#57caff">  e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,</text>
   <text x="44" y="396" fill="#57caff">  context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,...]</text>
   <rect class="cur" x="830" y="384" width="8" height="15" fill="#57caff"/>
-  <text x="24" y="422" fill="#6e7681">依使用者指定排序與圖示前綴，將自動編排為 11 列高資訊密度狀態列</text>`
+  <text x="24" y="422" fill="#6e7681">依使用者指定排序與圖示前綴，將自動編排為 10 列高資訊密度狀態列</text>`
     : (isZhCn
       ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 40 项）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 36 项）</text>
   <text x="290" y="156" fill="#8b949e">— 于 Write-in 输入自定义顺序（e: 为 Emoji，n 为换行，n,n 为空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 内存用量 (memory)   │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 对话 ID (conv-id)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ 沙箱状态 (sandbox)  │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">13</tspan> │ 🗓️ 每周时间 (time)     │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 💾 内存用量 (memory)   │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">14</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ 📧 账号邮箱 (email)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 💬 对话 ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ 🧠 上下文 (context)    │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 🛡️ 沙箱状态 (sandbox)  │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -571,18 +559,18 @@ ${optionLines}
   <text x="44" y="376" fill="#57caff">  e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,</text>
   <text x="44" y="396" fill="#57caff">  context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,...]</text>
   <rect class="cur" x="830" y="384" width="8" height="15" fill="#57caff"/>
-  <text x="24" y="422" fill="#6e7681">依使用者指定排序与图标前缀，将自动编排为 11 列高信息密度状态栏</text>`
+  <text x="24" y="422" fill="#6e7681">依使用者指定排序与图标前缀，将自动编排为 10 列高信息密度状态栏</text>`
       : (isJp
         ? `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 40 項目）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">現在選択中の指標（全 36 項目）</text>
   <text x="280" y="156" fill="#8b949e">— 下の Write-in に並び順を入力（e: で絵文字、n で改行、n,n で空行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon バー (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 メモリ (memory)     │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 残 (cd)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 時刻 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 会話番号 (conv-id)  │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 プラン (plan)       │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ サンド (sandbox)    │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 モデル (model-name) │ <tspan fill="#57caff" font-weight="700">13</tspan> │ 🗓️ 週間時刻 (time)     │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 💾 メモリ (memory)     │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 プロファイル (prof) │ <tspan fill="#57caff" font-weight="700">14</tspan> │ 💎 プラン (plan)       │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状態 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ 📧 メール (email)      │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 💬 会話番号 (conv-id)  │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ モード (mode)       │ <tspan fill="#57caff" font-weight="700">16</tspan> │ 🧠 コンテキスト (ctx)  │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 🛡️ サンド (sandbox)    │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -594,17 +582,17 @@ ${optionLines}
   <text x="44" y="376" fill="#57caff">  e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,</text>
   <text x="44" y="396" fill="#57caff">  context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,...]</text>
   <rect class="cur" x="830" y="384" width="8" height="15" fill="#57caff"/>
-  <text x="24" y="422" fill="#6e7681">指定された順序とスタイルに基づき、11 列の高密度ステータスラインを自動構築</text>`
+  <text x="24" y="422" fill="#6e7681">指定された順序とスタイルに基づき、10 列の高密度ステータスラインを自動構築</text>`
         : `  <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 40)</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">Currently Selected Metrics (Total 36)</text>
   <text x="330" y="156" fill="#8b949e">— Enter custom order below (e: for Emoji, n for newline):</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon Bar (bar)     │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 Memory (memory)     │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon CD (cd)       │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon Time (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 Conv ID (conv-id)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 Plan Tier (plan)    │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ Sandbox (sandbox)   │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 Model (model-name)  │ <tspan fill="#57caff" font-weight="700">13</tspan> │ 🗓️ Weekly Time (time)  │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 💾 Memory (memory)     │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 Profile (profile)   │ <tspan fill="#57caff" font-weight="700">14</tspan> │ 💎 Plan Tier (plan)    │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ State (agent-state) │ <tspan fill="#57caff" font-weight="700">15</tspan> │ 📧 Email (email)       │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 💬 Conv ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ Mode (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ 🧠 Context (ctx)       │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 🛡️ Sandbox (sandbox)   │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -616,7 +604,7 @@ ${optionLines}
   <text x="44" y="376" fill="#57caff">  e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,</text>
   <text x="44" y="396" fill="#57caff">  context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,...]</text>
   <rect class="cur" x="830" y="384" width="8" height="15" fill="#57caff"/>
-  <text x="24" y="422" fill="#6e7681">Compiles custom array into an 11-row high-density statusline with auto-merged bars</text>`));
+  <text x="24" y="422" fill="#6e7681">Compiles custom array into a 10-row high-density statusline with auto-merged bars</text>`));
 
   const termContentF7 = isZhTw
     ? `  <!-- Step 4: Configuration Deployed & Hot Reloaded -->
@@ -625,8 +613,8 @@ ${optionLines}
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 腳本部署完成，已寫入版本同步資訊（.hook-version.json）</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
-  <text x="44" y="204" fill="#57caff" font-weight="700">狀態列已熱重載生效！已套用自訂 11 列排版與 Emoji/Text 混合風格</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 48 個指標與排版單元已解析 · 自動合併相鄰額度與長條圖 · 支援 GitHub Release 版本檢查</text>
+  <text x="44" y="204" fill="#57caff" font-weight="700">狀態列已熱重載生效！已套用自訂 10 列排版與 Emoji/Text 混合風格</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 44 個指標與排版單元已解析 · 自動合併相鄰額度與長條圖 · 支援 GitHub Release 版本檢查</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI 狀態列已就緒，隨時監控系統指標與工作區檔案變更。</text>
@@ -638,8 +626,8 @@ ${optionLines}
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 脚本部署完成，已写入版本同步信息（.hook-version.json）</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
-  <text x="44" y="204" fill="#57caff" font-weight="700">状态栏已热重载生效！已应用自定义 11 列排版与 Emoji/Text 混合风格</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 48 个指标与排版单元已解析 · 自动合并相邻额度与长条图 · 支持 GitHub Release 版本检查</text>
+  <text x="44" y="204" fill="#57caff" font-weight="700">状态栏已热重载生效！已应用自定义 10 列排版与 Emoji/Text 混合风格</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 44 个指标与排版单元已解析 · 自动合并相邻额度与长条图 · 支持 GitHub Release 版本检查</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI 状态栏已就绪，随时监控系统指标与工作区文件变更。</text>
@@ -651,8 +639,8 @@ ${optionLines}
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="180" fill="#c9d1d9">フックを配置しバージョン同期情報（.hook-version.json）を記録</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
-  <text x="44" y="204" fill="#57caff" font-weight="700">ステータスラインが即時反映！11 列のカスタム並び順と混合スタイルを適用</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 48 の指標・改行要素を解決 · 隣接バーの自動統合 · GitHub Release 更新確認に対応</text>
+  <text x="44" y="204" fill="#57caff" font-weight="700">ステータスラインが即時反映！10 列のカスタム並び順と混合スタイルを適用</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 44 の指標・改行要素を解決 · 隣接バーの自動統合 · GitHub Release 更新確認に対応</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI ステータスライン稼働中。ワークスペースを監視しています。</text>
@@ -663,8 +651,8 @@ ${optionLines}
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="180" fill="#c9d1d9">Cross-platform hook deployed &amp; version sync recorded (.hook-version.json)</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
-  <text x="44" y="204" fill="#57caff" font-weight="700">Statusline hot reloaded! Applied custom 11-row layout with mixed Emoji/Text</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 48 metrics &amp; layout tokens resolved · Auto-merged bars · GitHub Release check enabled</text>
+  <text x="44" y="204" fill="#57caff" font-weight="700">Statusline hot reloaded! Applied custom 10-row layout with mixed Emoji/Text</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 44 metrics &amp; layout tokens resolved · Auto-merged bars · GitHub Release check enabled</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI statusline active. Ready to monitor workspace and telemetry.</text>
