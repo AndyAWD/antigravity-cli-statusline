@@ -85,9 +85,11 @@
    - 由狀態列子行程向上追蹤父行程樹，尋找最接近的 `agy`（或 Windows `agy.exe`）主行程（略過 `--hub` 背景中心行程），取得 `pid` 與行程啟動時間作為本次開啟識別（`sessionKey = "<pid>:<startTime>"`）。
    - 若該 `agy` 行程帶有 `-p`、`--print` 或 `--prompt`（含 `--flag=value` 形式，不含 `-i` / `--prompt-interactive`）非互動旗標，則**略過**線上更新檢查。
    - **跨平台實作**：Linux 優先讀取 `/proc/<pid>/stat` 與 `/proc/<pid>/cmdline`（失敗退回 `ps`）；macOS 呼叫 `ps -ww -o pid=,ppid=,lstart=,ucomm=`（於命中 `agy` 時再查 `args=`）；Windows 呼叫單次 PowerShell `Get-CimInstance Win32_Process`（強制 `windowsHide: true`）。
-3. **快取與離線／失敗處理（`~/.gemini/tmp/plugin_update_cache.json`）**：
-   - 每個互動式 `agy` 開啟識別僅嘗試查詢一次 `https://github.com/AndyAWD/antigravity-cli-statusline/releases/latest`（透過 HTTP 302 `Location` 標頭解析 `/releases/tag/<tag>`，避開 REST API 速率限制；具備 1.5 秒逾時保護並隨總預算調適）。
-   - 若查詢失敗（離線、逾時、非 200 狀態等），立即將本次 `sessionKey` 與 `lastSessionStatus: "failed"` 寫入快取且保留先前已知的 `latestVersion`，本次開啟期間不再重試，並沿用快取中上次已知的 `latestVersion` 進行比對，待下次重啟 `agy` 時才重新查詢。
+3. **快取與離線／失敗處理（`~/.gemini/antigravity/plugin_data/antigravity-cli-statusline/update_cache.json`）**：
+   - CLI 與 Antigravity 2.0 共用同一份更新快取檔（CLI 首次讀取時若共用快取尚未建立，會自動相容唯讀遷移舊檔 `~/.gemini/tmp/plugin_update_cache.json`）。
+   - 每個互動式 `agy` 開啟識別僅嘗試查詢一次 `https://github.com/AndyAWD/antigravity-cli-statusline/releases/latest`（透過 HTTP 302 `Location` 標頭解析 `/releases/tag/<tag>`，避開 REST API 速率限制；具備逾時保護並由獨立背景工作行程執行，避免短命狀態列子行程在啟動初期遭取消而中斷寫入）。
+   - 請求期間會先記錄 `status: "pending"` 與 5 秒租約，若前次子行程遭異常中斷導致租約逾時，後續刷新可自動接手重試（最多 `MAX_INTERRUPTED_ATTEMPTS = 3` 次）。
+   - 若查詢明確完成失敗（離線、逾時、非 200 狀態等），立即將本次 `sessionKey`、`lastSessionStatus: "failed"` 與 `lastError` 寫入快取且保留先前已知的 `latestVersion`，本次開啟期間不再重試，並沿用快取中上次已知的 `latestVersion` 進行比對，待下次重啟 `agy` 時才重新查詢。
 4. **獨立兩行更新提醒排版與空行修剪**：
    - 當已安裝版本在 SemVer 語意化版本比對上落後於最新 Release 版本時，`plugin-update` 會於使用者在 `ui.footer.items` 排定的順序位置輸出固定兩行獨立區塊（不與相鄰指標以 `│` 合併，亦不經由自動換行邏輯打散）：
      - 第一行（文字樣式）：依 `ui.language` 顯示版本差異與更新提示（如 `⚠️ 狀態列有新版本可用（目前 v1.11.4 → 最新 v1.12.0），請執行以下指令更新：`）；Emoji 樣式則顯示精簡格式 `🆕 v1.11.4 → v1.12.0`。

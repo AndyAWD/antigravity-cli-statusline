@@ -55,7 +55,7 @@ antigravity-cli-statusline/
 
 ### 1.3 Antigravity 2.0（MCP Apps + 生命週期 Hooks）隔離與同步契約
 
-- **CLI 零動刀邊界**：2.0 後端（`scripts/mcp/*`）僅唯讀匯入 `skills/agy-cli-statusline/scripts/` 的無副作用匯出函式，絕不修改 CLI 核心腳本或寫入／刪除 `~/.gemini/tmp/*`；未設定 `PLUGIN_DATA` 時退讓至 `~/.gemini/plugin-data/antigravity-cli-statusline/`。
+- **CLI 零動刀邊界**：2.0 後端（`scripts/mcp/*`）僅唯讀匯入 `skills/agy-cli-statusline/scripts/` 的無副作用匯出函式，絕不修改 CLI 核心腳本或寫入／刪除 `~/.gemini/tmp/*`；未設定 `PLUGIN_DATA` 時退讓至 `~/.gemini/antigravity/plugin_data/antigravity-cli-statusline/`。外掛版本更新快取已統一收斂至 `plugin-update.mjs` 並由 CLI 與 2.0 共用 `update_cache.json`（離線額度退讓亦唯讀比對 `quota_cache.json` 與 `real_quota_cache.json` 時間戳擇新）。
 - **能力探測與防護**：`scripts/mcp/server.mjs` 於 `initialize` 檢查 `capabilities.extensions["io.modelcontextprotocol/ui"]`，非 UI 用戶端（如 CLI）隱藏 `statusline_save_config`；2.0 寫入必須通過 `uiSessionToken` 驗證。
 - **CLI R27 相容契約**：`scripts/mcp/cli-settings-bridge.mjs` 同步寫回 CLI `settings.json` 時，若全域 `labelStyle === 'emoji'` 且全數為 Emoji，會刪除 `ui.footer.itemStyles`；若為混搭樣式，則將 `labelStyle` 設為 `'text'` 並將 Emoji 項目具象化寫入 `itemStyles`。
 - **預編譯單一 HTML**：`npm run build:app` 使用 `esbuild` 將 `src/app/` 打包為無 BOM 且小於 1 MiB 的 `scripts/mcp/statusline-app.html`，並嵌入 `source-sha256` 與 `app-version` 註解，由 `scripts/tests/sync-contract.test.mjs` 把關。
@@ -65,7 +65,7 @@ antigravity-cli-statusline/
 | 層級 | 目錄 | 核心檔案與職責 |
 |---|---|---|
 | **第 1 層：基礎核心** | `lib/core/` | `constants.mjs`（版本常數 `HOOK_VERSION`、倉儲網址、脈絡壓縮門檻）、`fs-utils.mjs`（無位元組順序記號〔Byte Order Mark〕讀寫、SHA-256 雜湊、`listMjsFilesRecursiveSync`、`isDirectExecution`）、`safe-cleanup.mjs`（Git 目錄防護與符號連結安全移除）、`normalize.mjs`（語系、標籤樣式、模型名稱與數字正規化）、`semver.mjs`（語意化版本〔Semantic Versioning〕含先行版本比較）、`process-utils.mjs`（`withTimeout` 與強制 `windowsHide: true` 子行程呼叫）、`settings.mjs`（三層 `settings.json` 讀取合併與跨平台 `statusLine.command` 生成）、`plugin-manifest.mjs`（統一同步與非同步外掛版本探索）。 |
-| **第 2 層：資料採集** | `lib/collectors/` | `time-format.mjs`（重置倒數與時間格式，支援自訂 `now` 參數以即時重算倒數）、`quota.mjs`（本地額度與語言伺服器〔Language Server〕快取、四層動態配額池解析〔`modelPools`〕、60 秒過期寬限期與即時倒數重算〔`normalizeResolvedQuotaEntry`〕）、`context.mjs`（對話脈絡與動態上限）、`account.mjs`（帳號資訊與日誌快取）、`probes.mjs`（Git、記憶體與計數器雙軌探針，匯出 `extractMetricsAsync`）、`plugin-update.mjs`（父行程樹識別與 GitHub Release 檢查）；對渲染層輸出與介面無關之結構化指標物件（含 `agentState`、`toolConfirmPending` 等狀態）。 |
+| **第 2 層：資料採集** | `lib/collectors/` | `time-format.mjs`（重置倒數與時間格式，支援自訂 `now` 參數以即時重算倒數）、`quota.mjs`（本地額度與語言伺服器〔Language Server〕快取、四層動態配額池解析〔`modelPools`〕、60 秒過期寬限期與即時倒數重算〔`normalizeResolvedQuotaEntry`〕）、`context.mjs`（對話脈絡與動態上限）、`account.mjs`（帳號資訊與日誌快取）、`probes.mjs`（Git、記憶體與計數器雙軌探針，匯出 `extractMetricsAsync`）、`plugin-update.mjs`（統一維護 CLI 與 2.0 共用之 `update_cache.json` 快取讀寫、父行程樹識別、`pending` 租約自癒、背景工作行程與 GitHub Release 檢查）；對渲染層輸出與介面無關之結構化指標物件（含 `agentState`、`toolConfirmPending` 等狀態）。 |
 | **第 3 層：指標與在地化** | `lib/metrics/` | `registry.mjs` 為全部 36 項指標、5 個分類、4 種語系（`zh-tw`、`zh-cn`、`us`、`jp`）、`EMOJI_MAP`（40 鍵）、`ADJACENT_PAIRS`（4 組長條圖配對）與問卷中繼資料 `LOCALE_WIZARD_META` 的單一真實來源；`i18n.mjs` 負責 `buildI18nDict` 四語系格式化字典、相鄰長條圖合併與狀態列更新提示雙行訊息。 |
 | **第 4 層：視覺渲染** | `lib/renderers/` | `ansi.mjs`（美國國家標準協會〔American National Standards Institute〕24-bit 四階配色、品牌色、顯示寬度計算與進度條繪製）、`index.mjs`（以 `Map` 維護之 `registerRenderer`、`getRenderer`、`listRenderers` 註冊表）與 `standard.mjs`（預設的 `standard` 多行智慧換行渲染器，支援含換行之獨立多行指標區塊〔如 `plugin-update`〕及頭尾純空白行自動修剪）。 |
 
