@@ -11,7 +11,6 @@ import {
   preprocessAdjacentItems,
   renderStatusLine,
   stripAnsi,
-  resolveArgonQuota,
   parseMetaQuota,
   mergeQuotaBuckets,
   formatResetTime,
@@ -521,7 +520,6 @@ async function main() {
       'quota-bar', 'quota-weekly-bar',
       'context-used-bar', 'token-count-bar',
       'quota+bar', 'context-used+bar', 'quota-weekly+bar', 'token-count+bar',
-      'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'quota-argon+bar',
       'plugin-version'
     ];
 
@@ -544,8 +542,6 @@ async function main() {
     assert.deepStrictEqual(preprocessAdjacentItems(['context-used-bar', 'context-used']), ['context-used+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['quota-weekly', 'quota-weekly-bar']), ['quota-weekly+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['quota-weekly-bar', 'quota-weekly']), ['quota-weekly+bar']);
-    assert.deepStrictEqual(preprocessAdjacentItems(['quota-argon', 'quota-argon-bar']), ['quota-argon+bar']);
-    assert.deepStrictEqual(preprocessAdjacentItems(['quota-argon-bar', 'quota-argon']), ['quota-argon+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['token-count', 'token-count-bar']), ['token-count+bar']);
     assert.deepStrictEqual(preprocessAdjacentItems(['token-count-bar', 'token-count']), ['token-count+bar']);
 
@@ -677,16 +673,21 @@ async function main() {
       terminal_width: 140
     };
 
-    console.log("\n[Test R28] Verifying Gemini 4 Argon quota resolution, auto-merge, and 4-locale rendering...");
-    // 1. Direct function test for resolveArgonQuota
-    const futureArgonResetR28 = new Date(Date.now() + ((6 * 24 + 1) * 3600 - 30) * 1000).toISOString();
+    console.log("\n[Test R28] Verifying deleted legacy quota-argon* config defense across all 4 locales...");
     const futureGeminiResetR28 = new Date(Date.now() + ((4 * 24 + 11) * 3600 - 30) * 1000).toISOString();
-    const mockArgonCache = {
+    const mockCacheR28 = {
       updatedAt: Date.now(),
+      shortTerm: {
+        gemini: {
+          remaining_percentage: 82,
+          reset_time: new Date(Date.now() + (3 * 3600 - 30) * 1000).toISOString(),
+          refreshes_in: "3h"
+        }
+      },
       weekly: {
         "gemini-argon-wtu": {
           remaining_percentage: 58.93,
-          reset_time: futureArgonResetR28,
+          reset_time: new Date(Date.now() + ((6 * 24 + 1) * 3600 - 30) * 1000).toISOString(),
           refreshes_in: "6d 1h"
         },
         "gemini": {
@@ -696,82 +697,62 @@ async function main() {
         }
       }
     };
-    const argonRes = resolveArgonQuota(mockArgonCache);
-    assert.ok(argonRes !== null, "resolveArgonQuota should find gemini-argon-wtu pool");
-    assert.strictEqual(Math.round(argonRes.remaining_percentage), 59, "Argon percentage should round to 59");
-    assert.strictEqual(argonRes.refreshes_in, "6d 1h");
-    assert.strictEqual(argonRes.reset_time, futureArgonResetR28);
 
-    // Test missing Argon pool
-    const mockNoArgonCache = {
-      updatedAt: Date.now(),
-      weekly: {
-        "gemini": {
-          remaining_percentage: 90,
-          reset_time: futureGeminiResetR28,
-          refreshes_in: "4d 11h"
-        }
-      }
-    };
-    const noArgonRes = resolveArgonQuota(mockNoArgonCache);
-    assert.strictEqual(noArgonRes.remaining_percentage, 100);
-    assert.strictEqual(noArgonRes.refreshes_in, "");
-
-    // 2. E2E rendering with 4 locales and Emoji mode
-    const localesR28 = [
-      { lang: 'zh-tw', quotaPrefix: 'Argon 可用: 59%', countdownPrefix: 'Argon 倒數: 6d 1h', resetPrefix: 'Argon 重置:' },
-      { lang: 'zh-cn', quotaPrefix: 'Argon 可用: 59%', countdownPrefix: 'Argon 倒数: 6d 1h', resetPrefix: 'Argon 重置:' },
-      { lang: 'us', quotaPrefix: 'Argon Available: 59%', countdownPrefix: 'Argon Reset: 6d 1h', resetPrefix: 'Argon Reset Time:' },
-      { lang: 'jp', quotaPrefix: 'Argon 残量: 59%', countdownPrefix: 'Argon リセット: 6d 1h', resetPrefix: 'Argon リセット時刻:' }
+    // 1. Verify buildI18nDict no longer defines quota-argon* keys in any locale
+    const removedArgonKeys = [
+      'quota-argon', 'quota-argon-bar', 'quota-argon-countdown', 'quota-argon-reset-time', 'quota-argon+bar'
     ];
-
-    for (const loc of localesR28) {
-      const settingsLoc = {
-        ui: {
-          language: loc.lang,
-          footer: {
-            labelStyle: "text",
-            items: ["quota-argon", "quota-argon-bar", "quota-argon-countdown", "quota-argon-reset-time"]
-          }
-        }
-      };
-      const homeLoc = makeTempHome(mockArgonCache, settingsLoc);
-      try {
-        const resLoc = await runStatusline(metaR27, homeLoc);
-        const plainLoc = stripAnsi(resLoc.stdout).trim();
-        assert.strictEqual(resLoc.code, 0);
-        assert.ok(plainLoc.includes(loc.quotaPrefix), `[${loc.lang}] Should contain "${loc.quotaPrefix}", got: "${plainLoc}"`);
-        assert.ok(plainLoc.includes("[█████░░░░░]"), `[${loc.lang}] Should contain auto-merged bar "[█████░░░░░]", got: "${plainLoc}"`);
-        assert.ok(plainLoc.includes(loc.countdownPrefix), `[${loc.lang}] Should contain "${loc.countdownPrefix}", got: "${plainLoc}"`);
-        assert.ok(plainLoc.includes(loc.resetPrefix), `[${loc.lang}] Should contain "${loc.resetPrefix}", got: "${plainLoc}"`);
-      } finally {
-        try { rmSync(homeLoc, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    for (const loc of ['zh-tw', 'zh-cn', 'us', 'jp']) {
+      const textDict = buildI18nDict(loc, dummyMetrics, 'text');
+      const emojiDict = buildI18nDict(loc, dummyMetrics, 'emoji');
+      for (const k of removedArgonKeys) {
+        assert.strictEqual(textDict[k], undefined, `[${loc}] text dict must not define removed key ${k}`);
+        assert.strictEqual(emojiDict[k], undefined, `[${loc}] emoji dict must not define removed key ${k}`);
       }
     }
 
-    // Emoji mode E2E test for Argon
-    const settingsEmoji = {
+    // 2. E2E mixed legacy config: quota-argon* alongside valid quota / quota-weekly must safely skip quota-argon*
+    const homeMixedArgon = makeTempHome(mockCacheR28, {
       ui: {
         language: "zh-tw",
         footer: {
-          labelStyle: "emoji",
-          items: ["quota-argon", "quota-argon-bar", "quota-argon-countdown", "quota-argon-reset-time"]
+          labelStyle: "text",
+          items: ["quota", "quota-argon", "quota-argon-bar", "quota-weekly"]
         }
       }
-    };
-    const homeEmoji = makeTempHome(mockArgonCache, settingsEmoji);
+    });
     try {
-      const resEmoji = await runStatusline(metaR27, homeEmoji);
-      const plainEmoji = stripAnsi(resEmoji.stdout).trim();
-      assert.strictEqual(resEmoji.code, 0);
-      assert.ok(plainEmoji.includes("✨ 59% [█████░░░░░]"), `Emoji mode should merge quota-argon+bar into "✨ 59% [█████░░░░░]", got: "${plainEmoji}"`);
-      assert.ok(plainEmoji.includes("⏱️ "), `Emoji mode should format countdown with "⏱️ ", got: "${plainEmoji}"`);
-      assert.ok(plainEmoji.includes("⏰ "), `Emoji mode should format reset-time with "⏰ ", got: "${plainEmoji}"`);
+      const resMixed = await runStatusline(metaR27, homeMixedArgon);
+      const plainMixed = stripAnsi(resMixed.stdout).trim();
+      assert.strictEqual(resMixed.code, 0);
+      assert.ok(plainMixed.includes("五小時可用: 82%"), `Valid 5h quota must still render, got: "${plainMixed}"`);
+      assert.ok(plainMixed.includes("七日內可用: 90%"), `Valid weekly quota must still render, got: "${plainMixed}"`);
+      assert.ok(!plainMixed.includes("Argon"), `Removed Argon label must not appear, got: "${plainMixed}"`);
     } finally {
-      try { rmSync(homeEmoji, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+      try { rmSync(homeMixedArgon, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
     }
 
-    console.log("✅ Test R28 passed! Gemini 4 Argon quota, countdown, and rendering work across all 4 locales!");
+    // 3. E2E only-argon legacy config: must gracefully fall back to '? for shortcuts' instead of crashing or printing empty output
+    const homeOnlyArgon = makeTempHome(mockCacheR28, {
+      ui: {
+        language: "zh-tw",
+        footer: {
+          labelStyle: "text",
+          items: ["quota-argon", "quota-argon-countdown"]
+        }
+      }
+    });
+    try {
+      const resOnlyArgon = await runStatusline(metaR27, homeOnlyArgon);
+      const plainOnlyArgon = stripAnsi(resOnlyArgon.stdout).trim();
+      assert.strictEqual(resOnlyArgon.code, 0);
+      assert.ok(plainOnlyArgon.includes("? for shortcuts"), `Only-argon legacy config must fall back to '? for shortcuts', got: "${plainOnlyArgon}"`);
+      assert.ok(plainOnlyArgon.includes("Gemini 3.1 Pro"), `Fallback line must include model name, got: "${plainOnlyArgon}"`);
+    } finally {
+      try { rmSync(homeOnlyArgon, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
+    }
+
+    console.log("✅ Test R28 passed! Deleted quota-argon* defense verified across all 4 locales and legacy configs!");
 
     // =========================================================================
     // Test R29: Real-time quota sync (Argon meta.quota classification, incomplete meta.quota fallback, state-transition & micro-wait)
@@ -812,7 +793,7 @@ async function main() {
       ui: {
         language: "zh-tw",
         footer: {
-          items: ["quota", "quota-weekly", "quota-argon"]
+          items: ["quota", "quota-weekly"]
         }
       }
     };
@@ -875,7 +856,6 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       assert.strictEqual(resR29.code, 0);
       assert.ok(plainR29.includes("五小時可用: 62%"), `Must render freshly fetched 5h quota (62%) on the spot instead of stale 88%, got: "${plainR29}"`);
       assert.ok(plainR29.includes("七日內可用: 91%"), `Must render updated weekly quota (91%), got: "${plainR29}"`);
-      assert.ok(plainR29.includes("Argon 可用: 51%"), `Must render freshly fetched Argon quota (51%), got: "${plainR29}"`);
       console.log("✅ Test R29 passed! (Real-time quota micro-wait and incomplete meta.quota fallback verified)");
     } finally {
       try { rmSync(homeR29, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch(e) {}
@@ -927,7 +907,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       ui: {
         language: "zh-tw",
         footer: {
-          items: ["quota", "quota-weekly", "quota-argon"]
+          items: ["quota", "quota-weekly"]
         }
       }
     };
@@ -969,7 +949,6 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       assert.strictEqual(resR30Active.code, 0);
       assert.ok(plainR30Active.includes("五小時可用: 99%"), `Must stay at 99% during conversation turn, NOT jump to 100%! Got: "${plainR30Active}"`);
       assert.ok(plainR30Active.includes("七日內可用: 93%"), `Weekly must stay at 93%, NOT jump to 100%! Got: "${plainR30Active}"`);
-      assert.ok(plainR30Active.includes("Argon 可用: 9%"), `Argon must stay at 9% (rounded from 8.9%), NOT jump to 100%! Got: "${plainR30Active}"`);
 
       // Verify the cache on disk was not poisoned with 100%
       const targetCacheFileR30 = join(homeR30, '.gemini', 'tmp', 'real_quota_cache.json');
@@ -997,7 +976,6 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
       assert.strictEqual(resR30Finished.code, 0);
       assert.ok(plainR30Finished.includes("五小時可用: 97%"), `Must update to 97% when conversation finishes! Got: "${plainR30Finished}"`);
       assert.ok(plainR30Finished.includes("七日內可用: 93%"), `Weekly remains 93%! Got: "${plainR30Finished}"`);
-      assert.ok(plainR30Finished.includes("Argon 可用: 9%"), `Argon remains 9%! Got: "${plainR30Finished}"`);
 
       // Step C: Subsequent frame with stale meta - must STAY at 97% and never jump back
       const metaR30Followup = {
@@ -1856,7 +1834,7 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
         footer: {
           items: [
             'quota', 'quota-bar', 'quota-reset-countdown', 'quota-reset-time',
-            'quota-weekly', 'quota-argon'
+            'quota-weekly'
           ],
           timeFormat: 'smart'
         }
@@ -1892,7 +1870,6 @@ writeFileSync(p, JSON.stringify(next, null, 2), 'utf8');
         assert.ok(plainModel.includes('五小時可用: 79%'), `${modelName} must resolve 5h quota to 79%, got: "${plainModel}"`);
         assert.ok(plainModel.includes('五小時倒數: 3h 46m'), `${modelName} must resolve 5h countdown to 3h 46m, got: "${plainModel}"`);
         assert.ok(plainModel.includes('七日內可用: 25%'), `${modelName} must resolve weekly quota to 25%, got: "${plainModel}"`);
-        assert.ok(plainModel.includes('Argon 可用: 48%'), `${modelName} must resolve Argon quota to 48%, got: "${plainModel}"`);
       }
     } finally {
       try { rmSync(homeR35Repro, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (_) {}

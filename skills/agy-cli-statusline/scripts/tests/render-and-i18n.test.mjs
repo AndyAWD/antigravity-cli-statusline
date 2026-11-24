@@ -297,11 +297,6 @@ async function main() {
       weeklyQuotaBarVal: `${GREEN_BOLD}[███████░░░]${RESET}`,
       weeklyCountdownVal: '5d 12h',
       weeklyResetTimeVal: '2026/10/20 12:00',
-      argonQuotaColor: GREEN_BOLD,
-      argonQuotaVal: '59%',
-      argonQuotaBarVal: `${GREEN_BOLD}[█████░░░░░]${RESET}`,
-      argonCountdownVal: '6d 1h',
-      argonResetTimeVal: '2026/10/30 23:57',
       contextColor: BLUE_BOLD,
       usedPct: '15%',
       contextBarVal: `${BLUE_BOLD}[██░░░░░░░░]${RESET}`,
@@ -343,7 +338,7 @@ async function main() {
     for (const lang of ['zh-tw', 'zh-cn', 'us', 'jp']) {
       const emojiDict = buildI18nDict(lang, mockMetricsR21, 'emoji');
       const allKeys = Object.keys(EMOJI_MAP);
-      assert.strictEqual(allKeys.length, 45, 'EMOJI_MAP must contain 40 metrics + 5 merged bar keys (45 total)');
+      assert.strictEqual(allKeys.length, 40, 'EMOJI_MAP must contain 36 metrics + 4 merged bar keys (40 total)');
 
       for (const key of allKeys) {
         const rendered = stripAnsi(emojiDict[key]);
@@ -407,7 +402,7 @@ async function main() {
     assert.strictEqual(fallbackEmojiLines.length, 1);
     assert.ok(stripAnsi(fallbackEmojiLines[0]).includes('Gemini 3.1 Pro'));
     assert.ok(!stripAnsi(fallbackEmojiLines[0]).includes('🤖'), 'Fallback shortcuts line should strip 🤖 prefix from model-name');
-    console.log("✅ R21 passed! (All 42 emoji mappings across 37 metrics + 5 merged bars and localized status values verified)");
+    console.log("✅ R21 passed! (All 40 emoji mappings across 36 metrics + 4 merged bars and localized status values verified)");
 
     // ----------------------------------------------------
     // Test Case R22: E2E test with ui.footer.labelStyle = "emoji"
