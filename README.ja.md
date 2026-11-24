@@ -2,18 +2,18 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | 日本語
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](skills/agy-cli-statusline/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-**Antigravity CLI（`agy`）** と **Antigravity App（2.0、`v2.34.0+`）** の両環境に向けて設計されたリアルタイムテレメトリ＆ステータスラインプラグインです。40種類の指標（AI モデルと Orchestrator 実行中実モデルの追跡、5時間／週間／Argon クォータ、コンテキストトークン内訳、Git/VCS 状態、エージェント活動、CLI・2.0 デュアルバージョン）を監視し、テキスト（`text`）と絵文字（`emoji`）スタイルを項目ごとに自由に混在させ、Antigravity 2.0 でのドラッグ＆ドロップ編集または CLI の 7 ステップウィザードでレイアウトを4言語（`us`、`zh-tw`、`zh-cn`、`jp`）にてカスタマイズできます。
+**Antigravity CLI（`agy`）** と **Antigravity App（2.0、`v2.34.0+`）** の両環境に向けて設計されたリアルタイムテレメトリ＆ステータスラインプラグインです。36種類の指標（AI モデルと Orchestrator 実行中実モデルの追跡、5時間／週間クォータ、コンテキストトークン内訳、Git/VCS 状態、エージェント活動、CLI・2.0 デュアルバージョン）を監視し、テキスト（`text`）と絵文字（`emoji`）スタイルを項目ごとに自由に混在させ、Antigravity 2.0 でのドラッグ＆ドロップ編集または CLI の 7 ステップウィザードでレイアウトを4言語（`us`、`zh-tw`、`zh-cn`、`jp`）にてカスタマイズできます。
 
 Windows、macOS、Linux の各環境で Google Antigravity の 3 大サーフェス（Antigravity CLI、Antigravity IDE サイドバーチャット、Antigravity 2.0 デスクトップアプリケーション）を包括的にサポートします。
 
 ## ステータスライン設定とリアルタイムテレメトリの動作デモ
 
 <p align="center">
-  <img src="docs/images/statusline-demo-jp.svg" alt="Antigravity コマンドラインインターフェース（CLI）ステータスラインの対話型設定と動的テレメトリデモ：/antigravity-cli-statusline:agy-cli-statusline コマンドの実行、言語選択、5大カテゴリページネーションウィザード、カスタム並び替え Write-in から 11 行の完全なステータスラインリアルタイム動作まで。" width="100%">
+  <img src="docs/images/statusline-demo-jp.svg" alt="Antigravity コマンドラインインターフェース（CLI）ステータスラインの対話型設定と動的テレメトリデモ：/antigravity-cli-statusline:agy-cli-statusline コマンドの実行、言語選択、5大カテゴリページネーションウィザード、カスタム並び替え Write-in から 10 行の完全なステータスラインリアルタイム動作まで。" width="100%">
 </p>
 
 設定コマンド `/antigravity-cli-statusline:agy-cli-statusline` の実行から、5 大カテゴリ別の指標選択、カスタム並び替え入力、そして複数行の高情報密度ステータスラインによるリアルタイムテレメトリ表示までの CLI フローを収録した動的デモです。
@@ -35,17 +35,17 @@ Windows、macOS、Linux の各環境で Google Antigravity の 3 大サーフェ
 ## 主な機能
 
 1. **デュアル環境ネイティブ体験（Antigravity 2.0 ビジュアルパネル ＋ CLI ターミナル）**：
-   - **Antigravity 2.0（MCP Apps）**：`ui://statusline/app.html` により `npm install` 不要で即座に利用可能。右補助ペインとフルページ表示に対応し、行ベースのドラッグ＆ドロップレイアウト編集、リアルタイム値プレビュー付き 5 カテゴリ 40 指標ドロワー、折りたたみ可能な `tokenBreakdown` 積上げバー、自動追従／固定セッション切替、1 秒カウントダウン、旧版並び順インポート／エクスポート、および指標を途中で分断しないコンパクト自動折り返しを備えています。
+   - **Antigravity 2.0（MCP Apps）**：`ui://statusline/app.html` により `npm install` 不要で即座に利用可能。右補助ペインとフルページ表示に対応し、行ベースのドラッグ＆ドロップレイアウト編集、リアルタイム値プレビュー付き 5 カテゴリ 36 指標ドロワー、折りたたみ可能な `tokenBreakdown` 積上げバー、自動追従／固定セッション切替、1 秒カウントダウン、旧版並び順インポート／エクスポート、および指標を途中で分断しないコンパクト自動折り返しを備えています。
    - **Antigravity CLI（`agy`）**：7 ステップのページネーション対話ウィザード、ターミナル幅対応のスマート折り返し、設定変更時の即時ホットリロードを提供。
-2. **40種類のリアルタイム指標、4言語＆デュアルラベルスタイル**：AI モデル状態（Orchestrator 利用時は `model-name` に外側のラッパー名を維持しつつ、`active-model` で `計画`／`作業` ロールの実モデルをリアルタイム追跡し、単一モデル時は赤色で `オフ` 表示）、API クォータ（5時間、週間、Gemini 4 Argon の 3 系統プール、4 層動的クォータプール帰属解決および 60 秒失効猶予期間のカウントダウン再計算に対応）、コンテキスト／トークン消費量、対話キュー、Git/VCS 状態、システムリソース、さらに CLI と 2.0 の双方から両バージョンを自動検出するデュアルバージョン表示を英語（`us`）、繁体字中国語（`zh-tw`）、簡体字中国語（`zh-cn`）、日本語（`jp`）で提供し、項目ごとに**テキスト（`text`）**または**絵文字（`emoji`）**スタイルを指定できます。
-3. **柔軟なバーグラフ表示（結合または個別）**：5時間クォータ、週間クォータ、Gemini 4 Argon クォータ、コンテキスト使用量、セッショントークンに対してデフォルト 10 マスのプログレスバー（`[████████░░]`）を描画。数値指標と隣接しスタイルが一致する場合は自動結合し、離れている場合やスタイルが異なる場合は独立表示します。
+2. **36種類のリアルタイム指標、4言語＆デュアルラベルスタイル**：AI モデル状態（Orchestrator 利用時は `model-name` に外側のラッパー名を維持しつつ、`active-model` で `プランナー`／`エグゼキューター` ロールの実モデルをリアルタイム追跡し、単一モデル時は赤色で `オフ` 表示）、API クォータ（5時間、週間の 2 系統プール、4 層動的クォータプール帰属解決および 60 秒失効猶予期間のカウントダウン再計算に対応）、コンテキスト／トークン消費量、対話キュー、Git/VCS 状態、システムリソース、さらに CLI と 2.0 の双方から両バージョンを自動検出するデュアルバージョン表示を英語（`us`）、繁体字中国語（`zh-tw`）、簡体字中国語（`zh-cn`）、日本語（`jp`）で提供し、項目ごとに**テキスト（`text`）**または**絵文字（`emoji`）**スタイルを指定できます。
+3. **柔軟なバーグラフ表示（結合または個別）**：5時間クォータ、週間クォータ、コンテキスト使用量、セッショントークンに対してデフォルト 10 マスのプログレスバー（`[████████░░]`）を描画。数値指標と隣接しスタイルが一致する場合は自動結合し、離れている場合やスタイルが異なる場合は独立表示します。
 4. **カスタム並び替え＆デュアル改行メカニズム**：1 始まりの数字インデックスおよび英字識別子、個別スタイルプレフィックス（`t` / `e`）、`n` による手動改行、`n,n` による空白行区切りに対応し、ターミナル幅と 2.0 パネル幅の双方で指標単位の自動折り返しを行います。
 5. **24ビット4段階カラーコーディング**：残量・圧迫度に応じて 4 つのしきい値（`#57caff` 青 `100–75%`、`#5cdb6d` 緑 `74–50%`、`#ffd427` 黄 `49–25%`、`#ff7daf` 赤 `24–0%`）へ動的に変化し、各 AI モデルファミリー専用のブランドアクセントカラーも適用されます。
 6. **環境間設定同期、スマートフック保守＆セキュリティ境界**：
    - CLI と 2.0 で 4 層コンテキスト上限計算、Language Server RPC テレメトリ解析、設定書込・フック配置コアを統一し、厳格な CSP とワークスペースパス許可リストを実装。
    - Antigravity 2.0 の初回起動時に既存の CLI `settings.json` レイアウトを自動継承し、「2.0 パネルのみ適用」と「2.0 ＋ CLI に同期適用」の 2 つの保存モードを提供。CLI 同期時には古いバージョンまたはハッシュ不一致の既存 CLI フックスクリプトを自動更新します（既存の `statusLine` コマンドは上書きせず、最新・上位版・未配置時はスキップ）。
    - CLI 側では CLI 固有・グローバル・ワークスペースの 3 層 `settings.json` と `trusted_hooks.json` を同期し、macOS/Linux の NVM パス解決と Windows の UTF-8 BOM 防止を自動処理。
-7. **非侵入的な更新チェック**：`ui.footer.items` で `plugin-update`（`#39`）が有効な場合、対話型 `agy` 起動ごとに 1 回だけ GitHub Releases を確認し（`agy -p` はスキップ）、最新時は自動非表示かつ先頭・末尾の純粋な空白行をトリム、オフライン時はキャッシュ済み情報で比較し、古い場合は配置位置に 2 行の更新案内（絵文字スタイルでは `🆕 vX → vY`）を表示します（バージョン表示専用の `plugin-version` `#38` とは完全に分離）。`diagnose-statusline.mjs` でプラグインとフックのバージョン整合性をいつでも確認できます。
+7. **非侵入的な更新チェック**：`ui.footer.items` で `plugin-update`（`#35`）が有効な場合、対話型 `agy` 起動ごとに 1 回だけ GitHub Releases を確認し（`agy -p` はスキップ）、最新時は自動非表示かつ先頭・末尾の純粋な空白行をトリム、オフライン時はキャッシュ済み情報で比較し、古い場合は配置位置に 2 行の更新案内（絵文字スタイルでは `🆕 vX → vY`）を表示します（バージョン表示専用の `plugin-version` `#34` とは完全に分離）。`diagnose-statusline.mjs` でプラグインとフックのバージョン整合性をいつでも確認できます。
 
 ## インストール方法
 
@@ -156,7 +156,7 @@ antigravity-cli-statusline/
 
 ## 指標、並び替え＆改行
 
-### 利用可能な指標（1–40）
+### 利用可能な指標（1–36）
 
 以下の番号は、ステップ 3（`resources/questions.json`）の 5 カテゴリにわたる 1 始まりの選択肢インデックス、および `emoji` モードで使用される絵文字プレフィックスに対応しています：
 
@@ -165,9 +165,9 @@ antigravity-cli-statusline/
 - `2.` 🪪 **エージェントプロファイル（`agent-profile`）** — 読み込まれているエージェントプロファイル名
 - `3.` ⚡ **エージェント状態（`agent-state`）** — `idle / thinking / working / tool_use / initializing`
 - `4.` ⚙️ **実行モード（`mode`）** — `default / code-only / plan / interactive / accept-edits`
-- `5.` 🪄 **Orchestrator 実行中の実モデル（`active-model`）** — Orchestrator 利用時に現在の実モデルとロール（テキストは `Orchestrator 計画:`／`Orchestrator 作業:`、絵文字は `🪄 計画 →`／`🪄 作業 →`）をリアルタイム表示、単一モデル時は赤色で `オフ` を表示
+- `5.` 🪄 **Orchestrator 実行中の実モデル（`active-model`）** — Orchestrator 利用時に現在の実モデルとロール（テキストは `プランナー:`／`エグゼキューター:`、絵文字は `🪄 プランナー →`／`🪄 エグゼキューター →`、ルーティング待機中は `Orchestrator: 待機中`）をリアルタイム表示、単一モデル時は赤色で `オフ` を表示
 
-**2. クォータ、課金とアカウント（14項目）**
+**2. クォータ、課金とアカウント（10項目）**
 - `6.` 🔋 **5時間利用可能クォータ（`quota`）** — 5時間 API 残量パーセンテージ、4段階カラー表示
 - `7.` 🔋 **5時間利用可能クォータバーグラフ（`quota-bar`）** — 10マスの5時間クォータバー（`[████████░░]`）
 - `8.` ⏳ **5時間クォータリセットカウントダウン（`quota-reset-countdown`）** — 5時間クォータ更新までの残り時間
@@ -176,39 +176,35 @@ antigravity-cli-statusline/
 - `11.` 📅 **週間利用可能クォータバーグラフ（`quota-weekly-bar`）** — 10マスの週間クォータバー（`[███████░░░]`）
 - `12.` ⏲️ **週間クォータリセットカウントダウン（`quota-weekly-countdown`）** — 週間クォータ更新までの残り時間
 - `13.` 🗓️ **週間リセット時刻（`quota-weekly-reset-time`）** — 週間ローカルリセット時刻（例: `2026/10/18 16:00`）
-- `14.` ✨ **Gemini 4 Argon 利用可能クォータ（`quota-argon`）** — Gemini 4 Argon 専用クォータパーセンテージ、4段階カラー表示
-- `15.` ✨ **Gemini 4 Argon クォータバーグラフ（`quota-argon-bar`）** — 10マスの Argon クォータバー（`[█████░░░░░]`）
-- `16.` ⏱️ **Gemini 4 Argon リセットカウントダウン（`quota-argon-countdown`）** — Argon クォータ更新までの残り時間
-- `17.` ⏰ **Gemini 4 Argon リセット時刻（`quota-argon-reset-time`）** — Argon ローカルリセット時刻（例: `2026/10/30 23:57`）
-- `18.` 💎 **加入プラン（`plan-tier`）** — 現在のサブスクリプションプランレベル
-- `19.` 📧 **アカウントメール（`account-email`）** — ログイン中のアカウントメールアドレス
+- `14.` 💎 **加入プラン（`plan-tier`）** — 現在のサブスクリプションプランレベル
+- `15.` 📧 **アカウントメール（`account-email`）** — ログイン中のアカウントメールアドレス
 
 **3. コンテキストとトークン（4項目）**
-- `20.` 🧠 **コンテキスト使用量（`context-used`）** — 消費されたコンテキストウィンドウの割合
-- `21.` 🧠 **コンテキスト使用量バーグラフ（`context-used-bar`）** — 10マスのコンテキスト消費バー（`[█░░░░░░░░░]`）
-- `22.` 💰 **トークン数（`token-count`）** — 現在のセッションで消費された正確なトークン数
-- `23.` 💰 **トークン数バーグラフ（`token-count-bar`）** — 10マスのトークン消費バー（`[█░░░░░░░░░]`）
+- `16.` 🧠 **コンテキスト使用量（`context-used`）** — 消費されたコンテキストウィンドウの割合
+- `17.` 🧠 **コンテキスト使用量バーグラフ（`context-used-bar`）** — 10マスのコンテキスト消費バー（`[█░░░░░░░░░]`）
+- `18.` 💰 **トークン数（`token-count`）** — 現在のセッションで消費された正確なトークン数
+- `19.` 💰 **トークン数バーグラフ（`token-count-bar`）** — 10マスのトークン消費バー（`[█░░░░░░░░░]`）
 
 **4. ワークスペースと VCS（5項目）**
-- `24.` 📁 **ワークスペース名（`project-path`）** — 現在のワークスペースディレクトリ名
-- `25.` 📍 **ワークスペース絶対パス（`project-full-path`）** — ワークスペースの絶対ディレクトリパス
-- `26.` 🔀 **Git ブランチ（`git-branch`）** — 現在のアクティブなブランチ名
-- `27.` 🔍 **VCS 変更状態（`vcs-dirty`）** — `未コミット / 変更なし`
-- `28.` 🗃️ **VCS 種別（`vcs-type`）** — `git / jj / fig`
+- `20.` 📁 **ワークスペース名（`project-path`）** — 現在のワークスペースディレクトリ名
+- `21.` 📍 **ワークスペース絶対パス（`project-full-path`）** — ワークスペースの絶対ディレクトリパス
+- `22.` 🔀 **Git ブランチ（`git-branch`）** — 現在のアクティブなブランチ名
+- `23.` 🔍 **VCS 変更状態（`vcs-dirty`）** — `未コミット / 変更なし`
+- `24.` 🗃️ **VCS 種別（`vcs-type`）** — `git / jj / fig`
 
 **5. システム状態とバックグラウンドタスク（12項目）**
-- `29.` 💾 **CLI メモリ使用量（`memory-usage`）** — `agy` プロセスが消費している RSS メモリ
-- `30.` 🚀 **Antigravity CLI バージョン（`cli-version`）** — インストール済みの `agy` CLI バージョン（テキスト表示ラベル：`Agy CLI バージョン:`；CLI と 2.0 の両方で自動検出）
-- `31.` 💬 **会話番号（`conversation-id`）** — デバッグ用の会話識別子の先頭8文字
-- `32.` 🛡️ **サンドボックス状態（`sandbox-status`）** — `オフ / オン（ネット） / オン（オフライン）`
-- `33.` 🔔 **ツール承認待ち（`tool-confirmation`）** — ツール確認ダイアログの応答待ち状態
-- `34.` 📥 **保留中の入力（`pending-input`）** — 実行待ちのユーザー入力キュー
-- `35.` 🔄 **実行中バックグラウンドタスク（`background-tasks`）** — 稼働中のバックグラウンドタスク数
-- `36.` 👥 **アクティブなサブエージェント（`subagents`）** — 稼働中のサブエージェント数
-- `37.` 📄 **成果物数（`artifacts`）** — このセッションで生成された累積ファイル・成果物数
-- `38.` 🧩 **ステータスライン版（`plugin-version`）** — インストール済みの `antigravity-cli-statusline` バージョン表示のみ（更新確認・通知は行いません）
-- `39.` 🆕 **ステータスライン更新通知（`plugin-update`）** — 対話型 `agy` 起動ごとに1回 GitHub Releases を確認し（`agy -p` はスキップ）、最新時は自動非表示、古い場合は配置位置に2行の更新案内を表示
-- `40.` 💻 **Antigravity 2.0 アプリバージョン（`app-version`）** — インストール済みの Antigravity 2.0 デスクトップアプリのバージョン（テキスト表示ラベル：`Agy 2.0 バージョン:`；CLI と 2.0 の両方で自動検出）
+- `25.` 💾 **CLI メモリ使用量（`memory-usage`）** — `agy` プロセスが消費している RSS メモリ
+- `26.` 🚀 **Antigravity CLI バージョン（`cli-version`）** — インストール済みの `agy` CLI バージョン（テキスト表示ラベル：`Agy CLI バージョン:`；CLI と 2.0 の両方で自動検出）
+- `27.` 💬 **会話番号（`conversation-id`）** — デバッグ用の会話識別子の先頭8文字
+- `28.` 🛡️ **サンドボックス状態（`sandbox-status`）** — `オフ / オン（ネット） / オン（オフライン）`
+- `29.` 🔔 **ツール承認待ち（`tool-confirmation`）** — ツール確認ダイアログの応答待ち状態
+- `30.` 📥 **保留中の入力（`pending-input`）** — 実行待ちのユーザー入力キュー
+- `31.` 🔄 **実行中バックグラウンドタスク（`background-tasks`）** — 稼働中のバックグラウンドタスク数
+- `32.` 👥 **アクティブなサブエージェント（`subagents`）** — 稼働中のサブエージェント数
+- `33.` 📄 **成果物数（`artifacts`）** — このセッションで生成された累積ファイル・成果物数
+- `34.` 🧩 **ステータスライン版（`plugin-version`）** — インストール済みの `antigravity-cli-statusline` バージョン表示のみ（更新確認・通知は行いません）
+- `35.` 🆕 **ステータスライン更新通知（`plugin-update`）** — 対話型 `agy` 起動ごとに1回 GitHub Releases を確認し（`agy -p` はスキップ）、最新時は自動非表示、古い場合は配置位置に2行の更新案内を表示
+- `36.` 💻 **Antigravity 2.0 アプリバージョン（`app-version`）** — インストール済みの Antigravity 2.0 デスクトップアプリのバージョン（テキスト表示ラベル：`Agy 2.0 バージョン:`；CLI と 2.0 の両方で自動検出）
 
 ### 並び替えルールとスタイル設定
 
@@ -217,9 +213,9 @@ CLI ウィザードのステップ 4 入力欄（または Antigravity 2.0 パ�
 - **スタイルプレフィックス**：
   - **テキストラベルスタイル（`text`、デフォルト）**：プレーンな数字（例: `1`）、`t` プレフィックス（例: `t1`）、または英字識別子（`quota`、`t:quota`）はローカライズされたテキストラベルとコロンで表示されます（例: `五時間残量: 88%`）。
   - **絵文字ラベルスタイル（`emoji`）**：`e` プレフィックス（例: `e1`、`e:quota`、大文字・小文字不問）でテキストラベルを絵文字とスペース 1 文字に置換します（例: `🔋 88%`）。状態値は選択言語のまま維持されます。
-  - **個別混在**：項目ごとに自由に混在可能（例: `e1, 19, e18, 32`）。未指定の項目はテキストスタイルとなります。
+  - **個別混在**：項目ごとに自由に混在可能（例: `e1, 15, e14, 28`）。未指定の項目はテキストスタイルとなります。
 - **パーセントバーグラフの結合と個別表示**：
-  - 5 組のペア（`quota` `6`+`7`、`quota-weekly` `10`+`11`、`quota-argon` `14`+`15`、`context-used` `20`+`21`、`token-count` `22`+`23`）は、**隣接**配置かつ同一スタイル時に 1 つのラベルへ自動結合されます。
+  - 4 組のペア（`quota` `6`+`7`、`quota-weekly` `10`+`11`、`context-used` `16`+`17`、`token-count` `18`+`19`）は、**隣接**配置かつ同一スタイル時に 1 つのラベルへ自動結合されます。
   - 他の指標や改行で**隔てられている**場合やスタイルが競合する場合（テキストと絵文字の混在）は、それぞれ独立して描画されます。
   - デフォルトのバー長は 10 マス（`ui.footer.barLength` で変更可能）、リセット時刻形式は `ui.footer.timeFormat` で設定可能です。
 - **改行とセクション区切り**：
@@ -232,36 +228,35 @@ CLI ウィザードのステップ 4 入力欄（または Antigravity 2.0 パ�
 
 - **英字識別子バージョン**：
   ```text
-  e:model-name,active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,quota-argon,quota-argon-bar,quota-argon-countdown,quota-argon-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,n,e:plugin-update
+  e:model-name,active-model,e:account-email,e:plan-tier,e:sandbox-status,n,e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,quota-reset-time,n,quota-weekly,quota-weekly-bar,quota-weekly-countdown,quota-weekly-reset-time,n,n,vcs-dirty,vcs-type,e:git-branch,n,e:project-path,project-full-path,n,n,e:mode,e:conversation-id,e:memory-usage,cli-version,app-version,plugin-version,n,e:plugin-update
   ```
 
 #### 出力プレビュー（混在モード）
 
-4 つの論理グループ、空行で区切られた計 9 行の情報（最新バージョン時は `e:plugin-update` が自動非表示となり末尾の改行もトリムされます）：
+4 つの論理グループ、空行で区切られた計 8 行の情報（最新バージョン時は `e:plugin-update` が自動非表示となり末尾の改行もトリムされます）：
 
 ```text
-🤖 Orchestrator (Neon) │ Orchestrator 計画: Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ オフ
+🤖 Orchestrator (Neon) │ プランナー: Gemini 4 Neon (High) │ 📧 anandydy529@gmail.com │ 💎 Google AI Pro │ 🛡️ オフ
 🪪 Default │ 状態: 実行中 │ サブ代理: 2 │ 成果物: 0 │ 入力キュー: 0 │ BGタスク: 0 │ ご承認待ち: なし
 
 コンテキスト使用: 18.5% [█░░░░░░░░░] │ トークン: 47.4k / 256.0k [█░░░░░░░░░]
 五時間残量: 88% [████████░░] │ 五時間リセット: 4h 50m │ 五時間リセット時刻: 15:50
 七日間残量: 78% [███████░░░] │ 七日間リセット: 4d 5h │ 七日間リセット時刻: 2026/10/18 16:00
-Argon 残量: 59% [█████░░░░░] │ Argon リセット: 6d 1h │ Argon リセット時刻: 2026/10/30 23:57
 
 版管理状態: 変更なし │ 版管理種別: git │ 🔀 main
 📁 antigravity-cli-statusline │ パス: /Users/andyawd/Project/antigravity-cli-statusline
 
-⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ Agy 2.0 バージョン: v2.34.0 │ ステータスライン版: v2.0.0
+⚙️ Accept-edits │ 💬 c5168b1c │ 💾 279MB │ Agy CLI バージョン: v1.5.10 │ Agy 2.0 バージョン: v2.34.0 │ ステータスライン版: v2.1.0
 ```
 
-`plugin-update`（`#39`）が有効で新しい GitHub Release が利用可能な場合、指定した配置位置に 2 行の更新案内が独立表示されます（ターミナルで `agy plugin install` を実行すると表示バージョンが追いつき警告は消えます。古い CLI フックスクリプトを同期する場合は Antigravity 2.0 の「2.0 ＋ CLI に同期適用」または CLI の `/antigravity-cli-statusline:agy-cli-statusline` を実行するか、`node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` でバージョン差を確認してください）：
+`plugin-update`（`#35`）が有効で新しい GitHub Release が利用可能な場合、指定した配置位置に 2 行の更新案内が独立表示されます（ターミナルで `agy plugin install` を実行すると表示バージョンが追いつき警告は消えます。古い CLI フックスクリプトを同期する場合は Antigravity 2.0 の「2.0 ＋ CLI に同期適用」または CLI の `/antigravity-cli-statusline:agy-cli-statusline` を実行するか、`node skills/agy-cli-statusline/scripts/diagnose-statusline.mjs` でバージョン差を確認してください）：
 
 ```text
-⚠️ ステータスラインの新バージョンが利用可能です（現在 v1.12.0 → 最新 v2.0.0）。以下のコマンドで更新してください：
+⚠️ ステータスラインの新バージョンが利用可能です（現在 v2.0.0 → 最新 v2.1.0）。以下のコマンドで更新してください：
 agy plugin install https://github.com/AndyAWD/antigravity-cli-statusline
 ```
 
-絵文字スタイル（`e39` / `e:plugin-update`）では、1 行目が `🆕 v1.12.0 → v2.0.0` のコンパクト表示になり、2 行目に更新コマンドが独立出力されます。最新バージョンの場合は自動的に非表示となり、先頭・末尾の純粋な空白行もトリムされます。
+絵文字スタイル（`e35` / `e:plugin-update`）では、1 行目が `🆕 v2.0.0 → v2.1.0` のコンパクト表示になり、2 行目に更新コマンドが独立出力されます。最新バージョンの場合は自動的に非表示となり、先頭・末尾の純粋な空白行もトリムされます。
 
 ## コントリビューション
 

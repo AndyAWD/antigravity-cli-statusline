@@ -17,7 +17,7 @@ import {
 } from './drag-rows.js';
 import { getUiStrings } from './i18n.js';
 
-const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.0';
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.0';
 const app = new App({ name: 'Statusline', version: APP_VERSION }, {});
 const MAX_UNDO_HISTORY = 30;
 
@@ -153,7 +153,6 @@ function getCountdownIsoForKey(key, snap) {
   if (!snap?.quotas) return '';
   if (key === 'quota-reset-countdown') return snap.quotas.shortTerm?.resetTime || '';
   if (key === 'quota-weekly-countdown') return snap.quotas.weekly?.resetTime || '';
-  if (key === 'quota-argon-countdown') return snap.quotas.argon?.resetTime || '';
   return '';
 }
 
@@ -829,7 +828,6 @@ function renderMonitorView(root, snap, t) {
         // 若為進度條相關指標，附上原生平滑進度條
         let barPct = null;
         if (g.key.startsWith('quota-weekly')) barPct = snap.quotas.weekly.remainingPct;
-        else if (g.key.startsWith('quota-argon')) barPct = snap.quotas.argon.remainingPct;
         else if (g.key === 'quota' || g.key === 'quota-bar' || g.key === 'quota+bar') barPct = snap.quotas.shortTerm.remainingPct;
         else if (g.key.startsWith('context-used')) barPct = snap.context.usedPct;
         else if (g.key.startsWith('token-count')) barPct = snap.context.tokenPct ?? snap.context.usedPct;

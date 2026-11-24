@@ -209,15 +209,25 @@ test('parse-order-expression resolves non-active metrics & save-both preserves C
 
     const snapRes = await svc.getDashboardSnapshot();
     assert.equal(snapRes.snapshot.cliLayout.labelStyle, 'text', 'CLI R27 itemStyles: {} must inherit as text');
+    assert.equal(snapRes.snapshot.quotas.argon, undefined, 'Removed Argon quota must not exist in snapshot.quotas');
+    assert.equal(snapRes.plainText.includes('Quota (5h / 7d):'), true, 'Plain text summary must show Quota (5h / 7d)');
+    assert.equal(snapRes.plainText.includes('Argon'), false, 'Plain text summary must not mention Argon');
     assert.equal(fs.existsSync(path.join(tmpHome, '.gemini', 'tmp')), false, 'StatuslineService fallback must never touch ~/.gemini/tmp');
 
     const parsedRes = await svc.saveConfig({
       action: 'parse-order-expression',
       layout: { items: ['model-name'] },
-      orderExpression: 'e:quota-argon, 16, n, model-name'
+      orderExpression: 'e:quota-weekly, 12, n, model-name'
     });
-    assert.deepEqual(parsedRes.parsed.items, ['quota-argon', 'quota-argon-countdown', 'n', 'model-name']);
-    assert.equal(parsedRes.parsed.itemStyles['quota-argon'], 'emoji');
+    assert.deepEqual(parsedRes.parsed.items, ['quota-weekly', 'quota-weekly-countdown', 'n', 'model-name']);
+    assert.equal(parsedRes.parsed.itemStyles['quota-weekly'], 'emoji');
+
+    // 舊設定若仍殘留 quota-argon*，getDashboardSnapshot() 須自動過濾而不影響其他有效指標
+    fs.writeFileSync(cliSettingsPath, JSON.stringify({
+      ui: { language: 'zh-tw', footer: { items: ['model-name', 'quota-argon', 'quota-argon-bar', 'quota'] } }
+    }), 'utf8');
+    const legacySnapRes = await svc.getDashboardSnapshot({ forceRefresh: true });
+    assert.deepEqual(legacySnapRes.snapshot.cliLayout.items, ['model-name', 'quota']);
 
     // 全 Emoji 同步至 CLI 時應刪除 itemStyles 鍵
     await svc.saveConfig({
@@ -748,8 +758,9 @@ test('StatuslineService renders active-model for Orchestrator sessions and red o
 
     const resOrch = await svc.getDashboardSnapshot({ conversationId: convId, hostLocale: 'zh-tw' });
     assert.equal(resOrch.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
-    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].plainText, '協調工作: Gemini 4 Hydrogen (High)');
-    assert.equal(resOrch.snapshot.renderedItems.emoji['active-model'].plainText, '🪄 工作 → Gemini 4 Hydrogen (High)');
+    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].plainText, '執行者: Gemini 4 Hydrogen (High)');
+    assert.equal(resOrch.snapshot.renderedItems.text['active-model'].label, '執行者');
+    assert.equal(resOrch.snapshot.renderedItems.emoji['active-model'].plainText, '🪄 執行者 → Gemini 4 Hydrogen (High)');
 
     // 切換為一般模型時，active-model 一律以紅色顯示關閉
     fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
@@ -865,8 +876,9 @@ test('StatuslineService detects 2.0 Orchestrator via antigravity_state.pbtxt and
     const resAuto = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw' });
     assert.equal(resAuto.snapshot.session.conversationId, appConvId);
     assert.equal(resAuto.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Neon)');
-    assert.equal(resAuto.snapshot.renderedItems.text['active-model'].plainText, '協調規劃: Gemini 4 Neon (High)');
-    assert.equal(resAuto.snapshot.renderedItems.emoji['active-model'].plainText, '🪄 規劃 → Gemini 4 Neon (High)');
+    assert.equal(resAuto.snapshot.renderedItems.text['active-model'].plainText, '規劃者: Gemini 4 Neon (High)');
+    assert.equal(resAuto.snapshot.renderedItems.text['active-model'].label, '規劃者');
+    assert.equal(resAuto.snapshot.renderedItems.emoji['active-model'].plainText, '🪄 規劃者 → Gemini 4 Neon (High)');
 
     // 2. 切回單一模型代號後，model-name 恢復顯示實際模型，active-model 顯示紅色關閉
     fs.writeFileSync(pbtxtPath, 'last_selected_agent_model: MODEL_PLACEHOLDER_M525\n', 'utf8');

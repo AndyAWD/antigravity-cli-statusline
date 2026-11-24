@@ -9,7 +9,6 @@ import { runCmdDetailedAsync, withTimeout } from '../core/process-utils.mjs';
 import { formatVersionTag } from '../core/semver.mjs';
 import { getSettingsAsync, resolveProjectPath } from '../core/settings.mjs';
 import { RESET, getColorByPercentage, renderBarGraph } from '../renderers/ansi.mjs';
-import { resolveArgonQuota } from './quota.mjs';
 import { resolveActiveRuntimeModelAsync } from './runtime-model.mjs';
 import { formatAbsoluteResetTime, formatResetTime } from './time-format.mjs';
 import { resolveInstalledAppVersionAsync, resolveInstalledCliVersionAsync } from './versions.mjs';
@@ -211,16 +210,6 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const formattedWeeklyReset = weeklyInfo.reset_time ? formatAbsoluteResetTime(weeklyInfo.reset_time, timeFormat) : '';
   const weeklyResetTimeVal = formattedWeeklyReset || noneStr;
   const weeklyQuotaBarVal = renderBarGraph(weeklyPct, barLength, weeklyQuotaColor);
-
-  // Argon Quota
-  const resolvedArgon = options?.argonInfo || resolveArgonQuota(cache);
-  const argonPct = resolvedArgon.remaining_percentage ?? 100;
-  const argonQuotaColor = getColorByPercentage(argonPct);
-  const argonQuotaVal = `${Math.round(argonPct)}%`;
-  const argonCountdownVal = (resolvedArgon.reset_time ? formatResetTime(resolvedArgon.reset_time) : '') || resolvedArgon.refreshes_in || noneStr;
-  const formattedArgonReset = resolvedArgon.reset_time ? formatAbsoluteResetTime(resolvedArgon.reset_time, timeFormat) : '';
-  const argonResetTimeVal = formattedArgonReset || noneStr;
-  const argonQuotaBarVal = renderBarGraph(argonPct, barLength, argonQuotaColor);
 
   // Context
   const remainCtx = Math.max(0, 100 - contextInfo.usedPctNum);
@@ -527,9 +516,8 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     sandboxAllowNet, sandboxStatusVal, cliVersion, appVersion, pluginVersion, conversationIdShort, agentProfileName,
     weeklyQuotaColor, weeklyQuotaVal, weeklyCountdownVal, mode,
     quotaResetTimeVal, weeklyResetTimeVal, quotaBarVal, weeklyQuotaBarVal, contextBarVal, tokenBarVal,
-    argonQuotaColor, argonQuotaVal, argonCountdownVal, argonResetTimeVal, argonQuotaBarVal,
     tokenColor,
-    quotaPct, weeklyPct, argonPct, usedPctNum: contextInfo.usedPctNum,
+    quotaPct, weeklyPct, usedPctNum: contextInfo.usedPctNum,
     totalInput: contextInfo.totalInput, effectiveTokenMax, rssMem,
     isOrchestrator: Boolean(activeModelInfo?.isOrchestrator),
     activeModelName: activeModelInfo?.modelName || '',

@@ -49,7 +49,6 @@ import { extractMetricsAsync, getGitBranch, getGitDirty } from './lib/collectors
 import {
   mergeQuotaBuckets,
   parseMetaQuota,
-  resolveArgonQuota,
   resolveModelQuota,
   resolveQuotaPool,
   resolveWeeklyQuota,
@@ -103,7 +102,6 @@ export {
   triggerQuotaUpdateIfNeededAsync,
   resolveModelQuota,
   resolveWeeklyQuota,
-  resolveArgonQuota,
   DEFAULT_COMPACTION_THRESHOLD,
   STEP_UP_INTERMEDIATE_THRESHOLD,
   parseCeilingValue,
@@ -177,7 +175,6 @@ async function main() {
     let cache = needsCache ? await readJsonSafeAsync(cachePath) : null;
 
     const activePool = resolveQuotaPool(fallbackModel, cache, meta);
-    const needsArgon = Array.isArray(footerItems) && footerItems.some(item => typeof item === 'string' && item.startsWith('quota-argon'));
 
     const metaQuota = parseMetaQuota(meta);
     const hasMetaShortTerm = activePool
@@ -186,25 +183,14 @@ async function main() {
     const hasMetaWeekly = activePool
       ? Boolean(metaQuota?.weekly?.[activePool])
       : Boolean(metaQuota?.weekly && Object.keys(metaQuota.weekly).some(k => !k.toLowerCase().includes('argon')));
-    const hasMetaArgon = !needsArgon || Boolean(
-      metaQuota && (
-        Object.keys(metaQuota.weekly || {}).some(k => k.toLowerCase().includes('argon')) ||
-        Object.keys(metaQuota.shortTerm || {}).some(k => k.toLowerCase().includes('argon'))
-      )
-    );
-    const isMetaQuotaComplete = Boolean(metaQuota && hasMetaShortTerm && hasMetaWeekly && hasMetaArgon);
+    const isMetaQuotaComplete = Boolean(metaQuota && hasMetaShortTerm && hasMetaWeekly);
 
     const hasCacheShortTerm = Boolean(
       (activePool && cache?.shortTerm?.[activePool]) ||
       (cache?.shortTerm && Object.keys(cache.shortTerm).length > 0) ||
       (cache?.models && typeof cache.models === 'object' && Object.keys(cache.models).length > 0)
     );
-    const hasCacheArgon = !needsArgon || Boolean(
-      (cache?.weekly && typeof cache.weekly === 'object' && Object.keys(cache.weekly).some(k => k.toLowerCase().includes('argon'))) ||
-      (cache?.shortTerm && typeof cache.shortTerm === 'object' && Object.keys(cache.shortTerm).some(k => k.toLowerCase().includes('argon'))) ||
-      (cache?.models && typeof cache.models === 'object' && Object.keys(cache.models).some(k => k.toLowerCase().includes('argon')))
-    );
-    const missingRequiredBuckets = (!hasMetaShortTerm && !hasCacheShortTerm) || (!hasMetaArgon && !hasCacheArgon);
+    const missingRequiredBuckets = !hasMetaShortTerm && !hasCacheShortTerm;
 
     const currentModelKeys = extractModelCandidateKeys(meta, fallbackModel);
     const primaryModelKey = currentModelKeys[0] || '';
@@ -256,15 +242,12 @@ async function main() {
       ? cache.shortTerm[activePool]
       : (primaryModelKey ? cache?.models?.[primaryModelKey] : null);
     const activeWeeklyBucket = activePool ? cache?.weekly?.[activePool] : null;
-    const argonBucket = needsArgon ? cache?.weekly?.['gemini-argon-wtu'] : null;
     const metaShortBucket = activePool ? metaQuota?.shortTerm?.[activePool] : null;
     const metaWeeklyBucket = activePool ? metaQuota?.weekly?.[activePool] : null;
-    const metaArgonBucket = needsArgon ? metaQuota?.weekly?.['gemini-argon-wtu'] : null;
     const hasExpiredActiveQuota = Boolean(
       needsQuotaOrAccount && (
         (isBucketExpired(activeShortBucket) && !hasFutureReset(metaShortBucket)) ||
-        (isBucketExpired(activeWeeklyBucket) && !hasFutureReset(metaWeeklyBucket)) ||
-        (isBucketExpired(argonBucket) && !hasFutureReset(metaArgonBucket))
+        (isBucketExpired(activeWeeklyBucket) && !hasFutureReset(metaWeeklyBucket))
       )
     );
 
@@ -332,7 +315,6 @@ async function main() {
     // 解析核心資料
     const quotaInfo = resolveModelQuota(fallbackModel, cache, meta);
     const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache, meta);
-    const argonInfo = resolveArgonQuota(cache);
     const contextInfo = needsContext
       ? await calculateContextUsageAsync(meta, conversationId, settings, cache)
       : { totalInput: 0, contextSize: 1048576, effectiveTokenCeiling: DEFAULT_COMPACTION_THRESHOLD, usedPctNum: 0 };
@@ -357,7 +339,6 @@ async function main() {
         {
           timeFormat,
           barLength,
-          argonInfo,
           footerItems: footerItemsSet,
           workspacePath: projectPath,
           settings,

@@ -43,7 +43,7 @@ export function computeSrcAppSha256(srcDir = SRC_APP_DIR, extraDeps = SHARED_APP
 
 export async function buildAppHtml() {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-  const pkgVersion = String(pkg.version || '2.0.0');
+  const pkgVersion = String(pkg.version || '2.1.0');
 
   const result = await esbuild.build({
     entryPoints: [path.join(SRC_APP_DIR, 'main.js')],

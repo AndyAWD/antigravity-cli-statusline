@@ -298,10 +298,10 @@ test('active-model renders across all 4 locales (text & emoji) and shows red off
   };
 
   const expectedPlanner = {
-    'zh-tw': { text: '協調規劃: Gemini 4 Carbon (High)', emoji: '🪄 規劃 → Gemini 4 Carbon (High)' },
-    'zh-cn': { text: '协调规划: Gemini 4 Carbon (High)', emoji: '🪄 规划 → Gemini 4 Carbon (High)' },
-    'us': { text: 'Orchestrator Plan: Gemini 4 Carbon (High)', emoji: '🪄 Plan → Gemini 4 Carbon (High)' },
-    'jp': { text: 'Orchestrator 計画: Gemini 4 Carbon (High)', emoji: '🪄 計画 → Gemini 4 Carbon (High)' }
+    'zh-tw': { text: '規劃者: Gemini 4 Carbon (High)', emoji: '🪄 規劃者 → Gemini 4 Carbon (High)' },
+    'zh-cn': { text: '规划者: Gemini 4 Carbon (High)', emoji: '🪄 规划者 → Gemini 4 Carbon (High)' },
+    'us': { text: 'Planner: Gemini 4 Carbon (High)', emoji: '🪄 Planner → Gemini 4 Carbon (High)' },
+    'jp': { text: 'プランナー: Gemini 4 Carbon (High)', emoji: '🪄 プランナー → Gemini 4 Carbon (High)' }
   };
 
   for (const [loc, exp] of Object.entries(expectedPlanner)) {
@@ -310,13 +310,28 @@ test('active-model renders across all 4 locales (text & emoji) and shows red off
   }
 
   const executorMetrics = { ...baseMetrics, activeModelName: 'Gemini 4 Hydrogen (High)', activeModelRole: 'executor' };
-  assert.equal(stripAnsi(buildI18nDict('zh-tw', executorMetrics, 'text')['active-model']), '協調工作: Gemini 4 Hydrogen (High)');
-  assert.equal(stripAnsi(buildI18nDict('us', executorMetrics, 'emoji')['active-model']), '🪄 Work → Gemini 4 Hydrogen (High)');
-  assert.equal(stripAnsi(buildI18nDict('jp', executorMetrics, 'emoji')['active-model']), '🪄 作業 → Gemini 4 Hydrogen (High)');
+  const expectedExecutor = {
+    'zh-tw': { text: '執行者: Gemini 4 Hydrogen (High)', emoji: '🪄 執行者 → Gemini 4 Hydrogen (High)' },
+    'zh-cn': { text: '执行者: Gemini 4 Hydrogen (High)', emoji: '🪄 执行者 → Gemini 4 Hydrogen (High)' },
+    'us': { text: 'Executor: Gemini 4 Hydrogen (High)', emoji: '🪄 Executor → Gemini 4 Hydrogen (High)' },
+    'jp': { text: 'エグゼキューター: Gemini 4 Hydrogen (High)', emoji: '🪄 エグゼキューター → Gemini 4 Hydrogen (High)' }
+  };
+  for (const [loc, exp] of Object.entries(expectedExecutor)) {
+    assert.equal(stripAnsi(buildI18nDict(loc, executorMetrics, 'text')['active-model']), exp.text);
+    assert.equal(stripAnsi(buildI18nDict(loc, executorMetrics, 'emoji')['active-model']), exp.emoji);
+  }
 
   const pendingMetrics = { ...baseMetrics, activeModelName: '', activeModelRole: 'pending' };
-  assert.equal(stripAnsi(buildI18nDict('zh-tw', pendingMetrics, 'text')['active-model']), '協調器: 待命');
-  assert.equal(stripAnsi(buildI18nDict('zh-tw', pendingMetrics, 'emoji')['active-model']), '🪄 待命');
+  const expectedPending = {
+    'zh-tw': { text: '協調器: 待命', emoji: '🪄 待命' },
+    'zh-cn': { text: '协调器: 待命', emoji: '🪄 待命' },
+    'us': { text: 'Orchestrator: Pending', emoji: '🪄 Pending' },
+    'jp': { text: 'Orchestrator: 待機中', emoji: '🪄 待機中' }
+  };
+  for (const [loc, exp] of Object.entries(expectedPending)) {
+    assert.equal(stripAnsi(buildI18nDict(loc, pendingMetrics, 'text')['active-model']), exp.text);
+    assert.equal(stripAnsi(buildI18nDict(loc, pendingMetrics, 'emoji')['active-model']), exp.emoji);
+  }
 
   const nonOrchMetrics = { ...baseMetrics, isOrchestrator: false, activeModelName: '', activeModelRole: 'none' };
   const expectedOff = {
@@ -379,7 +394,7 @@ test('E2E CLI statusline-quota.mjs renders active-model under Orchestrator and r
     assert.equal(orchRes.code, 0);
     assert.equal(
       stripAnsi(orchRes.stdout).trim(),
-      '模型: Orchestrator (Carbon) │ 🪄 工作 → Gemini 4 Hydrogen (High)'
+      '模型: Orchestrator (Carbon) │ 🪄 執行者 → Gemini 4 Hydrogen (High)'
     );
 
     // 切換為一般模型時，active-model 一律以紅色顯示關閉

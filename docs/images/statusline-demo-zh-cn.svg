@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640" role="img" aria-label="Antigravity 命令行界面（CLI）状态栏交互设置与动态遥测展示：从执行 /antigravity-cli-statusline:agy-cli-statusline 指令、语言选择、五大分类分页向导（Question 1/5 至 5/5 全五层展示）、自定义排序 Write-in 到 11 列完整状态栏即时运作。" xml:space="preserve">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640" role="img" aria-label="Antigravity 命令行界面（CLI）状态栏交互设置与动态遥测展示：从执行 /antigravity-cli-statusline:agy-cli-statusline 指令、语言选择、五大分类分页向导（Question 1/5 至 5/5 全五层展示）、自定义排序 Write-in 到 10 列完整状态栏即时运作。" xml:space="preserve">
 <style>
   text { font: 12.5px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace; white-space: pre; }
   .cap { font: 15.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-weight: 600; }
@@ -227,14 +227,10 @@
   <text x="44" y="316" fill="#39c5cf">[✓] 📅 每周可用额度长条图（quota-weekly-bar）</text>
   <text x="44" y="334" fill="#39c5cf">[✓] ⏲️ 账号每周额度重置时间倒计时（quota-weekly-countdown）</text>
   <text x="44" y="352" fill="#39c5cf">[✓] 🗓️ 每周重置时间（quota-weekly-reset-time）</text>
-  <text x="44" y="370" fill="#39c5cf">[✓] ✨ Gemini 4 Argon 可用额度百分比（quota-argon）</text>
-  <text x="44" y="388" fill="#39c5cf">[✓] ✨ Gemini 4 Argon 可用额度长条图（quota-argon-bar）</text>
-  <text x="44" y="406" fill="#39c5cf">[✓] ⏱️ Gemini 4 Argon 额度重置时间倒计时（quota-argon-countdown）</text>
-  <text x="44" y="424" fill="#39c5cf">[✓] ⏰ Gemini 4 Argon 重置时间（quota-argon-reset-time）</text>
-  <text x="44" y="442" fill="#39c5cf">[✓] 💎 当前订阅计划等级（plan-tier）</text>
-  <text x="44" y="460" fill="#39c5cf">[✓] 📧 账号电子邮件（account-email）</text>
-  <text x="44" y="498" fill="#8b949e">⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 19 项指标</text>
-  <text x="24" y="520" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (3/5 上下文令牌) · 终端分页免滚动零截断</text>
+  <text x="44" y="370" fill="#39c5cf">[✓] 💎 当前订阅计划等级（plan-tier）</text>
+  <text x="44" y="388" fill="#39c5cf">[✓] 📧 账号电子邮件（account-email）</text>
+  <text x="44" y="426" fill="#8b949e">⎿ 分页进度：[ 第 2 / 5 页 ] · 累计选取 15 项指标</text>
+  <text x="24" y="448" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (3/5 上下文令牌) · 终端分页免滚动零截断</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
   <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
@@ -242,7 +238,7 @@
   <text x="936" y="554" fill="#6e7681" text-anchor="end">Gemini 3.8 Flash (Low)</text>
 
   <!-- Caption -->
-  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">③ 指标分页勾选 (2/5 额度计费账号) · 勾选 5小时/每周/Argon 额度、长条图与时间等 14 项</text>
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">③ 指标分页勾选 (2/5 额度计费账号) · 勾选 5小时/每周额度、长条图与时间等 10 项</text>
 </g>
 
 <!-- ============================================================== -->
@@ -261,7 +257,7 @@
   <text x="44" y="244" fill="#39c5cf">[✓] 🧠 上下文用量长条图（context-used-bar）</text>
   <text x="44" y="262" fill="#39c5cf">[✓] 💰 当前会话消耗的精确令牌数量（token-count）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 💰 令牌数长条图（token-count-bar）</text>
-  <text x="44" y="318" fill="#8b949e">⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 23 项指标</text>
+  <text x="44" y="318" fill="#8b949e">⎿ 分页进度：[ 第 3 / 5 页 ] · 累计选取 19 项指标</text>
   <text x="24" y="340" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (4/5 工作区) · 终端分页免滚动零截断</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -290,7 +286,7 @@
   <text x="44" y="262" fill="#39c5cf">[✓] 🔀 当前工作区项目的 Git 分支（git-branch）</text>
   <text x="44" y="280" fill="#39c5cf">[✓] 🔍 工作区是否有未提交变更（vcs-dirty）</text>
   <text x="44" y="298" fill="#39c5cf">[✓] 🗃️ 版本控制类型（vcs-type）</text>
-  <text x="44" y="336" fill="#8b949e">⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 28 项指标</text>
+  <text x="44" y="336" fill="#8b949e">⎿ 分页进度：[ 第 4 / 5 页 ] · 累计选取 24 项指标</text>
   <text x="24" y="358" fill="#6e7681">Space 勾选/取消 · Enter 进入下一分页 (5/5 系统任务) · 终端分页免滚动零截断</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -326,7 +322,7 @@
   <text x="44" y="388" fill="#39c5cf">[✓] 🧩 状态栏版本号（plugin-version）</text>
   <text x="44" y="406" fill="#39c5cf">[✓] 🆕 状态栏新版本更新提醒（plugin-update）</text>
   <text x="44" y="424" fill="#39c5cf">[✓] 💻 Antigravity 2.0 应用程序版本号（app-version）</text>
-  <text x="44" y="462" fill="#5cdb6d">★ 全部五大分类共 40 项指标已全数选取完成！</text>
+  <text x="44" y="462" fill="#5cdb6d">★ 全部五大分类共 36 项指标已全数选取完成！</text>
   <text x="24" y="484" fill="#6e7681">Space 勾选/取消 · Enter 确认并前往手动排序 (Write-in) · 零截断勾选完毕</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
@@ -344,14 +340,14 @@
 <g class="f f6">
   <!-- 3-Column Reference Table & Question 3: Manual Order & Styles Write-in -->
   <text x="24" y="156" fill="#8b949e">📋</text>
-  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 40 项）</text>
+  <text x="44" y="156" fill="#c9d1d9" font-weight="700">目前已选取的状态栏指标（共 36 项）</text>
   <text x="290" y="156" fill="#8b949e">— 于 Write-in 输入自定义顺序（e: 为 Emoji，n 为换行，n,n 为空白行）：</text>
   
   <text x="24" y="174" fill="#383e5a">┌────┬────────────────────────┬────┬────────────────────────┬────┬────────────────────────┐</text>
-  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">15</tspan> │ ✨ Argon 长条 (bar)    │ <tspan fill="#57caff" font-weight="700">29</tspan> │ 💾 内存用量 (memory)   │</text>
-  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">16</tspan> │ ⏱️ Argon 倒数 (cd)     │ <tspan fill="#57caff" font-weight="700">30</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
-  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">17</tspan> │ ⏰ Argon 时间 (time)   │ <tspan fill="#57caff" font-weight="700">31</tspan> │ 💬 对话 ID (conv-id)   │</text>
-  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">18</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">32</tspan> │ 🛡️ 沙箱状态 (sandbox)  │</text>
+  <text x="24" y="192" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 1</tspan> │ 🤖 模型 (model-name)   │ <tspan fill="#57caff" font-weight="700">13</tspan> │ 🗓️ 每周时间 (time)     │ <tspan fill="#57caff" font-weight="700">25</tspan> │ 💾 内存用量 (memory)   │</text>
+  <text x="24" y="210" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 2</tspan> │ 🪪 代理 (profile)      │ <tspan fill="#57caff" font-weight="700">14</tspan> │ 💎 订阅计划 (plan)     │ <tspan fill="#57caff" font-weight="700">26</tspan> │ 🚀 Agy CLI (cli-ver)   │</text>
+  <text x="24" y="228" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 3</tspan> │ ⚡ 状态 (agent-state)  │ <tspan fill="#57caff" font-weight="700">15</tspan> │ 📧 账号邮箱 (email)    │ <tspan fill="#57caff" font-weight="700">27</tspan> │ 💬 对话 ID (conv-id)   │</text>
+  <text x="24" y="246" fill="#c9d1d9">│ <tspan fill="#57caff" font-weight="700"> 4</tspan> │ ⚙️ 模式 (mode)         │ <tspan fill="#57caff" font-weight="700">16</tspan> │ 🧠 上下文 (context)    │ <tspan fill="#57caff" font-weight="700">28</tspan> │ 🛡️ 沙箱状态 (sandbox)  │</text>
   <text x="24" y="264" fill="#383e5a">└────┴────────────────────────┴────┴────────────────────────┴────┴────────────────────────┘</text>
 
   <text x="24" y="290" fill="#57caff" font-weight="700">?</text>
@@ -363,7 +359,7 @@
   <text x="44" y="376" fill="#57caff">  e:agent-profile,agent-state,subagents,artifacts,pending-input,background-tasks,tool-confirmation,n,n,</text>
   <text x="44" y="396" fill="#57caff">  context-used,context-used-bar,token-count,token-count-bar,n,quota,quota-bar,quota-reset-countdown,...]</text>
   <rect class="cur" x="830" y="384" width="8" height="15" fill="#57caff"/>
-  <text x="24" y="422" fill="#6e7681">依使用者指定排序与图标前缀，将自动编排为 11 列高信息密度状态栏</text>
+  <text x="24" y="422" fill="#6e7681">依使用者指定排序与图标前缀，将自动编排为 10 列高信息密度状态栏</text>
 
   <!-- Default CLI Single-Line Footer (prior to Statusline deployment) -->
   <line x1="24" y1="535" x2="936" y2="535" stroke="#383e5a" stroke-width="1"/>
@@ -384,8 +380,8 @@
   <text x="24" y="180" fill="#5cdb6d" font-weight="700">✓</text>
   <text x="44" y="180" fill="#c9d1d9">跨平台 Hook 脚本部署完成，已写入版本同步信息（.hook-version.json）</text>
   <text x="24" y="204" fill="#57caff" font-weight="700">★</text>
-  <text x="44" y="204" fill="#57caff" font-weight="700">状态栏已热重载生效！已应用自定义 11 列排版与 Emoji/Text 混合风格</text>
-  <text x="44" y="226" fill="#8b949e">⎿ 48 个指标与排版单元已解析 · 自动合并相邻额度与长条图 · 支持 GitHub Release 版本检查</text>
+  <text x="44" y="204" fill="#57caff" font-weight="700">状态栏已热重载生效！已应用自定义 10 列排版与 Emoji/Text 混合风格</text>
+  <text x="44" y="226" fill="#8b949e">⎿ 44 个指标与排版单元已解析 · 自动合并相邻额度与长条图 · 支持 GitHub Release 版本检查</text>
   <line x1="24" y1="294" x2="936" y2="294" stroke="#383e5a" stroke-width="1"/>
   <text x="24" y="314" fill="#57caff">&gt;</text>
   <text x="40" y="314" fill="#e6edf3">Antigravity CLI 状态栏已就绪，随时监控系统指标与工作区文件变更。</text>
@@ -402,15 +398,14 @@
   <text x="24" y="408"><tspan fill="#ffffff">上下文用量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">0.0%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#c9d1d9">░░░░░░░░░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">令牌数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff">0</tspan><tspan fill="#c9d1d9"> / 256.0k [</tspan><tspan fill="#c9d1d9">░░░░░░░░░░]</tspan></text>
   <text x="24" y="427"><tspan fill="#ffffff">五小时可用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五小时倒数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">5h 00m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五小时重置:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">03:22</tspan></text>
   <text x="24" y="446"><tspan fill="#ffffff">七日内可用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日内倒数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">7d 00h</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日内重置:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/09 03:22</tspan></text>
-  <text x="24" y="465"><tspan fill="#ffffff">Argon 可用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon 倒数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">24h 00m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon 重置:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/03 03:22</tspan></text>
-  <!-- Empty row 7 from n,n -->
-  <text x="24" y="484"> </text>
-  <text x="24" y="503"><tspan fill="#ffffff">版控状态:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">✓ 无变更</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版控类型: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
-  <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">完整路径: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
-  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy 2.0 版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.34.0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">状态栏版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.0.0</tspan></text>
+  <!-- Empty row 6 from n,n -->
+  <text x="24" y="465"> </text>
+  <text x="24" y="484"><tspan fill="#ffffff">版控状态:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#5cdb6d" font-weight="700">✓ 无变更</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版控类型: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
+  <text x="24" y="503"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">完整路径: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
+  <text x="24" y="522"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">204MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy 2.0 版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.34.0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">状态栏版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.1.0</tspan></text>
 
   <!-- Caption -->
-  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑧ 设置部署与即时热重载 · 三层 settings.json 同步，立即呈现 11 列自订状态栏</text>
+  <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑧ 设置部署与即时热重载 · 三层 settings.json 同步，立即呈现 10 列自订状态栏</text>
 </g>
 
 <!-- ============================================================== -->
@@ -442,12 +437,11 @@
   <text x="24" y="408"><tspan fill="#ffffff">上下文用量:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">18.5%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">█</tspan><tspan fill="#c9d1d9">░░░░░░░░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">令牌数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff">47.4k</tspan><tspan fill="#c9d1d9"> / 256.0k [</tspan><tspan fill="#57caff">█</tspan><tspan fill="#c9d1d9">░░░░░░░░░]</tspan></text>
   <text x="24" y="427"><tspan fill="#ffffff">五小时可用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">86%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">████████</tspan><tspan fill="#c9d1d9">░░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五小时倒数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">4h 32m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">五小时重置:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">03:49</tspan></text>
   <text x="24" y="446"><tspan fill="#ffffff">七日内可用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">96%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">█████████</tspan><tspan fill="#c9d1d9">░] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日内倒数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">6d 18h</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">七日内重置:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/08 05:06</tspan></text>
-  <text x="24" y="465"><tspan fill="#ffffff">Argon 可用:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">100%</tspan><tspan fill="#c9d1d9"> [</tspan><tspan fill="#57caff">██████████</tspan><tspan fill="#c9d1d9">] </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon 倒数:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">23h 59m</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Argon 重置:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">07/02 08:30</tspan></text>
-  <!-- Empty row 7 from n,n -->
-  <text x="24" y="484"> </text>
-  <text x="24" y="503"><tspan fill="#ffffff">版控状态:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">✘ 未提交 (+3)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版控类型: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
-  <text x="24" y="522"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">完整路径: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
-  <text x="24" y="541"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy 2.0 版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.34.0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">状态栏版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.0.0</tspan></text>
+  <!-- Empty row 6 from n,n -->
+  <text x="24" y="465"> </text>
+  <text x="24" y="484"><tspan fill="#ffffff">版控状态:</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ff7daf" font-weight="700">✘ 未提交 (+3)</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">版控类型: </tspan><tspan fill="#ffffff" font-weight="700">git</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">🔀 </tspan><tspan fill="#ffffff" font-weight="700">main</tspan></text>
+  <text x="24" y="503"><tspan fill="#ffffff">📁 </tspan><tspan fill="#ffffff" font-weight="700">antigravity-cli-statusline</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">完整路径: </tspan><tspan fill="#ffffff" font-weight="700">~/Project/antigravity-cli-statusline</tspan></text>
+  <text x="24" y="522"><tspan fill="#ffffff">⚙️</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">Default</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💬 </tspan><tspan fill="#ffffff" font-weight="700">557d1ccd</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">💾</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#57caff" font-weight="700">288MB</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy CLI 版本: </tspan><tspan fill="#ffffff" font-weight="700">v1.5.10</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">Agy 2.0 版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.34.0</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#6e7681">│</tspan><tspan fill="#c9d1d9"> </tspan><tspan fill="#ffffff">状态栏版本: </tspan><tspan fill="#ffffff" font-weight="700">v2.1.0</tspan></text>
 
   <!-- Caption -->
   <text class="cap" x="480" y="608" fill="#e6edf3" text-anchor="middle">⑨ 完整状态栏即时遥测运作 · 依指定排序即时追踪长条图、令牌用量与子代理</text>

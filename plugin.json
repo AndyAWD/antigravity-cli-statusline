@@ -2,7 +2,7 @@
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "antigravity-cli-statusline",
   "displayName": "Statusline",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Monitor real-time model quota, context token breakdown, Git status, and agent activity in Antigravity App, and visually customize your statusline layout across 4 locales.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [

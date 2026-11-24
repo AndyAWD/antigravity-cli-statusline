@@ -34,13 +34,12 @@
 
 ## 3. 容量長條圖與相鄰自動合併
 
-支援五組數值與長條圖指標配對（預設 10 格 `[████████░░]`，可於 `ui.footer.barLength` 自訂 1–50）：
+支援四組數值與長條圖指標配對（預設 10 格 `[████████░░]`，可於 `ui.footer.barLength` 自訂 1–50）：
 
 | 數值指標 | 長條圖指標 | 自動合併鍵值 |
 |---|---|---|
 | `quota` | `quota-bar` | `quota+bar` |
 | `quota-weekly` | `quota-weekly-bar` | `quota-weekly+bar` |
-| `quota-argon` | `quota-argon-bar` | `quota-argon+bar` |
 | `context-used` | `context-used-bar` | `context-used+bar` |
 | `token-count` | `token-count-bar` | `token-count+bar` |
 
@@ -51,7 +50,7 @@
 
 ## 4. 絕對重置時間（Reset Absolute Time）
 
-支援 `quota-reset-time`、`quota-weekly-reset-time`、`quota-argon-reset-time`，自動轉換為本機時區，可透過 `ui.footer.timeFormat` 設定：
+支援 `quota-reset-time`、`quota-weekly-reset-time`，自動轉換為本機時區，可透過 `ui.footer.timeFormat` 設定：
 
 - `"smart"` / `"auto"`（預設）：同日顯示 `HH:mm`、跨日顯示 `yyyy/MM/dd HH:mm`
 - `"yyyy/MM/dd HH:mm"`（或 `"full"`）：一律顯示完整年月日與時間
@@ -107,7 +106,7 @@
    狀態列掛鉤與配置工具採用四層架構拆分職責（純 Node.js 零外部依賴 ESM）：
    - `core/`：常數與版本（`constants.mjs`）、無位元組順序記號（Byte Order Mark）檔案讀寫與 SHA-256 雜湊（`fs-utils.mjs`）、安全清理與符號連結防護（`safe-cleanup.mjs`）、參數正規化（`normalize.mjs`）、語意化版本（Semantic Versioning）比較（`semver.mjs`）、`windowsHide: true` 子行程工具（`process-utils.mjs`）、三層設定檔合併與命令產生（`settings.mjs`）、外掛清單探索（`plugin-manifest.mjs`）。
    - `collectors/`：資料採集層，包含時間格式（`time-format.mjs`）、本地額度與語言伺服器（Language Server）快取（`quota.mjs`）、對話脈絡與動態上限（`context.mjs`）、帳號快取（`account.mjs`）、系統探針（`probes.mjs` 負責 Git、記憶體與計數器探測）、跨平台版本探測（`versions.mjs` 負責獨立解析已安裝之 Agy CLI 與 Agy 2.0 版本號）、Orchestrator 執行期模型解析（`runtime-model.mjs` 負責多源追蹤實際執行的思考／快速模型）以及父行程樹與 GitHub Release 更新檢查（`plugin-update.mjs`）；對渲染層輸出與介面無關之結構化指標物件。
-   - `metrics/`：指標中繼資料與在地化層，包含單一真實來源 `registry.mjs`（管理 40 項指標、5 個分類、4 種語系、`EMOJI_MAP`（45 鍵）、`ADJACENT_PAIRS` 與問卷中繼資料，並透過 `scripts/sync-resources.mjs` 生成 `resources/questions.json` 與 `resources/prompts.json`）以及四語系標籤字典與相鄰長條圖合併邏輯（`i18n.mjs`）。
+   - `metrics/`：指標中繼資料與在地化層，包含單一真實來源 `registry.mjs`（管理 36 項指標、5 個分類、4 種語系、`EMOJI_MAP`（40 鍵）、`ADJACENT_PAIRS` 與問卷中繼資料，並透過 `scripts/sync-resources.mjs` 生成 `resources/questions.json` 與 `resources/prompts.json`）以及四語系標籤字典與相鄰長條圖合併邏輯（`i18n.mjs`）。
    - `renderers/`：視覺渲染層，包含美國國家標準協會（American National Standards Institute）24-bit 配色與終端顯示寬度計算（`ansi.mjs`）、渲染器註冊表（`index.mjs`）與預設的 `standard` 狀態列渲染器（`standard.mjs`）。
 2. **遞迴掛鉤部署與 `.hook-version.json`**：
    - `scripts/configure-statusline.mjs` 執行時，除了部署主入口 `statusline-quota.mjs` 與背景採集器 `fetch-local-quota.mjs` 至 `~/.gemini/antigravity-cli/hooks/`，亦會遞迴同步整個 `scripts/lib/` 至 `~/.gemini/antigravity-cli/hooks/lib/`。

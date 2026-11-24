@@ -1,7 +1,7 @@
 /**
  * 單一真實來源（Single Source of Truth）：
- * 統一定義 4 種支援語系、5 大分類頁籤、40 項標準狀態列指標、5 組相鄰合併長條圖、
- * 45 個 Emoji 圖示對應表，以及安裝精靈各步驟之跨語系靜態提示範本。
+ * 統一定義 4 種支援語系、5 大分類頁籤、36 項標準狀態列指標、4 組相鄰合併長條圖、
+ * 40 個 Emoji 圖示對應表，以及安裝精靈各步驟之跨語系靜態提示範本。
  */
 
 export const SUPPORTED_LOCALES = ['zh-tw', 'zh-cn', 'us', 'jp'];
@@ -112,7 +112,7 @@ export const METRICS = [
     }
   },
 
-  // 2. 額度、計費與帳號（14 項）
+  // 2. 額度、計費與帳號（10 項）
   {
     id: 'quota',
     category: 'quota-and-billing',
@@ -199,50 +199,6 @@ export const METRICS = [
       'zh-cn': '每周重置时间',
       'us': 'Weekly reset time',
       'jp': '週間リセット時刻'
-    }
-  },
-  {
-    id: 'quota-argon',
-    category: 'quota-and-billing',
-    emoji: '✨',
-    descriptions: {
-      'zh-tw': 'Gemini 4 Argon 可用額度百分比',
-      'zh-cn': 'Gemini 4 Argon 可用额度百分比',
-      'us': 'Gemini 4 Argon available quota remaining',
-      'jp': 'Gemini 4 Argon 利用可能残量'
-    }
-  },
-  {
-    id: 'quota-argon-bar',
-    category: 'quota-and-billing',
-    emoji: '✨',
-    descriptions: {
-      'zh-tw': 'Gemini 4 Argon 可用額度長條圖',
-      'zh-cn': 'Gemini 4 Argon 可用额度长条图',
-      'us': 'Gemini 4 Argon available quota bar graph',
-      'jp': 'Gemini 4 Argon 利用可能残量バーグラフ'
-    }
-  },
-  {
-    id: 'quota-argon-countdown',
-    category: 'quota-and-billing',
-    emoji: '⏱️',
-    descriptions: {
-      'zh-tw': 'Gemini 4 Argon 額度重置時間倒數',
-      'zh-cn': 'Gemini 4 Argon 额度重置时间倒计时',
-      'us': 'Gemini 4 Argon quota reset countdown',
-      'jp': 'Gemini 4 Argon 残量リセットカウントダウン'
-    }
-  },
-  {
-    id: 'quota-argon-reset-time',
-    category: 'quota-and-billing',
-    emoji: '⏰',
-    descriptions: {
-      'zh-tw': 'Gemini 4 Argon 重置時間',
-      'zh-cn': 'Gemini 4 Argon 重置时间',
-      'us': 'Gemini 4 Argon reset time',
-      'jp': 'Gemini 4 Argon リセット時刻'
     }
   },
   {
@@ -512,7 +468,6 @@ export const ADJACENT_PAIRS = [
   { val: 'quota', bar: 'quota-bar', merged: 'quota+bar' },
   { val: 'context-used', bar: 'context-used-bar', merged: 'context-used+bar' },
   { val: 'quota-weekly', bar: 'quota-weekly-bar', merged: 'quota-weekly+bar' },
-  { val: 'quota-argon', bar: 'quota-argon-bar', merged: 'quota-argon+bar' },
   { val: 'token-count', bar: 'token-count-bar', merged: 'token-count+bar' }
 ];
 
