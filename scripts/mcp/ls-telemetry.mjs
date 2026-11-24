@@ -310,7 +310,40 @@ export async function collectLsTelemetryAsync({
     };
   }
 
-  const pluginCache = pluginQuotaCachePath ? await readJsonSafeAsync(pluginQuotaCachePath) : null;
+  const [pluginCache, cliCache] = await Promise.all([
+    pluginQuotaCachePath ? readJsonSafeAsync(pluginQuotaCachePath) : Promise.resolve(null),
+    readJsonSafeAsync(cliQuotaCachePath)
+  ]);
+
+  if (pluginCache && cliCache) {
+    const pluginTs = Number(pluginCache.lsUpdatedAt || pluginCache.updatedAt || 0);
+    const cliTs = Number(cliCache.lsUpdatedAt || cliCache.updatedAt || 0);
+    if (cliTs > pluginTs) {
+      return {
+        cache: cliCache,
+        runtimeTelemetry,
+        conversationNotFound,
+        telemetryStatus: {
+          lsConnected: lsReachable,
+          lsEnvSource,
+          source: 'cli_cache',
+          warning
+        }
+      };
+    }
+    return {
+      cache: pluginCache,
+      runtimeTelemetry,
+      conversationNotFound,
+      telemetryStatus: {
+        lsConnected: lsReachable,
+        lsEnvSource,
+        source: 'plugin_cache',
+        warning
+      }
+    };
+  }
+
   if (pluginCache) {
     return {
       cache: pluginCache,
@@ -325,7 +358,6 @@ export async function collectLsTelemetryAsync({
     };
   }
 
-  const cliCache = await readJsonSafeAsync(cliQuotaCachePath);
   if (cliCache) {
     return {
       cache: cliCache,
