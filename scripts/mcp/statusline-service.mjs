@@ -30,8 +30,10 @@ import {
 import { extractMetricsAsync } from '../../skills/agy-cli-statusline/scripts/lib/collectors/probes.mjs';
 import {
   isOrchestratorModelName,
-  readAppSelectedModelAsync,
-  resolveOrchestratorWrapperDisplayName
+  readAppModelStateAsync,
+  resolveConfiguredPlannerRef,
+  resolveOrchestratorWrapperDisplayName,
+  resolvePlannerCatalogModelRef
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/runtime-model.mjs';
 import {
   resolveInstalledAppVersionAsync,
@@ -307,7 +309,7 @@ export class StatuslineService {
       brainSessions,
       installedPlugin,
       installedVersions,
-      appSelectedModel
+      appModelState
     ] = await Promise.all([
       this._readPanelPreferencesAsync(),
       readJsonSafeAsync(appSessionsPath),
@@ -315,8 +317,13 @@ export class StatuslineService {
       discoverRecentBrainSessionsAsync(this.homeDir, 15),
       resolveInstalledPluginVersionAsync({ pluginDir: this.pluginRootDir, homeDir: this.homeDir }),
       this._resolveInstalledVersionsAsync(forceRefresh),
-      readAppSelectedModelAsync(this.homeDir)
+      readAppModelStateAsync(this.homeDir)
     ]);
+    const {
+      selectedModel: appSelectedModel,
+      orchestratorModel: appOrchestratorModel,
+      orchestratorExecutorModel: appOrchestratorExecutorModel
+    } = appModelState;
 
     // 合併 Hook 對話與磁碟 brain/ 掃描對話
     const sessionMap = new Map();
@@ -501,21 +508,50 @@ export class StatuslineService {
       activeSession.conversationId === latestId
     );
     const effectiveAppSelectedModel = isCurrentAppSession ? appSelectedModel : '';
+    const effectiveAppOrchestratorModel = isCurrentAppSession ? appOrchestratorModel : '';
+    const effectiveAppExecutorModel = isCurrentAppSession ? appOrchestratorExecutorModel : '';
     let effectiveSettings = cliSettings;
-    if (isAppProduct && cliSettings && typeof cliSettings === 'object' && 'model' in cliSettings) {
-      const { model: _ignoredCliModel, ...restCliSettings } = cliSettings;
+    if (isAppProduct && cliSettings && typeof cliSettings === 'object') {
+      const { model: _ignoredCliModel, orchestrator: _ignoredCliOrchestrator, ...restCliSettings } = cliSettings;
       effectiveSettings = restCliSettings;
+      if (effectiveAppOrchestratorModel || effectiveAppExecutorModel) {
+        effectiveSettings = {
+          ...effectiveSettings,
+          orchestrator: {
+            ...(effectiveAppOrchestratorModel ? { planner: effectiveAppOrchestratorModel } : {}),
+            ...(effectiveAppExecutorModel ? { executor: effectiveAppExecutorModel } : {})
+          }
+        };
+      }
     }
 
     const { cache, runtimeTelemetry, telemetryStatus } = lsResult;
-    const appOrchWrapperName = resolveOrchestratorWrapperDisplayName(effectiveAppSelectedModel, cache);
+    const appOrchWrapperName = resolveOrchestratorWrapperDisplayName(effectiveAppSelectedModel, cache, {
+      appOrchestratorModel: effectiveAppOrchestratorModel
+    });
     const hookOrchWrapperName = (!effectiveAppSelectedModel || isOrchestratorModelName(effectiveAppSelectedModel, cache))
-      ? resolveOrchestratorWrapperDisplayName(activeSession.modelName, cache)
+      ? resolveOrchestratorWrapperDisplayName(activeSession.modelName, cache, {
+          settings: effectiveAppSelectedModel ? null : effectiveSettings,
+          appOrchestratorModel: effectiveAppOrchestratorModel
+        })
       : '';
-    const wrapperDisplayName = appOrchWrapperName || hookOrchWrapperName;
+    const cliLatestId = sanitizeConversationId(cliHookSessionsData?.latestConversationId || '');
+    const isCliOrchestratorSession = !isAppProduct &&
+      typeof effectiveSettings?.model === 'string' &&
+      isOrchestratorModelName(effectiveSettings.model, cache) &&
+      (
+        !cliLatestId ||
+        activeSession.conversationId === cliLatestId ||
+        Boolean(transcriptSummary?.hasOrchestratorSignal) ||
+        !activeSession.modelName
+      );
+    const cliSettingsOrchWrapperName = (!appOrchWrapperName && !hookOrchWrapperName && isCliOrchestratorSession)
+      ? resolveOrchestratorWrapperDisplayName(effectiveSettings.model, cache, { settings: effectiveSettings })
+      : '';
+    const wrapperDisplayName = appOrchWrapperName || hookOrchWrapperName || cliSettingsOrchWrapperName;
     const wrapperModelId = appOrchWrapperName
       ? effectiveAppSelectedModel
-      : (hookOrchWrapperName ? activeSession.modelName : '');
+      : (hookOrchWrapperName ? activeSession.modelName : (cliSettingsOrchWrapperName ? effectiveSettings.model : ''));
 
     const fallbackModel = wrapperDisplayName ||
       runtimeTelemetry?.modelDisplayName ||
@@ -526,19 +562,35 @@ export class StatuslineService {
       ? activeSession.agentState
       : (transcriptSummary.exists ? transcriptSummary.derivedAgentState : (activeSession.agentState || 'idle'));
 
+    const staticWrapperName = wrapperModelId ? resolveOrchestratorWrapperDisplayName(wrapperModelId, cache) : '';
+    const didOverrideWrapper = Boolean(wrapperDisplayName && wrapperDisplayName !== staticWrapperName);
+    const activePlannerRef = isAppProduct
+      ? effectiveAppOrchestratorModel
+      : resolveConfiguredPlannerRef(null, effectiveSettings, '');
+    const plannerCatalogRef = didOverrideWrapper ? resolvePlannerCatalogModelRef(activePlannerRef, cache) : '';
+
     const meta = {
       conversation_id: activeSession.conversationId || '',
-      model: {
-        id: wrapperModelId || runtimeTelemetry?.model || fallbackModel,
-        display_name: fallbackModel
-      },
+      model: didOverrideWrapper
+        ? {
+            id: fallbackModel,
+            display_name: fallbackModel,
+            name: plannerCatalogRef || wrapperModelId || fallbackModel
+          }
+        : {
+            id: wrapperModelId || runtimeTelemetry?.model || fallbackModel,
+            display_name: fallbackModel
+          },
       agent_state: derivedState,
       artifact_count: artifactsCount,
       ...(hasWorkspace ? { cwd: projectPath, project: { path: projectPath } } : {})
     };
+    const quotaMeta = didOverrideWrapper
+      ? { ...meta, model: { id: fallbackModel, display_name: fallbackModel } }
+      : meta;
 
-    const quotaInfo = resolveModelQuota(fallbackModel, cache, meta);
-    const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache, meta);
+    const quotaInfo = resolveModelQuota(fallbackModel, cache, quotaMeta);
+    const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache, quotaMeta);
     const contextInfo = await computePureContextInfoAsync({
       runtimeTelemetry,
       cache,
