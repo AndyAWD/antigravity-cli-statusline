@@ -5,14 +5,18 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   classifyOrchestratorModelRole,
+  extractOrchestratorPlannerLabel,
   formatRuntimeModelDisplayName,
   isOrchestratorModelName,
   isOrchestratorSession,
   isOrchestratorWorkerModel,
+  readAppModelStateAsync,
   readAppSelectedModelAsync,
   readLatestTranscriptModelAsync,
   resolveActiveRuntimeModelAsync,
-  resolveOrchestratorWrapperDisplayName
+  resolveConfiguredPlannerRef,
+  resolveOrchestratorWrapperDisplayName,
+  resolvePlannerCatalogModelRef
 } from '../lib/collectors/runtime-model.mjs';
 import {
   buildI18nDict,
@@ -594,5 +598,276 @@ test('loads CLI sessions.json without PLUGIN_DATA, falls back from oversized tra
     assert.equal(appSingleRes.role, 'none');
   } finally {
     fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('resolveOrchestratorWrapperDisplayName dynamically reflects configured planner (Carbon, Argon, Claude) and ignores single models', () => {
+  const cache = {
+    modelLimits: {
+      modelplaceholderm537: {
+        slug: 'gemini-pro-orchestrator-neon',
+        model: 'MODEL_PLACEHOLDER_M537',
+        displayName: 'Orchestrator (Neon)'
+      },
+      modelplaceholderm670: {
+        slug: 'gemini-4-carbon-high',
+        model: 'MODEL_PLACEHOLDER_M670',
+        displayName: 'Gemini 4 Carbon (High)'
+      },
+      modelplaceholderm418: {
+        slug: 'gemini-4-argon-medium',
+        model: 'MODEL_PLACEHOLDER_M418',
+        displayName: 'Gemini 4 Argon (Medium)'
+      }
+    }
+  };
+
+  assert.equal(extractOrchestratorPlannerLabel({ model: 'gemini-4-carbon', effort: 'high' }, cache), 'Carbon');
+  assert.equal(extractOrchestratorPlannerLabel({ modelId: 'gemini-4-argon', effort: 'medium' }, cache), 'Argon');
+  assert.equal(extractOrchestratorPlannerLabel('gemini-4-argon', cache), 'Argon');
+  assert.equal(extractOrchestratorPlannerLabel('argon', cache), 'Argon');
+  assert.equal(extractOrchestratorPlannerLabel('claude-opus-5-5@default', cache), 'Claude Opus 5.5');
+  assert.equal(extractOrchestratorPlannerLabel('MODEL_PLACEHOLDER_M670', cache), 'Carbon');
+  assert.equal(extractOrchestratorPlannerLabel('MODEL_PLACEHOLDER_M418', cache), 'Argon');
+  assert.equal(extractOrchestratorPlannerLabel('MODEL_PLACEHOLDER_M999', null), '');
+
+  const plannerCases = [
+    { settings: { orchestrator: { planner: { model: 'gemini-4-carbon', effort: 'high' } } }, expected: 'Orchestrator (Carbon)' },
+    { settings: { orchestrator: { planner: { modelId: 'gemini-4-argon', effort: 'medium' } } }, expected: 'Orchestrator (Argon)' },
+    { settings: { orchestrator: { planner: 'gemini-4-argon' } }, expected: 'Orchestrator (Argon)' },
+    { settings: { orchestrator: { planner: 'argon' } }, expected: 'Orchestrator (Argon)' },
+    { settings: { orchestrator: { planner: 'claude-opus-5-5@default' } }, expected: 'Orchestrator (Claude Opus 5.5)' }
+  ];
+
+  for (const wrapper of ['Orchestrator (Neon)', 'MODEL_PLACEHOLDER_M537']) {
+    for (const tc of plannerCases) {
+      assert.equal(
+        resolveOrchestratorWrapperDisplayName(wrapper, cache, { settings: tc.settings }),
+        tc.expected
+      );
+    }
+    // 未知 placeholder 且無法解析 planner 時安全退讓回外層靜態名稱
+    assert.equal(
+      resolveOrchestratorWrapperDisplayName(wrapper, wrapper.startsWith('MODEL_') ? cache : null, { plannerModel: 'MODEL_PLACEHOLDER_M999' }),
+      'Orchestrator (Neon)'
+    );
+  }
+
+  // 非 Orchestrator 單一模型即使 settings.orchestrator 有設定也不可誤改
+  assert.equal(
+    resolveOrchestratorWrapperDisplayName('Gemini 4 Neon (High)', cache, {
+      settings: { orchestrator: { planner: 'gemini-4-carbon-high' } }
+    }),
+    ''
+  );
+  assert.equal(
+    resolveConfiguredPlannerRef(
+      { orchestrator: { planner: 'gemini-4-argon' } },
+      { orchestrator: { planner: 'gemini-4-carbon' } },
+      'MODEL_PLACEHOLDER_M670'
+    ),
+    'gemini-4-argon'
+  );
+  assert.equal(
+    resolveConfiguredPlannerRef(
+      {},
+      { orchestrator: { planner: 'gemini-4-carbon' } },
+      'MODEL_PLACEHOLDER_M418'
+    ),
+    'MODEL_PLACEHOLDER_M418'
+  );
+
+  // plannerModel 為空字串或 MODEL_UNSPECIFIED 時不得遮蔽 settings / 2.0 退讓
+  assert.equal(
+    resolveOrchestratorWrapperDisplayName('Orchestrator (Neon)', cache, {
+      plannerModel: '',
+      settings: { orchestrator: { planner: { modelId: 'gemini-4-carbon', effort: 'high' } } }
+    }),
+    'Orchestrator (Carbon)'
+  );
+  assert.equal(
+    resolveConfiguredPlannerRef(
+      {},
+      { orchestrator: { planner: 'gemini-4-carbon' } },
+      'MODEL_UNSPECIFIED'
+    ),
+    'gemini-4-carbon'
+  );
+
+  // @default 變體後綴移除後應正確比對角色，且 resolvePlannerCatalogModelRef 僅在命中目錄時回傳
+  assert.equal(
+    classifyOrchestratorModelRole(
+      'claude-opus-5-5',
+      {
+        orchestrator: {
+          planner: { modelId: 'claude-opus-5-5@default', effort: 'high' },
+          executor: { modelId: 'claude-haiku-4-5@default', effort: 'low' }
+        }
+      },
+      cache
+    ),
+    'planner'
+  );
+  assert.equal(
+    classifyOrchestratorModelRole(
+      'claude-opus-5-5-thinking',
+      {
+        orchestrator: {
+          planner: { modelId: 'claude-opus-5-5@default', effort: 'high' },
+          executor: { modelId: 'claude-haiku-4-5@default', effort: 'low' }
+        }
+      },
+      cache
+    ),
+    'planner'
+  );
+  assert.equal(
+    resolvePlannerCatalogModelRef(
+      { modelId: 'claude-opus-5-5@default', effort: 'high' },
+      {
+        modelLimits: {
+          claudeopus55: { slug: 'claude-opus-5-5', model: 'MODEL_PLACEHOLDER_M601', displayName: 'Claude Opus 5.5', limit: 160000, maxTokens: 200000 }
+        }
+      }
+    ),
+    'MODEL_PLACEHOLDER_M601'
+  );
+  assert.equal(
+    resolvePlannerCatalogModelRef({ modelId: 'gemini-4-carbon', effort: 'high' }, cache),
+    ''
+  );
+});
+
+test('readAppModelStateAsync reads orchestrator_model and orchestrator_executor_model from pbtxt and user_config.json', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-app-state-'));
+  try {
+    const stateDir = path.join(tmpHome, '.gemini', 'antigravity');
+    const configDir = path.join(tmpHome, '.gemini', 'config');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.mkdirSync(configDir, { recursive: true });
+
+    const pbtxtPath = path.join(stateDir, 'antigravity_state.pbtxt');
+    fs.writeFileSync(pbtxtPath, [
+      'last_selected_agent_model: MODEL_PLACEHOLDER_M537',
+      'user_settings {',
+      '  orchestrator_model: MODEL_PLACEHOLDER_M670',
+      '  orchestrator_executor_model: MODEL_PLACEHOLDER_M525',
+      '}'
+    ].join('\n'), 'utf8');
+
+    const pbState = await readAppModelStateAsync(tmpHome);
+    assert.deepEqual(pbState, {
+      selectedModel: 'MODEL_PLACEHOLDER_M537',
+      orchestratorModel: 'MODEL_PLACEHOLDER_M670',
+      orchestratorExecutorModel: 'MODEL_PLACEHOLDER_M525'
+    });
+    assert.equal(await readAppSelectedModelAsync(tmpHome), 'MODEL_PLACEHOLDER_M537');
+
+    // 若 pbtxt 未填或為 MODEL_UNSPECIFIED，退讓讀取 user_config.json
+    fs.writeFileSync(pbtxtPath, [
+      'last_selected_agent_model: MODEL_PLACEHOLDER_M537',
+      'user_settings {',
+      '  orchestrator_model: MODEL_UNSPECIFIED',
+      '}'
+    ].join('\n'), 'utf8');
+    fs.writeFileSync(path.join(configDir, 'user_config.json'), JSON.stringify({
+      userSettings: {
+        orchestratorModel: 'MODEL_PLACEHOLDER_M418',
+        orchestratorExecutorModel: 'MODEL_PLACEHOLDER_M525'
+      }
+    }), 'utf8');
+
+    const cfgState = await readAppModelStateAsync(tmpHome);
+    assert.deepEqual(cfgState, {
+      selectedModel: 'MODEL_PLACEHOLDER_M537',
+      orchestratorModel: 'MODEL_PLACEHOLDER_M418',
+      orchestratorExecutorModel: 'MODEL_PLACEHOLDER_M525'
+    });
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('E2E CLI statusline-quota.mjs overrides static Orchestrator (Neon) with configured planner and routes 3p quota', async () => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'statusline-e2e-planner-'));
+  try {
+    const fakeHome = path.join(sandbox, 'home');
+    const cliDir = path.join(fakeHome, '.gemini', 'antigravity-cli');
+    const tmpDir = path.join(fakeHome, '.gemini', 'tmp');
+    fs.mkdirSync(cliDir, { recursive: true });
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    fs.writeFileSync(path.join(tmpDir, 'real_quota_cache.json'), JSON.stringify({
+      updatedAt: Date.now(),
+      modelPools: {
+        modelplaceholderm537: 'gemini',
+        orchestratorneon: 'gemini'
+      },
+      modelLimits: {
+        modelplaceholderm537: {
+          slug: 'gemini-pro-orchestrator-neon',
+          model: 'MODEL_PLACEHOLDER_M537',
+          displayName: 'Orchestrator (Neon)',
+          limit: 512000,
+          maxTokens: 1048576
+        },
+        claudeopus55: {
+          slug: 'claude-opus-5-5',
+          model: 'claude-opus-5-5',
+          displayName: 'Claude Opus 5.5',
+          limit: 160000,
+          maxTokens: 200000
+        }
+      },
+      shortTerm: {
+        gemini: { remaining_percentage: 88, refreshes_in: '3h' },
+        '3p': { remaining_percentage: 42, refreshes_in: '2h' }
+      }
+    }), 'utf8');
+
+    const writeCliSettings = (planner) => {
+      fs.writeFileSync(path.join(cliDir, 'settings.json'), JSON.stringify({
+        orchestrator: {
+          planner,
+          executor: { model: 'gemini-4-hydrogen', effort: 'high' }
+        },
+        ui: {
+          language: 'zh-tw',
+          footer: { items: ['model-name', 'quota', 'token-count'] }
+        }
+      }), 'utf8');
+    };
+
+    const meta = {
+      model: { id: 'MODEL_PLACEHOLDER_M537', display_name: 'Orchestrator (Neon)' },
+      context_window: { total_input_tokens: 80000, total_output_tokens: 1000 },
+      terminal_width: 200
+    };
+
+    writeCliSettings({ modelId: 'gemini-4-carbon', effort: 'high' });
+    const carbonRes = await runStatusline(meta, fakeHome);
+    assert.equal(carbonRes.code, 0);
+    const carbonPlain = stripAnsi(carbonRes.stdout).trim();
+    assert.ok(carbonPlain.includes('模型: Orchestrator (Carbon)'), carbonPlain);
+    assert.ok(carbonPlain.includes('五小時可用: 88%'), carbonPlain);
+    assert.ok(carbonPlain.includes('80.0k / 512.0k'), carbonPlain);
+
+    writeCliSettings('gemini-4-argon');
+    const argonRes = await runStatusline(meta, fakeHome);
+    assert.equal(argonRes.code, 0);
+    const argonPlain = stripAnsi(argonRes.stdout).trim();
+    assert.ok(argonPlain.includes('模型: Orchestrator (Argon)'), argonPlain);
+    assert.ok(argonPlain.includes('五小時可用: 88%'), argonPlain);
+    assert.ok(argonPlain.includes('80.0k / 512.0k'), argonPlain);
+
+    writeCliSettings({ modelId: 'claude-opus-5-5@default', effort: 'high' });
+    const claudeRes = await runStatusline(meta, fakeHome);
+    assert.equal(claudeRes.code, 0);
+    const claudePlain = stripAnsi(claudeRes.stdout).trim();
+    assert.ok(claudePlain.includes('模型: Orchestrator (Claude Opus 5.5)'), claudePlain);
+    assert.ok(claudePlain.includes('五小時可用: 42%'), claudePlain);
+    assert.ok(claudePlain.includes('80.0k / 160.0k'), claudePlain);
+  } finally {
+    fs.rmSync(sandbox, { recursive: true, force: true });
   }
 });

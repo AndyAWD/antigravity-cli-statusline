@@ -1104,3 +1104,151 @@ test('StatuslineService shares update_cache.json with CLI without clobbering che
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }
 });
+
+test('StatuslineService resolves 2.0 orchestrator_model (Carbon/Argon) from antigravity_state.pbtxt and CLI Orchestrator planner from settings.json', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-svc-orch-planner-'));
+  try {
+    const pluginData = path.join(tmpHome, 'plugin_data');
+    const cliDir = path.join(tmpHome, '.gemini', 'antigravity-cli');
+    const cliPluginData = path.join(cliDir, 'plugin_data', 'antigravity-cli-statusline');
+    const appStateDir = path.join(tmpHome, '.gemini', 'antigravity');
+    fs.mkdirSync(pluginData, { recursive: true });
+    fs.mkdirSync(cliPluginData, { recursive: true });
+    fs.mkdirSync(appStateDir, { recursive: true });
+
+    const appConvId = 'app-orch-conv-1';
+    const cliConvId = 'cli-orch-conv-1';
+    const cliWorkspace = path.join(tmpHome, 'proj-cli-orch');
+    fs.mkdirSync(cliWorkspace, { recursive: true });
+
+    fs.writeFileSync(path.join(cliDir, 'settings.json'), JSON.stringify({
+      model: 'Orchestrator (Neon)',
+      orchestrator: {
+        planner: { model: 'gemini-4-carbon', effort: 'high' },
+        executor: { model: 'gemini-4-hydrogen', effort: 'high' }
+      },
+      ui: {
+        language: 'zh-tw',
+        footer: { items: ['model-name', 'active-model', 'quota'] }
+      }
+    }), 'utf8');
+
+    fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      latestConversationId: appConvId,
+      sessions: {
+        [appConvId]: {
+          conversationId: appConvId,
+          modelName: 'gemini-4-carbon-high',
+          agentState: 'working',
+          updatedAt: 3000
+        }
+      }
+    }), 'utf8');
+
+    fs.writeFileSync(path.join(cliPluginData, 'sessions.json'), JSON.stringify({
+      version: 1,
+      latestConversationId: cliConvId,
+      sessions: {
+        [cliConvId]: {
+          conversationId: cliConvId,
+          workspacePaths: [cliWorkspace],
+          cwd: cliWorkspace,
+          transcriptPath: path.join(cliDir, 'brain', cliConvId, '.system_generated', 'logs', 'transcript.jsonl'),
+          modelName: 'Orchestrator (Neon)',
+          agentState: 'working',
+          updatedAt: 5000
+        }
+      }
+    }), 'utf8');
+
+    const pbtxtPath = path.join(appStateDir, 'antigravity_state.pbtxt');
+    fs.writeFileSync(pbtxtPath, [
+      'last_selected_agent_model: MODEL_PLACEHOLDER_M537',
+      'user_settings {',
+      '  orchestrator_model: MODEL_PLACEHOLDER_M670',
+      '  orchestrator_executor_model: MODEL_PLACEHOLDER_M525',
+      '}'
+    ].join('\n'), 'utf8');
+
+    const cache = {
+      modelPools: {
+        modelplaceholderm537: 'gemini',
+        orchestratorneon: 'gemini'
+      },
+      shortTerm: {
+        gemini: { remaining_percentage: 88, refreshes_in: '3h' },
+        '3p': { remaining_percentage: 42, refreshes_in: '2h' }
+      },
+      modelLimits: {
+        modelplaceholderm537: { slug: 'gemini-pro-orchestrator-neon', model: 'MODEL_PLACEHOLDER_M537', displayName: 'Orchestrator (Neon)', limit: 512000, maxTokens: 1048576 },
+        modelplaceholderm670: { slug: 'gemini-4-carbon-high', model: 'MODEL_PLACEHOLDER_M670', displayName: 'Gemini 4 Carbon (High)', limit: 512000, maxTokens: 1048576 },
+        modelplaceholderm418: { slug: 'gemini-4-argon-medium', model: 'MODEL_PLACEHOLDER_M418', displayName: 'Gemini 4 Argon (Medium)', limit: 512000, maxTokens: 1048576 },
+        modelplaceholderm525: { slug: 'gemini-4-hydrogen-high', model: 'MODEL_PLACEHOLDER_M525', displayName: 'Gemini 4 Hydrogen (High)', limit: 512000, maxTokens: 1048576 },
+        modelplaceholderm601: { slug: 'claude-opus-5-5', model: 'MODEL_PLACEHOLDER_M601', displayName: 'Claude Opus 5.5', limit: 160000, maxTokens: 200000 }
+      }
+    };
+
+    const svc = new StatuslineService({
+      homeDir: tmpHome,
+      pluginRootDir: ROOT,
+      pluginDataDir: pluginData,
+      fetchReleaseFn: async () => ({ ok: false }),
+      resolveCliVersionFn: async () => ({ version: '1.5.17', tag: 'v1.5.17', installed: true, source: 'mock' }),
+      resolveAppVersionFn: async () => ({ version: '2.34.0', tag: 'v2.34.0', installed: true, source: 'mock' }),
+      collectLsTelemetryFn: async ({ conversationId }) => ({
+        cache,
+        runtimeTelemetry: conversationId === appConvId
+          ? { maxContextTokens: 512000, estimatedTokensUsed: 1200, modelDisplayName: 'Gemini 4 Carbon (High)', model: 'MODEL_PLACEHOLDER_M670', tokenBreakdown: [] }
+          : null,
+        telemetryStatus: { lsConnected: true, lsEnvSource: 'env', source: 'live', warning: '' }
+      })
+    });
+
+    // 1. 2.0 對話：即使 last_selected_agent_model 指向靜態 Orchestrator (Neon)，仍依 orchestrator_model 顯示 Carbon
+    const resAppCarbon = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw' });
+    assert.equal(resAppCarbon.snapshot.session.conversationId, appConvId);
+    assert.equal(resAppCarbon.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
+    assert.equal(resAppCarbon.snapshot.renderedItems.text['active-model'].plainText, '規劃者: Gemini 4 Carbon (High)');
+
+    // 2. 切換 2.0 orchestrator_model 至 Argon
+    fs.writeFileSync(pbtxtPath, [
+      'last_selected_agent_model: MODEL_PLACEHOLDER_M537',
+      'user_settings {',
+      '  orchestrator_model: MODEL_PLACEHOLDER_M418',
+      '  orchestrator_executor_model: MODEL_PLACEHOLDER_M525',
+      '}'
+    ].join('\n'), 'utf8');
+    const resAppArgon = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resAppArgon.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Argon)');
+
+    // 3. 2.0 orchestrator_model 為 Claude 時，顯示 Orchestrator (Claude Opus 5.5) 並正確路由至 3p 額度池（不遭 M537=gemini 劫持）
+    fs.writeFileSync(pbtxtPath, [
+      'last_selected_agent_model: MODEL_PLACEHOLDER_M537',
+      'user_settings {',
+      '  orchestrator_model: MODEL_PLACEHOLDER_M601',
+      '  orchestrator_executor_model: MODEL_PLACEHOLDER_M525',
+      '}'
+    ].join('\n'), 'utf8');
+    const resAppClaude = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resAppClaude.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Claude Opus 5.5)');
+    assert.equal(resAppClaude.snapshot.renderedItems.text['quota'].plainText, '五小時可用: 42%');
+
+    // 4. 2.0 orchestrator_model 為 MODEL_UNSPECIFIED 時，不得外洩 CLI settings.orchestrator（應維持靜態 Orchestrator (Neon)）
+    fs.writeFileSync(pbtxtPath, [
+      'last_selected_agent_model: MODEL_PLACEHOLDER_M537',
+      'user_settings {',
+      '  orchestrator_model: MODEL_UNSPECIFIED',
+      '}'
+    ].join('\n'), 'utf8');
+    const resAppIsolated = await svc.getDashboardSnapshot({ hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resAppIsolated.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Neon)');
+
+    // 5. 切換檢視 CLI Orchestrator 對話（即使 2.0 orchestrator_model 為 MODEL_UNSPECIFIED）：仍依 CLI settings.orchestrator.planner 顯示 Carbon
+    const resCliOrch = await svc.getDashboardSnapshot({ conversationId: cliConvId, hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resCliOrch.snapshot.session.product, 'antigravity-cli');
+    assert.equal(resCliOrch.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
