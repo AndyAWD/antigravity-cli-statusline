@@ -75,7 +75,14 @@ export async function getSettingsAsync(meta, options = {}) {
     const cliContent = await fs.readFile(cliPath, 'utf8');
     const cliSettings = JSON.parse(cliContent.replace(/^\uFEFF/, ''));
     if (cliSettings && typeof cliSettings === 'object' && !Array.isArray(cliSettings)) {
+      const prevOrch = settings.orchestrator;
       settings = { ...settings, ...cliSettings };
+      if (
+        prevOrch && typeof prevOrch === 'object' && !Array.isArray(prevOrch) &&
+        cliSettings.orchestrator && typeof cliSettings.orchestrator === 'object' && !Array.isArray(cliSettings.orchestrator)
+      ) {
+        settings.orchestrator = { ...prevOrch, ...cliSettings.orchestrator };
+      }
       if (cliSettings.ui) {
         settings.ui = { ...settings.ui, ...cliSettings.ui };
         if (cliSettings.ui.footer) {
@@ -89,7 +96,14 @@ export async function getSettingsAsync(meta, options = {}) {
     const projContent = await fs.readFile(projectPath, 'utf8');
     const projSettings = JSON.parse(projContent.replace(/^\uFEFF/, ''));
     if (projSettings && typeof projSettings === 'object' && !Array.isArray(projSettings)) {
+      const prevOrch = settings.orchestrator;
       settings = { ...settings, ...projSettings };
+      if (
+        prevOrch && typeof prevOrch === 'object' && !Array.isArray(prevOrch) &&
+        projSettings.orchestrator && typeof projSettings.orchestrator === 'object' && !Array.isArray(projSettings.orchestrator)
+      ) {
+        settings.orchestrator = { ...prevOrch, ...projSettings.orchestrator };
+      }
       if (projSettings.ui) {
         settings.ui = { ...settings.ui, ...projSettings.ui };
         if (projSettings.ui.footer) {

@@ -44,7 +44,13 @@ import {
   resolveAgySessionAsync,
   tokenizeCommandLine
 } from './lib/collectors/plugin-update.mjs';
-import { isOrchestratorSession } from './lib/collectors/runtime-model.mjs';
+import {
+  isOrchestratorModelName,
+  isOrchestratorSession,
+  resolveConfiguredPlannerRef,
+  resolveOrchestratorWrapperDisplayName,
+  resolvePlannerCatalogModelRef
+} from './lib/collectors/runtime-model.mjs';
 import { extractMetricsAsync, getGitBranch, getGitDirty } from './lib/collectors/probes.mjs';
 import {
   mergeQuotaBuckets,
@@ -117,6 +123,26 @@ export {
   renderStatusLine
 };
 
+function resolveEffectiveCliModel(meta, settings, cache, currentFallback) {
+  for (const cand of [meta?.model?.display_name, meta?.model?.id, currentFallback]) {
+    if (typeof cand === 'string' && cand.trim() && isOrchestratorModelName(cand, cache)) {
+      const resolved = resolveOrchestratorWrapperDisplayName(cand, cache, { settings, meta });
+      if (resolved) return resolved;
+    }
+  }
+  return currentFallback;
+}
+
+function hasPlaceholderPlannerRef(settings, meta) {
+  for (const obj of [meta?.orchestrator, settings?.orchestrator]) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) continue;
+    const raw = obj.planner ?? obj.plannerModel ?? obj.planner_model ?? obj.plan ?? obj.planModel ?? obj.plan_model ?? obj.orchestratorModel ?? obj.orchestrator_model;
+    const cand = typeof raw === 'string' ? raw : (raw && typeof raw === 'object' ? (raw.model ?? raw.modelId ?? raw.model_id ?? raw.id) : '');
+    if (typeof cand === 'string' && /^MODEL_/i.test(cand.trim())) return true;
+  }
+  return false;
+}
+
 // ==========================================
 // Main Entry
 // ==========================================
@@ -138,6 +164,7 @@ async function main() {
     let fallbackModel = 'Gemini 3.5 Flash (High)';
     if (meta?.model?.display_name) fallbackModel = meta.model.display_name;
     else if (meta?.model?.id) fallbackModel = meta.model.id;
+    fallbackModel = resolveEffectiveCliModel(meta, settings, null, fallbackModel);
 
     // 退讓模式
     if (!settings?.ui?.footer?.items || !Array.isArray(settings.ui.footer.items) || settings.ui.footer.items.length === 0) {
@@ -172,9 +199,60 @@ async function main() {
 
     // 讀取快取並優先整合 Antigravity CLI 原生 meta.quota
     const cachePath = join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
+    const needsCatalogOnlyCache = !needsCache && footerItemsSet.has('model-name') && (
+      /^MODEL_/i.test(fallbackModel) ||
+      /^MODEL_/i.test(String(meta?.model?.id || '')) ||
+      hasPlaceholderPlannerRef(settings, meta)
+    );
     let cache = needsCache ? await readJsonSafeAsync(cachePath) : null;
+    const catalogReadOnlyCache = needsCatalogOnlyCache ? await readJsonSafeAsync(cachePath) : null;
+    let effectiveCache = cache || catalogReadOnlyCache;
+    fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel);
 
-    const activePool = resolveQuotaPool(fallbackModel, cache, meta);
+    const buildEffectiveMetas = (resolvedModel, curCache) => {
+      if (!isOrchestratorModelName(resolvedModel, curCache)) {
+        return { effectiveMeta: meta, quotaMeta: meta };
+      }
+      const rawWrapperRef = meta?.model?.id || meta?.model?.display_name || '';
+      const staticWrapperName = rawWrapperRef ? resolveOrchestratorWrapperDisplayName(rawWrapperRef, curCache) : '';
+      const didOverrideWrapper = Boolean(resolvedModel !== (staticWrapperName || meta?.model?.display_name || ''));
+      if (!didOverrideWrapper && meta?.model?.display_name === resolvedModel) {
+        return { effectiveMeta: meta, quotaMeta: meta };
+      }
+      if (didOverrideWrapper) {
+        const plannerRef = resolveConfiguredPlannerRef(meta, settings, '');
+        const plannerCatalogRef = resolvePlannerCatalogModelRef(plannerRef, curCache);
+        const baseModelObj = (meta?.model && typeof meta.model === 'object') ? meta.model : {};
+        return {
+          effectiveMeta: {
+            ...meta,
+            model: {
+              ...baseModelObj,
+              id: resolvedModel,
+              display_name: resolvedModel,
+              name: plannerCatalogRef || baseModelObj.id || baseModelObj.name || resolvedModel
+            }
+          },
+          quotaMeta: {
+            ...meta,
+            model: {
+              id: resolvedModel,
+              display_name: resolvedModel
+            }
+          }
+        };
+      }
+      const nextModel = (meta?.model && typeof meta.model === 'object') ? { ...meta.model } : {};
+      nextModel.display_name = resolvedModel;
+      if (typeof nextModel.id === 'string' && isOrchestratorModelName(nextModel.id, curCache) && !/^MODEL_/i.test(nextModel.id)) {
+        nextModel.id = resolvedModel;
+      }
+      const updated = { ...meta, model: nextModel };
+      return { effectiveMeta: updated, quotaMeta: updated };
+    };
+    let { effectiveMeta, quotaMeta } = buildEffectiveMetas(fallbackModel, effectiveCache);
+
+    const activePool = resolveQuotaPool(fallbackModel, effectiveCache, quotaMeta);
 
     const metaQuota = parseMetaQuota(meta);
     const hasMetaShortTerm = activePool
@@ -192,7 +270,7 @@ async function main() {
     );
     const missingRequiredBuckets = !hasMetaShortTerm && !hasCacheShortTerm;
 
-    const currentModelKeys = extractModelCandidateKeys(meta, fallbackModel);
+    const currentModelKeys = extractModelCandidateKeys(effectiveMeta, fallbackModel);
     const primaryModelKey = currentModelKeys[0] || '';
     const catalogEntry = resolveCatalogEntry(currentModelKeys, cache?.modelLimits);
     const hasCatalogCeiling = Boolean(catalogEntry && typeof catalogEntry.limit === 'number' && catalogEntry.limit > 0);
@@ -252,18 +330,21 @@ async function main() {
     );
 
     const prevPollAttemptAt = cache?.lastPollAttemptAt || 0;
-    const needsActiveModel = wantsActiveModel && isOrchestratorSession(meta, settings, null, fallbackModel, { cache });
+    const needsActiveModel = wantsActiveModel && isOrchestratorSession(effectiveMeta, settings, null, fallbackModel, { cache });
     const shouldUpdateForQuota = needsQuotaOrAccount && (!isMetaQuotaComplete || stateOrTokensChanged || isCacheStale || hasExpiredActiveQuota);
     const shouldUpdateForContext = needsContext && (missingModelLimits || stateOrTokensChanged || isCacheStale);
     const shouldUpdateForActiveModel = needsActiveModel && (stateOrTokensChanged || isCacheStale || (currentState !== '' && currentState !== 'idle'));
     if (needsCache && (shouldUpdateForQuota || shouldUpdateForContext || shouldUpdateForActiveModel)) {
-      const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, meta, {
+      const updateRes = await triggerQuotaUpdateIfNeededAsync(cache, effectiveMeta, {
         cachePath,
         missingRequiredBuckets: (needsQuotaOrAccount && missingRequiredBuckets) || missingModelLimits,
         hasExpiredQuota: hasExpiredActiveQuota,
         conversationId
       });
       cache = updateRes.cache;
+      effectiveCache = cache || catalogReadOnlyCache;
+      fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel);
+      ({ effectiveMeta, quotaMeta } = buildEffectiveMetas(fallbackModel, effectiveCache));
       freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
       timedOut = updateRes.timedOut;
       if (cache && typeof cache === 'object' && cache.lastPollAttemptAt && cache.lastPollAttemptAt !== prevPollAttemptAt) {
@@ -313,10 +394,10 @@ async function main() {
     }
 
     // 解析核心資料
-    const quotaInfo = resolveModelQuota(fallbackModel, cache, meta);
-    const weeklyInfo = resolveWeeklyQuota(fallbackModel, cache, meta);
+    const quotaInfo = resolveModelQuota(fallbackModel, effectiveCache, quotaMeta);
+    const weeklyInfo = resolveWeeklyQuota(fallbackModel, effectiveCache, quotaMeta);
     const contextInfo = needsContext
-      ? await calculateContextUsageAsync(meta, conversationId, settings, cache)
+      ? await calculateContextUsageAsync(effectiveMeta, conversationId, settings, cache)
       : { totalInput: 0, contextSize: 1048576, effectiveTokenCeiling: DEFAULT_COMPACTION_THRESHOLD, usedPctNum: 0 };
 
     const timeFormat = settings?.ui?.footer?.timeFormat || settings?.ui?.timeFormat || 'smart';
@@ -328,10 +409,10 @@ async function main() {
     const [pluginUpdateInfo, metrics] = await Promise.all([
       pluginUpdatePromise,
       extractMetricsAsync(
-        meta,
+        effectiveMeta,
         lang,
         fallbackModel,
-        cache,
+        effectiveCache,
         cachedAccount,
         quotaInfo,
         contextInfo,

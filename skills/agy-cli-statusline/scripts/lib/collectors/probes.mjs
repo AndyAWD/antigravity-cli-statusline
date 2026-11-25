@@ -9,7 +9,7 @@ import { runCmdDetailedAsync, withTimeout } from '../core/process-utils.mjs';
 import { formatVersionTag } from '../core/semver.mjs';
 import { getSettingsAsync, resolveProjectPath } from '../core/settings.mjs';
 import { RESET, getColorByPercentage, renderBarGraph } from '../renderers/ansi.mjs';
-import { resolveActiveRuntimeModelAsync } from './runtime-model.mjs';
+import { isOrchestratorModelName, resolveActiveRuntimeModelAsync, resolveOrchestratorWrapperDisplayName } from './runtime-model.mjs';
 import { formatAbsoluteResetTime, formatResetTime } from './time-format.mjs';
 import { resolveInstalledAppVersionAsync, resolveInstalledCliVersionAsync } from './versions.mjs';
 
@@ -186,6 +186,9 @@ export async function getMetricValueAsync(meta, keys, countersCachePath, fallbac
  * @returns {Promise<object>}
  */
 export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo = { remaining_percentage: 100, refreshes_in: '' }, options = {}) {
+  const resolvedFallbackModel = ((options?.settings || meta?.orchestrator) && isOrchestratorModelName(fallbackModel, cache))
+    ? (resolveOrchestratorWrapperDisplayName(fallbackModel, cache, { settings: options?.settings, meta }) || fallbackModel)
+    : fallbackModel;
   const timeFormat = options?.timeFormat || 'smart';
   const barLength = options?.barLength || 10;
   const normLang = normalizeLanguage(lang);
@@ -286,7 +289,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
           : await getSettingsAsync(meta, { homeDir: options?.homeDir || os.homedir() }).catch(() => ({}));
         return resolveActiveRuntimeModelAsync({
           meta,
-          fallbackModel,
+          fallbackModel: resolvedFallbackModel,
           settings: resolvedSettings,
           cache,
           homeDir: options?.homeDir || os.homedir(),
@@ -509,7 +512,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const mode = modeVal;
 
   return {
-    fallbackModel, quotaColor, quotaVal, contextColor, usedPct, memUsage, tokenCount,
+    fallbackModel: resolvedFallbackModel, quotaColor, quotaVal, contextColor, usedPct, memUsage, tokenCount,
     countdownVal, gitBranch, projectName, projectFullPath, planTier, accountEmail,
     agentState, toolConfirmPending, pendingInputCount, backgroundTasksCount, subagentsCount,
     artifactsCount, vcsDirtyFlag, vcsDirtyGlyph, vcsDirtyLabel, vcsType, sandboxEnabled,
