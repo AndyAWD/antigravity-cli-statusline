@@ -7,6 +7,8 @@ import { normalizeModelName, sanitizeConversationId } from '../core/normalize.mj
 const TRANSCRIPT_TAIL_BYTES = 64 * 1024;
 const TRANSCRIPT_FALLBACK_TAIL_BYTES = 256 * 1024;
 const EFFORT_SUFFIX_RE = /-(low|medium|high|xhigh|max|minimal)$/i;
+const MODEL_VARIANT_SUFFIX_RE = /@[a-z0-9._-]+$/i;
+const EFFORT_PAREN_SUFFIX_RE = /\s*\(\s*(?:low|medium|high|xhigh|max|minimal)\s*\)\s*$/i;
 const EFFORT_DISPLAY_MAP = {
   low: 'Low',
   medium: 'Medium',
@@ -14,6 +16,12 @@ const EFFORT_DISPLAY_MAP = {
   xhigh: 'XHigh',
   max: 'Max',
   minimal: 'Minimal'
+};
+const GEMINI_ELEMENT_LABEL_MAP = {
+  carbon: 'Carbon',
+  argon: 'Argon',
+  neon: 'Neon',
+  hydrogen: 'Hydrogen'
 };
 const WORKER_SLUG_RE = /-worker\b/i;
 const CONCRETE_ORCH_SUFFIX_RE = /^\s*(?!orchestrator\b).+\(\s*orchestrator\s*\)\s*$/i;
@@ -120,17 +128,135 @@ export function isOrchestratorModelName(rawName, cache = null) {
   return false;
 }
 
+function cleanProtoModelToken(raw) {
+  if (typeof raw !== 'string') return '';
+  const cleaned = raw.replace(/^["']|["']$/g, '').trim();
+  if (!cleaned || /^(?:MODEL_UNSPECIFIED|0|none|null)$/i.test(cleaned)) return '';
+  return cleaned;
+}
+
+function isUsablePlannerRef(ref) {
+  if (typeof ref === 'string') {
+    return Boolean(cleanProtoModelToken(ref));
+  }
+  if (ref && typeof ref === 'object' && !Array.isArray(ref)) {
+    for (const key of ['model', 'modelId', 'model_id', 'slug', 'id', 'name', 'displayName', 'display_name']) {
+      if (typeof ref[key] === 'string' && cleanProtoModelToken(ref[key])) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function readPlannerFieldFromOrchestratorObj(orchObj) {
+  if (!orchObj || typeof orchObj !== 'object' || Array.isArray(orchObj)) return null;
+  return (
+    orchObj.planner ??
+    orchObj.plannerModel ??
+    orchObj.planner_model ??
+    orchObj.plan ??
+    orchObj.planModel ??
+    orchObj.plan_model ??
+    orchObj.orchestratorModel ??
+    orchObj.orchestrator_model ??
+    null
+  );
+}
+
 /**
- * 解析 Orchestrator 外層包裝模型的人類可讀顯示名稱（如 MODEL_PLACEHOLDER_M537 -> Orchestrator (Neon)）。
- * 若傳入為具體底層模型或具名 Worker，回傳空字串。
- * @param {unknown} rawModel
+ * 依據優先順序解析已配置的 Orchestrator 規劃模型參考（meta.orchestrator > 2.0 orchestrator_model > settings.orchestrator）。
+ * @param {object} [meta={}]
+ * @param {object} [settings={}]
+ * @param {string} [appOrchestratorModel='']
+ * @returns {string|object|null}
+ */
+export function resolveConfiguredPlannerRef(meta = {}, settings = {}, appOrchestratorModel = '') {
+  const fromMeta = readPlannerFieldFromOrchestratorObj(meta?.orchestrator);
+  if (isUsablePlannerRef(fromMeta)) return fromMeta;
+  const cleanedApp = cleanProtoModelToken(appOrchestratorModel);
+  if (cleanedApp) return cleanedApp;
+  const fromSettings = readPlannerFieldFromOrchestratorObj(settings?.orchestrator);
+  if (isUsablePlannerRef(fromSettings)) return fromSettings;
+  return null;
+}
+
+/**
+ * 從已配置的規劃模型參考擷取適合放入 Orchestrator (<Planner>) 括號內的精簡顯示名稱。
+ * @param {string|object|null} plannerRef
  * @param {object|null} [cache=null]
  * @returns {string}
  */
-export function resolveOrchestratorWrapperDisplayName(rawModel, cache = null) {
+export function extractOrchestratorPlannerLabel(plannerRef, cache = null) {
+  if (!plannerRef) return '';
+  let candidates = [];
+  if (typeof plannerRef === 'string') {
+    if (plannerRef.trim()) candidates = [plannerRef.trim()];
+  } else if (typeof plannerRef === 'object' && !Array.isArray(plannerRef)) {
+    for (const key of ['model', 'modelId', 'model_id', 'slug', 'id', 'name', 'displayName', 'display_name']) {
+      if (typeof plannerRef[key] === 'string' && plannerRef[key].trim()) {
+        candidates.push(plannerRef[key].trim());
+      }
+    }
+  }
+
+  for (const cand of candidates) {
+    const cleaned = cand.replace(MODEL_VARIANT_SUFFIX_RE, '').trim();
+    if (!cleaned || /^(?:MODEL_UNSPECIFIED|0|none|null)$/i.test(cleaned)) continue;
+
+    const elementHit = GEMINI_ELEMENT_LABEL_MAP[cleaned.toLowerCase()];
+    if (elementHit) return elementHit;
+
+    if (isOrchestratorModelName(cleaned, cache)) {
+      const entryDisplay = lookupModelLimitEntry(cleaned, cache)?.displayName || cleaned;
+      const parenMatch = entryDisplay.match(/\(\s*([^)]+?)\s*\)/);
+      if (parenMatch && parenMatch[1] && !parenMatch[1].toLowerCase().includes('orchestrator')) {
+        const inner = parenMatch[1].trim();
+        return GEMINI_ELEMENT_LABEL_MAP[inner.toLowerCase()] || inner;
+      }
+      for (const tok of entryDisplay.toLowerCase().split(/[^a-z0-9]+/)) {
+        if (tok === 'carbon' || tok === 'argon' || tok === 'neon') {
+          return GEMINI_ELEMENT_LABEL_MAP[tok];
+        }
+      }
+      continue;
+    }
+
+    const formatted = formatRuntimeModelDisplayName(cleaned, cache);
+    if (!formatted || /^MODEL_/i.test(formatted) || formatted.includes('_')) continue;
+
+    const baseDisplay = formatted.replace(EFFORT_PAREN_SUFFIX_RE, '').trim();
+    const geminiElemMatch = baseDisplay.match(/^Gemini(?:\s+\d+(?:\.\d+)?)?\s+(Carbon|Argon|Neon|Hydrogen)$/i);
+    if (geminiElemMatch) {
+      return GEMINI_ELEMENT_LABEL_MAP[geminiElemMatch[1].toLowerCase()];
+    }
+    if (baseDisplay) return baseDisplay;
+  }
+
+  return '';
+}
+
+/**
+ * 解析 Orchestrator 外層包裝模型的人類可讀顯示名稱（如 MODEL_PLACEHOLDER_M537 -> Orchestrator (Neon)）。
+ * 若傳入配置之規劃模型（options.plannerModel / options.settings / options.meta / options.appOrchestratorModel），則動態合成 Orchestrator (<Planner>)。
+ * 若傳入為具體底層模型或具名 Worker，回傳空字串。
+ * @param {unknown} rawModel
+ * @param {object|null} [cache=null]
+ * @param {{ plannerModel?: string|object|null, settings?: object, meta?: object, appOrchestratorModel?: string }} [options={}]
+ * @returns {string}
+ */
+export function resolveOrchestratorWrapperDisplayName(rawModel, cache = null, options = {}) {
   if (typeof rawModel !== 'string') return '';
   const trimmed = rawModel.trim();
   if (!trimmed || !isOrchestratorModelName(trimmed, cache)) return '';
+
+  const plannerRef = isUsablePlannerRef(options?.plannerModel)
+    ? options.plannerModel
+    : resolveConfiguredPlannerRef(options?.meta, options?.settings, options?.appOrchestratorModel);
+  const plannerLabel = extractOrchestratorPlannerLabel(plannerRef, cache);
+  if (plannerLabel) {
+    return `Orchestrator (${plannerLabel})`;
+  }
 
   const entry = lookupModelLimitEntry(trimmed, cache);
   if (entry && !entry.ambiguous && typeof entry.displayName === 'string' && entry.displayName.trim()) {
@@ -146,6 +272,54 @@ export function resolveOrchestratorWrapperDisplayName(rawModel, cache = null) {
   return formatRuntimeModelDisplayName(trimmed, null);
 }
 
+/**
+ * 僅在 cache.modelLimits 內確實存在非歧義且具上限資訊的條目時，將規劃模型參考解析為目錄識別字串；否則回傳空字串。
+ * @param {string|object|null} plannerRef
+ * @param {object|null} [cache=null]
+ * @returns {string}
+ */
+export function resolvePlannerCatalogModelRef(plannerRef, cache = null) {
+  if (!isUsablePlannerRef(plannerRef) || !cache?.modelLimits || typeof cache.modelLimits !== 'object') {
+    return '';
+  }
+  const baseCandidates = extractModelRefCandidates(plannerRef);
+  const expanded = [];
+  const pushUnique = (val) => {
+    if (typeof val !== 'string' || !val.trim()) return;
+    const t = val.trim();
+    if (!expanded.includes(t)) expanded.push(t);
+  };
+
+  for (const cand of baseCandidates) {
+    const cleaned = cleanProtoModelToken(cand);
+    if (!cleaned) continue;
+    pushUnique(cleaned);
+    const lower = cleaned.toLowerCase();
+    if (GEMINI_ELEMENT_LABEL_MAP[lower]) {
+      pushUnique(`gemini-4-${lower}`);
+      pushUnique(`gemini-4-${lower}-high`);
+      pushUnique(`gemini-4-${lower}-medium`);
+    } else if (cleaned.includes('-') && !EFFORT_SUFFIX_RE.test(cleaned) && !/\s/.test(cleaned)) {
+      pushUnique(`${cleaned}-high`);
+      pushUnique(`${cleaned}-medium`);
+    }
+  }
+
+  for (const cand of expanded) {
+    if (isOrchestratorModelName(cand, cache)) continue;
+    const entry = lookupModelLimitEntry(cand, cache);
+    if (
+      entry &&
+      !entry.ambiguous &&
+      ((typeof entry.limit === 'number' && entry.limit > 0) || (typeof entry.maxTokens === 'number' && entry.maxTokens > 0))
+    ) {
+      return entry.model || entry.slug || entry.displayName || cand;
+    }
+  }
+
+  return '';
+}
+
 function isKnownSingleModelRef(rawName, cache = null) {
   if (typeof rawName !== 'string' || !rawName.trim()) return false;
   if (isOrchestratorModelName(rawName, cache) || isOrchestratorWorkerModel(rawName, cache)) return false;
@@ -157,23 +331,43 @@ function isKnownSingleModelRef(rawName, cache = null) {
   return true;
 }
 
+function pushModelRefCandidate(out, rawVal) {
+  if (typeof rawVal !== 'string') return;
+  const trimmed = rawVal.trim();
+  if (!trimmed) return;
+  if (MODEL_VARIANT_SUFFIX_RE.test(trimmed)) {
+    const stripped = trimmed.replace(MODEL_VARIANT_SUFFIX_RE, '').trim();
+    if (stripped && !out.includes(stripped)) {
+      out.push(stripped);
+    }
+  }
+  if (!out.includes(trimmed)) {
+    out.push(trimmed);
+  }
+}
+
 function extractModelRefCandidates(ref) {
   if (!ref) return [];
+  const out = [];
   if (typeof ref === 'string') {
-    return ref.trim() ? [ref.trim()] : [];
+    pushModelRefCandidate(out, ref);
+    return out;
   }
   if (typeof ref === 'object' && !Array.isArray(ref)) {
-    const out = [];
-    for (const key of ['display_name', 'displayName', 'name', 'id', 'model', 'slug']) {
-      if (typeof ref[key] === 'string' && ref[key].trim()) {
-        out.push(ref[key].trim());
-      }
+    for (const key of ['display_name', 'displayName', 'name', 'id', 'model', 'modelId', 'model_id', 'slug']) {
+      pushModelRefCandidate(out, ref[key]);
     }
     const effort = typeof ref.effort === 'string' && ref.effort.trim() ? ref.effort.trim() : '';
     if (effort && out.length > 0) {
       const base = out[0];
       if (!base.toLowerCase().includes(effort.toLowerCase())) {
-        out.push(`${base} (${effort})`);
+        const lowerEff = effort.toLowerCase();
+        if (base.includes('-') && !EFFORT_SUFFIX_RE.test(base)) {
+          const hyphenated = `${base}-${lowerEff}`;
+          if (!out.includes(hyphenated)) out.push(hyphenated);
+        }
+        const paren = `${base} (${effort})`;
+        if (!out.includes(paren)) out.push(paren);
       }
     }
     return out;
@@ -182,21 +376,64 @@ function extractModelRefCandidates(ref) {
 }
 
 /**
+ * 唯讀解析 Antigravity 2.0 狀態檔（antigravity_state.pbtxt 與 user_config.json）的選定模型與協調器模型代號。
+ * @param {string} [homeDir=os.homedir()]
+ * @returns {Promise<{ selectedModel: string, orchestratorModel: string, orchestratorExecutorModel: string }>}
+ */
+export async function readAppModelStateAsync(homeDir = os.homedir()) {
+  const empty = { selectedModel: '', orchestratorModel: '', orchestratorExecutorModel: '' };
+  if (!homeDir || typeof homeDir !== 'string') return empty;
+  let selectedModel = '';
+  let orchestratorModel = '';
+  let orchestratorExecutorModel = '';
+
+  const pbtxtPath = join(homeDir, '.gemini', 'antigravity', 'antigravity_state.pbtxt');
+  try {
+    const raw = await fs.readFile(pbtxtPath, 'utf8');
+    const selectedMatch = raw.match(/^\s*last_selected_agent_model:\s*([^\s#]+)/m);
+    if (selectedMatch && selectedMatch[1]) {
+      selectedModel = cleanProtoModelToken(selectedMatch[1]);
+    }
+    const orchMatch = raw.match(/^\s*orchestrator_model:\s*([^\s#]+)/m);
+    if (orchMatch && orchMatch[1]) {
+      orchestratorModel = cleanProtoModelToken(orchMatch[1]);
+    }
+    const execMatch = raw.match(/^\s*orchestrator_executor_model:\s*([^\s#]+)/m);
+    if (execMatch && execMatch[1]) {
+      orchestratorExecutorModel = cleanProtoModelToken(execMatch[1]);
+    }
+  } catch (_) {}
+
+  if (!orchestratorModel || !orchestratorExecutorModel) {
+    const userConfigCandidates = [
+      join(homeDir, '.gemini', 'config', 'user_config.json'),
+      join(homeDir, '.gemini', 'antigravity', 'user_config.json')
+    ];
+    for (const cfgPath of userConfigCandidates) {
+      const cfg = await readJsonSafeAsync(cfgPath);
+      const us = cfg?.userSettings ?? cfg?.user_settings;
+      if (!us || typeof us !== 'object') continue;
+      if (!orchestratorModel) {
+        orchestratorModel = cleanProtoModelToken(us.orchestratorModel ?? us.orchestrator_model ?? '');
+      }
+      if (!orchestratorExecutorModel) {
+        orchestratorExecutorModel = cleanProtoModelToken(us.orchestratorExecutorModel ?? us.orchestrator_executor_model ?? '');
+      }
+      if (orchestratorModel && orchestratorExecutorModel) break;
+    }
+  }
+
+  return { selectedModel, orchestratorModel, orchestratorExecutorModel };
+}
+
+/**
  * 唯讀解析 Antigravity 2.0 狀態檔（antigravity_state.pbtxt）的目前選定模型代號。
  * @param {string} [homeDir=os.homedir()]
  * @returns {Promise<string>}
  */
 export async function readAppSelectedModelAsync(homeDir = os.homedir()) {
-  if (!homeDir || typeof homeDir !== 'string') return '';
-  const pbtxtPath = join(homeDir, '.gemini', 'antigravity', 'antigravity_state.pbtxt');
-  try {
-    const raw = await fs.readFile(pbtxtPath, 'utf8');
-    const match = raw.match(/^\s*last_selected_agent_model:\s*([^\s#]+)/m);
-    if (!match || !match[1]) return '';
-    return match[1].replace(/^["']|["']$/g, '').trim();
-  } catch (_) {
-    return '';
-  }
+  const state = await readAppModelStateAsync(homeDir);
+  return state.selectedModel;
 }
 
 /**
@@ -265,7 +502,7 @@ function capitalizeWord(word) {
  */
 export function formatRuntimeModelDisplayName(rawModel, cache = null) {
   if (typeof rawModel !== 'string') return '';
-  const trimmed = rawModel.trim();
+  let trimmed = rawModel.trim();
   if (!trimmed) return '';
 
   // 1. 優先透過 cache.modelLimits 反查官方 displayName（保留具名 Worker 並去除外層 (Orchestrator) 尾綴）
@@ -277,6 +514,9 @@ export function formatRuntimeModelDisplayName(rawModel, cache = null) {
         return cleanedDisplay;
       }
     }
+    if (entry && typeof entry.slug === 'string' && entry.slug.trim() && !isOrchestratorModelName(entry.slug, cache)) {
+      trimmed = entry.slug.trim();
+    }
   }
 
   // 2. 若已包含空白或括號，視為人類可讀名稱（若為具名 Worker 尾綴則清理後回傳）
@@ -284,20 +524,22 @@ export function formatRuntimeModelDisplayName(rawModel, cache = null) {
     return stripConcreteOrchestratorSuffix(trimmed);
   }
 
+  const normalizedSlug = trimmed.replace(MODEL_VARIANT_SUFFIX_RE, '').trim() || trimmed;
+
   // 3. 避免誤轉內部位元佔位符（如 MODEL_PLACEHOLDER_M401）
-  if (/^MODEL_/i.test(trimmed) || trimmed.includes('_')) {
-    return trimmed;
+  if (/^MODEL_/i.test(normalizedSlug) || normalizedSlug.includes('_')) {
+    return normalizedSlug;
   }
 
   // 4. 格式化連字號 slug（如 gemini-4-hydrogen-high -> Gemini 4 Hydrogen (High)）
-  if (trimmed.includes('-')) {
+  if (normalizedSlug.includes('-')) {
     let effortLabel = '';
-    let baseSlug = trimmed;
-    const effortMatch = trimmed.match(EFFORT_SUFFIX_RE);
+    let baseSlug = normalizedSlug;
+    const effortMatch = normalizedSlug.match(EFFORT_SUFFIX_RE);
     if (effortMatch) {
       const eff = effortMatch[1].toLowerCase();
       effortLabel = EFFORT_DISPLAY_MAP[eff] || (eff.charAt(0).toUpperCase() + eff.slice(1));
-      baseSlug = trimmed.slice(0, -effortMatch[0].length);
+      baseSlug = normalizedSlug.slice(0, -effortMatch[0].length);
     }
 
     // 合併緊鄰的版本號連字號（如 3-8 -> 3.8、5-5 -> 5.5）
@@ -309,7 +551,7 @@ export function formatRuntimeModelDisplayName(rawModel, cache = null) {
     }
   }
 
-  return capitalizeWord(trimmed);
+  return capitalizeWord(normalizedSlug);
 }
 
 function stripEffortFromNormKey(normKey) {
