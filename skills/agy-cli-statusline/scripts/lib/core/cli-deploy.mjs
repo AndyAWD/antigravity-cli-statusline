@@ -1,13 +1,17 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {
   listMjsFilesRecursiveSync,
+  readJsonSafeSync,
   readJsonWithBOMDefenseSync,
+  sha256FileSync,
   sha256String,
   writeFileSyncAndVerifyNoBOM
 } from './fs-utils.mjs';
-import { readPluginManifestFromDirSync } from './plugin-manifest.mjs';
+import { discoverInstalledPluginSync, readPluginManifestFromDirSync } from './plugin-manifest.mjs';
 import { safeRemoveSync } from './safe-cleanup.mjs';
+import { compareSemver } from './semver.mjs';
 
 /**
  * 檢查目標路徑是否位於指定父目錄內（strict=true 時排除目錄本身）。
@@ -141,6 +145,162 @@ export function deployCliHooksFromPluginSync({
   );
 
   return hooksDir;
+}
+
+/**
+ * 判斷本機既有的 CLI 掛鉤腳本是否過舊或內容不同步，應於自動同步或「同步套用至 2.0 ＋ CLI」時更新。
+ * 僅處理已存在之掛鉤（排除 hook_missing 與 plugin_not_found），且當掛鉤版本新於外掛時不降級覆寫。
+ * @param {{ status?: string, hookVersion?: string, pluginVersion?: string } | null | undefined} hookSync
+ * @returns {boolean}
+ */
+export function isOutdatedCliHookSync(hookSync) {
+  if (!hookSync || typeof hookSync !== 'object') return false;
+  const status = hookSync.status;
+  if (
+    status !== 'version_mismatch' &&
+    status !== 'content_mismatch' &&
+    status !== 'legacy_mismatch' &&
+    status !== 'legacy_no_meta' &&
+    status !== 'legacy_untracked'
+  ) {
+    return false;
+  }
+  if (hookSync.hookVersion && hookSync.pluginVersion) {
+    const cmp = compareSemver(hookSync.hookVersion, hookSync.pluginVersion);
+    if (cmp !== null && cmp > 0) return false;
+  }
+  return true;
+}
+
+/**
+ * 檢查既有的 CLI 掛鉤目錄是否與已安裝的外掛版本／內容不同步；僅在掛鉤已安裝時安全覆寫，
+ * 絕不為未設定 CLI 的環境建立 hooks 目錄，亦不更動任何 settings.json 或降級較新版本的掛鉤。
+ * @param {{ homeDir?: string, pluginRootDir?: string, workspacePath?: string, verifyContentHashes?: boolean, onWarn?: ((msg: string) => void) | null }} [options]
+ * @returns {{ synced: boolean, reason: string, hooksDir: string, hookVersion?: string, previousVersion?: string, pluginVersion?: string, error?: string }}
+ */
+export function maybeAutoSyncCliHooksSync(options = {}) {
+  const {
+    homeDir = os.homedir(),
+    pluginRootDir = '',
+    workspacePath = process.cwd(),
+    verifyContentHashes = false,
+    onWarn = null
+  } = options || {};
+
+  const hooksDir = path.join(homeDir, '.gemini', 'antigravity-cli', 'hooks');
+  if (
+    !fs.existsSync(path.join(hooksDir, 'statusline-quota.mjs')) ||
+    !fs.existsSync(path.join(hooksDir, 'fetch-local-quota.mjs'))
+  ) {
+    return { synced: false, reason: 'hook_missing', hooksDir };
+  }
+
+  let resolvedPluginRoot = '';
+  if (
+    typeof pluginRootDir === 'string' &&
+    pluginRootDir.trim() &&
+    fs.existsSync(path.join(pluginRootDir, 'skills', 'agy-cli-statusline', 'scripts', 'statusline-quota.mjs'))
+  ) {
+    resolvedPluginRoot = pluginRootDir;
+  } else {
+    const discovered = discoverInstalledPluginSync(homeDir, workspacePath);
+    if (
+      discovered?.dir &&
+      fs.existsSync(path.join(discovered.dir, 'skills', 'agy-cli-statusline', 'scripts', 'statusline-quota.mjs'))
+    ) {
+      resolvedPluginRoot = discovered.dir;
+    }
+  }
+
+  if (!resolvedPluginRoot) {
+    return { synced: false, reason: 'plugin_not_found', hooksDir };
+  }
+
+  const pluginScriptsDir = path.join(resolvedPluginRoot, 'skills', 'agy-cli-statusline', 'scripts');
+  if (path.resolve(hooksDir) === path.resolve(pluginScriptsDir)) {
+    return { synced: false, reason: 'in_sync', hooksDir };
+  }
+
+  const manifest = readPluginManifestFromDirSync(resolvedPluginRoot);
+  const pluginVersion = typeof manifest?.version === 'string' ? manifest.version.trim() : '';
+  const meta = readJsonSafeSync(path.join(hooksDir, '.hook-version.json'));
+  const rawHookVersion = typeof meta?.pluginVersion === 'string' ? meta.pluginVersion.trim() : '';
+  const hookVersion = rawHookVersion && rawHookVersion !== 'unknown' ? rawHookVersion : '';
+
+  if (hookVersion && pluginVersion) {
+    const cmp = compareSemver(hookVersion, pluginVersion);
+    if (cmp !== null && cmp > 0) {
+      return { synced: false, reason: 'hook_newer', hooksDir, hookVersion, pluginVersion };
+    }
+  }
+
+  let mismatchReason = '';
+  if (!hookVersion) {
+    mismatchReason = 'legacy_untracked';
+  } else if (pluginVersion) {
+    const cmp = compareSemver(hookVersion, pluginVersion);
+    if ((cmp !== null && cmp < 0) || (cmp === null && hookVersion !== pluginVersion)) {
+      mismatchReason = 'version_mismatch';
+    }
+  }
+
+  if (!mismatchReason && verifyContentHashes) {
+    const coreFiles = ['statusline-quota.mjs', 'fetch-local-quota.mjs'];
+    for (const rel of coreFiles) {
+      if (sha256FileSync(path.join(hooksDir, rel)) !== sha256FileSync(path.join(pluginScriptsDir, rel))) {
+        mismatchReason = 'content_mismatch';
+        break;
+      }
+    }
+    if (!mismatchReason) {
+      const pluginLibFiles = listMjsFilesRecursiveSync(path.join(pluginScriptsDir, 'lib'));
+      const hookLibFiles = listMjsFilesRecursiveSync(path.join(hooksDir, 'lib'));
+      if (
+        pluginLibFiles.length !== hookLibFiles.length ||
+        pluginLibFiles.some((rel, idx) => rel !== hookLibFiles[idx])
+      ) {
+        mismatchReason = 'content_mismatch';
+      } else {
+        for (const rel of pluginLibFiles) {
+          if (
+            sha256FileSync(path.join(hooksDir, 'lib', rel)) !==
+            sha256FileSync(path.join(pluginScriptsDir, 'lib', rel))
+          ) {
+            mismatchReason = 'content_mismatch';
+            break;
+          }
+        }
+      }
+    }
+  } else if (!mismatchReason && !fs.existsSync(path.join(hooksDir, 'lib', 'collectors', 'runtime-model.mjs'))) {
+    mismatchReason = 'content_mismatch';
+  }
+
+  if (!mismatchReason) {
+    return { synced: false, reason: 'in_sync', hooksDir, hookVersion, pluginVersion };
+  }
+
+  try {
+    deployCliHooksFromPluginSync({
+      homeDir,
+      srcScriptsDir: pluginScriptsDir,
+      pluginRootDir: resolvedPluginRoot,
+      fallbackPluginVersion: pluginVersion || 'unknown',
+      onWarn
+    });
+    return {
+      synced: true,
+      reason: mismatchReason,
+      hooksDir,
+      previousVersion: hookVersion || 'unknown',
+      pluginVersion: pluginVersion || 'unknown'
+    };
+  } catch (err) {
+    if (typeof onWarn === 'function') {
+      onWarn(`自動同步 CLI 掛鉤失敗（${err?.message || err}）`);
+    }
+    return { synced: false, reason: 'error', error: err?.message || String(err), hooksDir };
+  }
 }
 
 /**

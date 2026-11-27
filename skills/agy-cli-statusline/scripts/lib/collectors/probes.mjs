@@ -186,8 +186,12 @@ export async function getMetricValueAsync(meta, keys, countersCachePath, fallbac
  * @returns {Promise<object>}
  */
 export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cachedAccount, quotaInfo, contextInfo, weeklyInfo = { remaining_percentage: 100, refreshes_in: '' }, options = {}) {
-  const resolvedFallbackModel = ((options?.settings || meta?.orchestrator) && isOrchestratorModelName(fallbackModel, cache))
-    ? (resolveOrchestratorWrapperDisplayName(fallbackModel, cache, { settings: options?.settings, meta }) || fallbackModel)
+  const resolvedFallbackModel = ((options?.settings || meta?.orchestrator || options?.runtimePlannerModel) && isOrchestratorModelName(fallbackModel, cache))
+    ? (resolveOrchestratorWrapperDisplayName(fallbackModel, cache, {
+        settings: options?.settings,
+        meta,
+        runtimePlannerModel: options?.runtimePlannerModel
+      }) || fallbackModel)
     : fallbackModel;
   const timeFormat = options?.timeFormat || 'smart';
   const barLength = options?.barLength || 10;

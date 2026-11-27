@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { dirname, join, resolve as resolvePath } from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
 
 import {
   DEFAULT_COMPACTION_THRESHOLD,
@@ -9,6 +10,7 @@ import {
   PLUGIN_REPO_URL,
   STEP_UP_INTERMEDIATE_THRESHOLD
 } from './lib/core/constants.mjs';
+import { maybeAutoSyncCliHooksSync } from './lib/core/cli-deploy.mjs';
 import { isDirectExecution, readJsonSafeAsync, writeFileAndVerifyNoBOM } from './lib/core/fs-utils.mjs';
 import {
   normalizeLabelStyle,
@@ -47,9 +49,11 @@ import {
 import {
   isOrchestratorModelName,
   isOrchestratorSession,
+  readLatestTranscriptModelAsync,
   resolveConfiguredPlannerRef,
   resolveOrchestratorWrapperDisplayName,
-  resolvePlannerCatalogModelRef
+  resolvePlannerCatalogModelRef,
+  resolveRuntimeSessionPlannerRef
 } from './lib/collectors/runtime-model.mjs';
 import { extractMetricsAsync, getGitBranch, getGitDirty } from './lib/collectors/probes.mjs';
 import {
@@ -123,10 +127,14 @@ export {
   renderStatusLine
 };
 
-function resolveEffectiveCliModel(meta, settings, cache, currentFallback) {
+function resolveEffectiveCliModel(meta, settings, cache, currentFallback, runtimePlannerModel = '') {
   for (const cand of [meta?.model?.display_name, meta?.model?.id, currentFallback]) {
     if (typeof cand === 'string' && cand.trim() && isOrchestratorModelName(cand, cache)) {
-      const resolved = resolveOrchestratorWrapperDisplayName(cand, cache, { settings, meta });
+      const resolved = resolveOrchestratorWrapperDisplayName(cand, cache, {
+        settings,
+        meta,
+        runtimePlannerModel
+      });
       if (resolved) return resolved;
     }
   }
@@ -134,13 +142,70 @@ function resolveEffectiveCliModel(meta, settings, cache, currentFallback) {
 }
 
 function hasPlaceholderPlannerRef(settings, meta) {
-  for (const obj of [meta?.orchestrator, settings?.orchestrator]) {
+  if (typeof settings?.model === 'string' && /^MODEL_/i.test(settings.model.trim())) return true;
+  for (const obj of [meta, settings, meta?.orchestrator, settings?.orchestrator]) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) continue;
     const raw = obj.planner ?? obj.plannerModel ?? obj.planner_model ?? obj.plan ?? obj.planModel ?? obj.plan_model ?? obj.orchestratorModel ?? obj.orchestrator_model;
     const cand = typeof raw === 'string' ? raw : (raw && typeof raw === 'object' ? (raw.model ?? raw.modelId ?? raw.model_id ?? raw.id) : '');
     if (typeof cand === 'string' && /^MODEL_/i.test(cand.trim())) return true;
   }
   return false;
+}
+
+async function resolveCliRuntimePlannerFallbackAsync({ homeDir, projectPath, conversationId, meta, settings, cache, fallbackModel }) {
+  const needsCheck =
+    isOrchestratorModelName(fallbackModel, cache) ||
+    isOrchestratorModelName(meta?.model?.display_name, cache) ||
+    isOrchestratorModelName(meta?.model?.id, cache) ||
+    isOrchestratorModelName(settings?.model, cache);
+  if (!needsCheck) return '';
+
+  const explicitConfigured = resolveConfiguredPlannerRef(meta, settings, '', fallbackModel, {
+    includeSettingsModelWrapper: false
+  });
+  if (explicitConfigured) return '';
+
+  const settingsPaths = [
+    join(homeDir, '.gemini', 'settings.json'),
+    join(homeDir, '.gemini', 'antigravity-cli', 'settings.json'),
+    ...(projectPath ? [join(projectPath, '.gemini', 'settings.json')] : [])
+  ];
+  const statResults = await Promise.all(settingsPaths.map(p => fs.stat(p).catch(() => null)));
+  let settingsTimestampMs = 0;
+  for (const st of statResults) {
+    if (st && Number.isFinite(st.mtimeMs) && st.mtimeMs > settingsTimestampMs) {
+      settingsTimestampMs = Math.round(st.mtimeMs);
+    }
+  }
+
+  const sessionsPath = join(homeDir, '.gemini', 'antigravity', 'plugin_data', 'antigravity-cli-statusline', 'sessions.json');
+  const sessionsData = await readJsonSafeAsync(sessionsPath);
+  const session = (conversationId && conversationId !== 'default' && sessionsData?.sessions && typeof sessionsData.sessions === 'object')
+    ? sessionsData.sessions[conversationId] || null
+    : null;
+
+  let transcript = null;
+  const trCandidates = [];
+  if (typeof session?.transcriptPath === 'string' && session.transcriptPath.trim()) {
+    trCandidates.push(session.transcriptPath.trim());
+  }
+  if (conversationId && conversationId !== 'default') {
+    trCandidates.push(join(homeDir, '.gemini', 'antigravity-cli', 'brain', conversationId, '.system_generated', 'logs', 'transcript.jsonl'));
+  }
+  for (const trPath of trCandidates) {
+    const res = await readLatestTranscriptModelAsync(trPath, cache);
+    if (res?.exists && (res.plannerModel || res.model)) {
+      transcript = res;
+      break;
+    }
+  }
+
+  return resolveRuntimeSessionPlannerRef({
+    session,
+    transcript,
+    settingsTimestampMs,
+    cache
+  });
 }
 
 // ==========================================
@@ -179,6 +244,18 @@ async function main() {
     const footerItems = settings.ui.footer.items;
     const footerItemsSet = new Set(footerItems);
     const projectPath = resolveProjectPath(meta);
+    try {
+      const selfDir = resolvePath(dirname(fileURLToPath(import.meta.url)));
+      const deployedHooksDir = resolvePath(join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks'));
+      const normPath = (p) => (process.platform === 'win32' || process.platform === 'darwin') ? p.toLowerCase() : p;
+      if (normPath(selfDir) === normPath(deployedHooksDir)) {
+        maybeAutoSyncCliHooksSync({
+          homeDir: os.homedir(),
+          workspacePath: projectPath,
+          verifyContentHashes: false
+        });
+      }
+    } catch (_) {}
     const needsPluginVersion = footerItemsSet.has('plugin-version');
     const needsPluginUpdate = footerItemsSet.has('plugin-update');
     const pluginUpdatePromise = needsPluginUpdate
@@ -207,7 +284,16 @@ async function main() {
     let cache = needsCache ? await readJsonSafeAsync(cachePath) : null;
     const catalogReadOnlyCache = needsCatalogOnlyCache ? await readJsonSafeAsync(cachePath) : null;
     let effectiveCache = cache || catalogReadOnlyCache;
-    fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel);
+    let runtimePlannerModel = await resolveCliRuntimePlannerFallbackAsync({
+      homeDir: os.homedir(),
+      projectPath,
+      conversationId,
+      meta,
+      settings,
+      cache: effectiveCache,
+      fallbackModel
+    });
+    fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel, runtimePlannerModel);
 
     const buildEffectiveMetas = (resolvedModel, curCache) => {
       if (!isOrchestratorModelName(resolvedModel, curCache)) {
@@ -220,7 +306,7 @@ async function main() {
         return { effectiveMeta: meta, quotaMeta: meta };
       }
       if (didOverrideWrapper) {
-        const plannerRef = resolveConfiguredPlannerRef(meta, settings, '');
+        const plannerRef = resolveConfiguredPlannerRef(meta, settings, '', rawWrapperRef) || runtimePlannerModel;
         const plannerCatalogRef = resolvePlannerCatalogModelRef(plannerRef, curCache);
         const baseModelObj = (meta?.model && typeof meta.model === 'object') ? meta.model : {};
         return {
@@ -343,7 +429,16 @@ async function main() {
       });
       cache = updateRes.cache;
       effectiveCache = cache || catalogReadOnlyCache;
-      fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel);
+      runtimePlannerModel = await resolveCliRuntimePlannerFallbackAsync({
+        homeDir: os.homedir(),
+        projectPath,
+        conversationId,
+        meta,
+        settings,
+        cache: effectiveCache,
+        fallbackModel
+      });
+      fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel, runtimePlannerModel);
       ({ effectiveMeta, quotaMeta } = buildEffectiveMetas(fallbackModel, effectiveCache));
       freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
       timedOut = updateRes.timedOut;
@@ -423,6 +518,7 @@ async function main() {
           footerItems: footerItemsSet,
           workspacePath: projectPath,
           settings,
+          runtimePlannerModel,
           skipPluginVersionResolve: needsPluginUpdate
         }
       )

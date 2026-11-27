@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { maybeAutoSyncCliHooksSync } from '../../skills/agy-cli-statusline/scripts/lib/core/cli-deploy.mjs';
 import { hasBOM } from '../../skills/agy-cli-statusline/scripts/lib/core/fs-utils.mjs';
+import { readPluginManifestFromDirSync } from '../../skills/agy-cli-statusline/scripts/lib/core/plugin-manifest.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const HOOK_SCRIPT = path.join(ROOT, 'scripts', 'hooks', 'record-session.mjs');
@@ -113,6 +115,70 @@ test('record-session.mjs exits within 200ms stdin timeout when pipe stays open a
     assert.deepEqual(JSON.parse(stdout), {});
     assert.equal(Date.now() - start < 1500, true);
     assert.equal(fs.existsSync(path.join(tmpHome, '.gemini', 'tmp')), false, 'Fallback without PLUGIN_DATA must never touch ~/.gemini/tmp');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('record-session.mjs preserves lastPlannerModel across worker turns and auto-syncs outdated CLI hooks without touching settings', () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-hook-sync-'));
+  const pluginData = path.join(tmpHome, 'plugin_data');
+  try {
+    const manifest = readPluginManifestFromDirSync(ROOT);
+    assert.ok(manifest?.version);
+
+    // 1. 保留 planner，不因後續 worker 呼叫被覆寫
+    const plannerTurn = runHook('PreInvocation', {
+      conversationId: 'conv-planner-keep',
+      modelName: 'gemini-4-carbon-high'
+    }, { HOME: tmpHome, USERPROFILE: tmpHome, PLUGIN_DATA: pluginData });
+    assert.equal(plannerTurn.status, 0);
+
+    const workerTurn = runHook('PreInvocation', {
+      conversationId: 'conv-planner-keep',
+      modelName: 'gemini-flash-worker-agy'
+    }, { HOME: tmpHome, USERPROFILE: tmpHome, PLUGIN_DATA: pluginData });
+    assert.equal(workerTurn.status, 0);
+
+    const unknownPlaceholderTurn = runHook('PreInvocation', {
+      conversationId: 'conv-planner-keep',
+      modelName: 'MODEL_PLACEHOLDER_M669'
+    }, { HOME: tmpHome, USERPROFILE: tmpHome, PLUGIN_DATA: pluginData });
+    assert.equal(unknownPlaceholderTurn.status, 0);
+
+    const sessData = JSON.parse(fs.readFileSync(path.join(pluginData, 'sessions.json'), 'utf8'));
+    assert.equal(sessData.sessions['conv-planner-keep'].lastPlannerModel, 'gemini-4-carbon-high');
+    assert.equal(sessData.sessions['conv-planner-keep'].modelName, 'MODEL_PLACEHOLDER_M669');
+
+    // 2. 不存在的 hooks 目錄不得自動建立
+    assert.deepEqual(maybeAutoSyncCliHooksSync({ homeDir: tmpHome, pluginRootDir: ROOT }).reason, 'hook_missing');
+    assert.equal(fs.existsSync(path.join(tmpHome, '.gemini', 'antigravity-cli', 'hooks')), false);
+
+    // 3. 既有舊版 hooks（如 2.1.1）於 record-session 執行時自動同步至新版，且不碰 settings.json 或 ~/.gemini/tmp
+    const hooksDir = path.join(tmpHome, '.gemini', 'antigravity-cli', 'hooks');
+    fs.mkdirSync(hooksDir, { recursive: true });
+    fs.writeFileSync(path.join(hooksDir, 'statusline-quota.mjs'), '// old 2.1.1\n', 'utf8');
+    fs.writeFileSync(path.join(hooksDir, 'fetch-local-quota.mjs'), '// old 2.1.1\n', 'utf8');
+    fs.writeFileSync(path.join(hooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '2.1.1' }), 'utf8');
+
+    const syncRun = runHook('SessionStart', { conversationId: 'conv-sync-1' }, {
+      HOME: tmpHome,
+      USERPROFILE: tmpHome,
+      PLUGIN_DATA: pluginData
+    });
+    assert.equal(syncRun.status, 0);
+
+    const updatedMeta = JSON.parse(fs.readFileSync(path.join(hooksDir, '.hook-version.json'), 'utf8'));
+    assert.equal(updatedMeta.pluginVersion, manifest.version);
+    assert.equal(fs.existsSync(path.join(tmpHome, '.gemini', 'settings.json')), false);
+    assert.equal(fs.existsSync(path.join(tmpHome, '.gemini', 'antigravity-cli', 'settings.json')), false);
+    assert.equal(fs.existsSync(path.join(tmpHome, '.gemini', 'tmp')), false);
+
+    // 4. 若 hooks 版本新於外掛，絕不降級覆寫
+    fs.writeFileSync(path.join(hooksDir, '.hook-version.json'), JSON.stringify({ pluginVersion: '99.0.0' }), 'utf8');
+    const newerRes = maybeAutoSyncCliHooksSync({ homeDir: tmpHome, pluginRootDir: ROOT, verifyContentHashes: true });
+    assert.equal(newerRes.synced, false);
+    assert.equal(newerRes.reason, 'hook_newer');
   } finally {
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }

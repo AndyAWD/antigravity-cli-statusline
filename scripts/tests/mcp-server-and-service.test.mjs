@@ -1248,6 +1248,78 @@ test('StatuslineService resolves 2.0 orchestrator_model (Carbon/Argon) from anti
     const resCliOrch = await svc.getDashboardSnapshot({ conversationId: cliConvId, hostLocale: 'zh-tw', forceRefresh: true });
     assert.equal(resCliOrch.snapshot.session.product, 'antigravity-cli');
     assert.equal(resCliOrch.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
+
+    // 6. CLI 僅設定頂層 settings.model = "Orchestrator (Carbon)" 且子代理搶走 cliLatestId 時，仍為 working 中的父對話顯示 Carbon
+    fs.writeFileSync(path.join(tmpHome, '.gemini', 'antigravity-cli', 'settings.json'), JSON.stringify({
+      model: 'Orchestrator (Carbon)',
+      ui: {
+        language: 'zh-tw',
+        footer: { items: ['model-name', 'quota'] }
+      }
+    }), 'utf8');
+    const cliSessFile = JSON.parse(fs.readFileSync(path.join(cliPluginData, 'sessions.json'), 'utf8'));
+    cliSessFile.latestConversationId = 'subagent-conv-99';
+    cliSessFile.sessions[cliConvId] = {
+      ...cliSessFile.sessions[cliConvId],
+      modelName: '',
+      agentState: 'working',
+      updatedAt: 9000
+    };
+    cliSessFile.sessions['subagent-conv-99'] = {
+      conversationId: 'subagent-conv-99',
+      transcriptPath: path.join(cliDir, 'brain', 'subagent-conv-99', '.system_generated', 'logs', 'transcript.jsonl'),
+      artifactDirectoryPath: path.join(cliDir, 'brain', 'subagent-conv-99'),
+      modelName: 'gemini-3-flash',
+      agentState: 'idle',
+      updatedAt: 9500
+    };
+    fs.writeFileSync(path.join(cliPluginData, 'sessions.json'), JSON.stringify(cliSessFile), 'utf8');
+    const resCliParentWorking = await svc.getDashboardSnapshot({ conversationId: cliConvId, hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resCliParentWorking.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
+
+    // 7. 模擬真實 2.0 antigravity_state.pbtxt（僅含 last_selected_agent_model: M537，無 orchestrator_model 欄位）且 transcript 含 Carbon planner
+    const realAppTrPath = path.join(tmpHome, '.gemini', 'antigravity', 'brain', appConvId, '.system_generated', 'logs', 'transcript.jsonl');
+    fs.mkdirSync(path.dirname(realAppTrPath), { recursive: true });
+    const appSessFile = JSON.parse(fs.readFileSync(path.join(pluginData, 'sessions.json'), 'utf8'));
+    appSessFile.sessions[appConvId].transcriptPath = realAppTrPath;
+    fs.writeFileSync(path.join(pluginData, 'sessions.json'), JSON.stringify(appSessFile), 'utf8');
+    fs.writeFileSync(pbtxtPath, 'last_selected_agent_model: MODEL_PLACEHOLDER_M537\n', 'utf8');
+    const pastPbTime = new Date(Date.now() - 10000);
+    fs.utimesSync(pbtxtPath, pastPbTime, pastPbTime);
+    fs.writeFileSync(realAppTrPath, [
+      JSON.stringify({
+        step_index: 1,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        created_at: new Date().toISOString(),
+        model: 'gemini-4-carbon-high',
+        tool_calls: [{ name: 'exit_plan_mode', args: {} }]
+      }),
+      JSON.stringify({
+        step_index: 2,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        created_at: new Date().toISOString(),
+        model: 'gemini-flash-worker-agy'
+      })
+    ].join('\n'), 'utf8');
+    const resAppTranscriptFallback = await svc.getDashboardSnapshot({ conversationId: appConvId, hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resAppTranscriptFallback.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
+
+    // 8. 若 antigravity_state.pbtxt 之後更新（使用者在 UI 切回 Neon），舊 transcript 不覆蓋 Neon
+    const futurePbTime = new Date(Date.now() + 10000);
+    fs.utimesSync(pbtxtPath, futurePbTime, futurePbTime);
+    const resAppAfterUiReset = await svc.getDashboardSnapshot({ conversationId: appConvId, hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resAppAfterUiReset.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Neon)');
+
+    // 9. config.json（userSettings.orchestratorModel）亦能提供 Antigravity 2.0 Carbon planner
+    const cfgDir = path.join(tmpHome, '.gemini', 'config');
+    fs.mkdirSync(cfgDir, { recursive: true });
+    fs.writeFileSync(path.join(cfgDir, 'config.json'), JSON.stringify({
+      userSettings: { orchestratorModel: 'MODEL_PLACEHOLDER_M670' }
+    }), 'utf8');
+    const resAppConfigJson = await svc.getDashboardSnapshot({ conversationId: appConvId, hostLocale: 'zh-tw', forceRefresh: true });
+    assert.equal(resAppConfigJson.snapshot.renderedItems.text['model-name'].plainText, '模型: Orchestrator (Carbon)');
   } finally {
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }
