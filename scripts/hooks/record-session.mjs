@@ -1,11 +1,20 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  classifyOrchestratorModelRole,
+  isOrchestratorModelName,
+  isOrchestratorWorkerModel
+} from '../../skills/agy-cli-statusline/scripts/lib/collectors/runtime-model.mjs';
+import { maybeAutoSyncCliHooksSync } from '../../skills/agy-cli-statusline/scripts/lib/core/cli-deploy.mjs';
 import {
   readJsonSafeSync,
   writeFileSyncAndVerifyNoBOM
 } from '../../skills/agy-cli-statusline/scripts/lib/core/fs-utils.mjs';
 import { sanitizeConversationId } from '../../skills/agy-cli-statusline/scripts/lib/core/normalize.mjs';
+
+const PLUGIN_ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const MAX_SESSIONS = 20;
 
@@ -113,7 +122,43 @@ async function main() {
         ? payload.workspacePaths.filter(p => typeof p === 'string' && p.trim())
         : (Array.isArray(prevEntry.workspacePaths) ? prevEntry.workspacePaths : []);
 
-      const nowIso = new Date().toISOString();
+      const nowMs = Date.now();
+      const nowIso = new Date(nowMs).toISOString();
+      const incomingModel = (typeof payload.modelName === 'string' && payload.modelName.trim())
+        ? payload.modelName.trim()
+        : '';
+      let nextPlannerModel = typeof prevEntry.lastPlannerModel === 'string' ? prevEntry.lastPlannerModel : '';
+      let nextPlannerUpdatedAt = Number(prevEntry.lastPlannerUpdatedAt || 0) || 0;
+      if (incomingModel) {
+        const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
+        const isPlaceholder = /^MODEL_/i.test(incomingModel);
+        const quotaCache = isPlaceholder
+          ? (
+              readJsonSafeSync(path.join(dataDir, 'quota_cache.json')) ||
+              readJsonSafeSync(path.join(homeDir, '.gemini', 'tmp', 'real_quota_cache.json'))
+            )
+          : null;
+        const hasCatalogMatch = !isPlaceholder || Boolean(
+          quotaCache?.modelLimits &&
+          typeof quotaCache.modelLimits === 'object' &&
+          (
+            quotaCache.modelLimits[incomingModel.replace(/[^a-z0-9]/gi, '').toLowerCase()] ||
+            Object.values(quotaCache.modelLimits).some(
+              e => e && typeof e === 'object' && (e.model === incomingModel || e.id === incomingModel)
+            )
+          )
+        );
+        if (!isOrchestratorModelName(incomingModel, quotaCache) && !isOrchestratorWorkerModel(incomingModel, quotaCache)) {
+          const cliSettings = readJsonSafeSync(path.join(homeDir, '.gemini', 'antigravity-cli', 'settings.json')) ||
+            readJsonSafeSync(path.join(homeDir, '.gemini', 'settings.json'));
+          const role = cliSettings ? classifyOrchestratorModelRole(incomingModel, cliSettings, quotaCache) : 'planner';
+          if (role !== 'executor' && (!isPlaceholder || hasCatalogMatch || !nextPlannerModel)) {
+            nextPlannerModel = incomingModel;
+            nextPlannerUpdatedAt = nowMs;
+          }
+        }
+      }
+
       const updatedEntry = {
         ...prevEntry,
         conversationId: convId,
@@ -125,13 +170,13 @@ async function main() {
         artifactDirectoryPath: (typeof payload.artifactDirectoryPath === 'string' && payload.artifactDirectoryPath.trim())
           ? payload.artifactDirectoryPath.trim()
           : (prevEntry.artifactDirectoryPath || ''),
-        modelName: (typeof payload.modelName === 'string' && payload.modelName.trim())
-          ? payload.modelName.trim()
-          : (prevEntry.modelName || ''),
+        modelName: incomingModel || (prevEntry.modelName || ''),
+        lastPlannerModel: nextPlannerModel,
+        lastPlannerUpdatedAt: nextPlannerUpdatedAt,
         agentState: deriveAgentState(eventName, payload),
         lastHookEvent: eventName,
         lastHookAt: nowIso,
-        updatedAt: Date.now()
+        updatedAt: nowMs
       };
 
       if (typeof payload.invocationNum === 'number') updatedEntry.invocationNum = payload.invocationNum;
@@ -176,6 +221,13 @@ async function main() {
         0o600
       );
     }
+
+    const hookHomeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
+    maybeAutoSyncCliHooksSync({
+      homeDir: hookHomeDir,
+      pluginRootDir: PLUGIN_ROOT_DIR,
+      verifyContentHashes: false
+    });
   } catch (_) {
     // fail-open: 絕對不阻塞代理迴圈
   }

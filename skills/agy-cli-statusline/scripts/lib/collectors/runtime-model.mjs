@@ -137,11 +137,14 @@ function cleanProtoModelToken(raw) {
 
 function isUsablePlannerRef(ref) {
   if (typeof ref === 'string') {
-    return Boolean(cleanProtoModelToken(ref));
+    const token = cleanProtoModelToken(ref);
+    if (!token) return false;
+    if (/^(?:orchestrator|gemini-orchestrator)$/i.test(token)) return false;
+    return true;
   }
   if (ref && typeof ref === 'object' && !Array.isArray(ref)) {
     for (const key of ['model', 'modelId', 'model_id', 'slug', 'id', 'name', 'displayName', 'display_name']) {
-      if (typeof ref[key] === 'string' && cleanProtoModelToken(ref[key])) {
+      if (typeof ref[key] === 'string' && isUsablePlannerRef(ref[key])) {
         return true;
       }
     }
@@ -160,24 +163,76 @@ function readPlannerFieldFromOrchestratorObj(orchObj) {
     orchObj.plan_model ??
     orchObj.orchestratorModel ??
     orchObj.orchestrator_model ??
+    orchObj.model ??
+    orchObj.modelId ??
+    orchObj.model_id ??
+    null
+  );
+}
+
+function readExecutorFieldFromOrchestratorObj(orchObj) {
+  if (!orchObj || typeof orchObj !== 'object' || Array.isArray(orchObj)) return null;
+  return (
+    orchObj.executor ??
+    orchObj.executorModel ??
+    orchObj.executor_model ??
+    orchObj.worker ??
+    orchObj.workerModel ??
+    orchObj.worker_model ??
+    orchObj.orchestratorExecutorModel ??
+    orchObj.orchestrator_executor_model ??
+    null
+  );
+}
+
+function readPlannerFieldFromTopLevelObj(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  return (
+    obj.planner ??
+    obj.plannerModel ??
+    obj.planner_model ??
+    obj.planModel ??
+    obj.plan_model ??
+    obj.orchestratorModel ??
+    obj.orchestrator_model ??
+    (isUsablePlannerRef(obj.plan) ? obj.plan : null) ??
     null
   );
 }
 
 /**
- * 依據優先順序解析已配置的 Orchestrator 規劃模型參考（meta.orchestrator > 2.0 orchestrator_model > settings.orchestrator）。
+ * 依據優先順序解析已配置的 Orchestrator 規劃模型參考（meta > Antigravity 2.0 狀態 > settings > settings.model 完整包裝名稱）。
  * @param {object} [meta={}]
  * @param {object} [settings={}]
  * @param {string} [appOrchestratorModel='']
+ * @param {string} [rawWrapperModel='']
  * @returns {string|object|null}
  */
-export function resolveConfiguredPlannerRef(meta = {}, settings = {}, appOrchestratorModel = '') {
+export function resolveConfiguredPlannerRef(meta = {}, settings = {}, appOrchestratorModel = '', rawWrapperModel = '', options = {}) {
+  const includeSettingsModelWrapper = options?.includeSettingsModelWrapper !== false;
   const fromMeta = readPlannerFieldFromOrchestratorObj(meta?.orchestrator);
   if (isUsablePlannerRef(fromMeta)) return fromMeta;
+  const fromMetaTop = readPlannerFieldFromTopLevelObj(meta);
+  if (isUsablePlannerRef(fromMetaTop)) return fromMetaTop;
   const cleanedApp = cleanProtoModelToken(appOrchestratorModel);
-  if (cleanedApp) return cleanedApp;
+  if (cleanedApp && isUsablePlannerRef(cleanedApp)) return cleanedApp;
   const fromSettings = readPlannerFieldFromOrchestratorObj(settings?.orchestrator);
   if (isUsablePlannerRef(fromSettings)) return fromSettings;
+  const fromSettingsTop = readPlannerFieldFromTopLevelObj(settings);
+  if (isUsablePlannerRef(fromSettingsTop)) return fromSettingsTop;
+  if (
+    includeSettingsModelWrapper &&
+    typeof settings?.model === 'string' &&
+    isOrchestratorModelName(settings.model) &&
+    isUsablePlannerRef(settings.model)
+  ) {
+    const explicitRawLabel = typeof rawWrapperModel === 'string' && rawWrapperModel.trim()
+      ? extractOrchestratorPlannerLabel(rawWrapperModel)
+      : '';
+    if (!explicitRawLabel || explicitRawLabel === 'Neon') {
+      return settings.model.trim();
+    }
+  }
   return null;
 }
 
@@ -207,6 +262,11 @@ export function extractOrchestratorPlannerLabel(plannerRef, cache = null) {
     const elementHit = GEMINI_ELEMENT_LABEL_MAP[cleaned.toLowerCase()];
     if (elementHit) return elementHit;
 
+    const cleanedLower = cleaned.toLowerCase().replace(/-disabled$/i, '');
+    if (cleanedLower === 'gemini-pro-orchestrator') return 'Carbon';
+    if (cleanedLower === 'gemini-pro-orchestrator-g1-pro') return 'Argon';
+    if (cleanedLower === 'gemini-pro-orchestrator-neon') return 'Neon';
+
     if (isOrchestratorModelName(cleaned, cache)) {
       const entryDisplay = lookupModelLimitEntry(cleaned, cache)?.displayName || cleaned;
       const parenMatch = entryDisplay.match(/\(\s*([^)]+?)\s*\)/);
@@ -225,12 +285,20 @@ export function extractOrchestratorPlannerLabel(plannerRef, cache = null) {
     const formatted = formatRuntimeModelDisplayName(cleaned, cache);
     if (!formatted || /^MODEL_/i.test(formatted) || formatted.includes('_')) continue;
 
-    const baseDisplay = formatted.replace(EFFORT_PAREN_SUFFIX_RE, '').trim();
+    let baseDisplay = formatted.replace(EFFORT_PAREN_SUFFIX_RE, '').trim();
+    const orchInnerMatch = baseDisplay.match(/^Orchestrator\s*\(([^)]+)\)$/i);
+    if (orchInnerMatch) {
+      baseDisplay = orchInnerMatch[1].replace(EFFORT_PAREN_SUFFIX_RE, '').trim();
+    }
+    const slugElemMatch = baseDisplay.match(/^gemini-(?:\d+(?:\.\d+)?-)?(carbon|argon|neon|hydrogen)(?:-(?:high|medium|low|minimal|fast|disabled))?$/i);
+    if (slugElemMatch) {
+      return GEMINI_ELEMENT_LABEL_MAP[slugElemMatch[1].toLowerCase()];
+    }
     const geminiElemMatch = baseDisplay.match(/^Gemini(?:\s+\d+(?:\.\d+)?)?\s+(Carbon|Argon|Neon|Hydrogen)$/i);
     if (geminiElemMatch) {
       return GEMINI_ELEMENT_LABEL_MAP[geminiElemMatch[1].toLowerCase()];
     }
-    if (baseDisplay) return baseDisplay;
+    if (baseDisplay && !/^Orchestrator$/i.test(baseDisplay)) return baseDisplay;
   }
 
   return '';
@@ -250,10 +318,41 @@ export function resolveOrchestratorWrapperDisplayName(rawModel, cache = null, op
   const trimmed = rawModel.trim();
   if (!trimmed || !isOrchestratorModelName(trimmed, cache)) return '';
 
-  const plannerRef = isUsablePlannerRef(options?.plannerModel)
-    ? options.plannerModel
-    : resolveConfiguredPlannerRef(options?.meta, options?.settings, options?.appOrchestratorModel);
-  const plannerLabel = extractOrchestratorPlannerLabel(plannerRef, cache);
+  const explicitConfiguredRef = resolveConfiguredPlannerRef(
+    options?.meta,
+    options?.settings,
+    options?.appOrchestratorModel,
+    trimmed,
+    { includeSettingsModelWrapper: false }
+  );
+  const settingsWrapperRef = explicitConfiguredRef
+    ? null
+    : resolveConfiguredPlannerRef(
+        options?.meta,
+        options?.settings,
+        options?.appOrchestratorModel,
+        trimmed,
+        { includeSettingsModelWrapper: true }
+      );
+  const settingsWrapperLabel = settingsWrapperRef ? extractOrchestratorPlannerLabel(settingsWrapperRef, cache) : '';
+  const runtimeRef = isUsablePlannerRef(options?.runtimePlannerModel) ? options.runtimePlannerModel : null;
+
+  let plannerRef = null;
+  if (isUsablePlannerRef(options?.plannerModel)) {
+    plannerRef = options.plannerModel;
+  } else if (explicitConfiguredRef) {
+    plannerRef = explicitConfiguredRef;
+  } else if (settingsWrapperRef && settingsWrapperLabel && settingsWrapperLabel !== 'Neon') {
+    plannerRef = settingsWrapperRef;
+  } else if (runtimeRef) {
+    plannerRef = runtimeRef;
+  } else {
+    plannerRef = settingsWrapperRef;
+  }
+  let plannerLabel = extractOrchestratorPlannerLabel(plannerRef, cache);
+  if (!plannerLabel && runtimeRef && plannerRef !== runtimeRef) {
+    plannerLabel = extractOrchestratorPlannerLabel(runtimeRef, cache);
+  }
   if (plannerLabel) {
     return `Orchestrator (${plannerLabel})`;
   }
@@ -386,10 +485,17 @@ export async function readAppModelStateAsync(homeDir = os.homedir()) {
   let selectedModel = '';
   let orchestratorModel = '';
   let orchestratorExecutorModel = '';
+  let pbtxtMtimeMs = 0;
+  let configMtimeMs = 0;
+  let hasExplicitOrchestratorField = false;
 
   const pbtxtPath = join(homeDir, '.gemini', 'antigravity', 'antigravity_state.pbtxt');
   try {
-    const raw = await fs.readFile(pbtxtPath, 'utf8');
+    const [raw, st] = await Promise.all([
+      fs.readFile(pbtxtPath, 'utf8'),
+      fs.stat(pbtxtPath).catch(() => null)
+    ]);
+    if (st && Number.isFinite(st.mtimeMs)) pbtxtMtimeMs = Math.round(st.mtimeMs);
     const selectedMatch = raw.match(/^\s*last_selected_agent_model:\s*([^\s#]+)/m);
     if (selectedMatch && selectedMatch[1]) {
       selectedModel = cleanProtoModelToken(selectedMatch[1]);
@@ -397,6 +503,7 @@ export async function readAppModelStateAsync(homeDir = os.homedir()) {
     const orchMatch = raw.match(/^\s*orchestrator_model:\s*([^\s#]+)/m);
     if (orchMatch && orchMatch[1]) {
       orchestratorModel = cleanProtoModelToken(orchMatch[1]);
+      if (orchestratorModel) hasExplicitOrchestratorField = true;
     }
     const execMatch = raw.match(/^\s*orchestrator_executor_model:\s*([^\s#]+)/m);
     if (execMatch && execMatch[1]) {
@@ -404,26 +511,91 @@ export async function readAppModelStateAsync(homeDir = os.homedir()) {
     }
   } catch (_) {}
 
-  if (!orchestratorModel || !orchestratorExecutorModel) {
-    const userConfigCandidates = [
-      join(homeDir, '.gemini', 'config', 'user_config.json'),
-      join(homeDir, '.gemini', 'antigravity', 'user_config.json')
-    ];
-    for (const cfgPath of userConfigCandidates) {
-      const cfg = await readJsonSafeAsync(cfgPath);
-      const us = cfg?.userSettings ?? cfg?.user_settings;
-      if (!us || typeof us !== 'object') continue;
-      if (!orchestratorModel) {
-        orchestratorModel = cleanProtoModelToken(us.orchestratorModel ?? us.orchestrator_model ?? '');
+  const userConfigCandidates = [
+    join(homeDir, '.gemini', 'config', 'config.json'),
+    join(homeDir, '.gemini', 'antigravity', 'config.json'),
+    join(homeDir, '.gemini', 'config', 'user_config.json'),
+    join(homeDir, '.gemini', 'antigravity', 'user_config.json')
+  ];
+  for (const cfgPath of userConfigCandidates) {
+    const cfg = await readJsonSafeAsync(cfgPath);
+    if (!cfg || typeof cfg !== 'object') continue;
+    let fileMtime = 0;
+    try {
+      const st = await fs.stat(cfgPath);
+      if (st && Number.isFinite(st.mtimeMs)) fileMtime = Math.round(st.mtimeMs);
+    } catch (_) {}
+    if (fileMtime > configMtimeMs) configMtimeMs = fileMtime;
+
+    const us = cfg?.userSettings ?? cfg?.user_settings;
+    const orchObj = cfg?.orchestrator ?? us?.orchestrator;
+
+    if (!orchestratorModel) {
+      const candidate =
+        readPlannerFieldFromOrchestratorObj(orchObj) ??
+        readPlannerFieldFromTopLevelObj(us) ??
+        readPlannerFieldFromTopLevelObj(cfg);
+      const cleaned = typeof candidate === 'string'
+        ? cleanProtoModelToken(candidate)
+        : (candidate && typeof candidate === 'object' ? (candidate.model ?? candidate.modelId ?? candidate.model_id ?? candidate.slug ?? candidate.id ?? candidate.displayName ?? candidate.display_name ?? '') : '');
+      if (isUsablePlannerRef(cleaned)) {
+        orchestratorModel = cleanProtoModelToken(cleaned);
+        if (orchestratorModel) hasExplicitOrchestratorField = true;
+      } else {
+        const wrapperFallback = typeof cfg?.model === 'string'
+          ? cfg.model
+          : (typeof us?.model === 'string' ? us.model : '');
+        if (
+          wrapperFallback &&
+          isOrchestratorModelName(wrapperFallback) &&
+          isUsablePlannerRef(wrapperFallback) &&
+          (!pbtxtMtimeMs || fileMtime >= pbtxtMtimeMs)
+        ) {
+          orchestratorModel = cleanProtoModelToken(wrapperFallback);
+        }
       }
-      if (!orchestratorExecutorModel) {
-        orchestratorExecutorModel = cleanProtoModelToken(us.orchestratorExecutorModel ?? us.orchestrator_executor_model ?? '');
-      }
-      if (orchestratorModel && orchestratorExecutorModel) break;
     }
+    if (!orchestratorExecutorModel) {
+      const execCand =
+        readExecutorFieldFromOrchestratorObj(orchObj) ??
+        us?.orchestratorExecutorModel ??
+        us?.orchestrator_executor_model ??
+        cfg?.orchestratorExecutorModel ??
+        cfg?.orchestrator_executor_model ??
+        '';
+      if (typeof execCand === 'string') {
+        orchestratorExecutorModel = cleanProtoModelToken(execCand);
+      }
+    }
+    if (!selectedModel) {
+      const selCand =
+        cfg?.selectedModel ??
+        cfg?.lastSelectedAgentModel ??
+        cfg?.last_selected_agent_model ??
+        us?.selectedModel ??
+        us?.lastSelectedAgentModel ??
+        cfg?.model ??
+        us?.model ??
+        '';
+      if (typeof selCand === 'string') {
+        selectedModel = cleanProtoModelToken(selCand);
+      }
+    }
+    if (orchestratorModel && orchestratorExecutorModel && selectedModel) break;
   }
 
-  return { selectedModel, orchestratorModel, orchestratorExecutorModel };
+  const result = { selectedModel, orchestratorModel, orchestratorExecutorModel };
+  Object.defineProperty(result, '_meta', {
+    value: {
+      pbtxtMtimeMs,
+      configMtimeMs,
+      mtimeMs: Math.max(pbtxtMtimeMs, configMtimeMs),
+      hasExplicitOrchestratorField
+    },
+    enumerable: false,
+    configurable: true
+  });
+  return result;
 }
 
 /**
@@ -611,9 +783,11 @@ export function classifyOrchestratorModelRole(rawModel, settings = {}, cache = n
 
   // 第 1 層：精準對照 settings.orchestrator（v1.5.14+ 原生 Planner / Executor 設定）
   const orchCfg = settings?.orchestrator;
-  if (orchCfg && typeof orchCfg === 'object') {
-    const plannerRef = orchCfg.planner ?? orchCfg.plannerModel ?? orchCfg.planner_model;
-    const executorRef = orchCfg.executor ?? orchCfg.executorModel ?? orchCfg.executor_model;
+  if ((orchCfg && typeof orchCfg === 'object') || settings) {
+    const plannerRef =
+      readPlannerFieldFromOrchestratorObj(orchCfg) ??
+      readPlannerFieldFromTopLevelObj(settings);
+    const executorRef = readExecutorFieldFromOrchestratorObj(orchCfg);
     const plannerKeys = buildModelRoleKeys(plannerRef, cache);
     const executorKeys = buildModelRoleKeys(executorRef, cache);
 
@@ -673,6 +847,15 @@ async function scanTranscriptTailAsync(fh, size, mtimeMs, tailBytes, cache = nul
     if (firstNl !== -1) raw = raw.slice(firstNl + 1);
   }
 
+  let latestModel = '';
+  let latestHasThinking = false;
+  let latestTimestampMs = 0;
+  let exitPlanModel = '';
+  let exitPlanTimestampMs = 0;
+  let nonWorkerModel = '';
+  let nonWorkerTimestampMs = 0;
+  let hasOrchestratorSignal = false;
+
   const lines = raw.split(/\r?\n/).filter(l => l.trim().length > 0);
   for (let i = lines.length - 1; i >= 0; i--) {
     let step;
@@ -683,26 +866,66 @@ async function scanTranscriptTailAsync(fh, size, mtimeMs, tailBytes, cache = nul
     }
     if (!step || typeof step !== 'object') continue;
     if (step.type !== 'PLANNER_RESPONSE' && step.source !== 'MODEL') continue;
+
+    const calls = Array.isArray(step.tool_calls) ? step.tool_calls : [];
+    const hasExitPlan = calls.some(tc => tc?.name === 'exit_plan_mode');
+    if (hasExitPlan) hasOrchestratorSignal = true;
+
     if (typeof step.model !== 'string' || !step.model.trim()) continue;
     const model = step.model.trim();
+    if (isOrchestratorModelName(model, cache) || isOrchestratorWorkerModel(model, cache)) {
+      hasOrchestratorSignal = true;
+    }
     if (isOrchestratorModelName(model, cache)) continue;
 
     const timestampMs = parseTimestampMs(step.created_at) || Math.round(mtimeMs || 0);
     const hasThinking = Boolean(typeof step.thinking === 'string' && step.thinking.trim());
-    return { exists: true, model, hasThinking, timestampMs };
+    if (!latestModel) {
+      latestModel = model;
+      latestHasThinking = hasThinking;
+      latestTimestampMs = timestampMs;
+    }
+    if (hasExitPlan && !exitPlanModel) {
+      exitPlanModel = model;
+      exitPlanTimestampMs = timestampMs;
+    }
+    if (!isOrchestratorWorkerModel(model, cache) && !nonWorkerModel) {
+      nonWorkerModel = model;
+      nonWorkerTimestampMs = timestampMs;
+    }
   }
 
-  return { exists: true, model: '', hasThinking: false, timestampMs: Math.round(mtimeMs || 0) };
+  const resolvedPlannerModel = exitPlanModel || nonWorkerModel || '';
+  const resolvedPlannerTs = exitPlanModel ? exitPlanTimestampMs : (nonWorkerModel ? nonWorkerTimestampMs : 0);
+  return {
+    exists: true,
+    model: latestModel,
+    hasThinking: latestHasThinking,
+    timestampMs: latestModel ? latestTimestampMs : Math.round(mtimeMs || 0),
+    plannerModel: resolvedPlannerModel,
+    plannerTimestampMs: resolvedPlannerTs,
+    hasOrchestratorSignal,
+    fileMtimeMs: Math.round(mtimeMs || 0)
+  };
 }
 
 /**
  * 讀取 transcript.jsonl 尾端（預設 64 KB，未命中時擴大至 256 KB），取得最新非 Orchestrator 包裝的模型識別碼與思考旗標。
  * @param {string} transcriptPath
  * @param {object|null} [cache=null]
- * @returns {Promise<{ exists: boolean, model: string, hasThinking: boolean, timestampMs: number }>}
+ * @returns {Promise<{ exists: boolean, model: string, hasThinking: boolean, timestampMs: number, plannerModel: string, plannerTimestampMs: number, hasOrchestratorSignal: boolean, fileMtimeMs: number }>}
  */
 export async function readLatestTranscriptModelAsync(transcriptPath, cache = null) {
-  const empty = { exists: false, model: '', hasThinking: false, timestampMs: 0 };
+  const empty = {
+    exists: false,
+    model: '',
+    hasThinking: false,
+    timestampMs: 0,
+    plannerModel: '',
+    plannerTimestampMs: 0,
+    hasOrchestratorSignal: false,
+    fileMtimeMs: 0
+  };
   if (!transcriptPath || typeof transcriptPath !== 'string') return empty;
 
   let fh;
@@ -989,4 +1212,81 @@ export async function resolveActiveRuntimeModelAsync({
     role: 'pending',
     source: 'pending'
   };
+}
+
+/**
+ * 當組態未顯式指定 Orchestrator planner（或 Antigravity 2.0 僅紀錄 Neon wrapper）時，
+ * 由活躍對話的工作階段紀錄、逐字稿規劃輪次與執行期偵測結果安全推斷目前 planner 模型，並比對組態更新時間避免舊工作階段污染。
+ * @param {object} [options={}]
+ * @returns {string}
+ */
+export function resolveRuntimeSessionPlannerRef(options = {}) {
+  const {
+    session = null,
+    transcript = null,
+    runtimeModel = null,
+    appModelState = null,
+    settingsTimestampMs = 0,
+    cache = null
+  } = options || {};
+
+  const appStateMtimeMs = Number(appModelState?._meta?.mtimeMs || 0) || 0;
+  const minFreshMs = Math.max(Number(settingsTimestampMs) || 0, appStateMtimeMs);
+
+  const isCandidateUsable = (cand) => {
+    if (typeof cand !== 'string' || !cand.trim()) return false;
+    const trimmed = cand.trim();
+    if (!isUsablePlannerRef(trimmed)) return false;
+    if (isOrchestratorModelName(trimmed, cache)) return false;
+    if (isOrchestratorWorkerModel(trimmed, cache)) return false;
+    return true;
+  };
+
+  const isFreshRelativeToConfig = (eventTs, fileTs = 0) => {
+    if (!minFreshMs) return true;
+    const bestTs = Math.max(Number(eventTs) || 0, Number(fileTs) || 0);
+    if (!bestTs) return false;
+    return bestTs >= minFreshMs;
+  };
+
+  if (session && typeof session === 'object') {
+    const sessUpdatedAt = Number(session.updatedAt || 0) || 0;
+    const sessPlannerTs = Number(session.lastPlannerUpdatedAt || sessUpdatedAt || 0) || 0;
+    if (isCandidateUsable(session.lastPlannerModel) && isFreshRelativeToConfig(sessPlannerTs, sessUpdatedAt)) {
+      return session.lastPlannerModel.trim();
+    }
+    if (isCandidateUsable(session.modelName) && isFreshRelativeToConfig(sessUpdatedAt, sessUpdatedAt)) {
+      return session.modelName.trim();
+    }
+  }
+
+  if (transcript && typeof transcript === 'object') {
+    const trPlanner =
+      (typeof transcript.lastPlannerModel === 'string' && transcript.lastPlannerModel.trim())
+        ? transcript.lastPlannerModel.trim()
+        : (typeof transcript.plannerModel === 'string' && transcript.plannerModel.trim() ? transcript.plannerModel.trim() : '');
+    const trFileMtime = Number(transcript.fileMtimeMs || transcript.mtimeMs || 0) || 0;
+    const trPlannerTs = Number(
+      transcript.lastPlannerTimestampMs ||
+      transcript.plannerTimestampMs ||
+      transcript.lastModelTimestampMs ||
+      transcript.timestampMs ||
+      0
+    ) || 0;
+    if (isCandidateUsable(trPlanner) && isFreshRelativeToConfig(trPlannerTs, trFileMtime)) {
+      return trPlanner;
+    }
+  }
+
+  if (runtimeModel && typeof runtimeModel === 'object' && runtimeModel.role === 'planner') {
+    const rtCand =
+      (typeof runtimeModel.rawModel === 'string' && runtimeModel.rawModel.trim())
+        ? runtimeModel.rawModel.trim()
+        : (typeof runtimeModel.modelName === 'string' ? runtimeModel.modelName.trim() : '');
+    if (isCandidateUsable(rtCand) && isFreshRelativeToConfig(Number(runtimeModel.timestampMs || 0) || 0, 0)) {
+      return rtCand;
+    }
+  }
+
+  return '';
 }

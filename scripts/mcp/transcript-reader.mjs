@@ -51,7 +51,13 @@ async function scanTranscriptTailSummaryAsync(fh, size, mtimeMs, tailBytes) {
   let lastModel = '';
   let lastModelHasThinking = false;
   let lastModelTimestampMs = 0;
+  let lastPlannerModel = '';
+  let lastPlannerTimestampMs = 0;
+  let exitPlanModel = '';
+  let exitPlanTimestampMs = 0;
   let hasOrchestratorSignal = false;
+  let foundPrimaryTurnBoundary = false;
+  let foundUserInputBoundary = false;
   let pendingToolResults = 0;
   let derivedAgentState = 'idle';
 
@@ -80,49 +86,75 @@ async function scanTranscriptTailSummaryAsync(fh, size, mtimeMs, tailBytes) {
     }
 
     if (step.type === 'GENERIC') {
-      pendingToolResults++;
-      if (step.status === 'RUNNING' && derivedAgentState !== 'error') {
-        derivedAgentState = 'tool_use';
+      if (!foundPrimaryTurnBoundary) {
+        pendingToolResults++;
+        if (step.status === 'RUNNING' && derivedAgentState !== 'error') {
+          derivedAgentState = 'tool_use';
+        }
       }
       continue;
     }
 
     if (step.type === 'PLANNER_RESPONSE') {
-      if (typeof step.model === 'string' && step.model.trim()) {
-        if (isOrchestratorModelName(step.model) || isOrchestratorWorkerModel(step.model)) {
-          hasOrchestratorSignal = true;
-        }
-        if (!lastModel && !isOrchestratorModelName(step.model)) {
-          lastModel = step.model.trim();
-          lastModelHasThinking = Boolean(typeof step.thinking === 'string' && step.thinking.trim());
-          const ts = typeof step.created_at === 'string' && step.created_at.trim() ? new Date(step.created_at).getTime() : 0;
-          lastModelTimestampMs = (Number.isFinite(ts) && ts > 0) ? ts : Math.round(mtimeMs || 0);
-        }
-      }
       const calls = Array.isArray(step.tool_calls) ? step.tool_calls : [];
-      if (calls.some(tc => tc?.name === 'exit_plan_mode')) {
+      const hasExitPlan = calls.some(tc => tc?.name === 'exit_plan_mode');
+      if (hasExitPlan) {
         hasOrchestratorSignal = true;
       }
-      if (calls.length > 0) {
-        const newestCall = calls[calls.length - 1];
-        lastToolName = newestCall?.name || '';
-        lastToolSummary = describeToolCall(newestCall);
-        if (derivedAgentState !== 'error') {
-          derivedAgentState = pendingToolResults < calls.length ? 'tool_use' : 'working';
+
+      if (typeof step.model === 'string' && step.model.trim()) {
+        const stepModel = step.model.trim();
+        if (isOrchestratorModelName(stepModel) || isOrchestratorWorkerModel(stepModel)) {
+          hasOrchestratorSignal = true;
         }
-      } else if (derivedAgentState !== 'error') {
-        derivedAgentState = pendingToolResults === 0 && lastStep === step ? 'idle' : 'working';
+        const ts = typeof step.created_at === 'string' && step.created_at.trim() ? new Date(step.created_at).getTime() : 0;
+        const resolvedTs = (Number.isFinite(ts) && ts > 0) ? ts : Math.round(mtimeMs || 0);
+        if (!foundUserInputBoundary && !lastModel && !isOrchestratorModelName(stepModel)) {
+          lastModel = stepModel;
+          lastModelHasThinking = Boolean(typeof step.thinking === 'string' && step.thinking.trim());
+          lastModelTimestampMs = resolvedTs;
+        }
+        if (!isOrchestratorModelName(stepModel) && !isOrchestratorWorkerModel(stepModel)) {
+          if (hasExitPlan && !exitPlanModel) {
+            exitPlanModel = stepModel;
+            exitPlanTimestampMs = resolvedTs;
+          }
+          if (!lastPlannerModel) {
+            lastPlannerModel = stepModel;
+            lastPlannerTimestampMs = resolvedTs;
+          }
+        }
       }
-      break;
+
+      if (!foundPrimaryTurnBoundary) {
+        if (calls.length > 0) {
+          const newestCall = calls[calls.length - 1];
+          lastToolName = newestCall?.name || '';
+          lastToolSummary = describeToolCall(newestCall);
+          if (derivedAgentState !== 'error') {
+            derivedAgentState = pendingToolResults < calls.length ? 'tool_use' : 'working';
+          }
+        } else if (derivedAgentState !== 'error') {
+          derivedAgentState = pendingToolResults === 0 && lastStep === step ? 'idle' : 'working';
+        }
+        foundPrimaryTurnBoundary = true;
+      }
+      continue;
     }
 
     if (step.type === 'USER_INPUT') {
-      if (derivedAgentState !== 'error' && lastStep === step) {
+      if (!foundPrimaryTurnBoundary && derivedAgentState !== 'error' && lastStep === step) {
         derivedAgentState = 'working';
       }
-      break;
+      foundPrimaryTurnBoundary = true;
+      foundUserInputBoundary = true;
     }
   }
+
+  const resolvedPlannerModel = exitPlanModel || lastPlannerModel || '';
+  const resolvedPlannerTimestampMs = exitPlanModel
+    ? exitPlanTimestampMs
+    : (lastPlannerModel ? lastPlannerTimestampMs : 0);
 
   return {
     exists: true,
@@ -134,6 +166,8 @@ async function scanTranscriptTailSummaryAsync(fh, size, mtimeMs, tailBytes) {
     lastModel,
     lastModelHasThinking,
     lastModelTimestampMs,
+    lastPlannerModel: resolvedPlannerModel,
+    lastPlannerTimestampMs: resolvedPlannerTimestampMs,
     hasOrchestratorSignal,
     mtimeMs
   };
@@ -142,7 +176,7 @@ async function scanTranscriptTailSummaryAsync(fh, size, mtimeMs, tailBytes) {
 /**
  * 僅讀取 transcript.jsonl 尾端 64 KB（必要時退讓精簡版或 256 KB）並容錯解析步驟數、目前代理狀態與底層模型訊號。
  * @param {string} transcriptPath
- * @returns {Promise<{ exists: boolean, stepCount: number, derivedAgentState: string, lastToolName: string, lastToolSummary: string, lastError: string, lastModel: string, lastModelHasThinking: boolean, lastModelTimestampMs: number, hasOrchestratorSignal: boolean, mtimeMs: number }>}
+ * @returns {Promise<{ exists: boolean, stepCount: number, derivedAgentState: string, lastToolName: string, lastToolSummary: string, lastError: string, lastModel: string, lastModelHasThinking: boolean, lastModelTimestampMs: number, lastPlannerModel: string, lastPlannerTimestampMs: number, hasOrchestratorSignal: boolean, mtimeMs: number }>}
  */
 export async function readTranscriptSummaryAsync(transcriptPath) {
   const empty = {
@@ -155,6 +189,8 @@ export async function readTranscriptSummaryAsync(transcriptPath) {
     lastModel: '',
     lastModelHasThinking: false,
     lastModelTimestampMs: 0,
+    lastPlannerModel: '',
+    lastPlannerTimestampMs: 0,
     hasOrchestratorSignal: false,
     mtimeMs: 0
   };
@@ -172,12 +208,12 @@ export async function readTranscriptSummaryAsync(transcriptPath) {
     if (!summary.lastModel && /(?:^|[\\/])transcript_full\.jsonl$/i.test(transcriptPath)) {
       const compactPath = transcriptPath.replace(/transcript_full\.jsonl$/i, 'transcript.jsonl');
       const compactRes = await readTranscriptSummaryAsync(compactPath);
-      if (compactRes.exists && (compactRes.lastModel || compactRes.hasOrchestratorSignal)) {
+      if (compactRes.exists && (compactRes.lastModel || compactRes.lastPlannerModel || compactRes.hasOrchestratorSignal)) {
         fallbackSummary = compactRes;
       }
     }
 
-    if (!summary.lastModel && !fallbackSummary?.lastModel && size > TAIL_BYTES) {
+    if ((!summary.lastModel || !summary.lastPlannerModel) && !fallbackSummary?.lastModel && size > TAIL_BYTES) {
       fallbackSummary = await scanTranscriptTailSummaryAsync(fh, size, stat.mtimeMs, FALLBACK_TAIL_BYTES);
     }
 
@@ -189,6 +225,10 @@ export async function readTranscriptSummaryAsync(transcriptPath) {
         summary.lastModel = fallbackSummary.lastModel;
         summary.lastModelHasThinking = fallbackSummary.lastModelHasThinking;
         summary.lastModelTimestampMs = fallbackSummary.lastModelTimestampMs;
+      }
+      if (!summary.lastPlannerModel && fallbackSummary.lastPlannerModel) {
+        summary.lastPlannerModel = fallbackSummary.lastPlannerModel;
+        summary.lastPlannerTimestampMs = fallbackSummary.lastPlannerTimestampMs;
       }
       if (fallbackSummary.hasOrchestratorSignal) {
         summary.hasOrchestratorSignal = true;

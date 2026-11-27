@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseOrderAndStyles } from '../../skills/agy-cli-statusline/scripts/configure-statusline.mjs';
 import { checkPluginHookSync } from '../../skills/agy-cli-statusline/scripts/diagnose-statusline.mjs';
+import { isOutdatedCliHookSync } from '../../skills/agy-cli-statusline/scripts/lib/core/cli-deploy.mjs';
 import {
   GITHUB_LATEST_RELEASE_URL
 } from '../../skills/agy-cli-statusline/scripts/lib/core/constants.mjs';
@@ -16,7 +17,6 @@ import {
   sanitizeConversationId
 } from '../../skills/agy-cli-statusline/scripts/lib/core/normalize.mjs';
 import { resolveInstalledPluginVersionAsync } from '../../skills/agy-cli-statusline/scripts/lib/core/plugin-manifest.mjs';
-import { compareSemver } from '../../skills/agy-cli-statusline/scripts/lib/core/semver.mjs';
 import { getSettingsAsync } from '../../skills/agy-cli-statusline/scripts/lib/core/settings.mjs';
 import {
   extractModelCandidateKeys,
@@ -33,7 +33,8 @@ import {
   readAppModelStateAsync,
   resolveConfiguredPlannerRef,
   resolveOrchestratorWrapperDisplayName,
-  resolvePlannerCatalogModelRef
+  resolvePlannerCatalogModelRef,
+  resolveRuntimeSessionPlannerRef
 } from '../../skills/agy-cli-statusline/scripts/lib/collectors/runtime-model.mjs';
 import {
   resolveInstalledAppVersionAsync,
@@ -86,25 +87,8 @@ const VERSION_CACHE_TTL_MS = 60 * 1000;
 
 /**
  * 判斷本機既有的 CLI 掛鉤腳本是否過舊或內容不同步，應於「同步套用至 2.0 ＋ CLI」時自動更新。
- * 僅處理已存在之掛鉤（排除 hook_missing 與 plugin_not_found），且當掛鉤版本新於外掛時不降級覆寫。
- * @param {{ status?: string, hookVersion?: string, pluginVersion?: string } | null | undefined} hookSync
- * @returns {boolean}
  */
-export function isOutdatedCliHookSync(hookSync) {
-  if (!hookSync || typeof hookSync !== 'object') return false;
-  const { status, hookVersion, pluginVersion } = hookSync;
-  if (status === 'content_mismatch' || status === 'legacy_mismatch' || status === 'legacy_no_meta') {
-    return true;
-  }
-  if (status === 'version_mismatch') {
-    if (hookVersion && pluginVersion) {
-      const cmp = compareSemver(hookVersion, pluginVersion);
-      if (cmp !== null) return cmp < 0;
-    }
-    return true;
-  }
-  return false;
-}
+export { isOutdatedCliHookSync };
 
 function resolveDefaultPluginRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -526,13 +510,37 @@ export class StatuslineService {
     }
 
     const { cache, runtimeTelemetry, telemetryStatus } = lsResult;
+    let cliSettingsMtimeMs = 0;
+    if (!isAppProduct) {
+      const cliCfgCandidates = [
+        path.join(this.homeDir, '.gemini', 'settings.json'),
+        path.join(this.homeDir, '.gemini', 'antigravity-cli', 'settings.json'),
+        ...(hasWorkspace ? [path.join(projectPath, '.gemini', 'settings.json')] : [])
+      ];
+      const cliStats = await Promise.all(cliCfgCandidates.map(p => fsPromises.stat(p).catch(() => null)));
+      for (const st of cliStats) {
+        if (st && Number.isFinite(st.mtimeMs) && st.mtimeMs > cliSettingsMtimeMs) {
+          cliSettingsMtimeMs = Math.round(st.mtimeMs);
+        }
+      }
+    }
+    const runtimePlannerModel = resolveRuntimeSessionPlannerRef({
+      session: activeSession,
+      transcript: transcriptSummary,
+      appModelState: isAppProduct ? appModelState : null,
+      settingsTimestampMs: cliSettingsMtimeMs,
+      cache
+    });
+
     const appOrchWrapperName = resolveOrchestratorWrapperDisplayName(effectiveAppSelectedModel, cache, {
-      appOrchestratorModel: effectiveAppOrchestratorModel
+      appOrchestratorModel: effectiveAppOrchestratorModel,
+      runtimePlannerModel
     });
     const hookOrchWrapperName = (!effectiveAppSelectedModel || isOrchestratorModelName(effectiveAppSelectedModel, cache))
       ? resolveOrchestratorWrapperDisplayName(activeSession.modelName, cache, {
           settings: effectiveAppSelectedModel ? null : effectiveSettings,
-          appOrchestratorModel: effectiveAppOrchestratorModel
+          appOrchestratorModel: effectiveAppOrchestratorModel,
+          runtimePlannerModel
         })
       : '';
     const cliLatestId = sanitizeConversationId(cliHookSessionsData?.latestConversationId || '');
@@ -542,11 +550,15 @@ export class StatuslineService {
       (
         !cliLatestId ||
         activeSession.conversationId === cliLatestId ||
+        activeSession.agentState === 'working' ||
         Boolean(transcriptSummary?.hasOrchestratorSignal) ||
         !activeSession.modelName
       );
     const cliSettingsOrchWrapperName = (!appOrchWrapperName && !hookOrchWrapperName && isCliOrchestratorSession)
-      ? resolveOrchestratorWrapperDisplayName(effectiveSettings.model, cache, { settings: effectiveSettings })
+      ? resolveOrchestratorWrapperDisplayName(effectiveSettings.model, cache, {
+          settings: effectiveSettings,
+          runtimePlannerModel
+        })
       : '';
     const wrapperDisplayName = appOrchWrapperName || hookOrchWrapperName || cliSettingsOrchWrapperName;
     const wrapperModelId = appOrchWrapperName
@@ -564,9 +576,11 @@ export class StatuslineService {
 
     const staticWrapperName = wrapperModelId ? resolveOrchestratorWrapperDisplayName(wrapperModelId, cache) : '';
     const didOverrideWrapper = Boolean(wrapperDisplayName && wrapperDisplayName !== staticWrapperName);
-    const activePlannerRef = isAppProduct
-      ? effectiveAppOrchestratorModel
-      : resolveConfiguredPlannerRef(null, effectiveSettings, '');
+    const activePlannerRef = (
+      isAppProduct
+        ? resolveConfiguredPlannerRef(null, effectiveSettings, effectiveAppOrchestratorModel)
+        : resolveConfiguredPlannerRef(null, effectiveSettings, '', wrapperModelId || effectiveSettings?.model || '')
+    ) || runtimePlannerModel;
     const plannerCatalogRef = didOverrideWrapper ? resolvePlannerCatalogModelRef(activePlannerRef, cache) : '';
 
     const meta = {
@@ -627,6 +641,7 @@ export class StatuslineService {
         homeDir: this.homeDir,
         pluginDataDir: this.pluginDataDir,
         settings: effectiveSettings,
+        runtimePlannerModel,
         hookSession: activeSession,
         runtimeTelemetry,
         transcriptSummary,
