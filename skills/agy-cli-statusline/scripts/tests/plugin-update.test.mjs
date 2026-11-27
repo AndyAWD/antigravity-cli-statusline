@@ -1080,7 +1080,8 @@ setTimeout(() => {
               {
                 PATH: `${parBinDir}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`,
                 STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 4001, startTime: 'par1', nonInteractive: false }),
-                STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${parPort}/latest`
+                STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${parPort}/latest`,
+                STATUSLINE_PLUGIN_UPDATE_WAIT_MS: '3000'
               }
             );
             assert.strictEqual(parRes.code, 0, `stderr: ${parRes.stderr}`);
@@ -1096,6 +1097,85 @@ setTimeout(() => {
             assert.ok(gitStart >= parTimeline.requestAt - 1000, 'Sanity: git probe belongs to this run');
           } finally {
             try { await new Promise(resolve => parServer.close(resolve)); } catch (_) {}
+          }
+        }
+
+        // F4c. 預設前景等待上限（<=850ms）對慢速伺服器提早結束不卡死，背景 worker 仍寫入快取供下次渲染顯示
+        let slowServer = null;
+        let slowPort = null;
+        try {
+          slowServer = http.createServer((req, res) => {
+            setTimeout(() => {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ tag_name: 'v1.12.0' }));
+            }, 2200);
+          });
+          await new Promise((resolve, reject) => {
+            slowServer.once('error', reject);
+            slowServer.listen(0, '127.0.0.1', () => { slowPort = slowServer.address().port; resolve(); });
+          });
+        } catch (bindErr) {
+          if (bindErr && (bindErr.code === 'EPERM' || bindErr.code === 'EACCES')) {
+            slowPort = null;
+          } else {
+            throw bindErr;
+          }
+        }
+        if (slowPort) {
+          const slowHome = join(sandboxR35, 'slow-home');
+          const slowPluginDir = join(slowHome, '.gemini', 'config', 'plugins', 'antigravity-cli-statusline');
+          const slowCachePath = getSharedUpdateCachePath(slowHome);
+          mkdirSync(join(slowHome, '.gemini', 'tmp'), { recursive: true });
+          mkdirSync(slowPluginDir, { recursive: true });
+          writeFileSync(join(slowPluginDir, 'plugin.json'), JSON.stringify({ name: 'antigravity-cli-statusline', version: '1.11.0' }), 'utf8');
+          writeFileSync(join(slowHome, '.gemini', 'settings.json'), JSON.stringify({
+            ui: { language: 'us', footer: { items: ['plugin-version', 'plugin-update'] } }
+          }), 'utf8');
+          try {
+            const tSlow0 = Date.now();
+            const slowRes1 = await runStatusline(
+              { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+              slowHome,
+              SCRIPT_PATH,
+              {
+                STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 4002, startTime: 'slow1', nonInteractive: false }),
+                STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${slowPort}/latest`
+              }
+            );
+            const slowElapsed = Date.now() - tSlow0;
+            assert.strictEqual(slowRes1.code, 0);
+            assert.ok(!stripAnsi(slowRes1.stdout).includes('v1.12.0'), 'First render must exit before slow 2200ms server responds');
+            assert.ok(slowElapsed < 2100, `Default parentWaitMs must return before 2200ms server finishes, took ${slowElapsed}ms`);
+
+            // 等待背景 detached worker 完成寫入快取（最多 3500ms）
+            let cachedReady = false;
+            for (let attempt = 0; attempt < 35; attempt++) {
+              await new Promise(r => setTimeout(r, 100));
+              if (existsSync(slowCachePath)) {
+                try {
+                  const parsed = JSON.parse(readFileSync(slowCachePath, 'utf8'));
+                  if (parsed?.lastSessionStatus === 'ok' && parsed?.latestVersion === '1.12.0') {
+                    cachedReady = true;
+                    break;
+                  }
+                } catch (_) {}
+              }
+            }
+            assert.strictEqual(cachedReady, true, 'Detached worker must finish writing update_cache.json in background');
+
+            const slowRes2 = await runStatusline(
+              { model: { displayName: 'Gemini 3.8 Flash' }, version: '1.5.10' },
+              slowHome,
+              SCRIPT_PATH,
+              {
+                STATUSLINE_AGY_SESSION_JSON: JSON.stringify({ pid: 4002, startTime: 'slow1', nonInteractive: false }),
+                STATUSLINE_PLUGIN_RELEASE_URL: `http://127.0.0.1:${slowPort}/latest`
+              }
+            );
+            assert.strictEqual(slowRes2.code, 0);
+            assert.ok(stripAnsi(slowRes2.stdout).includes('v1.12.0'), 'Second render must show update notice from background worker cache');
+          } finally {
+            try { await new Promise(resolve => slowServer.close(resolve)); } catch (_) {}
           }
         }
       }
