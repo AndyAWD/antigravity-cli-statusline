@@ -429,17 +429,19 @@ async function main() {
       });
       cache = updateRes.cache;
       effectiveCache = cache || catalogReadOnlyCache;
-      runtimePlannerModel = await resolveCliRuntimePlannerFallbackAsync({
-        homeDir: os.homedir(),
-        projectPath,
-        conversationId,
-        meta,
-        settings,
-        cache: effectiveCache,
-        fallbackModel
-      });
-      fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel, runtimePlannerModel);
-      ({ effectiveMeta, quotaMeta } = buildEffectiveMetas(fallbackModel, effectiveCache));
+      if (updateRes.freshlyFetchedFromLs) {
+        runtimePlannerModel = await resolveCliRuntimePlannerFallbackAsync({
+          homeDir: os.homedir(),
+          projectPath,
+          conversationId,
+          meta,
+          settings,
+          cache: effectiveCache,
+          fallbackModel
+        });
+        fallbackModel = resolveEffectiveCliModel(meta, settings, effectiveCache, fallbackModel, runtimePlannerModel);
+        ({ effectiveMeta, quotaMeta } = buildEffectiveMetas(fallbackModel, effectiveCache));
+      }
       freshlyFetchedFromLs = updateRes.freshlyFetchedFromLs;
       timedOut = updateRes.timedOut;
       if (cache && typeof cache === 'object' && cache.lastPollAttemptAt && cache.lastPollAttemptAt !== prevPollAttemptAt) {

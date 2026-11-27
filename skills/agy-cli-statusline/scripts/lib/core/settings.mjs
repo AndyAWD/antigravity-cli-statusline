@@ -4,22 +4,42 @@ import { join } from 'path';
 import { fileURLToPath } from 'url';
 
 /**
- * 從標準輸入（stdin）讀取中繼資料字串（附帶 300 毫秒逾時保護）。
- * @param {number} [timeoutMs=300]
+ * 從標準輸入（stdin）讀取中繼資料字串（附帶 150 毫秒逾時與 TTY 防護）。
+ * @param {number} [timeoutMs=150]
  * @returns {Promise<string>}
  */
-export async function readStdin(timeoutMs = 300) {
+export async function readStdin(timeoutMs = 150) {
+  if (process.stdin.isTTY) {
+    return '';
+  }
   return new Promise((resolve) => {
+    let settled = false;
     let data = '';
-    const timer = setTimeout(() => resolve(data), timeoutMs);
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk) => {
-      data += chunk;
-    });
-    process.stdin.on('end', () => {
+    const finish = () => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      process.stdin.removeListener('data', onData);
+      process.stdin.removeListener('end', onEnd);
+      process.stdin.removeListener('error', onError);
+      try { process.stdin.pause(); } catch (_) {}
       resolve(data);
-    });
+    };
+    const onData = (chunk) => {
+      data += chunk;
+    };
+    const onEnd = () => finish();
+    const onError = () => finish();
+    const timer = setTimeout(finish, timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+    try {
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', onData);
+      process.stdin.on('end', onEnd);
+      process.stdin.on('error', onError);
+    } catch (_) {
+      finish();
+    }
   });
 }
 

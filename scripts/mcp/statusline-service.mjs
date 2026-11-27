@@ -223,6 +223,7 @@ export class StatuslineService {
     }
     const probeOpts = {
       homeDir: this.homeDir,
+      execTimeoutMs: 1500,
       ...(this.env !== undefined ? { env: this.env } : {}),
       ...(this.execFn ? { execFn: this.execFn } : {})
     };
