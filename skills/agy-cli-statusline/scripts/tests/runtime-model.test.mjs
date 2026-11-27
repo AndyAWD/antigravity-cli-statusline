@@ -867,6 +867,136 @@ test('E2E CLI statusline-quota.mjs overrides static Orchestrator (Neon) with con
     assert.ok(claudePlain.includes('模型: Orchestrator (Claude Opus 5.5)'), claudePlain);
     assert.ok(claudePlain.includes('五小時可用: 42%'), claudePlain);
     assert.ok(claudePlain.includes('80.0k / 160.0k'), claudePlain);
+
+    // 4. agy CLI v1.5.10+ 僅更新頂層 settings.model = "Orchestrator (Carbon)"（無 settings.orchestrator）時，亦能覆寫 Neon
+    fs.writeFileSync(path.join(cliDir, 'settings.json'), JSON.stringify({
+      model: 'Orchestrator (Carbon)',
+      ui: {
+        language: 'zh-tw',
+        footer: { items: ['model-name', 'quota', 'token-count'] }
+      }
+    }), 'utf8');
+    const topModelRes = await runStatusline(meta, fakeHome);
+    assert.equal(topModelRes.code, 0);
+    assert.ok(stripAnsi(topModelRes.stdout).includes('模型: Orchestrator (Carbon)'), topModelRes.stdout);
+
+    // 5. settings.model 為 MODEL_PLACEHOLDER_M667 / gemini-pro-orchestrator 時，能透過目錄或別名顯示 Carbon
+    fs.writeFileSync(path.join(cliDir, 'settings.json'), JSON.stringify({
+      model: 'gemini-pro-orchestrator',
+      ui: { language: 'zh-tw', footer: { items: ['model-name'] } }
+    }), 'utf8');
+    const slugModelRes = await runStatusline(meta, fakeHome);
+    assert.equal(slugModelRes.code, 0);
+    assert.ok(stripAnsi(slugModelRes.stdout).includes('模型: Orchestrator (Carbon)'), slugModelRes.stdout);
+
+    // 6. --model CLI 旗標明確指定 Orchestrator (Argon) 時，不得被 settings.model = Orchestrator (Carbon) 覆蓋
+    fs.writeFileSync(path.join(cliDir, 'settings.json'), JSON.stringify({
+      model: 'Orchestrator (Carbon)',
+      ui: { language: 'zh-tw', footer: { items: ['model-name'] } }
+    }), 'utf8');
+    const cliOverrideRes = await runStatusline({
+      ...meta,
+      model: { id: 'Orchestrator (Argon)', display_name: 'Orchestrator (Argon)' }
+    }, fakeHome);
+    assert.equal(cliOverrideRes.code, 0);
+    assert.ok(stripAnsi(cliOverrideRes.stdout).includes('模型: Orchestrator (Argon)'), cliOverrideRes.stdout);
+  } finally {
+    fs.rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
+test('readAppModelStateAsync supports config.json with non-enumerable _meta and transcript tracks earlier plannerModel', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-rt-cfg-'));
+  try {
+    const cfgDir = path.join(tmpHome, '.gemini', 'config');
+    fs.mkdirSync(cfgDir, { recursive: true });
+    fs.writeFileSync(path.join(cfgDir, 'config.json'), JSON.stringify({
+      userSettings: {
+        orchestratorModel: 'MODEL_PLACEHOLDER_M670',
+        orchestratorExecutorModel: 'MODEL_PLACEHOLDER_M525'
+      }
+    }), 'utf8');
+
+    const state = await readAppModelStateAsync(tmpHome);
+    assert.deepEqual(state, {
+      selectedModel: '',
+      orchestratorModel: 'MODEL_PLACEHOLDER_M670',
+      orchestratorExecutorModel: 'MODEL_PLACEHOLDER_M525'
+    });
+    assert.deepEqual(Object.keys(state), ['selectedModel', 'orchestratorModel', 'orchestratorExecutorModel']);
+    assert.equal(state._meta.hasExplicitOrchestratorField, true);
+
+    const trPath = path.join(tmpHome, 'transcript.jsonl');
+    fs.writeFileSync(trPath, [
+      JSON.stringify({
+        step_index: 1,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        created_at: '2026-11-27T10:00:00Z',
+        model: 'gemini-4-carbon-high',
+        tool_calls: [{ name: 'exit_plan_mode', args: {} }]
+      }),
+      JSON.stringify({
+        step_index: 2,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        created_at: '2026-11-27T10:01:00Z',
+        model: 'gemini-flash-worker-agy'
+      })
+    ].join('\n'), 'utf8');
+    const tr = await readLatestTranscriptModelAsync(trPath);
+    assert.equal(tr.model, 'gemini-flash-worker-agy');
+    assert.equal(tr.plannerModel, 'gemini-4-carbon-high');
+    assert.equal(tr.hasOrchestratorSignal, true);
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('E2E CLI statusline-quota.mjs recovers planner from runtime transcript when settings.model stays Neon and rejects stale transcript', async () => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'statusline-e2e-runtime-planner-'));
+  try {
+    const fakeHome = path.join(sandbox, 'home');
+    const cliDir = path.join(fakeHome, '.gemini', 'antigravity-cli');
+    const convId = 'conv-runtime-carbon';
+    const trDir = path.join(cliDir, 'brain', convId, '.system_generated', 'logs');
+    fs.mkdirSync(trDir, { recursive: true });
+
+    const settingsPath = path.join(cliDir, 'settings.json');
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      model: 'Orchestrator (Neon)',
+      ui: { language: 'zh-tw', footer: { items: ['model-name'] } }
+    }), 'utf8');
+    const t0 = new Date(Date.now() - 10000);
+    fs.utimesSync(settingsPath, t0, t0);
+
+    const trPath = path.join(trDir, 'transcript.jsonl');
+    fs.writeFileSync(trPath, [
+      JSON.stringify({
+        step_index: 1,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        created_at: new Date().toISOString(),
+        model: 'gemini-4-carbon-high',
+        tool_calls: [{ name: 'exit_plan_mode', args: {} }]
+      })
+    ].join('\n'), 'utf8');
+
+    const meta = {
+      conversation_id: convId,
+      model: { id: 'MODEL_PLACEHOLDER_M537', display_name: 'Orchestrator (Neon)' },
+      terminal_width: 200
+    };
+    const freshRes = await runStatusline(meta, fakeHome);
+    assert.equal(freshRes.code, 0);
+    assert.ok(stripAnsi(freshRes.stdout).includes('模型: Orchestrator (Carbon)'), freshRes.stdout);
+
+    // 若 settings.json 之後重新寫入 Neon（時間戳比舊 transcript 更新），不應被舊 Carbon 逐字稿污染
+    const tFuture = new Date(Date.now() + 10000);
+    fs.utimesSync(settingsPath, tFuture, tFuture);
+    const staleRes = await runStatusline(meta, fakeHome);
+    assert.equal(staleRes.code, 0);
+    assert.ok(stripAnsi(staleRes.stdout).includes('模型: Orchestrator (Neon)'), staleRes.stdout);
   } finally {
     fs.rmSync(sandbox, { recursive: true, force: true });
   }
