@@ -1,6 +1,6 @@
 {
   "name": "antigravity-cli-statusline",
-  "version": "2.1.3",
+  "version": "2.1.4",
   "description": "Monitor and customize Antigravity CLI & Antigravity App (2.0) statusline across macOS / Linux / Windows.",
   "type": "module",
   "scripts": {

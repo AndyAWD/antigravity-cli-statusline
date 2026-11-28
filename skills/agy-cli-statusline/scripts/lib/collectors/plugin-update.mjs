@@ -908,9 +908,10 @@ export async function checkPluginUpdateAsync(options = {}) {
       let ranDetached = false;
       if (useDetachedWorker) {
         const workerScriptPath = options.workerScriptPath || fileURLToPath(import.meta.url);
+        const defaultParentWait = Math.min(850, Math.max(250, 950 - elapsedMs));
         const parentWaitMs = typeof options.timeoutMs === 'number'
           ? options.timeoutMs
-          : Math.min(1800, Math.max(timeoutMs + 250, 400));
+          : (!isNaN(envWait) && envWait > 0 ? envWait : defaultParentWait);
         const workerRes = await runDetachedFetchAndWaitAsync({
           workerScriptPath,
           cachePath,

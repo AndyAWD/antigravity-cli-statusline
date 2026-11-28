@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { readJsonSafeAsync, writeFileAndVerifyNoBOM } from '../core/fs-utils.mjs';
 import { runCmdDetailedAsync } from '../core/process-utils.mjs';
 import { formatVersionTag, normalizeSemver } from '../core/semver.mjs';
 
@@ -183,6 +184,58 @@ async function readLogHeadVersionAsync(logPath) {
   }
 }
 
+/**
+ * 取得 CLI 版本快取檔路徑（`~/.gemini/tmp/cli_version_cache.json`）。
+ * @param {string} [homeDir=os.homedir()]
+ * @returns {string}
+ */
+export function getCliVersionCachePath(homeDir = os.homedir()) {
+  return path.join(homeDir, '.gemini', 'tmp', 'cli_version_cache.json');
+}
+
+async function readLatestCliLogVersionAsync(cliDir) {
+  const direct = await readLogHeadVersionAsync(path.join(cliDir, 'cli.log'));
+  if (direct) return direct;
+  try {
+    const logDir = path.join(cliDir, 'log');
+    const files = await fs.readdir(logDir);
+    const latestLogs = files.filter(f => f.startsWith('cli-') && f.endsWith('.log')).sort().reverse().slice(0, 2);
+    for (const f of latestLogs) {
+      const ver = await readLogHeadVersionAsync(path.join(logDir, f));
+      if (ver) return ver;
+    }
+  } catch (_) {}
+  return '';
+}
+
+async function statRegularFileAsync(targetPath) {
+  if (!targetPath || typeof targetPath !== 'string') return null;
+  try {
+    const st = await fs.stat(targetPath);
+    if (!st.isFile()) return null;
+    return { path: targetPath, mtimeMs: Math.round(st.mtimeMs), size: st.size };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function persistCliVersionCacheAsync(cachePath, binStat, version) {
+  if (!cachePath || !binStat?.path || !version) return;
+  try {
+    const existing = (await readJsonSafeAsync(cachePath)) || {};
+    const entries = (existing.entries && typeof existing.entries === 'object' && !Array.isArray(existing.entries))
+      ? { ...existing.entries }
+      : {};
+    entries[binStat.path] = {
+      version,
+      mtimeMs: binStat.mtimeMs,
+      size: binStat.size,
+      updatedAt: Date.now()
+    };
+    await writeFileAndVerifyNoBOM(cachePath, JSON.stringify({ entries }, null, 2));
+  } catch (_) {}
+}
+
 async function readAgentApiTargetAsync(binDir, platform) {
   const candidates = platform === 'win32'
     ? ['agentapi.cmd', 'agentapi.bat', 'agentapi']
@@ -278,7 +331,8 @@ async function readAppVersionFromRootAsync(appRoot, platform) {
 
 /**
  * 探測本機已安裝的 Antigravity CLI（`agy`）版本號（支援 macOS / Linux / Windows）。
- * 優先順序：顯式傳入 metaVersion -> PATH `agy --version` -> 常見安裝路徑與 agentapi 指向路徑 -> 確認執行檔存在時退讓讀取 `cli.log`。
+ * 優先順序：顯式傳入 metaVersion -> 環境變數 `ANTIGRAVITY_LS_VERSION=cli-X.Y.Z` ->
+ * 執行檔 `mtimeMs`+`size` 快取 -> PATH `agy --version` -> 候選路徑（僅未在 PATH 找到執行檔時）-> 確認執行檔存在時退讓讀取 `cli.log` / `log/cli-*.log`。
  * @param {object} [options={}]
  * @returns {Promise<{ version: string, tag: string, installed: boolean, source: string }>}
  */
@@ -293,39 +347,37 @@ export async function resolveInstalledCliVersionAsync(options = {}) {
 
   const platform = options.platform || process.platform;
   const homeDir = options.homeDir || os.homedir();
-  const env = options.env || process.env;
-  const execFn = typeof options.execFn === 'function' ? options.execFn : runCmdDetailedAsync;
+  const hasExplicitCliPaths = Array.isArray(options.cliPaths);
+  const hasExplicitEnv = options.env !== undefined;
+  const isDefaultExec = !options.execFn || options.execFn === runCmdDetailedAsync;
+  const env = hasExplicitEnv ? options.env : process.env;
+  const execFn = isDefaultExec ? runCmdDetailedAsync : options.execFn;
+  const allowEnvFastPath = hasExplicitEnv || (!hasExplicitCliPaths && isDefaultExec);
+  const useCache = options.useCache === true || (options.useCache !== false && isDefaultExec);
+  const execTimeoutMs = (typeof options.execTimeoutMs === 'number' && options.execTimeoutMs > 0) ? options.execTimeoutMs : 600;
   const cliBinName = platform === 'win32' ? 'agy.exe' : 'agy';
 
-  let binaryFound = false;
-
-  // 1. 優先嘗試 PATH 上的 agy --version
-  if (options.skipPathLookup !== true) {
-    try {
-      const res = await execFn(`${cliBinName} --version`, {
-        execFile: cliBinName,
-        execArgs: ['--version'],
-        timeout: 600
-      });
-      if (res && !res.notFound) {
-        binaryFound = true;
-      }
-      if (res?.ok && res.stdout) {
-        const ver = parseSemverFromText(res.stdout);
-        if (ver) {
-          return { version: ver, tag: formatVersionTag(ver), installed: true, source: 'path' };
-        }
-      }
-    } catch (_) {}
+  // 快速路徑 1：執行於 Antigravity CLI 內時直接由 ANTIGRAVITY_LS_VERSION=cli-X.Y.Z 零 I/O 取得（排除 hub-*）
+  if (allowEnvFastPath) {
+    const lsVerEnv = typeof env?.ANTIGRAVITY_LS_VERSION === 'string' ? env.ANTIGRAVITY_LS_VERSION.trim() : '';
+    const cliMatch = lsVerEnv.match(/^cli-v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$/i);
+    if (cliMatch) {
+      const norm = normalizeSemver(cliMatch[1]) || cliMatch[1];
+      return { version: norm, tag: formatVersionTag(norm), installed: true, source: 'env' };
+    }
   }
 
-  // 2. 掃描常見安裝路徑與 ~/.gemini/antigravity-cli/bin/agentapi 指向的執行檔（補救 GUI App 缺少 ~/.local/bin PATH）
   const candidateSet = new Set();
-  if (Array.isArray(options.cliPaths)) {
+  if (hasExplicitCliPaths) {
     for (const p of options.cliPaths) {
       if (typeof p === 'string' && p.trim()) candidateSet.add(p.trim());
     }
   } else {
+    const envExe = typeof env?.ANTIGRAVITY_AGENTAPI_EXE === 'string' ? env.ANTIGRAVITY_AGENTAPI_EXE.trim() : '';
+    const pathMod = platform === 'win32' ? path.win32 : path.posix;
+    if (envExe && /^agy(?:\.exe)?$/i.test(pathMod.basename(envExe))) {
+      candidateSet.add(envExe);
+    }
     const agentApiTarget = await readAgentApiTargetAsync(path.join(homeDir, '.gemini', 'antigravity-cli', 'bin'), platform);
     if (agentApiTarget) candidateSet.add(agentApiTarget);
     for (const p of getCliCandidatePaths(homeDir, platform, env)) {
@@ -333,27 +385,94 @@ export async function resolveInstalledCliVersionAsync(options = {}) {
     }
   }
 
-  for (const candidate of candidateSet) {
-    if (!(await fileExistsAsync(candidate))) continue;
-    binaryFound = true;
+  const cachePath = options.cachePath || getCliVersionCachePath(homeDir);
+  let existingBin = null;
+  if (useCache) {
+    for (const candidate of candidateSet) {
+      const st = await statRegularFileAsync(candidate);
+      if (st) {
+        existingBin = st;
+        break;
+      }
+    }
+    if (existingBin) {
+      const cacheData = await readJsonSafeAsync(cachePath);
+      const entry = cacheData?.entries?.[existingBin.path];
+      if (
+        entry &&
+        typeof entry === 'object' &&
+        entry.mtimeMs === existingBin.mtimeMs &&
+        entry.size === existingBin.size &&
+        typeof entry.version === 'string'
+      ) {
+        const cachedVer = normalizeSemver(entry.version);
+        if (cachedVer) {
+          return { version: cachedVer, tag: formatVersionTag(cachedVer), installed: true, source: 'cache' };
+        }
+      }
+    }
+  }
+
+  let binaryFound = Boolean(existingBin);
+  let pathBinaryFound = false;
+
+  // 1. 優先嘗試 PATH 上的 agy --version
+  if (options.skipPathLookup !== true) {
     try {
-      const res = await execFn(`"${candidate}" --version`, {
-        execFile: candidate,
+      const res = await execFn(`${cliBinName} --version`, {
+        execFile: cliBinName,
         execArgs: ['--version'],
-        timeout: 600
+        timeout: execTimeoutMs
       });
+      if (res && !res.notFound) {
+        binaryFound = true;
+        pathBinaryFound = true;
+      }
       if (res?.ok && res.stdout) {
         const ver = parseSemverFromText(res.stdout);
         if (ver) {
-          return { version: ver, tag: formatVersionTag(ver), installed: true, source: candidate };
+          if (useCache && existingBin) {
+            await persistCliVersionCacheAsync(cachePath, existingBin, ver);
+          }
+          return { version: ver, tag: formatVersionTag(ver), installed: true, source: 'path' };
         }
       }
     } catch (_) {}
   }
 
-  // 3. 僅於已確認執行檔存在但 --version 逾時/失敗時，退讓讀取 ~/.gemini/antigravity-cli/cli.log 標頭
+  // 2. 僅於 PATH 未找到執行檔（notFound）或跳過 PATH 查詢時才掃描候選執行檔，避免逾時後重複啟動第二次
+  if (!pathBinaryFound || options.skipPathLookup === true) {
+    for (const candidate of candidateSet) {
+      const st = (existingBin && existingBin.path === candidate)
+        ? existingBin
+        : await statRegularFileAsync(candidate);
+      if (!st) continue;
+      binaryFound = true;
+      try {
+        const res = await execFn(`"${candidate}" --version`, {
+          execFile: candidate,
+          execArgs: ['--version'],
+          timeout: execTimeoutMs
+        });
+        if (res?.ok && res.stdout) {
+          const ver = parseSemverFromText(res.stdout);
+          if (ver) {
+            if (useCache) {
+              await persistCliVersionCacheAsync(cachePath, st, ver);
+            }
+            return { version: ver, tag: formatVersionTag(ver), installed: true, source: candidate };
+          }
+        }
+        if (res && !res.notFound) {
+          break;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 3. 僅於已確認執行檔存在但 --version 逾時/失敗時，退讓讀取 cli.log 或 log/cli-*.log 標頭
   if (binaryFound) {
-    const logVer = await readLogHeadVersionAsync(path.join(homeDir, '.gemini', 'antigravity-cli', 'cli.log'));
+    const logVer = await readLatestCliLogVersionAsync(path.join(homeDir, '.gemini', 'antigravity-cli'));
     if (logVer) {
       return { version: logVer, tag: formatVersionTag(logVer), installed: true, source: 'cli_log' };
     }

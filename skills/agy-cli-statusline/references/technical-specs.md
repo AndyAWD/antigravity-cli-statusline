@@ -87,7 +87,8 @@
    - **跨平台實作**：Linux 優先讀取 `/proc/<pid>/stat` 與 `/proc/<pid>/cmdline`（失敗退回 `ps`）；macOS 呼叫 `ps -ww -o pid=,ppid=,lstart=,ucomm=`（於命中 `agy` 時再查 `args=`）；Windows 呼叫單次 PowerShell `Get-CimInstance Win32_Process`（強制 `windowsHide: true`）。
 3. **快取與離線／失敗處理（`~/.gemini/antigravity/plugin_data/antigravity-cli-statusline/update_cache.json`）**：
    - CLI 與 Antigravity 2.0 共用同一份更新快取檔（CLI 首次讀取時若共用快取尚未建立，會自動相容唯讀遷移舊檔 `~/.gemini/tmp/plugin_update_cache.json`）。
-   - 每個互動式 `agy` 開啟識別僅嘗試查詢一次 `https://github.com/AndyAWD/antigravity-cli-statusline/releases/latest`（透過 HTTP 302 `Location` 標頭解析 `/releases/tag/<tag>`，避開 REST API 速率限制；具備逾時保護並由獨立背景工作行程執行，避免短命狀態列子行程在啟動初期遭取消而中斷寫入）。
+   - 每個互動式 `agy` 開啟識別僅嘗試查詢一次 `https://github.com/AndyAWD/antigravity-cli-statusline/releases/latest`（透過 HTTP 302 `Location` 標頭解析 `/releases/tag/<tag>`，避開 REST API 速率限制；前景僅在總預算內等待最多 `850ms`（預設 `Math.min(850, Math.max(250, 950 - elapsedMs))`，可用 `STATUSLINE_PLUGIN_UPDATE_WAIT_MS` 覆寫），逾時即先行輸出狀態列，由獨立背景工作行程繼續完成查詢並寫入快取）。
+   - `cli-version` 探測優先採用 `meta.version` 與執行中 `ANTIGRAVITY_LS_VERSION=cli-X.Y.Z` 環境變數（零子行程），次之讀取以執行檔 `mtimeMs`＋`size` 驗證之 `~/.gemini/tmp/cli_version_cache.json`，未命中才執行 `agy --version`（單次逾時不重複啟動候選路徑，失敗時退讓讀取 `cli.log` / `log/cli-*.log`）。
    - 請求期間會先記錄 `status: "pending"` 與 5 秒租約，若前次子行程遭異常中斷導致租約逾時，後續刷新可自動接手重試（最多 `MAX_INTERRUPTED_ATTEMPTS = 3` 次）。
    - 若查詢明確完成失敗（離線、逾時、非 200 狀態等），立即將本次 `sessionKey`、`lastSessionStatus: "failed"` 與 `lastError` 寫入快取且保留先前已知的 `latestVersion`，本次開啟期間不再重試，並沿用快取中上次已知的 `latestVersion` 進行比對，待下次重啟 `agy` 時才重新查詢。
 4. **獨立兩行更新提醒排版與空行修剪**：

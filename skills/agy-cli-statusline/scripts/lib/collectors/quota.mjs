@@ -495,7 +495,11 @@ export async function triggerQuotaUpdateIfNeededAsync(cacheInfo, meta = {}, opti
   let freshlyFetchedFromLs = false;
   const cachePath = options?.cachePath || join(os.homedir(), '.gemini', 'tmp', 'real_quota_cache.json');
   const envWait = parseInt(process.env.STATUSLINE_QUOTA_WAIT_MS || '', 10);
-  const waitMs = typeof options?.waitMs === 'number' ? options.waitMs : (!isNaN(envWait) && envWait > 0 ? envWait : 500);
+  const isUrgent = Boolean(options?.missingRequiredBuckets || options?.hasExpiredQuota || !cacheInfo || !lastUpdatedAt);
+  const defaultWaitMs = isUrgent ? 400 : 300;
+  const waitMs = typeof options?.waitMs === 'number'
+    ? options.waitMs
+    : (!isNaN(envWait) && envWait > 0 ? envWait : defaultWaitMs);
 
   try {
     const updaterScript = options?.updaterScript || join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks', 'fetch-local-quota.mjs');

@@ -7,6 +7,7 @@ import {
   deriveAppRootFromLanguageServerPath,
   extractAppVersionFromPackageJson,
   extractExecutableFromAgentApiScript,
+  getCliVersionCachePath,
   parseInfoPlistVersion,
   parseSemverFromText,
   readAsarPackageVersionAsync,
@@ -189,6 +190,169 @@ test('resolveInstalledCliVersionAsync supports meta fast-path, PATH, fallback pa
     });
     assert.equal(uninstalled.installed, false);
     assert.equal(uninstalled.tag, '');
+
+    // 6. ANTIGRAVITY_LS_VERSION=cli-* fast path (zero exec) & hub-* exclusion
+    let fastExecCalls = 0;
+    const fromCliEnv = await resolveInstalledCliVersionAsync({
+      homeDir: tmpDir,
+      env: { ANTIGRAVITY_LS_VERSION: 'cli-1.5.18' },
+      execFn: async () => { fastExecCalls++; return { ok: false, stdout: '', notFound: true }; }
+    });
+    assert.equal(fastExecCalls, 0);
+    assert.equal(fromCliEnv.tag, 'v1.5.18');
+    assert.equal(fromCliEnv.source, 'env');
+
+    const ignoredHubEnv = await resolveInstalledCliVersionAsync({
+      homeDir: tmpDir,
+      env: { ANTIGRAVITY_LS_VERSION: 'hub-2.35.2' },
+      cliPaths: [path.join(tmpDir, 'missing-agy')],
+      skipPathLookup: true,
+      execFn: async () => ({ ok: false, stdout: '', notFound: true })
+    });
+    assert.equal(ignoredHubEnv.installed, false);
+    assert.equal(ignoredHubEnv.tag, '');
+
+    // 7. cli_version_cache.json hit, invalidation on binary change, and uninstalled safety
+    const cacheHome = path.join(tmpDir, 'cache-home');
+    const cachedBin = path.join(cacheHome, '.local', 'bin', 'agy');
+    fs.mkdirSync(path.dirname(cachedBin), { recursive: true });
+    fs.writeFileSync(cachedBin, '#!/bin/sh\necho 1.5.19\n', 'utf8');
+    let cacheProbeCount = 0;
+    const firstProbe = await resolveInstalledCliVersionAsync({
+      homeDir: cacheHome,
+      platform: 'darwin',
+      env: {},
+      cliPaths: [cachedBin],
+      skipPathLookup: true,
+      useCache: true,
+      execFn: async () => {
+        cacheProbeCount++;
+        return { ok: true, stdout: '1.5.19\n', notFound: false };
+      }
+    });
+    assert.equal(firstProbe.tag, 'v1.5.19');
+    assert.equal(cacheProbeCount, 1);
+    assert.equal(fs.existsSync(getCliVersionCachePath(cacheHome)), true);
+
+    const cacheHit = await resolveInstalledCliVersionAsync({
+      homeDir: cacheHome,
+      platform: 'darwin',
+      env: {},
+      cliPaths: [cachedBin],
+      skipPathLookup: true,
+      useCache: true,
+      execFn: async () => {
+        cacheProbeCount++;
+        return { ok: true, stdout: '9.9.9\n', notFound: false };
+      }
+    });
+    assert.equal(cacheHit.tag, 'v1.5.19');
+    assert.equal(cacheHit.source, 'cache');
+    assert.equal(cacheProbeCount, 1, 'Cache hit must not invoke execFn');
+
+    // Modify binary size -> cache invalidated
+    fs.writeFileSync(cachedBin, '#!/bin/sh\necho 1.5.20\n# updated\n', 'utf8');
+    const cacheInvalidated = await resolveInstalledCliVersionAsync({
+      homeDir: cacheHome,
+      platform: 'darwin',
+      env: {},
+      cliPaths: [cachedBin],
+      skipPathLookup: true,
+      useCache: true,
+      execFn: async () => {
+        cacheProbeCount++;
+        return { ok: true, stdout: '1.5.20\n', notFound: false };
+      }
+    });
+    assert.equal(cacheInvalidated.tag, 'v1.5.20');
+    assert.equal(cacheProbeCount, 2);
+
+    // Delete binary -> must not return stale cached version
+    fs.unlinkSync(cachedBin);
+    const cacheAfterUninstall = await resolveInstalledCliVersionAsync({
+      homeDir: cacheHome,
+      platform: 'darwin',
+      env: {},
+      cliPaths: [cachedBin],
+      skipPathLookup: true,
+      useCache: true,
+      execFn: async () => ({ ok: false, stdout: '', notFound: true })
+    });
+    assert.equal(cacheAfterUninstall.installed, false);
+    assert.equal(cacheAfterUninstall.tag, '');
+
+    // 8. PATH timeout must NOT double-run candidate paths and must fall back to log/cli-*.log
+    const logFallbackHome = path.join(tmpDir, 'log-fallback-home');
+    const logBin = path.join(logFallbackHome, '.local', 'bin', 'agy');
+    fs.mkdirSync(path.dirname(logBin), { recursive: true });
+    fs.writeFileSync(logBin, '#!/bin/sh\n', 'utf8');
+    fs.mkdirSync(path.join(logFallbackHome, '.gemini', 'antigravity-cli', 'log'), { recursive: true });
+    fs.writeFileSync(
+      path.join(logFallbackHome, '.gemini', 'antigravity-cli', 'log', 'cli-20261128_010000.log'),
+      'I1128 01:00:00.000000 1 server.go:1] Language server version: 1.5.21\n',
+      'utf8'
+    );
+    let timeoutExecCalls = 0;
+    const fromDatedLog = await resolveInstalledCliVersionAsync({
+      homeDir: logFallbackHome,
+      platform: 'darwin',
+      env: {},
+      cliPaths: [logBin],
+      execFn: async () => {
+        timeoutExecCalls++;
+        return { ok: false, stdout: '', notFound: false };
+      }
+    });
+    assert.equal(timeoutExecCalls, 1, 'PATH timeout must not re-run candidate paths');
+    assert.equal(fromDatedLog.tag, 'v1.5.21');
+    assert.equal(fromDatedLog.source, 'cli_log');
+
+    // 9. Antigravity 2.0 (hub-*) cold cache with PATH missing must still probe candidate path and populate cache
+    const appColdHome = path.join(tmpDir, 'app-cold-home');
+    const appColdBin = path.join(appColdHome, '.local', 'bin', 'agy');
+    fs.mkdirSync(path.dirname(appColdBin), { recursive: true });
+    fs.writeFileSync(appColdBin, '#!/bin/sh\necho 1.5.22\n', 'utf8');
+    let appColdCalls = 0;
+    const appColdRes = await resolveInstalledCliVersionAsync({
+      homeDir: appColdHome,
+      platform: 'darwin',
+      env: { ANTIGRAVITY_LS_VERSION: 'hub-2.35.2' },
+      useCache: true,
+      execFn: async (_cmd, opts) => {
+        appColdCalls++;
+        if (opts?.execFile === 'agy') return { ok: false, stdout: '', notFound: true };
+        if (opts?.execFile === appColdBin) return { ok: true, stdout: '1.5.22\n', notFound: false };
+        return { ok: false, stdout: '', notFound: true };
+      }
+    });
+    assert.equal(appColdRes.tag, 'v1.5.22');
+    assert.equal(appColdRes.source, appColdBin);
+    assert.equal(appColdCalls, 2, 'PATH notFound must fall through to candidate path even when binary exists on disk');
+    assert.equal(fs.existsSync(getCliVersionCachePath(appColdHome)), true);
+
+    const appWarmRes = await resolveInstalledCliVersionAsync({
+      homeDir: appColdHome,
+      platform: 'darwin',
+      env: { ANTIGRAVITY_LS_VERSION: 'hub-2.35.2' },
+      useCache: true,
+      execFn: async () => { appColdCalls++; return { ok: false, stdout: '', notFound: true }; }
+    });
+    assert.equal(appWarmRes.tag, 'v1.5.22');
+    assert.equal(appWarmRes.source, 'cache');
+    assert.equal(appColdCalls, 2, 'Warm cache hit must skip execFn');
+
+    // 10. Win32 backslash ANTIGRAVITY_AGENTAPI_EXE basename parsing on any host
+    const winEnvRes = await resolveInstalledCliVersionAsync({
+      homeDir: tmpDir,
+      platform: 'win32',
+      env: { ANTIGRAVITY_AGENTAPI_EXE: 'C:\\Users\\Dev\\AppData\\Local\\agy\\bin\\agy.exe' },
+      useCache: false,
+      execFn: async (_cmd, opts) => {
+        if (opts?.execFile === 'agy.exe') return { ok: true, stdout: '1.5.23\n', notFound: false };
+        return { ok: false, stdout: '', notFound: true };
+      }
+    });
+    assert.equal(winEnvRes.tag, 'v1.5.23');
   } finally {
     rmRfSync(tmpDir);
   }

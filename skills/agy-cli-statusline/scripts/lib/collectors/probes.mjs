@@ -237,7 +237,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
   const tokenBarVal = renderBarGraph(tokenPct, barLength, tokenColor);
 
   const projectPath = resolveProjectPath(meta);
-  const projectName = basename(projectPath);
+  const projectName = basename(projectPath) || projectPath;
   const projectFullPath = projectPath;
 
   // Account
@@ -280,6 +280,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     ...(options?.cliPaths ? { cliPaths: options.cliPaths } : {}),
     ...(options?.appPaths ? { appPaths: options.appPaths } : {}),
     ...(options?.skipPathLookup !== undefined ? { skipPathLookup: options.skipPathLookup } : {}),
+    execTimeoutMs: options?.cliExecTimeoutMs ?? 450,
     execFn
   };
   const shouldProbeCliVersion = !options?.cliVersion && !rawMetaCliVersion && hasFooterItem('cli-version') && options?.skipVersionProbes !== true;
@@ -364,7 +365,7 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
     // 5. 背景任務數
     !hasFooterItem('background-tasks')
       ? Promise.resolve(0)
-      : getMetricValueAsync(
+      : withTimeout(getMetricValueAsync(
           meta,
           ['background_tasks', 'background_tasks_count', 'task_count', 'background_jobs'],
           countersCachePath,
@@ -388,12 +389,12 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
               return 0;
             }
           }
-        ),
+        ), 300, 0),
 
     // 6. 活躍子代理數
     !hasFooterItem('subagents')
       ? Promise.resolve(0)
-      : getMetricValueAsync(
+      : withTimeout(getMetricValueAsync(
           subagentsMeta,
           ['subagents', 'subagents_count', 'active_subagents'],
           countersCachePath,
@@ -424,12 +425,12 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
               return 0;
             }
           }
-        ),
+        ), 300, 0),
 
     // 7. 產出檔案數
     !hasFooterItem('artifacts')
       ? Promise.resolve(0)
-      : getMetricValueAsync(
+      : withTimeout(getMetricValueAsync(
           meta,
           ['artifacts', 'artifacts_count', 'artifact_count'],
           countersCachePath,
@@ -447,17 +448,17 @@ export async function extractMetricsAsync(meta, lang, fallbackModel, cache, cach
             }
             return 0;
           }
-        ),
+        ), 300, 0),
 
     // 8. Antigravity CLI 版本號（僅在缺少 meta.version 且啟用 cli-version 時探測）
     !shouldProbeCliVersion
       ? Promise.resolve({ tag: '' })
-      : withTimeout(resolveInstalledCliVersionAsync(versionProbeOpts), 800, { tag: '' }),
+      : withTimeout(resolveInstalledCliVersionAsync(versionProbeOpts), 500, { tag: '' }),
 
     // 9. Antigravity 2.0 應用程式版本號（僅在啟用 app-version 時以純檔案探測）
     !shouldProbeAppVersion
       ? Promise.resolve({ tag: '' })
-      : withTimeout(resolveInstalledAppVersionAsync(versionProbeOpts), 800, { tag: '' }),
+      : withTimeout(resolveInstalledAppVersionAsync(versionProbeOpts), 400, { tag: '' }),
 
     // 10. Orchestrator 實際執行模型（僅在啟用 active-model 時探測）
     withTimeout(activeModelPromise, 400, { isOrchestrator: false, modelName: '', rawModel: '', role: 'none', source: '' })

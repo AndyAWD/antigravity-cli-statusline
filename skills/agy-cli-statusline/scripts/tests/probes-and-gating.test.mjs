@@ -174,6 +174,13 @@ async function main() {
       assert.strictEqual(metaSubagents.subagents, rawSubagents, 'meta.subagents must not be reassigned');
       assert.strictEqual(rawSubagents.length, 4, 'meta.subagents entries must not be removed');
 
+      // project.path === '/' must fall back to '/' instead of empty basename('')
+      const rootMetrics = await extractMetricsAsync(
+        { ...metaR34, project: { path: '/' } }, 'us', 'Gemini 3.5 Flash', null, {}, quotaInfoR34, ctxInfoR34, quotaInfoR34,
+        { footerItems: ['project-path'] }
+      );
+      assert.strictEqual(rootMetrics.projectName, '/', 'Root path projectName must fall back to "/"');
+
       // 3. Enabled real probes & E2E output stay unchanged
       const allProbeItems = [
         'model-name', 'git-branch', 'vcs-dirty', 'memory-usage',

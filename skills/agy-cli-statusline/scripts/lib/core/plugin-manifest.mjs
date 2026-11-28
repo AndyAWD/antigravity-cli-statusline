@@ -98,6 +98,12 @@ export async function readPluginManifestFromDirAsync(dirPath, requireExplicitNam
     const parsed = await readJsonSafeAsync(manifestPath);
     const info = extractManifestInfo(parsed, fileName, manifestPath, requireExplicitName);
     if (info) return info;
+    if (fileName === 'plugin.json' && parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const manifestName = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+      if (manifestName && manifestName !== PLUGIN_PACKAGE_NAME) {
+        return null;
+      }
+    }
   }
   return null;
 }
@@ -115,6 +121,12 @@ export function readPluginManifestFromDirSync(dirPath, requireExplicitName = fal
     const parsed = readJsonSafeSync(manifestPath);
     const info = extractManifestInfo(parsed, fileName, manifestPath, requireExplicitName);
     if (info) return info;
+    if (fileName === 'plugin.json' && parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const manifestName = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+      if (manifestName && manifestName !== PLUGIN_PACKAGE_NAME) {
+        return null;
+      }
+    }
   }
   return null;
 }
